@@ -1,0 +1,89 @@
+/* ═══════════════════════════════════════════════════════
+   STEMNEST ACADEMY — LOGIN PAGE STYLES (login.css)
+═══════════════════════════════════════════════════════ */
+
+.login-page-wrap   { display: flex; min-height: calc(100vh - 70px); }
+
+/* ── LEFT FORM PANEL ── */
+.form-panel  { flex: 1; display: flex; align-items: center; justify-content: center; padding: 60px 5%; background: var(--white); }
+.form-box    { width: 100%; max-width: 420px; }
+
+/* ── ROLE SWITCHER ── */
+.role-switcher { display: flex; background: var(--bg); border-radius: 50px; padding: 5px; margin-bottom: 36px; border: 1.5px solid #e8eaf0; }
+.role-btn      { flex: 1; padding: 11px 16px; border-radius: 50px; border: none; cursor: pointer; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 15px; background: transparent; color: var(--light); transition: all .25s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.role-btn.active-tutor   { background: var(--blue); color: #fff; box-shadow: 0 4px 14px rgba(26,86,219,.3); }
+.role-btn.active-student { background: var(--green); color: #fff; box-shadow: 0 4px 14px rgba(14,159,110,.3); }
+
+/* ── FORM WELCOME TEXT ── */
+.form-welcome  { margin-bottom: 28px; }
+.form-eyebrow  { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; padding: 5px 14px; border-radius: 50px; margin-bottom: 14px; }
+.eyebrow-tutor   { background: var(--blue-light); color: var(--blue); }
+.eyebrow-student { background: var(--green-light); color: var(--green-dark); }
+.form-title    { font-family: 'Fredoka One', cursive; font-size: 32px; color: var(--dark); line-height: 1.2; margin-bottom: 8px; }
+.form-sub      { font-size: 15px; color: var(--light); line-height: 1.6; }
+
+/* ── LOGIN FIELDS ── */
+.login-field   { margin-bottom: 18px; }
+.login-field label { display: block; font-size: 13px; font-weight: 800; color: var(--mid); margin-bottom: 7px; text-transform: uppercase; letter-spacing: .4px; }
+.input-wrap    { position: relative; }
+.input-wrap .input-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 17px; pointer-events: none; }
+.login-field input { width: 100%; padding: 13px 14px 13px 44px; border: 2px solid #e8eaf0; border-radius: 14px; font-family: 'Nunito', sans-serif; font-size: 15px; font-weight: 600; color: var(--dark); background: var(--white); outline: none; transition: border-color .2s, box-shadow .2s; }
+.login-field input:focus       { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(26,86,219,.08); }
+.login-field input.focus-green:focus { border-color: var(--green); box-shadow: 0 0 0 4px rgba(14,159,110,.08); }
+.field-row     { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
+.forgot        { font-size: 13px; font-weight: 800; color: var(--blue); text-decoration: none; }
+.forgot:hover  { text-decoration: underline; }
+.pw-toggle     { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 17px; color: var(--light); padding: 4px; transition: color .2s; }
+.pw-toggle:hover { color: var(--dark); }
+
+/* ── REMEMBER ME ── */
+.remember      { display: flex; align-items: center; gap: 10px; margin-bottom: 26px; }
+.remember input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--blue); cursor: pointer; }
+.remember label { font-size: 14px; font-weight: 700; color: var(--mid); cursor: pointer; }
+
+/* ── LOGIN BUTTON ── */
+.login-btn     { width: 100%; padding: 15px; border-radius: 50px; border: none; font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 16px; cursor: pointer; transition: transform .15s, box-shadow .15s; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 20px; color: #fff; }
+.login-btn:hover { transform: translateY(-2px); }
+.btn-tutor-login   { background: var(--blue); box-shadow: 0 6px 20px rgba(26,86,219,.35); }
+.btn-tutor-login:hover   { box-shadow: 0 8px 26px rgba(26,86,219,.45); }
+.btn-student-login { background: var(--green); box-shadow: 0 6px 20px rgba(14,159,110,.35); }
+.btn-student-login:hover { box-shadow: 0 8px 26px rgba(14,159,110,.45); }
+
+/* ── DIVIDER ── */
+.divider       { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+.divider-line  { flex: 1; height: 1px; background: #e8eaf0; }
+.divider span  { font-size: 12px; font-weight: 800; color: var(--light); }
+
+/* ── CTA LINK ── */
+.trial-link    { display: flex; align-items: center; justify-content: center; background: var(--bg); border: 1.5px dashed #c3d4f5; border-radius: 14px; padding: 14px; font-size: 14px; font-weight: 700; color: var(--mid); text-decoration: none; transition: .2s; gap: 8px; cursor: pointer; }
+.trial-link:hover { border-color: var(--orange); background: var(--orange-light); color: var(--orange); }
+
+/* ── TRUST ROW ── */
+.trust-row-login  { display: flex; justify-content: center; gap: 20px; margin-top: 28px; flex-wrap: wrap; }
+.trust-item-login { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; color: var(--light); }
+
+/* ── RIGHT BRAND PANEL ── */
+.brand-panel   { width: 480px; flex-shrink: 0; position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 48px; transition: background .4s; }
+.brand-panel.panel-tutor   { background: linear-gradient(150deg, #1140b0 0%, #1a56db 50%, #2563eb 100%); }
+.brand-panel.panel-student { background: linear-gradient(150deg, #065f46 0%, #0e9f6e 50%, #10b981 100%); }
+.panel-orb     { position: absolute; border-radius: 50%; pointer-events: none; }
+.orb1          { width: 350px; height: 350px; top: -100px; right: -80px; background: rgba(255,255,255,.06); }
+.orb2          { width: 250px; height: 250px; bottom: -60px; left: -60px; background: rgba(255,255,255,.05); }
+.panel-content { position: relative; z-index: 1; text-align: center; }
+.panel-icon    { width: 80px; height: 80px; background: rgba(255,255,255,.15); border-radius: 24px; display: flex; align-items: center; justify-content: center; font-size: 38px; margin: 0 auto 24px; border: 2px solid rgba(255,255,255,.2); }
+.panel-title   { font-family: 'Fredoka One', cursive; font-size: 32px; color: #fff; margin-bottom: 14px; line-height: 1.2; }
+.panel-sub     { font-size: 15px; color: rgba(255,255,255,.75); line-height: 1.7; margin-bottom: 36px; max-width: 320px; }
+.panel-cards   { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 300px; margin: 0 auto; }
+.pcard         { background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.22); border-radius: 16px; padding: 14px 18px; backdrop-filter: blur(6px); display: flex; align-items: center; gap: 14px; animation: floatCard 4s ease-in-out infinite; }
+.pcard:nth-child(2) { animation-delay: 1.2s; }
+.pcard:nth-child(3) { animation-delay: 2.4s; }
+.pcard-icon    { font-size: 26px; flex-shrink: 0; }
+.pcard-title   { font-weight: 800; font-size: 14px; color: #fff; }
+.pcard-sub     { font-size: 12px; color: rgba(255,255,255,.65); font-weight: 700; margin-top: 2px; }
+.panel-footer-login { position: absolute; bottom: 24px; left: 0; right: 0; text-align: center; font-size: 12px; color: rgba(255,255,255,.5); font-weight: 700; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 900px) {
+  .brand-panel { display: none; }
+  .form-panel  { padding: 40px 6%; }
+}

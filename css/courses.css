@@ -1,0 +1,107 @@
+/* ═══════════════════════════════════════════════════════
+   STEMNEST ACADEMY — COURSES PAGE STYLES (courses.css)
+═══════════════════════════════════════════════════════ */
+
+/* ── PAGE HERO ── */
+.page-hero {
+  background: linear-gradient(150deg, #e8f0fd 0%, #e3f8f1 60%, #fff1eb 100%);
+  padding: 60px 5% 50px; text-align: center; position: relative; overflow: hidden;
+}
+.page-hero::before {
+  content: ''; position: absolute; top: -80px; right: -80px; width: 350px; height: 350px;
+  background: radial-gradient(circle, rgba(26,86,219,.07) 0%, transparent 70%); border-radius: 50%;
+}
+.breadcrumb   { font-size: 13px; font-weight: 700; color: var(--light); margin-bottom: 16px; }
+.breadcrumb a { color: var(--blue); text-decoration: none; }
+.breadcrumb a:hover { text-decoration: underline; }
+.page-hero h1 { font-family: 'Fredoka One', cursive; font-size: clamp(34px, 5vw, 56px); color: var(--dark); line-height: 1.15; margin-bottom: 14px; }
+.page-hero p  { font-size: 17px; color: var(--mid); max-width: 520px; margin: 0 auto 28px; line-height: 1.7; }
+.hero-stats   { display: flex; gap: 28px; justify-content: center; flex-wrap: wrap; }
+.hstat        { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 800; color: var(--mid); }
+.hstat-icon   { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.hi-b { background: var(--blue-light); }
+.hi-g { background: var(--green-light); }
+.hi-o { background: var(--orange-light); }
+
+/* ── FILTER BAR ── */
+.filter-bar {
+  background: var(--white); padding: 20px 5%;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;
+  border-bottom: 1.5px solid #e8eaf0;
+  position: sticky; top: 70px; z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,.04);
+}
+.filter-tabs    { display: flex; gap: 8px; flex-wrap: wrap; }
+.filter-tab     { padding: 8px 20px; border-radius: 50px; font-weight: 800; font-size: 14px; cursor: pointer; border: 2px solid transparent; transition: .2s; background: var(--bg); color: var(--mid); }
+.filter-tab:hover  { border-color: var(--blue); color: var(--blue); }
+.filter-tab.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+.filter-right   { display: flex; align-items: center; gap: 12px; }
+.sort-select    { padding: 8px 14px; border-radius: 10px; border: 2px solid #e8eaf0; font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 13px; color: var(--mid); background: var(--white); cursor: pointer; outline: none; }
+.course-count   { font-size: 13px; font-weight: 700; color: var(--light); }
+.count-num      { color: var(--blue); font-weight: 900; }
+
+/* ── COURSE GRID ── */
+.courses-wrap { padding: 40px 5% 80px; }
+.courses-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px; }
+
+/* ── COURSE CARD ── */
+.course-card {
+  background: var(--white); border-radius: 20px; overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0,0,0,.06); border: 1.5px solid transparent;
+  transition: transform .25s, box-shadow .25s, border-color .25s;
+  position: relative; display: flex; flex-direction: column;
+}
+.course-card:hover { transform: translateY(-6px); box-shadow: 0 14px 40px rgba(0,0,0,.12); }
+.card-banner  { height: 160px; display: flex; align-items: center; justify-content: center; font-size: 64px; position: relative; overflow: hidden; flex-shrink: 0; }
+.badge-popular { position: absolute; top: 14px; left: 14px; background: var(--orange); color: #fff; font-size: 11px; font-weight: 900; padding: 5px 12px; border-radius: 50px; text-transform: uppercase; letter-spacing: .5px; }
+.badge-new    { position: absolute; top: 14px; left: 14px; background: var(--green); color: #fff; font-size: 11px; font-weight: 900; padding: 5px 12px; border-radius: 50px; text-transform: uppercase; letter-spacing: .5px; }
+.card-body    { padding: 22px; flex: 1; display: flex; flex-direction: column; }
+.card-meta-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.subject-tag  { font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: .5px; padding: 4px 12px; border-radius: 50px; }
+.tag-b        { background: var(--blue-light); color: var(--blue-dark); }
+.tag-g        { background: var(--green-light); color: var(--green-dark); }
+.tag-o        { background: var(--orange-light); color: var(--orange-dark); }
+.tag-p        { background: var(--purple-light); color: var(--purple); }
+.age-pill     { font-size: 11px; font-weight: 800; color: var(--light); background: var(--bg); padding: 4px 10px; border-radius: 50px; }
+.card-title   { font-family: 'Fredoka One', cursive; font-size: 22px; color: var(--dark); margin-bottom: 8px; line-height: 1.2; }
+.card-desc    { font-size: 13px; color: var(--light); line-height: 1.6; margin-bottom: 16px; flex: 1; }
+.card-stats   { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+.cstat        { background: var(--bg); border-radius: 10px; padding: 10px 8px; text-align: center; }
+.cstat-val    { font-family: 'Fredoka One', cursive; font-size: 18px; color: var(--dark); line-height: 1; }
+.cstat-label  { font-size: 10px; font-weight: 800; color: var(--light); text-transform: uppercase; letter-spacing: .3px; margin-top: 3px; }
+.card-rating  { display: flex; align-items: center; gap: 6px; margin-bottom: 16px; }
+.stars        { color: #f59e0b; font-size: 13px; letter-spacing: 1px; }
+.rating-val   { font-weight: 900; font-size: 14px; color: var(--dark); }
+.rating-count { font-size: 12px; color: var(--light); font-weight: 700; }
+.card-footer  { display: flex; align-items: center; justify-content: space-between; padding-top: 16px; border-top: 1.5px solid var(--bg); }
+.course-price { font-family: 'Fredoka One', cursive; font-size: 26px; color: var(--blue); }
+.price-note   { font-size: 11px; font-weight: 700; color: var(--light); margin-top: 1px; }
+.enroll-btn   { padding: 10px 20px; border-radius: 50px; background: var(--orange); color: #fff; border: none; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 13px; cursor: pointer; transition: transform .15s, box-shadow .15s; box-shadow: 0 4px 14px rgba(255,107,53,.3); }
+.enroll-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(255,107,53,.4); }
+
+/* ── ADD COURSE CARD ── */
+.add-course-card {
+  background: var(--white); border-radius: 20px; border: 2px dashed #c3d4f5;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 40px 24px; cursor: pointer; transition: .2s; min-height: 420px;
+}
+.add-course-card:hover { border-color: var(--blue); background: var(--blue-light); }
+.add-icon    { width: 60px; height: 60px; background: var(--blue-light); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; margin-bottom: 16px; transition: .2s; }
+.add-course-card:hover .add-icon { background: var(--blue); color: #fff; }
+.add-title   { font-family: 'Fredoka One', cursive; font-size: 20px; color: var(--blue); margin-bottom: 8px; }
+.add-sub     { font-size: 13px; color: var(--light); text-align: center; line-height: 1.6; }
+.no-results  { grid-column: 1 / -1; text-align: center; padding: 60px 20px; }
+.no-results p { font-size: 16px; font-weight: 700; color: var(--light); }
+
+/* ── ADD COURSE MODAL ── */
+.emoji-grid  { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; margin-top: 6px; }
+.emoji-opt   { width: 100%; aspect-ratio: 1; border-radius: 10px; border: 2px solid #e8eaf0; background: var(--bg); font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: .2s; }
+.emoji-opt:hover, .emoji-opt.selected { border-color: var(--blue); background: var(--blue-light); }
+.color-grid  { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+.color-opt   { width: 36px; height: 36px; border-radius: 10px; cursor: pointer; border: 3px solid transparent; transition: .2s; }
+.color-opt:hover, .color-opt.selected { border-color: var(--dark); transform: scale(1.1); }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 600px) {
+  .filter-bar  { flex-direction: column; align-items: flex-start; }
+}

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Courses – StemNest Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/courses.css">
+</head>
+<body>
+
+<!-- ═══ NAVBAR ═══ -->
+<nav>
+  <a class="logo" href="../index.html">
+    <div class="logo-icon">S</div>
+    <div class="logo-text">StemNest<span>Academy</span></div>
+  </a>
+  <ul class="nav-links">
+    <li><a href="../index.html"   data-page="home">Home</a></li>
+    <li><a href="courses.html"    data-page="courses" class="active">Courses</a></li>
+    <li><a href="../index.html#how"      data-page="">How It Works</a></li>
+    <li><a href="../index.html#teachers" data-page="">Tutors</a></li>
+    <li><a href="../index.html#reviews"  data-page="">Reviews</a></li>
+  </ul>
+  <div class="nav-actions">
+    <a href="login.html"         class="btn btn-outline">Log In</a>
+    <a href="../index.html#cta"  class="btn btn-primary">Book Free Trial ✦</a>
+  </div>
+</nav>
+
+<!-- ═══ PAGE HERO ═══ -->
+<div class="page-hero">
+  <div class="breadcrumb"><a href="../index.html">Home</a> › Courses</div>
+  <h1>Our Courses 📚</h1>
+  <p>Expert 1-on-1 programmes in Coding, Maths and Sciences — crafted for every learner from age 7 to 19.</p>
+  <div class="hero-stats">
+    <div class="hstat"><div class="hstat-icon hi-b">💻</div>Live 1-on-1 Sessions</div>
+    <div class="hstat"><div class="hstat-icon hi-g">📊</div>Progress Tracked</div>
+    <div class="hstat"><div class="hstat-icon hi-o">🏆</div>UK-Certified Tutors</div>
+  </div>
+</div>
+
+<!-- ═══ FILTER BAR ═══ -->
+<div class="filter-bar">
+  <div class="filter-tabs" id="filterTabs">
+    <div class="filter-tab active" data-filter="all">All Courses</div>
+    <div class="filter-tab" data-filter="coding">💻 Coding</div>
+    <div class="filter-tab" data-filter="maths">📐 Maths</div>
+    <div class="filter-tab" data-filter="sciences">🔬 Sciences</div>
+  </div>
+  <div class="filter-right">
+    <span class="course-count">Showing <span class="count-num" id="countNum">0</span> courses</span>
+    <select class="sort-select" id="sortSelect">
+      <option value="default">Sort: Default</option>
+      <option value="price-low">Price: Low to High</option>
+      <option value="price-high">Price: High to Low</option>
+      <option value="rating">Highest Rated</option>
+      <option value="popular">Most Popular</option>
+    </select>
+  </div>
+</div>
+
+<!-- ═══ COURSES GRID ═══ -->
+<div class="courses-wrap">
+  <div class="courses-grid" id="coursesGrid"></div>
+</div>
+
+<!-- ═══ ADD COURSE MODAL ═══ -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">➕ Add New Course</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field form-full"><label>Course Name *</label><input type="text" id="f-name" placeholder="e.g. Python for Beginners"></div>
+        <div class="field form-full"><label>Short Description *</label><textarea id="f-desc" placeholder="Briefly describe what students will learn..."></textarea></div>
+        <div class="field"><label>Subject *</label>
+          <select id="f-subject">
+            <option value="coding">💻 Coding</option>
+            <option value="maths">📐 Maths</option>
+            <option value="sciences">🔬 Sciences</option>
+          </select>
+        </div>
+        <div class="field"><label>Age Range</label><input type="text" id="f-age" placeholder="e.g. Ages 10–14"></div>
+        <div class="field"><label>Price (£/month) *</label><input type="number" id="f-price" placeholder="e.g. 120" min="0"></div>
+        <div class="field"><label>Number of Classes</label><input type="number" id="f-classes" placeholder="e.g. 20" min="1"></div>
+        <div class="field"><label>Rating (1–5)</label><input type="number" id="f-rating" placeholder="e.g. 4.8" min="1" max="5" step="0.1"></div>
+        <div class="field"><label>Students Enrolled</label><input type="number" id="f-students" placeholder="e.g. 85" min="0"></div>
+        <div class="form-divider form-full"></div>
+        <div class="field form-full"><label>Course Icon</label><div class="emoji-grid" id="emojiGrid"></div></div>
+        <div class="field form-full"><label>Card Accent Colour</label><div class="color-grid" id="colorGrid"></div></div>
+        <div class="field form-full"><label>Badge (optional)</label>
+          <select id="f-badge">
+            <option value="">None</option>
+            <option value="popular">🔥 Popular</option>
+            <option value="new">✨ New</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveCourse()">Save Course ✦</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/utils.js"></script>
+<script src="../js/courses.js"></script>
+</body>
+</html>

@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tutor Dashboard – StemNest Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/dashboard.css">
+  <style>
+    /* Calendar full grid */
+    .cal-full { background: var(--white); border-radius: 20px; padding: 24px; box-shadow: 0 2px 16px rgba(0,0,0,.06); margin-bottom: 32px; }
+    .cal-full-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .cal-month-label { font-family: 'Fredoka One', cursive; font-size: 20px; color: var(--dark); }
+    .cal-nav-btn { width: 36px; height: 36px; border-radius: 10px; border: 2px solid #e8eaf0; background: var(--bg); cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: .2s; }
+    .cal-nav-btn:hover { border-color: var(--blue); background: var(--blue-light); }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+    .cal-day-label { text-align: center; font-size: 11px; font-weight: 900; color: var(--light); text-transform: uppercase; padding: 8px 0; }
+    .cal-grid .cal-day { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 10px; font-weight: 700; font-size: 14px; color: var(--dark); background: var(--bg); border: 1.5px solid transparent; cursor: pointer; transition: .2s; width: auto; }
+    .cal-grid .cal-day:hover { border-color: var(--blue); }
+    .cal-grid .cal-day.today { background: var(--blue); color: #fff; border-color: var(--blue); }
+    .cal-grid .cal-day.has-session { border-color: var(--green); position: relative; }
+    .cal-grid .cal-day.has-session::after { content: ''; position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: var(--green); }
+    .cal-grid .cal-day.other-month { color: var(--light); opacity: .5; }
+  </style>
+</head>
+<body>
+
+<!-- ═══ TOP NAV (minimal — dashboard has sidebar) ═══ -->
+<nav style="position:sticky;top:0;z-index:200;">
+  <a class="logo" href="../index.html">
+    <div class="logo-icon">S</div>
+    <div class="logo-text">StemNest<span>Academy</span></div>
+  </a>
+  <ul class="nav-links">
+    <li><a href="../index.html">← Back to Website</a></li>
+  </ul>
+  <div class="nav-actions">
+    <span style="font-size:13px;font-weight:700;color:var(--light);">
+      <span class="live-dot"></span> Sarah Rahman — Online
+    </span>
+    <a href="login.html" class="btn btn-outline" style="font-size:13px;padding:8px 18px;">Log Out</a>
+  </div>
+</nav>
+
+<!-- ═══ DASHBOARD LAYOUT ═══ -->
+<div class="dash-wrap">
+
+  <!-- SIDEBAR -->
+  <div class="dash-sidebar">
+    <div class="sidebar-profile">
+      <div class="sidebar-avatar">SR</div>
+      <div class="sidebar-name">Sarah Rahman</div>
+      <div class="sidebar-role">Coding Tutor</div>
+      <div class="sidebar-status"><span class="live-dot"></span> Online</div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="sidebar-section-label">Main</div>
+      <a class="sidebar-link active" data-tab="overview"  onclick="showDashTab('overview')"><span class="sl-icon">🏠</span> Overview</a>
+      <a class="sidebar-link"        data-tab="sessions"  onclick="showDashTab('sessions')"><span class="sl-icon">📡</span> Live Sessions <span class="sl-badge">2</span></a>
+      <a class="sidebar-link"        data-tab="projects"  onclick="showDashTab('projects')"><span class="sl-icon">📁</span> Student Projects <span class="sl-badge">5</span></a>
+      <a class="sidebar-link"        data-tab="calendar"  onclick="showDashTab('calendar')"><span class="sl-icon">📅</span> Calendar</a>
+      <div class="sidebar-section-label">Account</div>
+      <a class="sidebar-link" onclick="openProfileModal()"><span class="sl-icon">👤</span> Update Profile</a>
+      <a class="sidebar-link" href="../index.html"><span class="sl-icon">🌐</span> Back to Website</a>
+    </div>
+    <div class="sidebar-bottom">
+      <button class="logout-btn" onclick="window.location.href='login.html'">🚪 Log Out</button>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div class="dash-main">
+
+    <!-- Top bar -->
+    <div class="dash-topbar">
+      <div>
+        <div class="dash-greeting"><span id="greetingTime">Good morning ☀️</span>, <span>Sarah</span> 👋</div>
+        <div class="dash-date" id="dashDate"></div>
+      </div>
+      <div class="dash-top-actions">
+        <button class="btn btn-outline" onclick="openProfileModal()">👤 My Profile</button>
+        <button class="btn btn-primary" onclick="showDashTab('sessions')">📡 Start Session</button>
+      </div>
+    </div>
+
+    <!-- Stat cards -->
+    <div class="dash-stats">
+      <div class="dstat ds-blue"><div class="dstat-icon di-blue">📡</div><div class="dstat-val">4</div><div class="dstat-label">Sessions Today</div><div class="dstat-trend trend-up">↑ 1 more than yesterday</div></div>
+      <div class="dstat ds-green"><div class="dstat-icon di-green">👩‍🎓</div><div class="dstat-val">18</div><div class="dstat-label">Active Students</div><div class="dstat-trend trend-up">↑ 2 new this week</div></div>
+      <div class="dstat ds-orange"><div class="dstat-icon di-orange">📁</div><div class="dstat-val">5</div><div class="dstat-label">Projects to Review</div><div class="dstat-trend trend-neutral">Awaiting your feedback</div></div>
+      <div class="dstat ds-purple"><div class="dstat-icon di-purple">⭐</div><div class="dstat-val">4.9</div><div class="dstat-label">Your Rating</div><div class="dstat-trend trend-up">↑ From 48 reviews</div></div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="dash-section-header">
+      <div class="dash-section-title">Quick Actions</div>
+    </div>
+    <div class="quick-actions" id="quickActions">
+      <div class="qa-btn qa-blue"   onclick="showDashTab('sessions')"><div class="qa-icon qi-blue">📡</div><div><div class="qa-label">Manage Sessions</div><div class="qa-sub">Start, join or reschedule</div></div></div>
+      <div class="qa-btn qa-orange" onclick="showDashTab('projects')"><div class="qa-icon qi-orange">📁</div><div><div class="qa-label">Student Projects</div><div class="qa-sub">5 submissions waiting</div></div></div>
+      <div class="qa-btn qa-green"  onclick="showDashTab('calendar')"><div class="qa-icon qi-green">📅</div><div><div class="qa-label">Calendar</div><div class="qa-sub">View your full schedule</div></div></div>
+      <div class="qa-btn qa-purple" onclick="openProfileModal()"><div class="qa-icon qi-purple">👤</div><div><div class="qa-label">Update Profile</div><div class="qa-sub">Bio, subjects & photo</div></div></div>
+    </div>
+
+    <!-- ── TAB: OVERVIEW ── -->
+    <div id="tab-overview">
+      <div class="dash-grid-2">
+        <!-- Sessions -->
+        <div class="dash-panel">
+          <div class="dash-section-header">
+            <div class="dash-section-title">📡 Today's Sessions</div>
+            <a class="dash-section-link" onclick="showDashTab('sessions')">See all →</a>
+          </div>
+          <div class="session-list">
+            <div class="session-item"><div class="sess-time"><div class="sess-time-val">9:00</div><div class="sess-time-label">AM</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">James Okafor</div><div class="sess-subject">Python · Year 9</div></div><span class="sess-badge sb-done">Done</span></div>
+            <div class="session-item live"><div class="sess-time"><div class="sess-time-val">11:00</div><div class="sess-time-label">AM</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">Aisha Taiwo</div><div class="sess-subject">Web Dev · Year 11</div></div><span class="sess-badge sb-live">🔴 Live</span><button class="join-btn">Join →</button></div>
+            <div class="session-item"><div class="sess-time"><div class="sess-time-val">2:00</div><div class="sess-time-label">PM</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">Marcus Kofi</div><div class="sess-subject">Scratch · Year 5</div></div><span class="sess-badge sb-upcoming">Upcoming</span></div>
+            <div class="session-item"><div class="sess-time"><div class="sess-time-val">4:30</div><div class="sess-time-label">PM</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">Emeka Sule</div><div class="sess-subject">A-Level CS · Year 13</div></div><span class="sess-badge sb-upcoming">Upcoming</span></div>
+          </div>
+        </div>
+        <!-- Projects -->
+        <div class="dash-panel">
+          <div class="dash-section-header">
+            <div class="dash-section-title">📁 Projects to Review</div>
+            <a class="dash-section-link" onclick="showDashTab('projects')">See all →</a>
+          </div>
+          <div class="project-list">
+            <div class="project-item"><div class="proj-emoji">🎮</div><div class="proj-info"><div class="proj-name">Snake Game in Python</div><div class="proj-student">James Okafor · Year 9</div></div><span class="proj-badge pb-new">New</span><button class="review-btn">Review →</button></div>
+            <div class="project-item"><div class="proj-emoji">🌐</div><div class="proj-info"><div class="proj-name">Personal Portfolio</div><div class="proj-student">Daniel Ferreira · Year 11</div></div><span class="proj-badge pb-new">New</span><button class="review-btn">Review →</button></div>
+            <div class="project-item"><div class="proj-emoji">🤖</div><div class="proj-info"><div class="proj-name">Scratch Maze Game</div><div class="proj-student">Amira Hassan · Year 7</div></div><span class="proj-badge pb-new">New</span><button class="review-btn">Review →</button></div>
+            <div class="project-item"><div class="proj-emoji">📊</div><div class="proj-info"><div class="proj-name">Data Visualiser App</div><div class="proj-student">Priya Nair · Year 10</div></div><span class="proj-badge pb-reviewed">Reviewed ✓</span></div>
+          </div>
+        </div>
+      </div>
+      <!-- Calendar strip -->
+      <div class="dash-section-header">
+        <div class="dash-section-title">📅 This Week</div>
+        <a class="dash-section-link" onclick="showDashTab('calendar')">Full calendar →</a>
+      </div>
+      <div class="cal-strip" id="calStrip"></div>
+    </div>
+
+    <!-- ── TAB: SESSIONS ── -->
+    <div id="tab-sessions" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📡 Manage Live Sessions</div>
+        <button class="btn btn-blue" style="font-size:13px;padding:9px 20px;">+ Schedule Session</button>
+      </div>
+      <div class="dash-panel">
+        <div class="session-list">
+          <div class="session-item"><div class="sess-time"><div class="sess-time-val">9:00</div><div class="sess-time-label">Today</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">James Okafor</div><div class="sess-subject">Python for Beginners · Year 9 · 60 mins</div></div><span class="sess-badge sb-done">Done</span></div>
+          <div class="session-item live"><div class="sess-time"><div class="sess-time-val">11:00</div><div class="sess-time-label">Today</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">Aisha Taiwo</div><div class="sess-subject">Web Dev: HTML, CSS & JS · Year 11 · 45 mins</div></div><span class="sess-badge sb-live">🔴 Live Now</span><button class="join-btn">Join →</button></div>
+          <div class="session-item"><div class="sess-time"><div class="sess-time-val">2:00</div><div class="sess-time-label">Today</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">Marcus Kofi</div><div class="sess-subject">Scratch & Game Design · Year 5 · 45 mins</div></div><span class="sess-badge sb-upcoming">Upcoming</span></div>
+          <div class="session-item"><div class="sess-time"><div class="sess-time-val">4:30</div><div class="sess-time-label">Today</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">Emeka Sule</div><div class="sess-subject">A-Level Computer Science · Year 13 · 60 mins</div></div><span class="sess-badge sb-upcoming">Upcoming</span></div>
+          <div class="session-item"><div class="sess-time"><div class="sess-time-val">10:00</div><div class="sess-time-label">Tomorrow</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">Fatima Nwosu</div><div class="sess-subject">Python for Beginners · Year 8 · 60 mins</div></div><span class="sess-badge sb-upcoming">Upcoming</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB: PROJECTS ── -->
+    <div id="tab-projects" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📁 Student Projects</div>
+        <span style="font-size:13px;font-weight:800;color:var(--orange);">5 pending review</span>
+      </div>
+      <div class="dash-panel">
+        <div class="project-list">
+          <div class="project-item"><div class="proj-emoji">🎮</div><div class="proj-info"><div class="proj-name">Snake Game in Python</div><div class="proj-student">James Okafor · Year 9 · Coding</div></div><span class="proj-badge pb-new">New</span><button class="review-btn">Review →</button></div>
+          <div class="project-item"><div class="proj-emoji">🌐</div><div class="proj-info"><div class="proj-name">Personal Portfolio Website</div><div class="proj-student">Daniel Ferreira · Year 11 · HTML/CSS</div></div><span class="proj-badge pb-new">New</span><button class="review-btn">Review →</button></div>
+          <div class="project-item"><div class="proj-emoji">🤖</div><div class="proj-info"><div class="proj-name">Scratch Maze Game</div><div class="proj-student">Amira Hassan · Year 7 · Scratch</div></div><span class="proj-badge pb-new">New</span><button class="review-btn">Review →</button></div>
+          <div class="project-item"><div class="proj-emoji">🧮</div><div class="proj-info"><div class="proj-name">Number Guessing Game</div><div class="proj-student">Emeka Sule · Year 13 · Python</div></div><span class="proj-badge pb-new">New</span><button class="review-btn">Review →</button></div>
+          <div class="project-item"><div class="proj-emoji">🌦️</div><div class="proj-info"><div class="proj-name">Weather App</div><div class="proj-student">Fatima Nwosu · Year 8 · JavaScript</div></div><span class="proj-badge pb-new">New</span><button class="review-btn">Review →</button></div>
+          <div class="project-item"><div class="proj-emoji">📊</div><div class="proj-info"><div class="proj-name">Data Visualiser App</div><div class="proj-student">Priya Nair · Year 10 · Python</div></div><span class="proj-badge pb-reviewed">Reviewed ✓</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB: CALENDAR ── -->
+    <div id="tab-calendar" style="display:none;">
+      <div class="cal-full">
+        <div class="cal-full-header">
+          <button class="cal-nav-btn" onclick="changeCalMonth(-1)">‹</button>
+          <div class="cal-month-label" id="calMonth"></div>
+          <button class="cal-nav-btn" onclick="changeCalMonth(1)">›</button>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+      </div>
+      <div class="dash-panel" style="margin-bottom:32px;">
+        <div class="dash-section-header" style="margin-bottom:16px;">
+          <div class="dash-section-title">📡 Upcoming Sessions</div>
+        </div>
+        <div class="session-list">
+          <div class="session-item live"><div class="sess-time"><div class="sess-time-val">11:00</div><div class="sess-time-label">Today</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">Aisha Taiwo</div><div class="sess-subject">Web Dev · Year 11 · 45 mins</div></div><span class="sess-badge sb-live">🔴 Live</span></div>
+          <div class="session-item"><div class="sess-time"><div class="sess-time-val">2:00</div><div class="sess-time-label">Today</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">Marcus Kofi</div><div class="sess-subject">Scratch · Year 5 · 45 mins</div></div><span class="sess-badge sb-upcoming">Upcoming</span></div>
+          <div class="session-item"><div class="sess-time"><div class="sess-time-val">10:00</div><div class="sess-time-label">Tomorrow</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">Fatima Nwosu</div><div class="sess-subject">Python · Year 8 · 60 mins</div></div><span class="sess-badge sb-upcoming">Upcoming</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end dash-main -->
+</div><!-- end dash-wrap -->
+
+<!-- ═══ PROFILE MODAL ═══ -->
+<div class="profile-modal-overlay" id="profileModalOverlay">
+  <div class="profile-modal">
+    <div class="pm-header">
+      <div class="pm-title">👤 Update Profile</div>
+      <button class="modal-close" onclick="closeProfileModal()">✕</button>
+    </div>
+    <div class="pm-body">
+      <div class="pm-avatar-row">
+        <div class="pm-avatar">SR</div>
+        <div class="pm-avatar-info">Profile photo upload coming soon.<br>Your initials are shown for now.</div>
+      </div>
+      <div class="pm-field"><label>Full Name</label><input type="text" value="Sarah Rahman"></div>
+      <div class="pm-field"><label>Email Address</label><input type="email" value="sarah.rahman@stemnest.co.uk"></div>
+      <div class="pm-field"><label>Phone Number</label><input type="tel" placeholder="+44 7700 000000"></div>
+      <div class="pm-field"><label>Subject Specialisms</label><input type="text" value="Python, Scratch, Web Development, AI Literacy"></div>
+      <div class="pm-field"><label>Age Groups You Teach</label><input type="text" value="Ages 7–19"></div>
+      <div class="pm-field"><label>Short Bio</label><textarea>Former software engineer turned educator. 6+ years helping young people fall in love with coding.</textarea></div>
+      <div class="pm-field"><label>Availability</label>
+        <select>
+          <option>Weekdays Only</option>
+          <option>Weekdays & Weekends</option>
+          <option>Weekends Only</option>
+          <option>Flexible / custom</option>
+        </select>
+      </div>
+      <div class="pm-footer">
+        <button class="btn btn-outline" onclick="closeProfileModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveProfile()">Save Changes ✦</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/utils.js"></script>
+<script src="../js/dashboard.js"></script>
+</body>
+</html>

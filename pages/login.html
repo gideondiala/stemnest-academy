@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Log In – StemNest Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/login.css">
+</head>
+<body>
+
+<!-- ═══ NAVBAR ═══ -->
+<nav>
+  <a class="logo" href="../index.html">
+    <div class="logo-icon">S</div>
+    <div class="logo-text">StemNest<span>Academy</span></div>
+  </a>
+  <ul class="nav-links">
+    <li><a href="../index.html"  data-page="home">Home</a></li>
+    <li><a href="courses.html"   data-page="courses">Courses</a></li>
+    <li><a href="../index.html#how"      data-page="">How It Works</a></li>
+    <li><a href="../index.html#teachers" data-page="">Tutors</a></li>
+    <li><a href="../index.html#reviews"  data-page="">Reviews</a></li>
+  </ul>
+  <div class="nav-actions">
+    <a href="login.html"        class="btn btn-outline active" style="border-color:var(--blue);background:var(--blue-light);">Log In</a>
+    <a href="../index.html#cta" class="btn btn-primary">Book Free Trial ✦</a>
+  </div>
+</nav>
+
+<!-- ═══ LOGIN WRAPPER ═══ -->
+<div class="login-page-wrap">
+
+  <!-- LEFT: FORM -->
+  <div class="form-panel">
+    <div class="form-box">
+
+      <!-- Role Switcher -->
+      <div class="role-switcher">
+        <button class="role-btn" id="tutorBtn"   onclick="switchRole('tutor')">🎓 I'm a Tutor</button>
+        <button class="role-btn" id="studentBtn" onclick="switchRole('student')">🧑‍💻 I'm a Student</button>
+      </div>
+
+      <!-- Welcome copy -->
+      <div class="form-welcome">
+        <div class="form-eyebrow" id="formEyebrow"></div>
+        <div class="form-title"   id="formTitle"></div>
+        <div class="form-sub"     id="formSub"></div>
+      </div>
+
+      <!-- Email -->
+      <div class="login-field">
+        <label>Email Address</label>
+        <div class="input-wrap">
+          <span class="input-icon">✉️</span>
+          <input type="email" id="emailInput" placeholder="you@stemnest.co.uk" autocomplete="email">
+        </div>
+      </div>
+
+      <!-- Password -->
+      <div class="login-field">
+        <div class="field-row">
+          <label style="margin-bottom:0;">Password</label>
+          <a href="#" class="forgot">Forgot password?</a>
+        </div>
+        <div class="input-wrap">
+          <span class="input-icon">🔑</span>
+          <input type="password" id="passwordInput" placeholder="Enter your password" autocomplete="current-password">
+          <button class="pw-toggle" id="pwToggle" onclick="togglePw()" tabindex="-1" type="button">👁️</button>
+        </div>
+      </div>
+
+      <!-- Remember -->
+      <div class="remember">
+        <input type="checkbox" id="rememberMe">
+        <label for="rememberMe">Keep me logged in on this device</label>
+      </div>
+
+      <!-- Submit -->
+      <button class="login-btn" id="loginBtn" onclick="handleLogin()">
+        <span id="btnIcon"></span>
+        <span id="btnText"></span>
+      </button>
+
+      <!-- Divider -->
+      <div class="divider">
+        <div class="divider-line"></div>
+        <span>Not a member yet?</span>
+        <div class="divider-line"></div>
+      </div>
+
+      <!-- CTA -->
+      <div class="trial-link" id="loginCtaLink"></div>
+
+      <!-- Trust -->
+      <div class="trust-row-login">
+        <div class="trust-item-login">🔒 Secure Login</div>
+        <div class="trust-item-login">🇬🇧 UK-Based</div>
+        <div class="trust-item-login">✦ DBS Verified</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- RIGHT: BRAND PANEL -->
+  <div class="brand-panel" id="brandPanel">
+    <div class="panel-orb orb1"></div>
+    <div class="panel-orb orb2"></div>
+    <div class="panel-content">
+      <div class="panel-icon"  id="panelIcon"></div>
+      <div class="panel-title" id="panelTitle"></div>
+      <div class="panel-sub"   id="panelSub"></div>
+      <div class="panel-cards" id="panelCards"></div>
+    </div>
+    <div class="panel-footer-login">StemNest Academy · Trusted by 500+ students across the UK & beyond</div>
+  </div>
+
+</div>
+
+<script src="../js/utils.js"></script>
+<script src="../js/login.js"></script>
+</body>
+</html>
