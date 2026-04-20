@@ -6,14 +6,35 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Node (if added later)
+# Node
 node_modules/
 npm-debug.log*
+yarn-error.log
 
-# Environment files
+# Environment & secrets
 .env
 .env.local
+.env.production
+credentials.json
+token.json
 
-# Build output (if added later)
+# Build output
 /dist
 /build
+frontend/dist
+backend/dist
+
+# Agent workflow intermediates (always regenerated)
+.tmp/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Logs
+*.log
+logs/

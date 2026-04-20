@@ -8,26 +8,11 @@
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../css/global.css">
   <link rel="stylesheet" href="../css/dashboard.css">
-  <style>
-    /* Calendar full grid */
-    .cal-full { background: var(--white); border-radius: 20px; padding: 24px; box-shadow: 0 2px 16px rgba(0,0,0,.06); margin-bottom: 32px; }
-    .cal-full-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-    .cal-month-label { font-family: 'Fredoka One', cursive; font-size: 20px; color: var(--dark); }
-    .cal-nav-btn { width: 36px; height: 36px; border-radius: 10px; border: 2px solid #e8eaf0; background: var(--bg); cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: .2s; }
-    .cal-nav-btn:hover { border-color: var(--blue); background: var(--blue-light); }
-    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
-    .cal-day-label { text-align: center; font-size: 11px; font-weight: 900; color: var(--light); text-transform: uppercase; padding: 8px 0; }
-    .cal-grid .cal-day { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 10px; font-weight: 700; font-size: 14px; color: var(--dark); background: var(--bg); border: 1.5px solid transparent; cursor: pointer; transition: .2s; width: auto; }
-    .cal-grid .cal-day:hover { border-color: var(--blue); }
-    .cal-grid .cal-day.today { background: var(--blue); color: #fff; border-color: var(--blue); }
-    .cal-grid .cal-day.has-session { border-color: var(--green); position: relative; }
-    .cal-grid .cal-day.has-session::after { content: ''; position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: var(--green); }
-    .cal-grid .cal-day.other-month { color: var(--light); opacity: .5; }
-  </style>
+  <link rel="stylesheet" href="../css/tutor-calendar.css">
 </head>
 <body>
 
-<!-- ═══ TOP NAV (minimal — dashboard has sidebar) ═══ -->
+<!-- ═══ TOP NAV ═══ -->
 <nav style="position:sticky;top:0;z-index:200;">
   <a class="logo" href="../index.html">
     <div class="logo-icon">S</div>
@@ -38,29 +23,30 @@
   </ul>
   <div class="nav-actions">
     <span style="font-size:13px;font-weight:700;color:var(--light);">
-      <span class="live-dot"></span> Sarah Rahman — Online
+      <span class="live-dot"></span> <span id="navTutorName">Loading…</span> — Online
     </span>
     <a href="login.html" class="btn btn-outline" style="font-size:13px;padding:8px 18px;">Log Out</a>
   </div>
 </nav>
 
-<!-- ═══ DASHBOARD LAYOUT ═══ -->
 <div class="dash-wrap">
 
-  <!-- SIDEBAR -->
+  <!-- ═══ SIDEBAR ═══ -->
   <div class="dash-sidebar">
     <div class="sidebar-profile">
-      <div class="sidebar-avatar">SR</div>
-      <div class="sidebar-name">Sarah Rahman</div>
-      <div class="sidebar-role">Coding Tutor</div>
+      <!-- Avatar: photo or initials — rendered by JS -->
+      <div id="sidebarAvatarWrap"></div>
+      <div class="sidebar-name" id="sidebarName">—</div>
+      <div class="sidebar-role" id="sidebarRole">—</div>
+      <div class="tutor-id-badge" id="tutorIdBadge">—</div>
       <div class="sidebar-status"><span class="live-dot"></span> Online</div>
     </div>
     <div class="sidebar-nav">
       <div class="sidebar-section-label">Main</div>
-      <a class="sidebar-link active" data-tab="overview"  onclick="showDashTab('overview')"><span class="sl-icon">🏠</span> Overview</a>
-      <a class="sidebar-link"        data-tab="sessions"  onclick="showDashTab('sessions')"><span class="sl-icon">📡</span> Live Sessions <span class="sl-badge">2</span></a>
-      <a class="sidebar-link"        data-tab="projects"  onclick="showDashTab('projects')"><span class="sl-icon">📁</span> Student Projects <span class="sl-badge">5</span></a>
-      <a class="sidebar-link"        data-tab="calendar"  onclick="showDashTab('calendar')"><span class="sl-icon">📅</span> Calendar</a>
+      <a class="sidebar-link active" data-tab="overview"  onclick="showDashTab('overview')"> <span class="sl-icon">🏠</span> Overview</a>
+      <a class="sidebar-link"        data-tab="sessions"  onclick="showDashTab('sessions')"> <span class="sl-icon">📡</span> Live Sessions <span class="sl-badge">2</span></a>
+      <a class="sidebar-link"        data-tab="projects"  onclick="showDashTab('projects')"> <span class="sl-icon">📁</span> Student Projects <span class="sl-badge">5</span></a>
+      <a class="sidebar-link"        data-tab="calendar"  onclick="showDashTab('calendar')"> <span class="sl-icon">📅</span> Availability</a>
       <div class="sidebar-section-label">Account</div>
       <a class="sidebar-link" onclick="openProfileModal()"><span class="sl-icon">👤</span> Update Profile</a>
       <a class="sidebar-link" href="../index.html"><span class="sl-icon">🌐</span> Back to Website</a>
@@ -70,13 +56,13 @@
     </div>
   </div>
 
-  <!-- MAIN CONTENT -->
+  <!-- ═══ MAIN CONTENT ═══ -->
   <div class="dash-main">
 
     <!-- Top bar -->
     <div class="dash-topbar">
       <div>
-        <div class="dash-greeting"><span id="greetingTime">Good morning ☀️</span>, <span>Sarah</span> 👋</div>
+        <div class="dash-greeting"><span id="greetingTime">Good morning ☀️</span>, <span id="greetingName" style="color:var(--blue);">—</span> 👋</div>
         <div class="dash-date" id="dashDate"></div>
       </div>
       <div class="dash-top-actions">
@@ -94,20 +80,20 @@
     </div>
 
     <!-- Quick Actions -->
-    <div class="dash-section-header">
-      <div class="dash-section-title">Quick Actions</div>
-    </div>
+    <div class="dash-section-header"><div class="dash-section-title">Quick Actions</div></div>
     <div class="quick-actions" id="quickActions">
       <div class="qa-btn qa-blue"   onclick="showDashTab('sessions')"><div class="qa-icon qi-blue">📡</div><div><div class="qa-label">Manage Sessions</div><div class="qa-sub">Start, join or reschedule</div></div></div>
       <div class="qa-btn qa-orange" onclick="showDashTab('projects')"><div class="qa-icon qi-orange">📁</div><div><div class="qa-label">Student Projects</div><div class="qa-sub">5 submissions waiting</div></div></div>
-      <div class="qa-btn qa-green"  onclick="showDashTab('calendar')"><div class="qa-icon qi-green">📅</div><div><div class="qa-label">Calendar</div><div class="qa-sub">View your full schedule</div></div></div>
-      <div class="qa-btn qa-purple" onclick="openProfileModal()"><div class="qa-icon qi-purple">👤</div><div><div class="qa-label">Update Profile</div><div class="qa-sub">Bio, subjects & photo</div></div></div>
+      <div class="qa-btn qa-green"  onclick="showDashTab('calendar')"><div class="qa-icon qi-green">📅</div><div><div class="qa-label">Set Availability</div><div class="qa-sub">Mark your free slots</div></div></div>
+      <div class="qa-btn qa-purple" onclick="openProfileModal()"><div class="qa-icon qi-purple">👤</div><div><div class="qa-label">Update Profile</div><div class="qa-sub">Bio, photo & subjects</div></div></div>
     </div>
 
     <!-- ── TAB: OVERVIEW ── -->
     <div id="tab-overview">
+      <!-- Assigned class notification banner -->
+      <div id="assignedClassBanner" style="display:none;"></div>
+
       <div class="dash-grid-2">
-        <!-- Sessions -->
         <div class="dash-panel">
           <div class="dash-section-header">
             <div class="dash-section-title">📡 Today's Sessions</div>
@@ -120,7 +106,6 @@
             <div class="session-item"><div class="sess-time"><div class="sess-time-val">4:30</div><div class="sess-time-label">PM</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">Emeka Sule</div><div class="sess-subject">A-Level CS · Year 13</div></div><span class="sess-badge sb-upcoming">Upcoming</span></div>
           </div>
         </div>
-        <!-- Projects -->
         <div class="dash-panel">
           <div class="dash-section-header">
             <div class="dash-section-title">📁 Projects to Review</div>
@@ -134,10 +119,9 @@
           </div>
         </div>
       </div>
-      <!-- Calendar strip -->
       <div class="dash-section-header">
         <div class="dash-section-title">📅 This Week</div>
-        <a class="dash-section-link" onclick="showDashTab('calendar')">Full calendar →</a>
+        <a class="dash-section-link" onclick="showDashTab('calendar')">Set availability →</a>
       </div>
       <div class="cal-strip" id="calStrip"></div>
     </div>
@@ -177,25 +161,35 @@
       </div>
     </div>
 
-    <!-- ── TAB: CALENDAR ── -->
+    <!-- ── TAB: CALENDAR / AVAILABILITY ── -->
     <div id="tab-calendar" style="display:none;">
-      <div class="cal-full">
-        <div class="cal-full-header">
-          <button class="cal-nav-btn" onclick="changeCalMonth(-1)">‹</button>
-          <div class="cal-month-label" id="calMonth"></div>
-          <button class="cal-nav-btn" onclick="changeCalMonth(1)">›</button>
+      <div class="dash-section-header">
+        <div class="dash-section-title">📅 Set Your Weekly Availability</div>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <span class="wcal-summary" id="availSummary">0 slots marked</span>
+          <button class="btn btn-outline" style="font-size:12px;padding:7px 14px;" onclick="clearWeekAvailability()">Clear Week</button>
         </div>
-        <div class="cal-grid" id="calGrid"></div>
       </div>
-      <div class="dash-panel" style="margin-bottom:32px;">
-        <div class="dash-section-header" style="margin-bottom:16px;">
-          <div class="dash-section-title">📡 Upcoming Sessions</div>
-        </div>
-        <div class="session-list">
-          <div class="session-item live"><div class="sess-time"><div class="sess-time-val">11:00</div><div class="sess-time-label">Today</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">Aisha Taiwo</div><div class="sess-subject">Web Dev · Year 11 · 45 mins</div></div><span class="sess-badge sb-live">🔴 Live</span></div>
-          <div class="session-item"><div class="sess-time"><div class="sess-time-val">2:00</div><div class="sess-time-label">Today</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">Marcus Kofi</div><div class="sess-subject">Scratch · Year 5 · 45 mins</div></div><span class="sess-badge sb-upcoming">Upcoming</span></div>
-          <div class="session-item"><div class="sess-time"><div class="sess-time-val">10:00</div><div class="sess-time-label">Tomorrow</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">Fatima Nwosu</div><div class="sess-subject">Python · Year 8 · 60 mins</div></div><span class="sess-badge sb-upcoming">Upcoming</span></div>
-        </div>
+
+      <!-- Legend -->
+      <div class="wcal-legend">
+        <div class="wcal-legend-item"><div class="wcal-legend-dot wcal-legend-avail"></div> Available</div>
+        <div class="wcal-legend-item"><div class="wcal-legend-dot wcal-legend-past"></div> Past</div>
+        <div class="wcal-legend-item"><div class="wcal-legend-dot wcal-legend-empty"></div> Click to mark available</div>
+      </div>
+
+      <!-- Week nav -->
+      <div class="wcal-nav">
+        <button class="cal-nav-btn" onclick="changeWeek(-1)">‹ Prev</button>
+        <div class="wcal-week-label" id="weekLabel">—</div>
+        <button class="cal-nav-btn" onclick="changeWeek(1)">Next ›</button>
+      </div>
+
+      <!-- Calendar grid rendered by JS -->
+      <div id="weeklyCalContainer"></div>
+
+      <div class="wcal-hint">
+        💡 Click any slot to toggle availability. Green = you're free. Admin will see your available slots when assigning classes.
       </div>
     </div>
 
@@ -204,30 +198,33 @@
 
 <!-- ═══ PROFILE MODAL ═══ -->
 <div class="profile-modal-overlay" id="profileModalOverlay">
-  <div class="profile-modal">
+  <div class="profile-modal" style="max-width:540px;">
     <div class="pm-header">
       <div class="pm-title">👤 Update Profile</div>
       <button class="modal-close" onclick="closeProfileModal()">✕</button>
     </div>
     <div class="pm-body">
+
+      <!-- Photo upload row -->
       <div class="pm-avatar-row">
-        <div class="pm-avatar">SR</div>
-        <div class="pm-avatar-info">Profile photo upload coming soon.<br>Your initials are shown for now.</div>
+        <div id="pmAvatarPreview" style="cursor:pointer;" onclick="triggerPhotoUpload()" title="Click to upload photo"></div>
+        <div>
+          <div style="font-weight:800;font-size:14px;color:var(--dark);" id="pmTutorName">—</div>
+          <div style="font-size:12px;color:var(--blue);font-weight:800;margin:4px 0;" id="pmTutorId">—</div>
+          <button class="btn btn-outline" style="font-size:12px;padding:6px 14px;margin-top:6px;" onclick="triggerPhotoUpload()">📷 Upload Photo</button>
+          <input type="file" id="photoUploadInput" accept="image/*" style="display:none;">
+          <div style="font-size:11px;color:var(--light);margin-top:4px;">JPG, PNG or GIF · Max 2MB</div>
+        </div>
       </div>
-      <div class="pm-field"><label>Full Name</label><input type="text" value="Sarah Rahman"></div>
-      <div class="pm-field"><label>Email Address</label><input type="email" value="sarah.rahman@stemnest.co.uk"></div>
-      <div class="pm-field"><label>Phone Number</label><input type="tel" placeholder="+44 7700 000000"></div>
-      <div class="pm-field"><label>Subject Specialisms</label><input type="text" value="Python, Scratch, Web Development, AI Literacy"></div>
-      <div class="pm-field"><label>Age Groups You Teach</label><input type="text" value="Ages 7–19"></div>
-      <div class="pm-field"><label>Short Bio</label><textarea>Former software engineer turned educator. 6+ years helping young people fall in love with coding.</textarea></div>
-      <div class="pm-field"><label>Availability</label>
-        <select>
-          <option>Weekdays Only</option>
-          <option>Weekdays & Weekends</option>
-          <option>Weekends Only</option>
-          <option>Flexible / custom</option>
-        </select>
-      </div>
+
+      <div class="pm-field"><label>Full Name</label><input type="text" id="pmFieldName" placeholder="Your full name"></div>
+      <div class="pm-field"><label>Email Address</label><input type="email" id="pmFieldEmail" placeholder="you@stemnest.co.uk"></div>
+      <div class="pm-field"><label>Phone Number</label><input type="tel" id="pmFieldPhone" placeholder="+44 7700 000000"></div>
+      <div class="pm-field"><label>Subject Specialisms</label><input type="text" id="pmFieldSubjects" placeholder="e.g. Python, Scratch, Web Dev"></div>
+      <div class="pm-field"><label>Age Groups You Teach</label><input type="text" id="pmFieldAgeGroups" placeholder="e.g. Ages 7–19"></div>
+      <div class="pm-field"><label>Short Bio</label><textarea id="pmFieldBio" placeholder="Tell students a bit about yourself..."></textarea></div>
+      <div class="pm-field"><label>Change Password</label><input type="password" id="pmFieldPassword" placeholder="Leave blank to keep current password"></div>
+
       <div class="pm-footer">
         <button class="btn btn-outline" onclick="closeProfileModal()">Cancel</button>
         <button class="btn btn-primary" onclick="saveProfile()">Save Changes ✦</button>

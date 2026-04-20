@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Join Your Class – StemNest Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/join-class.css">
+</head>
+<body>
+
+<nav class="lp-nav" style="border-bottom:1.5px solid #e8eaf0;box-shadow:0 2px 12px rgba(0,0,0,.06);">
+  <a class="logo" href="../index.html">
+    <div class="logo-icon">S</div>
+    <div class="logo-text">StemNest<span>Academy</span></div>
+  </a>
+  <div class="nav-actions">
+    <a href="free-trial.html" class="btn btn-primary" style="font-size:13px;padding:8px 20px;">Book Free Trial ✦</a>
+  </div>
+</nav>
+
+<!-- ── LOOKUP SCREEN ── -->
+<div class="jc-page" id="lookupScreen">
+  <div class="jc-card">
+    <div class="jc-icon">📡</div>
+    <h1 class="jc-title">Join Your Class</h1>
+    <p class="jc-sub">Enter your Gmail address or WhatsApp number to find your class details and join button.</p>
+    <div class="jc-field">
+      <label>Gmail Address or WhatsApp Number</label>
+      <input type="text" id="lookupInput" placeholder="e.g. parent@gmail.com or +44 7700 000000"
+             onkeydown="if(event.key==='Enter') findClass()">
+    </div>
+    <button class="jc-btn" onclick="findClass()">
+      <span id="lookupBtnText">🔍 Find My Class</span>
+    </button>
+    <div class="jc-lookup-note">
+      Don't have a booking yet?
+      <a href="free-trial.html">Book your FREE demo class →</a>
+    </div>
+  </div>
+</div>
+
+<!-- ── CLASS SCREEN ── -->
+<div class="jc-page" id="classScreen" style="display:none;">
+  <div class="jc-class-wrap">
+
+    <!-- Student info card -->
+    <div class="jc-student-card" id="studentCard"></div>
+
+    <!-- Join button card -->
+    <div class="jc-join-card" id="joinCard"></div>
+
+    <!-- Rules card -->
+    <div class="jc-rules-card">
+      <div class="jc-rules-title">📋 Class Rules & Tips for a Great Session</div>
+      <div class="jc-rules-grid">
+        <div class="jc-rule"><div class="jc-rule-icon">💻</div><div><strong>Use a laptop or desktop</strong><br>Phones make it hard to see and share work.</div></div>
+        <div class="jc-rule"><div class="jc-rule-icon">🔇</div><div><strong>Find a quiet spot</strong><br>Reduce background noise so your tutor can hear you clearly.</div></div>
+        <div class="jc-rule"><div class="jc-rule-icon">📷</div><div><strong>Camera on, please</strong><br>Seeing each other makes learning much more effective.</div></div>
+        <div class="jc-rule"><div class="jc-rule-icon">⏰</div><div><strong>Join 2–3 minutes early</strong><br>Test your mic and camera before the session starts.</div></div>
+        <div class="jc-rule"><div class="jc-rule-icon">📓</div><div><strong>Have a notebook ready</strong><br>Write down key points — it helps you remember.</div></div>
+        <div class="jc-rule"><div class="jc-rule-icon">🙋</div><div><strong>Ask questions freely</strong><br>There are no silly questions. Your tutor is here to help.</div></div>
+        <div class="jc-rule"><div class="jc-rule-icon">🌐</div><div><strong>Good internet connection</strong><br>Use Wi-Fi if possible for the best video quality.</div></div>
+        <div class="jc-rule"><div class="jc-rule-icon">😊</div><div><strong>Have fun!</strong><br>Learning is exciting — enjoy every moment of your class.</div></div>
+      </div>
+    </div>
+
+    <div style="text-align:center;margin-top:16px;">
+      <a href="../index.html" style="font-size:14px;font-weight:700;color:var(--light);text-decoration:none;">← Back to StemNest Academy</a>
+    </div>
+  </div>
+</div>
+
+<!-- ── NO BOOKING SCREEN ── -->
+<div class="jc-page" id="noBookingScreen" style="display:none;">
+  <div class="jc-card">
+    <div class="jc-icon">😕</div>
+    <h1 class="jc-title">No Booking Found</h1>
+    <p class="jc-sub">We couldn't find a booking for <strong id="notFoundQuery"></strong>.<br>Double-check your email or WhatsApp number, or book a free class below.</p>
+    <a href="free-trial.html" class="jc-btn" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;">🎓 Book a FREE Demo Class</a>
+    <button class="jc-btn-outline" onclick="resetLookup()">← Try Again</button>
+  </div>
+</div>
+
+<script src="../js/utils.js"></script>
+<script src="../js/join-class.js"></script>
+</body>
+</html>

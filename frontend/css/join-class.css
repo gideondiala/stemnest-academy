@@ -1,0 +1,142 @@
+/* ═══════════════════════════════════════════════════════
+   STEMNEST ACADEMY — JOIN CLASS PAGE STYLES
+═══════════════════════════════════════════════════════ */
+
+.lp-nav {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--white); padding: 0 5%;
+  display: flex; align-items: center; justify-content: space-between;
+  height: 70px;
+}
+
+.jc-page {
+  min-height: calc(100vh - 70px);
+  background: linear-gradient(160deg, #f0f4ff 0%, #e8f8f2 100%);
+  display: flex; align-items: center; justify-content: center;
+  padding: 40px 5%;
+}
+
+/* ── LOOKUP CARD ── */
+.jc-card {
+  background: var(--white); border-radius: 28px; padding: 48px 44px;
+  max-width: 500px; width: 100%; text-align: center;
+  box-shadow: 0 12px 48px rgba(26,86,219,.12);
+  border: 1.5px solid #e8eaf0;
+  animation: fadeIn .4s ease;
+}
+.jc-icon  { font-size: 64px; margin-bottom: 16px; }
+.jc-title { font-family: 'Fredoka One', cursive; font-size: 32px; color: var(--dark); margin-bottom: 12px; }
+.jc-sub   { font-size: 16px; color: var(--mid); line-height: 1.7; margin-bottom: 28px; }
+.jc-field { text-align: left; margin-bottom: 16px; }
+.jc-field label {
+  display: block; font-size: 12px; font-weight: 900; color: var(--mid);
+  text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px;
+}
+.jc-field input {
+  width: 100%; padding: 14px 16px; border: 2px solid #e8eaf0; border-radius: 14px;
+  font-family: 'Nunito', sans-serif; font-size: 15px; font-weight: 600;
+  color: var(--dark); outline: none; transition: border-color .2s;
+}
+.jc-field input:focus { border-color: var(--blue); }
+.jc-btn {
+  width: 100%; padding: 16px; border-radius: 14px;
+  background: linear-gradient(135deg, var(--blue), var(--green));
+  color: #fff; border: none; font-family: 'Nunito', sans-serif;
+  font-weight: 900; font-size: 17px; cursor: pointer;
+  transition: transform .2s, box-shadow .2s;
+  box-shadow: 0 6px 24px rgba(26,86,219,.3);
+  margin-bottom: 16px;
+}
+.jc-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 32px rgba(26,86,219,.4); }
+.jc-btn-outline {
+  width: 100%; padding: 12px; border-radius: 14px;
+  background: transparent; border: 2px solid #e8eaf0;
+  font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 15px;
+  color: var(--mid); cursor: pointer; transition: .2s;
+}
+.jc-btn-outline:hover { border-color: var(--blue); color: var(--blue); }
+.jc-lookup-note {
+  font-size: 13px; color: var(--light); font-weight: 700; margin-top: 8px;
+}
+.jc-lookup-note a { color: var(--blue); text-decoration: none; font-weight: 800; }
+.jc-lookup-note a:hover { text-decoration: underline; }
+
+/* ── CLASS SCREEN ── */
+.jc-class-wrap {
+  max-width: 720px; width: 100%;
+  display: flex; flex-direction: column; gap: 20px;
+  animation: fadeIn .4s ease;
+}
+
+/* Student info card */
+.jc-student-card {
+  background: var(--white); border-radius: 20px; padding: 24px 28px;
+  border: 1.5px solid #e8eaf0; box-shadow: 0 4px 20px rgba(0,0,0,.06);
+  display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+}
+.jc-student-av {
+  width: 64px; height: 64px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--blue), var(--green));
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Fredoka One', cursive; font-size: 22px; color: #fff;
+  flex-shrink: 0;
+}
+.jc-student-info { flex: 1; }
+.jc-student-name { font-family: 'Fredoka One', cursive; font-size: 22px; color: var(--dark); }
+.jc-student-meta { font-size: 13px; color: var(--light); font-weight: 700; margin-top: 4px; line-height: 1.6; }
+.jc-booking-id   { font-size: 11px; font-weight: 900; color: var(--blue); background: var(--blue-light); padding: 3px 10px; border-radius: 50px; margin-top: 6px; display: inline-block; }
+
+/* Join button card */
+.jc-join-card {
+  background: linear-gradient(135deg, var(--green-dark), var(--green));
+  border-radius: 20px; padding: 32px 28px;
+  box-shadow: 0 8px 32px rgba(14,159,110,.35);
+  text-align: center;
+}
+.jc-join-card.no-link {
+  background: linear-gradient(135deg, #4a5568, #718096);
+}
+.jc-join-subject { font-size: 13px; font-weight: 900; color: rgba(255,255,255,.7); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.jc-join-time    { font-family: 'Fredoka One', cursive; font-size: 28px; color: #fff; margin-bottom: 4px; }
+.jc-join-date    { font-size: 14px; color: rgba(255,255,255,.8); font-weight: 700; margin-bottom: 24px; }
+.jc-join-main-btn {
+  display: inline-flex; align-items: center; gap: 10px;
+  background: #fff; color: var(--green-dark);
+  font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 20px;
+  padding: 16px 48px; border-radius: 50px; text-decoration: none;
+  box-shadow: 0 6px 24px rgba(0,0,0,.2);
+  transition: transform .2s, box-shadow .2s;
+}
+.jc-join-main-btn:hover { transform: translateY(-3px); box-shadow: 0 10px 32px rgba(0,0,0,.25); }
+.jc-join-pending {
+  font-size: 16px; color: rgba(255,255,255,.85); font-weight: 700; line-height: 1.6;
+}
+
+/* Rules card */
+.jc-rules-card {
+  background: var(--white); border-radius: 20px; padding: 28px;
+  border: 1.5px solid #e8eaf0; box-shadow: 0 4px 20px rgba(0,0,0,.06);
+}
+.jc-rules-title {
+  font-family: 'Fredoka One', cursive; font-size: 20px; color: var(--dark);
+  margin-bottom: 20px;
+}
+.jc-rules-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+.jc-rule {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px 14px; border-radius: 12px; background: var(--bg);
+  border: 1.5px solid #e8eaf0;
+}
+.jc-rule-icon { font-size: 22px; flex-shrink: 0; }
+.jc-rule strong { font-size: 14px; color: var(--dark); display: block; margin-bottom: 2px; }
+.jc-rule div:last-child { font-size: 13px; color: var(--light); font-weight: 600; line-height: 1.5; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 600px) {
+  .jc-card { padding: 32px 20px; }
+  .jc-student-card { flex-direction: column; text-align: center; }
+  .jc-rules-grid { grid-template-columns: 1fr; }
+}

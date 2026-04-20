@@ -138,29 +138,56 @@ function handleLogin() {
 
   if (!email || !pw) {
     btn.style.animation = 'none';
-    btn.offsetHeight; // reflow
+    btn.offsetHeight;
     btn.style.animation = 'shake .4s ease';
     return;
   }
 
-  // Loading state
-  btn.style.opacity        = '0.7';
-  btn.style.pointerEvents  = 'none';
+  btn.style.opacity       = '0.7';
+  btn.style.pointerEvents = 'none';
   document.getElementById('btnText').textContent = 'Logging in…';
   document.getElementById('btnIcon').textContent = '⏳';
 
-  // Simulate auth (replace with real API call)
   setTimeout(() => {
     btn.style.opacity       = '1';
     btn.style.pointerEvents = '';
-    document.getElementById('btnIcon').textContent = '✅';
 
     if (currentRole === 'tutor') {
-      document.getElementById('btnText').textContent = 'Welcome back! Redirecting…';
-      setTimeout(() => navigate('tutor-dashboard'), 700);
+      // Check teacher registry
+      const teachers = JSON.parse(localStorage.getItem('sn_teachers') || '[]');
+      const teacher  = teachers.find(t =>
+        t.email.toLowerCase() === email.toLowerCase() && t.password === pw
+      );
+
+      if (teacher) {
+        // Store logged-in teacher id for dashboard to read
+        localStorage.setItem('sn_logged_in_teacher', teacher.id);
+        document.getElementById('btnIcon').textContent = '✅';
+        document.getElementById('btnText').textContent = `Welcome back, ${teacher.name.split(' ')[0]}! Redirecting…`;
+        setTimeout(() => navigate('tutor-dashboard'), 700);
+      } else {
+        // Admin fallback (hardcoded for now — replace with real auth)
+        if (email === 'admin@stemnest.co.uk' && pw === 'admin123') {
+          document.getElementById('btnIcon').textContent = '✅';
+          document.getElementById('btnText').textContent = 'Welcome, Admin! Redirecting…';
+          setTimeout(() => navigate('admin-dashboard'), 700);
+        } else {
+          document.getElementById('btnIcon').textContent = '❌';
+          document.getElementById('btnText').textContent = 'Invalid credentials';
+          btn.style.animation = 'none';
+          btn.offsetHeight;
+          btn.style.animation = 'shake .4s ease';
+          setTimeout(() => {
+            document.getElementById('btnIcon').textContent = loginConfig[currentRole].btnIcon;
+            document.getElementById('btnText').textContent = loginConfig[currentRole].btnText;
+          }, 1500);
+        }
+      }
     } else {
+      // Student login
+      document.getElementById('btnIcon').textContent = '✅';
       document.getElementById('btnText').textContent = 'Joining your class…';
-      setTimeout(() => navigate('home'), 700); // → student dashboard (future page)
+      setTimeout(() => navigate('student-dashboard'), 700);
     }
-  }, 1600);
+  }, 1200);
 }

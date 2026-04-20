@@ -1,0 +1,215 @@
+/* ═══════════════════════════════════════════════════════
+   STEMNEST ACADEMY — ADMIN DASHBOARD STYLES
+═══════════════════════════════════════════════════════ */
+
+/* ── FILTERS ── */
+.admin-filters {
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+}
+.admin-search {
+  padding: 9px 14px; border: 2px solid #e8eaf0; border-radius: 10px;
+  font-family: 'Nunito', sans-serif; font-size: 14px; font-weight: 600;
+  color: var(--dark); outline: none; transition: border-color .2s;
+  width: 260px;
+}
+.admin-search:focus { border-color: var(--blue); }
+.admin-filter-sel {
+  padding: 9px 12px; border: 2px solid #e8eaf0; border-radius: 10px;
+  font-family: 'Nunito', sans-serif; font-size: 13px; font-weight: 700;
+  color: var(--dark); outline: none; cursor: pointer; background: var(--white);
+}
+
+/* ── TABLE ── */
+.admin-table-wrap {
+  background: var(--white); border-radius: 20px;
+  box-shadow: 0 2px 16px rgba(0,0,0,.06); overflow: hidden;
+  border: 1.5px solid #e8eaf0;
+}
+.admin-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+}
+.admin-table thead tr {
+  background: var(--bg); border-bottom: 2px solid #e8eaf0;
+}
+.admin-table th {
+  padding: 14px 16px; text-align: left;
+  font-size: 11px; font-weight: 900; color: var(--light);
+  text-transform: uppercase; letter-spacing: .5px; white-space: nowrap;
+}
+.admin-table td {
+  padding: 14px 16px; border-bottom: 1px solid #f0f2f8;
+  vertical-align: middle; color: var(--dark); font-weight: 600;
+}
+.admin-table tbody tr:hover { background: #fafbff; }
+.admin-table tbody tr:last-child td { border-bottom: none; }
+
+/* Status badges */
+.ab-status {
+  display: inline-block; font-size: 11px; font-weight: 900;
+  padding: 4px 12px; border-radius: 50px;
+}
+.ab-pending   { background: var(--orange-light); color: var(--orange-dark); }
+.ab-scheduled { background: var(--blue-light);   color: var(--blue-dark); }
+.ab-completed { background: var(--green-light);  color: var(--green-dark); }
+
+/* Subject badges */
+.ab-subject {
+  display: inline-block; font-size: 11px; font-weight: 900;
+  padding: 3px 10px; border-radius: 50px;
+}
+.ab-coding   { background: var(--blue-light);   color: var(--blue); }
+.ab-maths    { background: var(--green-light);  color: var(--green-dark); }
+.ab-sciences { background: var(--orange-light); color: var(--orange-dark); }
+
+/* Action buttons */
+.ab-btn {
+  padding: 6px 12px; border-radius: 8px; border: none;
+  font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 12px;
+  cursor: pointer; transition: .2s; margin-right: 4px;
+}
+.ab-btn-view     { background: var(--bg); color: var(--mid); border: 1.5px solid #e8eaf0; }
+.ab-btn-view:hover { border-color: var(--blue); color: var(--blue); }
+.ab-btn-assign   { background: var(--blue-light); color: var(--blue); }
+.ab-btn-assign:hover { background: var(--blue); color: #fff; }
+.ab-btn-complete { background: var(--green-light); color: var(--green-dark); }
+.ab-btn-complete:hover { background: var(--green); color: #fff; }
+
+/* Empty state */
+.admin-empty {
+  text-align: center; padding: 60px 20px;
+}
+
+/* ── TUTOR GRID ── */
+.tutor-assign-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 20px;
+}
+.tutor-card {
+  background: var(--white); border-radius: 18px; padding: 24px;
+  border: 1.5px solid #e8eaf0; box-shadow: 0 2px 12px rgba(0,0,0,.05);
+  text-align: center;
+}
+.tutor-card-av {
+  width: 64px; height: 64px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Fredoka One', cursive; font-size: 22px; color: #fff;
+  margin: 0 auto 12px;
+}
+.tutor-card-name    { font-family: 'Fredoka One', cursive; font-size: 18px; color: var(--dark); }
+.tutor-card-subject { font-size: 12px; font-weight: 800; color: var(--blue); margin: 4px 0 8px; }
+.tutor-card-avail   { font-size: 12px; color: var(--light); font-weight: 700; margin-bottom: 12px; }
+.tutor-card-tags    { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.tutor-card-tag     { background: var(--bg); color: var(--mid); font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 50px; }
+
+/* ── BOOKING DETAIL MODAL ── */
+.detail-row {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 10px 0; border-bottom: 1px solid #f0f2f8; font-size: 14px;
+}
+.detail-row:last-child { border-bottom: none; }
+.detail-label { font-weight: 900; color: var(--light); font-size: 12px; text-transform: uppercase; letter-spacing: .4px; flex-shrink: 0; width: 140px; }
+.detail-val   { font-weight: 700; color: var(--dark); text-align: right; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 900px) {
+  .admin-table-wrap { overflow-x: auto; }
+  .admin-filters    { flex-direction: column; align-items: stretch; }
+  .admin-search     { width: 100%; }
+}
+
+/* ── TUTOR CARD ID badge ── */
+.tutor-card-id {
+  font-size: 11px; font-weight: 900; color: var(--blue);
+  background: var(--blue-light); padding: 2px 10px; border-radius: 50px;
+  display: inline-block; margin-bottom: 6px;
+}
+
+/* ── ASSIGN MODAL — available teacher cards ── */
+.assign-teacher-card {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 14px; border-radius: 14px;
+  border: 2px solid #e8eaf0; background: var(--bg);
+  cursor: pointer; transition: .2s; margin-bottom: 8px;
+}
+.assign-teacher-card:hover { border-color: var(--blue); background: var(--blue-light); }
+.assign-teacher-card.atc-available { border-color: var(--green); background: var(--green-light); }
+.assign-teacher-card.atc-selected  { border-color: var(--blue); background: var(--blue-light); box-shadow: 0 0 0 3px rgba(26,86,219,.15); }
+.atc-av {
+  width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Fredoka One', cursive; font-size: 16px; color: #fff;
+  overflow: hidden;
+}
+.atc-info { flex: 1; }
+.atc-name { font-weight: 800; font-size: 14px; color: var(--dark); }
+.atc-id   { font-size: 11px; font-weight: 900; color: var(--blue); background: var(--blue-light); padding: 1px 8px; border-radius: 50px; margin-left: 6px; }
+.atc-subject { font-size: 12px; color: var(--light); font-weight: 700; margin-top: 2px; }
+.atc-slots { font-size: 11px; font-weight: 800; color: var(--light); margin-top: 3px; }
+.atc-slots-avail { color: var(--green-dark); }
+.atc-badge {
+  font-size: 10px; font-weight: 900; padding: 3px 10px; border-radius: 50px;
+  background: var(--green); color: #fff; flex-shrink: 0;
+}
+
+/* ── ADD TEACHER FORM ── */
+.add-teacher-form-wrap {
+  max-width: 800px;
+}
+.add-teacher-form {
+  background: var(--white); border-radius: 20px; padding: 32px;
+  border: 1.5px solid #e8eaf0; box-shadow: 0 2px 16px rgba(0,0,0,.06);
+}
+.atf-section-title {
+  font-family: 'Fredoka One', cursive; font-size: 18px; color: var(--dark);
+  margin-bottom: 16px;
+}
+.atf-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 8px;
+}
+.atf-full { grid-column: 1 / -1; }
+.atf-field { display: flex; flex-direction: column; gap: 6px; }
+.atf-field label {
+  font-size: 12px; font-weight: 900; color: var(--mid);
+  text-transform: uppercase; letter-spacing: .4px;
+}
+.req { color: var(--orange); }
+.atf-field input, .atf-field select, .atf-field textarea {
+  padding: 11px 14px; border: 2px solid #e8eaf0; border-radius: 12px;
+  font-family: 'Nunito', sans-serif; font-size: 14px; font-weight: 600;
+  color: var(--dark); background: var(--white); outline: none;
+  transition: border-color .2s; width: 100%;
+}
+.atf-field input:focus, .atf-field select:focus, .atf-field textarea:focus { border-color: var(--blue); }
+.atf-field textarea { resize: vertical; min-height: 80px; }
+.atf-hint { font-size: 11px; color: var(--light); font-weight: 700; margin-top: 2px; }
+.atf-gen-btn {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  background: var(--blue-light); color: var(--blue); border: none;
+  border-radius: 8px; padding: 6px 12px; font-family: 'Nunito', sans-serif;
+  font-weight: 800; font-size: 12px; cursor: pointer;
+}
+.atf-divider { height: 1px; background: #e8eaf0; margin: 20px 0; }
+.atf-actions { display: flex; gap: 12px; justify-content: flex-end; padding-top: 8px; }
+
+/* Courses / grades checkbox grid */
+.atf-courses-grid, .atf-grades-grid {
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+.atf-check-opt {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 12px; border-radius: 10px;
+  border: 2px solid #e8eaf0; background: var(--bg);
+  cursor: pointer; font-size: 13px; font-weight: 700; color: var(--mid);
+  transition: .2s;
+}
+.atf-check-opt:hover { border-color: var(--blue); }
+.atf-check-opt input { display: none; }
+.atf-check-opt:has(input:checked) {
+  border-color: var(--blue); background: var(--blue-light); color: var(--blue);
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 700px) {
+  .atf-grid { grid-template-columns: 1fr; }
+  .atf-full { grid-column: 1; }
+}

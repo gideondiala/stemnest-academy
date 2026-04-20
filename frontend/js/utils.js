@@ -11,10 +11,14 @@ function navigate(page) {
   const inPages = window.location.pathname.includes('/pages/');
   const root    = inPages ? '../' : './';
   const map = {
-    home:             inPages ? '../index.html' : 'index.html',
-    courses:          root + 'pages/courses.html',
-    login:            root + 'pages/login.html',
-    'tutor-dashboard': root + 'pages/tutor-dashboard.html',
+    home:               inPages ? '../index.html' : 'index.html',
+    courses:            root + 'pages/courses.html',
+    login:              root + 'pages/login.html',
+    'tutor-dashboard':  root + 'pages/tutor-dashboard.html',
+    'student-dashboard': root + 'pages/student-dashboard.html',
+    'free-trial':       root + 'pages/free-trial.html',
+    'join-class':       root + 'pages/join-class.html',
+    'admin-dashboard':  root + 'pages/admin-dashboard.html',
   };
   if (map[page]) window.location.href = map[page];
 }

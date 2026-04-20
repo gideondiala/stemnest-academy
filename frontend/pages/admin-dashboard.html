@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard – StemNest Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/dashboard.css">
+  <link rel="stylesheet" href="../css/admin-dashboard.css">
+</head>
+<body>
+
+<nav style="position:sticky;top:0;z-index:200;">
+  <a class="logo" href="../index.html">
+    <div class="logo-icon">S</div>
+    <div class="logo-text">StemNest<span>Academy</span></div>
+  </a>
+  <ul class="nav-links"><li><a href="../index.html">← Back to Website</a></li></ul>
+  <div class="nav-actions">
+    <span style="font-size:13px;font-weight:700;color:var(--light);"><span class="live-dot"></span> Admin Panel</span>
+    <a href="login.html" class="btn btn-outline" style="font-size:13px;padding:8px 18px;">Log Out</a>
+  </div>
+</nav>
+
+<div class="dash-wrap">
+
+  <!-- SIDEBAR -->
+  <div class="dash-sidebar">
+    <div class="sidebar-profile">
+      <div class="sidebar-avatar" style="background:linear-gradient(135deg,var(--orange),#fbbf24);">AD</div>
+      <div class="sidebar-name">Admin</div>
+      <div class="sidebar-role">StemNest Admin</div>
+      <div class="sidebar-status"><span class="live-dot"></span> Online</div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="sidebar-section-label">Bookings</div>
+      <a class="sidebar-link active" data-tab="bookings"   onclick="showAdminTab('bookings')">  <span class="sl-icon">📋</span> All Bookings <span class="sl-badge" id="newBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="scheduled"  onclick="showAdminTab('scheduled')"> <span class="sl-icon">📅</span> Scheduled</a>
+      <a class="sidebar-link"        data-tab="completed"  onclick="showAdminTab('completed')"> <span class="sl-icon">✅</span> Completed</a>
+      <div class="sidebar-section-label">Teachers</div>
+      <a class="sidebar-link"        data-tab="tutors"     onclick="showAdminTab('tutors')">    <span class="sl-icon">👩‍🏫</span> All Teachers <span class="sl-badge" id="teacherBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="add-teacher" onclick="showAdminTab('add-teacher')"><span class="sl-icon">➕</span> Add Teacher</a>
+      <div class="sidebar-section-label">Links</div>
+      <a class="sidebar-link" href="free-trial.html" target="_blank"><span class="sl-icon">🔗</span> Landing Page</a>
+    </div>
+    <div class="sidebar-bottom">
+      <button class="logout-btn" onclick="window.location.href='login.html'">🚪 Log Out</button>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="dash-main">
+
+    <div class="dash-topbar">
+      <div>
+        <div class="dash-greeting">📋 Admin Dashboard</div>
+        <div class="dash-date" id="adminDate"></div>
+      </div>
+      <div class="dash-top-actions">
+        <button class="btn btn-outline" onclick="exportCSV()">⬇ Export CSV</button>
+        <button class="btn btn-primary" onclick="refreshBookings()">🔄 Refresh</button>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="dash-stats">
+      <div class="dstat ds-orange"><div class="dstat-icon di-orange">📋</div><div class="dstat-val" id="statTotal">0</div><div class="dstat-label">Total Bookings</div><div class="dstat-trend trend-up" id="statNew">0 new today</div></div>
+      <div class="dstat ds-blue"><div class="dstat-icon di-blue">⏳</div><div class="dstat-val" id="statPending">0</div><div class="dstat-label">Pending</div><div class="dstat-trend trend-neutral">Needs tutor assigned</div></div>
+      <div class="dstat ds-green"><div class="dstat-icon di-green">📅</div><div class="dstat-val" id="statScheduled">0</div><div class="dstat-label">Scheduled</div><div class="dstat-trend trend-up">Tutor assigned</div></div>
+      <div class="dstat ds-purple"><div class="dstat-icon di-purple">👩‍🏫</div><div class="dstat-val" id="statTeachers">0</div><div class="dstat-label">Teachers</div><div class="dstat-trend trend-up">On platform</div></div>
+    </div>
+
+    <!-- ── TAB: ALL BOOKINGS ── -->
+    <div id="tab-bookings">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📋 All Bookings</div>
+        <div class="admin-filters">
+          <input type="text" id="searchInput" placeholder="🔍 Search name, email, WhatsApp..." class="admin-search" oninput="filterBookings()">
+          <select id="filterSubject" class="admin-filter-sel" onchange="filterBookings()">
+            <option value="">All Subjects</option>
+            <option>Coding</option><option>Maths</option><option>Sciences</option>
+          </select>
+          <select id="filterStatus" class="admin-filter-sel" onchange="filterBookings()">
+            <option value="">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="scheduled">Scheduled</option>
+            <option value="completed">Completed</option>
+          </select>
+        </div>
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr>
+            <th>Booking ID</th><th>Student</th><th>Age/Grade</th><th>Subject</th>
+            <th>Date & Time</th><th>Parent Email</th><th>WhatsApp</th>
+            <th>Device</th><th>Booked At</th><th>Status</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="bookingsBody"></tbody>
+        </table>
+        <div class="admin-empty" id="adminEmpty" style="display:none;">
+          <div style="font-size:48px;">📭</div>
+          <div style="font-family:'Fredoka One',cursive;font-size:22px;color:var(--dark);margin-top:12px;">No bookings yet</div>
+          <div style="font-size:14px;color:var(--light);margin-top:8px;">Bookings from the landing page will appear here instantly.</div>
+          <a href="free-trial.html" target="_blank" class="btn btn-primary" style="margin-top:20px;">View Landing Page →</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB: SCHEDULED ── -->
+    <div id="tab-scheduled" style="display:none;">
+      <div class="dash-section-header"><div class="dash-section-title">📅 Scheduled Classes</div></div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr><th>Student</th><th>Subject</th><th>Date & Time</th><th>Tutor</th><th>Email</th><th>WhatsApp</th><th>Class Link</th><th>Actions</th></tr></thead>
+          <tbody id="scheduledBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── TAB: COMPLETED ── -->
+    <div id="tab-completed" style="display:none;">
+      <div class="dash-section-header"><div class="dash-section-title">✅ Completed Classes</div></div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr><th>Student</th><th>Subject</th><th>Date & Time</th><th>Tutor</th><th>Email</th><th>WhatsApp</th></tr></thead>
+          <tbody id="completedBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── TAB: ALL TEACHERS ── -->
+    <div id="tab-tutors" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">👩‍🏫 All Teachers</div>
+        <button class="btn btn-primary" style="font-size:13px;padding:9px 20px;" onclick="showAdminTab('add-teacher')">➕ Add Teacher</button>
+      </div>
+      <div class="tutor-assign-grid" id="tutorGrid"></div>
+    </div>
+
+    <!-- ── TAB: ADD TEACHER ── -->
+    <div id="tab-add-teacher" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">➕ Onboard New Teacher</div>
+      </div>
+      <div class="add-teacher-form-wrap">
+        <form class="add-teacher-form" id="addTeacherForm" onsubmit="return false;">
+
+          <div class="atf-section-title">👤 Personal Details</div>
+          <div class="atf-grid">
+            <div class="atf-field atf-full">
+              <label>Full Name <span class="req">*</span></label>
+              <input type="text" id="at-name" placeholder="e.g. Sarah Rahman" required>
+            </div>
+            <div class="atf-field">
+              <label>Email Address <span class="req">*</span></label>
+              <input type="email" id="at-email" placeholder="sarah@stemnest.co.uk" required>
+            </div>
+            <div class="atf-field">
+              <label>Phone Number</label>
+              <input type="tel" id="at-phone" placeholder="+44 7700 000000">
+            </div>
+            <div class="atf-field atf-full">
+              <label>Default Password <span class="req">*</span></label>
+              <div style="position:relative;">
+                <input type="text" id="at-password" placeholder="e.g. StemNest2024!" required>
+                <button type="button" class="atf-gen-btn" onclick="generatePassword()">🔀 Generate</button>
+              </div>
+              <div class="atf-hint">Teacher will be prompted to change this on first login.</div>
+            </div>
+          </div>
+
+          <div class="atf-divider"></div>
+          <div class="atf-section-title">📚 Teaching Profile</div>
+          <div class="atf-grid">
+            <div class="atf-field">
+              <label>Primary Subject <span class="req">*</span></label>
+              <select id="at-subject" required onchange="updateTeacherId()">
+                <option value="">Select subject</option>
+                <option value="Coding">💻 Coding</option>
+                <option value="Maths">📐 Maths</option>
+                <option value="Sciences">🔬 Sciences</option>
+              </select>
+            </div>
+            <div class="atf-field">
+              <label>Teacher ID (auto-generated)</label>
+              <input type="text" id="at-id" placeholder="e.g. CT001" readonly style="background:var(--bg);color:var(--blue);font-weight:900;">
+            </div>
+            <div class="atf-field atf-full">
+              <label>Courses Qualified to Teach <span class="req">*</span></label>
+              <div class="atf-courses-grid" id="atCoursesGrid"></div>
+            </div>
+            <div class="atf-field atf-full">
+              <label>Grade Groups Assigned <span class="req">*</span></label>
+              <div class="atf-grades-grid" id="atGradesGrid"></div>
+            </div>
+            <div class="atf-field atf-full">
+              <label>Short Bio</label>
+              <textarea id="at-bio" placeholder="Brief description of the teacher's background and expertise..."></textarea>
+            </div>
+            <div class="atf-field">
+              <label>Availability</label>
+              <select id="at-availability">
+                <option value="Mon–Fri, 9am–6pm">Mon–Fri, 9am–6pm</option>
+                <option value="Mon–Sat, 9am–6pm">Mon–Sat, 9am–6pm</option>
+                <option value="Mon–Fri, 2pm–9pm">Mon–Fri, 2pm–9pm</option>
+                <option value="Weekends Only">Weekends Only</option>
+                <option value="Flexible">Flexible</option>
+              </select>
+            </div>
+            <div class="atf-field">
+              <label>DBS Checked</label>
+              <select id="at-dbs">
+                <option value="yes">✅ Yes — DBS Verified</option>
+                <option value="pending">⏳ Pending</option>
+                <option value="no">❌ Not yet</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="atf-divider"></div>
+          <div class="atf-actions">
+            <button type="button" class="btn btn-outline" onclick="resetAddTeacherForm()">Clear Form</button>
+            <button type="button" class="btn btn-primary" onclick="saveNewTeacher()">✦ Create Teacher Account</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div><!-- end dash-main -->
+</div><!-- end dash-wrap -->
+
+<!-- ═══ ASSIGN TUTOR MODAL ═══ -->
+<div class="modal-overlay" id="assignModalOverlay">
+  <div class="modal" style="max-width:580px;">
+    <div class="modal-header">
+      <div class="modal-title">👩‍🏫 Assign Teacher</div>
+      <button class="modal-close" onclick="closeAssignModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="assignBookingInfo" style="background:var(--bg);border-radius:12px;padding:16px;margin-bottom:20px;font-size:14px;font-weight:700;color:var(--mid);line-height:1.8;"></div>
+
+      <!-- Available teachers for this subject -->
+      <div style="margin-bottom:16px;">
+        <div style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px;">Available Teachers</div>
+        <div id="availTeacherCards"></div>
+      </div>
+
+      <div class="field">
+        <label>Selected Teacher</label>
+        <select id="assignTutorSelect"></select>
+      </div>
+      <div class="field" style="margin-top:12px;">
+        <label>Class Link (Google Meet / Zoom) *</label>
+        <input type="url" id="assignClassLink" placeholder="https://meet.google.com/xxx-xxxx-xxx">
+      </div>
+      <div class="field" style="margin-top:12px;">
+        <label>Notes for Teacher (optional)</label>
+        <textarea id="assignNotes" style="min-height:60px;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;width:100%;outline:none;" placeholder="Any special notes..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeAssignModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="confirmAssign()">Assign & Notify Teacher ✦</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ BOOKING DETAIL MODAL ═══ -->
+<div class="modal-overlay" id="detailModalOverlay">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <div class="modal-title">📋 Booking Details</div>
+      <button class="modal-close" onclick="closeDetailModal()">✕</button>
+    </div>
+    <div class="modal-body" id="detailModalBody"></div>
+  </div>
+</div>
+
+<!-- ═══ TEACHER DETAIL MODAL ═══ -->
+<div class="modal-overlay" id="teacherDetailOverlay">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-header">
+      <div class="modal-title">👩‍🏫 Teacher Profile</div>
+      <button class="modal-close" onclick="closeTeacherDetail()">✕</button>
+    </div>
+    <div class="modal-body" id="teacherDetailBody"></div>
+  </div>
+</div>
+
+<script src="../js/utils.js"></script>
+<script src="../js/admin-dashboard.js"></script>
+</body>
+</html>

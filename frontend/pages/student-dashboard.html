@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Dashboard – StemNest Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/dashboard.css">
+  <link rel="stylesheet" href="../css/student-dashboard.css">
+</head>
+<body>
+
+<!-- ═══ TOP NAV ═══ -->
+<nav style="position:sticky;top:0;z-index:200;">
+  <a class="logo" href="../index.html">
+    <div class="logo-icon">S</div>
+    <div class="logo-text">StemNest<span>Academy</span></div>
+  </a>
+  <ul class="nav-links">
+    <li><a href="../index.html">← Back to Website</a></li>
+  </ul>
+  <div class="nav-actions">
+    <span style="font-size:13px;font-weight:700;color:var(--light);">
+      <span class="live-dot"></span> James Okafor — Online
+    </span>
+    <a href="login.html" class="btn btn-outline" style="font-size:13px;padding:8px 18px;">Log Out</a>
+  </div>
+</nav>
+
+<!-- ═══ DASHBOARD LAYOUT ═══ -->
+<div class="dash-wrap">
+
+  <!-- ═══ SIDEBAR ═══ -->
+  <div class="dash-sidebar">
+    <div class="sidebar-profile">
+      <div class="sidebar-avatar student-avatar" id="sidebarAvatar">JO</div>
+      <div class="sidebar-name" id="sidebarName">James Okafor</div>
+      <div class="sidebar-role">Student · Year 9</div>
+      <div class="student-id-badge">ID: SN-2024-0047</div>
+      <div class="sidebar-status"><span class="live-dot"></span> Online</div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="sidebar-section-label">My Learning</div>
+      <a class="sidebar-link active" data-tab="overview"      onclick="showTab('overview')">     <span class="sl-icon">🏠</span> Overview</a>
+      <a class="sidebar-link"        data-tab="lessons"       onclick="showTab('lessons')">      <span class="sl-icon">📚</span> My Lessons</a>
+      <a class="sidebar-link"        data-tab="projects"      onclick="showTab('projects')">     <span class="sl-icon">📁</span> My Projects     <span class="sl-badge" id="projBadge">3</span></a>
+      <a class="sidebar-link"        data-tab="quizzes"       onclick="showTab('quizzes')">      <span class="sl-icon">🧠</span> My Quizzes      <span class="sl-badge" id="quizBadge">2</span></a>
+      <a class="sidebar-link"        data-tab="certificates"  onclick="showTab('certificates')"> <span class="sl-icon">🏆</span> Certificates</a>
+      <div class="sidebar-section-label">Account</div>
+      <a class="sidebar-link" onclick="openProfileModal()"><span class="sl-icon">👤</span> My Profile</a>
+      <a class="sidebar-link" href="../index.html"><span class="sl-icon">🌐</span> Back to Website</a>
+    </div>
+    <div class="sidebar-bottom">
+      <button class="logout-btn" onclick="window.location.href='login.html'">🚪 Log Out</button>
+    </div>
+  </div>
+
+  <!-- ═══ MAIN CONTENT ═══ -->
+  <div class="dash-main">
+
+    <!-- Top bar -->
+    <div class="dash-topbar">
+      <div>
+        <div class="dash-greeting"><span id="greetingTime">Good morning ☀️</span>, <span style="color:var(--green);">James</span> 👋</div>
+        <div class="dash-date" id="dashDate"></div>
+      </div>
+      <div class="dash-top-actions">
+        <button class="btn btn-outline" onclick="openProfileModal()">👤 My Profile</button>
+        <button class="btn btn-green"   onclick="showTab('lessons')">📚 My Lessons</button>
+      </div>
+    </div>
+
+    <!-- Stat cards -->
+    <div class="dash-stats">
+      <div class="dstat ds-green">
+        <div class="dstat-icon di-green">📡</div>
+        <div class="dstat-val">12</div>
+        <div class="dstat-label">Classes Done</div>
+        <div class="dstat-trend trend-up">↑ 2 this week</div>
+      </div>
+      <div class="dstat ds-blue">
+        <div class="dstat-icon di-blue">📚</div>
+        <div class="dstat-val">3</div>
+        <div class="dstat-label">Courses Enrolled</div>
+        <div class="dstat-trend trend-up">Active learner</div>
+      </div>
+      <div class="dstat ds-orange">
+        <div class="dstat-icon di-orange">📁</div>
+        <div class="dstat-val">3</div>
+        <div class="dstat-label">Projects Pending</div>
+        <div class="dstat-trend trend-neutral">Due this week</div>
+      </div>
+      <div class="dstat ds-purple">
+        <div class="dstat-icon di-purple">🏆</div>
+        <div class="dstat-val">2</div>
+        <div class="dstat-label">Certificates</div>
+        <div class="dstat-trend trend-up">Keep going!</div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         TAB: OVERVIEW
+    ══════════════════════════════════════ -->
+    <div id="tab-overview">
+
+      <!-- JOIN LIVE CLASS CARD -->
+      <div class="join-class-card">
+        <div class="jc-left">
+          <div class="jc-live-pill"><span class="live-dot"></span> Live Now</div>
+          <div class="jc-title">Python for Beginners</div>
+          <div class="jc-meta">
+            <span>👩‍🏫 Tutor: Sarah Rahman</span>
+            <span>🕐 11:00 AM – 12:00 PM</span>
+            <span>📅 Today</span>
+          </div>
+          <div class="jc-desc">Today's topic: <strong>Functions & Return Values</strong> — Module 4 of 8</div>
+        </div>
+        <div class="jc-right">
+          <button class="join-class-btn" onclick="joinClass()">
+            🚀 Join Class Now
+          </button>
+          <div class="jc-note">Link opens in a new tab</div>
+        </div>
+      </div>
+
+      <!-- PROGRESS BARS -->
+      <div class="dash-section-header" style="margin-top:32px;">
+        <div class="dash-section-title">📊 My Course Progress</div>
+        <a class="dash-section-link" onclick="showTab('lessons')">View lessons →</a>
+      </div>
+      <div class="dash-panel" style="margin-bottom:32px;">
+        <div class="progress-list" id="progressList"></div>
+      </div>
+
+      <!-- UPCOMING LESSONS PREVIEW -->
+      <div class="dash-section-header">
+        <div class="dash-section-title">📅 Upcoming Lessons</div>
+        <a class="dash-section-link" onclick="showTab('lessons')">See all →</a>
+      </div>
+      <div class="dash-panel" style="margin-bottom:32px;">
+        <div class="session-list" id="upcomingPreview"></div>
+      </div>
+
+    </div><!-- end tab-overview -->
+
+    <!-- ══════════════════════════════════════
+         TAB: MY LESSONS
+    ══════════════════════════════════════ -->
+    <div id="tab-lessons" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📚 My Lessons</div>
+        <span style="font-size:13px;font-weight:800;color:var(--green);">Next 6 upcoming</span>
+      </div>
+
+      <div class="lessons-layout">
+        <!-- LEFT: lesson list -->
+        <div class="lessons-list-col">
+          <div id="lessonsList"></div>
+        </div>
+        <!-- RIGHT: module panel -->
+        <div class="lessons-module-col">
+          <div class="module-panel" id="modulePanel">
+            <div class="module-panel-empty">
+              <div style="font-size:48px;">📖</div>
+              <div style="font-family:'Fredoka One',cursive;font-size:20px;color:var(--dark);margin-top:12px;">Select a lesson</div>
+              <div style="font-size:14px;color:var(--light);margin-top:8px;">Click any lesson on the left to see its modules and what you'll cover.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div><!-- end tab-lessons -->
+
+    <!-- ══════════════════════════════════════
+         TAB: MY PROJECTS
+    ══════════════════════════════════════ -->
+    <div id="tab-projects" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📁 My Projects</div>
+      </div>
+
+      <!-- Pending -->
+      <div class="proj-section-label">🔲 Pending Projects</div>
+      <div class="student-project-grid" id="pendingProjects"></div>
+
+      <!-- Submitted -->
+      <div class="proj-section-label" style="margin-top:36px;">✅ Submitted Projects</div>
+      <div class="student-project-grid" id="submittedProjects"></div>
+    </div><!-- end tab-projects -->
+
+    <!-- ══════════════════════════════════════
+         TAB: MY QUIZZES
+    ══════════════════════════════════════ -->
+    <div id="tab-quizzes" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🧠 My Quizzes</div>
+      </div>
+
+      <!-- Pending quizzes -->
+      <div class="proj-section-label">📝 Pending Quizzes</div>
+      <div class="quiz-grid" id="pendingQuizzes"></div>
+
+      <!-- Completed quizzes -->
+      <div class="proj-section-label" style="margin-top:36px;">✅ Completed Quizzes</div>
+      <div class="quiz-grid" id="completedQuizzes"></div>
+    </div><!-- end tab-quizzes -->
+
+    <!-- ══════════════════════════════════════
+         TAB: CERTIFICATES
+    ══════════════════════════════════════ -->
+    <div id="tab-certificates" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🏆 My Certificates</div>
+        <span style="font-size:13px;font-weight:800;color:var(--light);" id="certCount">2 earned</span>
+      </div>
+      <div class="cert-grid" id="certGrid"></div>
+      <div class="cert-empty" id="certEmpty" style="display:none;">
+        <div style="font-size:56px;">🎓</div>
+        <div style="font-family:'Fredoka One',cursive;font-size:22px;color:var(--dark);margin-top:16px;">No certificates yet</div>
+        <div style="font-size:15px;color:var(--light);margin-top:8px;">Complete a course to earn your first certificate!</div>
+      </div>
+    </div><!-- end tab-certificates -->
+
+  </div><!-- end dash-main -->
+</div><!-- end dash-wrap -->
+
+<!-- ═══════════════════════════════════════════════════
+     PROJECT DETAIL MODAL
+═══════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="projectModalOverlay">
+  <div class="modal" style="max-width:680px;">
+    <div class="modal-header">
+      <div class="modal-title" id="projModalTitle">Project Title</div>
+      <button class="modal-close" onclick="closeProjectModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="proj-modal-meta" id="projModalMeta"></div>
+      <div class="proj-modal-brief" id="projModalBrief"></div>
+      <div class="proj-modal-steps" id="projModalSteps"></div>
+      <div class="proj-submit-area" id="projSubmitArea">
+        <label class="proj-submit-label">📝 Your Submission</label>
+        <textarea id="projSubmitText" placeholder="Describe your approach, paste your code, or share a link to your work..."></textarea>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:12px;" onclick="submitProject()">
+          Submit Project ✦
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     QUIZ PORTAL MODAL
+═══════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="quizModalOverlay">
+  <div class="modal quiz-modal">
+    <div class="modal-header">
+      <div class="modal-title" id="quizModalTitle">Quiz</div>
+      <div class="quiz-progress-wrap">
+        <span id="quizProgressText">Q 1 / 10</span>
+        <div class="quiz-progress-bar"><div class="quiz-progress-fill" id="quizProgressFill"></div></div>
+      </div>
+      <button class="modal-close" onclick="closeQuizModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="quizPortal"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     PROFILE MODAL
+═══════════════════════════════════════════════════ -->
+<div class="profile-modal-overlay" id="profileModalOverlay">
+  <div class="profile-modal">
+    <div class="pm-header">
+      <div class="pm-title">👤 My Profile</div>
+      <button class="modal-close" onclick="closeProfileModal()">✕</button>
+    </div>
+    <div class="pm-body">
+      <div class="pm-avatar-row">
+        <div class="pm-avatar student-avatar">JO</div>
+        <div>
+          <div style="font-weight:800;font-size:16px;color:var(--dark);">James Okafor</div>
+          <div style="font-size:12px;color:var(--light);font-weight:700;margin-top:4px;">Student ID: SN-2024-0047</div>
+        </div>
+      </div>
+      <div class="pm-field"><label>Full Name</label><input type="text" value="James Okafor"></div>
+      <div class="pm-field"><label>Email Address</label><input type="email" value="james.okafor@student.stemnest.co.uk"></div>
+      <div class="pm-field"><label>Year Group</label>
+        <select>
+          <option>Year 7</option><option>Year 8</option><option selected>Year 9</option>
+          <option>Year 10</option><option>Year 11</option><option>Year 12</option><option>Year 13</option>
+        </select>
+      </div>
+      <div class="pm-field"><label>Parent / Guardian Email</label><input type="email" placeholder="parent@email.com"></div>
+      <div class="pm-footer">
+        <button class="btn btn-outline" onclick="closeProfileModal()">Cancel</button>
+        <button class="btn btn-green" onclick="saveProfile()">Save Changes ✦</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     CERTIFICATE PREVIEW MODAL
+═══════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="certModalOverlay">
+  <div class="modal cert-preview-modal">
+    <div class="modal-header">
+      <div class="modal-title">🏆 Certificate Preview</div>
+      <button class="modal-close" onclick="closeCertModal()">✕</button>
+    </div>
+    <div class="modal-body" style="padding:0;">
+      <div class="certificate-doc" id="certificateDoc">
+        <!-- rendered by JS -->
+      </div>
+      <div style="padding:20px 28px;display:flex;gap:12px;justify-content:flex-end;border-top:1px solid #e8eaf0;">
+        <button class="btn btn-outline" onclick="closeCertModal()">Close</button>
+        <button class="btn btn-primary" onclick="downloadCert()">⬇ Download PDF</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/utils.js"></script>
+<script src="../js/student-dashboard.js"></script>
+</body>
+</html>
