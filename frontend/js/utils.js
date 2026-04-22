@@ -16,9 +16,11 @@ function navigate(page) {
     login:              root + 'pages/login.html',
     'tutor-dashboard':  root + 'pages/tutor-dashboard.html',
     'student-dashboard': root + 'pages/student-dashboard.html',
-    'free-trial':       root + 'pages/free-trial.html',
-    'join-class':       root + 'pages/join-class.html',
-    'admin-dashboard':  root + 'pages/admin-dashboard.html',
+    'free-trial':        root + 'pages/free-trial.html',
+    'join-class':        root + 'pages/join-class.html',
+    'admin-dashboard':   root + 'pages/admin-dashboard.html',
+    'teach-with-us':     root + 'pages/teach-with-us.html',
+    'sales-dashboard':   root + 'pages/sales-dashboard.html',
   };
   if (map[page]) window.location.href = map[page];
 }

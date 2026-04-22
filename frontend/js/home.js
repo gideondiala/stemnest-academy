@@ -19,7 +19,6 @@ function initWordRotation() {
   setInterval(() => {
     idx = (idx + 1) % words.length;
 
-    // Fade out + slide up
     el.style.transition = 'all 0.3s ease';
     el.style.opacity    = '0';
     el.style.transform  = 'translateY(-20px)';
@@ -30,7 +29,6 @@ function initWordRotation() {
       el.style.opacity    = '0';
       el.style.transform  = 'translateY(20px)';
 
-      // Fade in + slide to position
       setTimeout(() => {
         el.style.transition = 'all 0.4s ease';
         el.style.opacity    = '1';
@@ -46,7 +44,6 @@ function initScrollReveal() {
     entries.forEach(e => {
       if (e.isIntersecting) {
         e.target.classList.add('visible');
-        // Unobserve after first reveal for performance
         observer.unobserve(e.target);
       }
     });

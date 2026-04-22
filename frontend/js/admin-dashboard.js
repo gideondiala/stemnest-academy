@@ -86,7 +86,7 @@ function isTeacherAvailableAt(teacherId, dateStr, timeStr) {
 let allBookings      = [];
 let filteredBookings = [];
 let activeAssignId   = null;
-const ADMIN_TABS     = ['bookings','scheduled','completed','tutors','add-teacher'];
+const ADMIN_TABS     = ['bookings','scheduled','completed','tutors','add-teacher','courses','add-course'];
 
 /* ── INIT ── */
 document.addEventListener('DOMContentLoaded', () => {
@@ -95,9 +95,10 @@ document.addEventListener('DOMContentLoaded', () => {
   renderTutors();
   buildAddTeacherForm();
   bindModalCloses();
+  // Seed courses if needed
+  getAdminCourses();
   showAdminTab('bookings');
 });
-
 function setAdminDate() {
   const el = document.getElementById('adminDate');
   if (el) el.textContent = new Date().toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
@@ -116,6 +117,8 @@ function showAdminTab(tab) {
   if (tab === 'completed')   renderCompletedTab();
   if (tab === 'tutors')      renderTutors();
   if (tab === 'add-teacher') resetAddTeacherForm();
+  if (tab === 'courses')     renderCoursesTable();
+  if (tab === 'add-course')  buildCourseForm();
 }
 
 /* ══════════════════════════════════════════════════════
@@ -138,9 +141,11 @@ function updateStats() {
   setText('statPending',   allBookings.filter(b => b.status === 'pending').length);
   setText('statScheduled', allBookings.filter(b => b.status === 'scheduled').length);
   setText('statTeachers',  teachers.length);
+  setText('statCourses',   getAdminCourses().length);
   setText('statNew',       allBookings.filter(b => b.bookedAt?.startsWith(today)).length + ' new today');
   setText('newBadge',      allBookings.filter(b => b.status === 'pending').length);
   setText('teacherBadge',  teachers.length);
+  setText('courseBadge',   getAdminCourses().length);
 }
 
 function setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
@@ -609,3 +614,501 @@ function formatDateTime(iso) {
   catch { return iso; }
 }
 function capitalise(str) { return str ? str.charAt(0).toUpperCase()+str.slice(1) : '—'; }
+
+/* ══════════════════════════════════════════════════════
+   COURSE MANAGEMENT (Admin only)
+══════════════════════════════════════════════════════ */
+
+const COURSE_EMOJIS = ['💻','📐','🔬','⚗️','🧬','🧪','🤖','🧠','📊','📡','🎮','🌍','🏗️','✏️','📱','🛰️','🔭','🧲','💡','🖥️'];
+const COURSE_COLORS = [
+  { id:'blue',   hex:'#1a56db', label:'Blue'   },
+  { id:'green',  hex:'#0e9f6e', label:'Green'  },
+  { id:'orange', hex:'#ff6b35', label:'Orange' },
+  { id:'purple', hex:'#7c3aed', label:'Purple' },
+  { id:'teal',   hex:'#0694a2', label:'Teal'   },
+  { id:'pink',   hex:'#e63387', label:'Pink'   },
+];
+
+let acSelectedEmoji = '💻';
+let acSelectedColor = 'blue';
+let editingCourseId = null; // null = adding new, string = editing existing
+
+/* ── Helpers ── */
+function getAdminCourses() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('sn_courses') || '[]');
+    if (stored.length === 0) {
+      // Seed defaults from courses.js DEFAULT_COURSES equivalent
+      const defaults = [
+        { id:'CRS001', name:'Python for Beginners',    desc:'Learn to code from scratch with Python — variables, loops, functions and your first real programs.',                subject:'coding',   age:'Ages 10–14', price:99,  classes:24, rating:4.9, students:312, emoji:'💻', color:'blue',   badge:'popular', level:'Beginner',     duration:'6 months' },
+        { id:'CRS002', name:'Scratch & Game Design',   desc:'Build fun interactive games using Scratch. Perfect intro to computational thinking.',                              subject:'coding',   age:'Ages 7–10',  price:79,  classes:16, rating:4.8, students:245, emoji:'🎮', color:'purple', badge:'',        level:'Beginner',     duration:'4 months' },
+        { id:'CRS003', name:'Web Dev: HTML, CSS & JS', desc:'Design and build real websites from zero. HTML structure, CSS styling and JavaScript interactivity.',               subject:'coding',   age:'Ages 13–19', price:129, classes:32, rating:4.9, students:178, emoji:'📱', color:'blue',   badge:'new',     level:'Intermediate', duration:'8 months' },
+        { id:'CRS004', name:'GCSE Maths Prep',         desc:'Targeted support aligned to the GCSE syllabus. Master number, algebra, geometry and statistics.',                  subject:'maths',    age:'Ages 14–16', price:109, classes:28, rating:4.9, students:401, emoji:'📐', color:'green',  badge:'popular', level:'Intermediate', duration:'7 months' },
+        { id:'CRS005', name:'Primary Maths Boost',     desc:'Build strong foundations in numbers, fractions, times tables and problem solving for KS2 learners.',               subject:'maths',    age:'Ages 7–11',  price:79,  classes:20, rating:4.8, students:293, emoji:'📊', color:'teal',   badge:'',        level:'Beginner',     duration:'5 months' },
+        { id:'CRS006', name:'A-Level Maths Mastery',   desc:'Deep-dive into pure maths, statistics and mechanics for A-Level students aiming for top grades.',                  subject:'maths',    age:'Ages 16–19', price:149, classes:40, rating:4.9, students:134, emoji:'🧠', color:'green',  badge:'',        level:'Advanced',     duration:'10 months' },
+        { id:'CRS007', name:'GCSE Biology',            desc:'Cells, genetics, ecosystems and the human body — expert-led sessions covering the full GCSE spec.',                subject:'sciences', age:'Ages 14–16', price:109, classes:28, rating:4.7, students:221, emoji:'🧬', color:'orange', badge:'',        level:'Intermediate', duration:'7 months' },
+        { id:'CRS008', name:'GCSE Chemistry',          desc:'From atomic structure to organic chemistry — build exam confidence with a specialist chemistry tutor.',             subject:'sciences', age:'Ages 14–16', price:109, classes:28, rating:4.8, students:198, emoji:'⚗️', color:'orange', badge:'',        level:'Intermediate', duration:'7 months' },
+        { id:'CRS009', name:'A-Level Physics',         desc:'Mechanics, waves, electricity and modern physics — for students pushing for top university offers.',                subject:'sciences', age:'Ages 16–19', price:149, classes:40, rating:4.9, students:97,  emoji:'🛰️', color:'teal',   badge:'new',     level:'Advanced',     duration:'10 months' },
+      ];
+      localStorage.setItem('sn_courses', JSON.stringify(defaults));
+      return defaults;
+    }
+    return stored;
+  } catch { return []; }
+}
+
+function saveAdminCourses(list) {
+  localStorage.setItem('sn_courses', JSON.stringify(list));
+}
+
+function nextCourseId() {
+  const courses = getAdminCourses();
+  const nums    = courses.map(c => parseInt(c.id.replace('CRS','')) || 0);
+  const next    = nums.length ? Math.max(...nums) + 1 : 1;
+  return 'CRS' + String(next).padStart(3, '0');
+}
+
+/* ── Render courses table ── */
+function renderCoursesTable() {
+  const tbody = document.getElementById('coursesTableBody');
+  if (!tbody) return;
+  const courses = getAdminCourses();
+  setText('statCourses', courses.length);
+  setText('courseBadge', courses.length);
+
+  if (courses.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:32px;color:var(--light);">No courses yet. Add the first one!</td></tr>';
+    return;
+  }
+
+  const subjectLabel = { coding:'💻 Coding', maths:'📐 Maths', sciences:'🔬 Sciences' };
+  const badgeLabel   = { popular:'🔥 Popular', new:'✨ New', '':'—' };
+  const levelColor   = { Beginner:'var(--green)', Intermediate:'var(--orange)', Advanced:'var(--blue)' };
+
+  tbody.innerHTML = courses.map(c => `
+    <tr>
+      <td><span style="font-family:'Fredoka One',cursive;font-size:12px;color:var(--blue);">${c.id}</span></td>
+      <td><strong>${c.emoji} ${c.name}</strong></td>
+      <td><span class="ab-subject ab-${c.subject}">${subjectLabel[c.subject] || c.subject}</span></td>
+      <td><span style="font-size:12px;font-weight:800;color:${levelColor[c.level]||'var(--mid)'};">${c.level||'—'}</span></td>
+      <td style="font-size:12px;">${c.age}</td>
+      <td><strong>£${c.price}</strong></td>
+      <td>${c.classes}</td>
+      <td>${(c.students||0).toLocaleString()}</td>
+      <td>
+        <span style="color:#f59e0b;">★</span>
+        <strong>${c.rating}</strong>
+      </td>
+      <td style="font-size:12px;">${c.duration||'—'}</td>
+      <td>${badgeLabel[c.badge||'']}</td>
+      <td>
+        <button class="ab-btn ab-btn-assign" onclick="editCourse('${c.id}')">✏️ Edit</button>
+        <button class="ab-btn" style="background:var(--orange-light);color:var(--orange-dark);" onclick="deleteCourse('${c.id}')">🗑 Delete</button>
+      </td>
+    </tr>`).join('');
+}
+
+/* ── Build emoji + colour pickers ── */
+function buildCourseForm() {
+  const eg = document.getElementById('acEmojiGrid');
+  if (eg) {
+    eg.innerHTML = COURSE_EMOJIS.map(em => `
+      <button type="button" class="ac-emoji-btn ${em === acSelectedEmoji ? 'selected' : ''}"
+              onclick="selectCourseEmoji(this,'${em}')">${em}</button>`).join('');
+  }
+  const cg = document.getElementById('acColorGrid');
+  if (cg) {
+    cg.innerHTML = COURSE_COLORS.map(co => `
+      <div class="ac-color-swatch ${co.id === acSelectedColor ? 'selected' : ''}"
+           style="background:${co.hex};" title="${co.label}"
+           onclick="selectCourseColor(this,'${co.id}')"></div>`).join('');
+  }
+  // Set auto-generated ID
+  if (!editingCourseId) {
+    const idEl = document.getElementById('ac-id');
+    if (idEl) idEl.value = nextCourseId();
+  }
+}
+
+function selectCourseEmoji(btn, emoji) {
+  acSelectedEmoji = emoji;
+  document.querySelectorAll('.ac-emoji-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+function selectCourseColor(swatch, colorId) {
+  acSelectedColor = colorId;
+  document.querySelectorAll('.ac-color-swatch').forEach(s => s.classList.remove('selected'));
+  swatch.classList.add('selected');
+}
+
+/* ── Edit existing course ── */
+function editCourse(id) {
+  const c = getAdminCourses().find(x => x.id === id);
+  if (!c) return;
+  editingCourseId = id;
+
+  // Set title
+  const titleEl = document.getElementById('addCourseTabTitle');
+  if (titleEl) titleEl.textContent = '✏️ Edit Course';
+  const btnEl = document.getElementById('saveCourseBtn');
+  if (btnEl) btnEl.textContent = '✦ Update Course';
+
+  showAdminTab('add-course');
+
+  // Populate fields
+  const set = (elId, val) => { const el = document.getElementById(elId); if (el) el.value = val || ''; };
+  set('ac-id',       c.id);
+  set('ac-name',     c.name);
+  set('ac-desc',     c.desc);
+  set('ac-subject',  c.subject);
+  set('ac-level',    c.level || '');
+  set('ac-age',      c.age);
+  set('ac-badge',    c.badge || '');
+  set('ac-price',    c.price);
+  set('ac-classes',  c.classes);
+  set('ac-duration', c.duration || '');
+  set('ac-students', c.students || 0);
+  set('ac-rating',   c.rating);
+
+  acSelectedEmoji = c.emoji || '💻';
+  acSelectedColor = c.color || 'blue';
+  buildCourseForm();
+}
+
+/* ── Delete course ── */
+function deleteCourse(id) {
+  const c = getAdminCourses().find(x => x.id === id);
+  if (!c) return;
+  if (!confirm(`Delete "${c.name}" (${c.id})? This will remove it from the public catalogue.`)) return;
+  const updated = getAdminCourses().filter(x => x.id !== id);
+  saveAdminCourses(updated);
+  renderCoursesTable();
+  showToast(`"${c.name}" deleted.`);
+}
+
+/* ── Save / update course ── */
+function saveCourse() {
+  const name    = document.getElementById('ac-name')?.value.trim();
+  const desc    = document.getElementById('ac-desc')?.value.trim();
+  const subject = document.getElementById('ac-subject')?.value;
+  const level   = document.getElementById('ac-level')?.value;
+  const age     = document.getElementById('ac-age')?.value.trim();
+  const price   = parseFloat(document.getElementById('ac-price')?.value);
+  const classes = parseInt(document.getElementById('ac-classes')?.value);
+
+  if (!name)              { showToast('Please enter a course title.', 'error'); return; }
+  if (!desc)              { showToast('Please enter a description.', 'error'); return; }
+  if (!subject)           { showToast('Please select a subject category.', 'error'); return; }
+  if (!level)             { showToast('Please select a level.', 'error'); return; }
+  if (!age)               { showToast('Please enter an age range.', 'error'); return; }
+  if (!price || isNaN(price)) { showToast('Please enter a valid price.', 'error'); return; }
+  if (!classes || isNaN(classes)) { showToast('Please enter the number of classes.', 'error'); return; }
+
+  const courseData = {
+    id:       editingCourseId || nextCourseId(),
+    name,
+    desc,
+    subject,
+    level,
+    age,
+    price,
+    classes,
+    duration: document.getElementById('ac-duration')?.value.trim() || '',
+    students: parseInt(document.getElementById('ac-students')?.value) || 0,
+    rating:   parseFloat(document.getElementById('ac-rating')?.value) || 5.0,
+    badge:    document.getElementById('ac-badge')?.value || '',
+    emoji:    acSelectedEmoji,
+    color:    acSelectedColor,
+  };
+
+  const all = getAdminCourses();
+  if (editingCourseId) {
+    const idx = all.findIndex(c => c.id === editingCourseId);
+    if (idx !== -1) all[idx] = courseData;
+    showToast(`✅ "${name}" updated successfully!`);
+  } else {
+    all.push(courseData);
+    showToast(`✅ "${name}" (${courseData.id}) added to catalogue!`);
+  }
+
+  saveAdminCourses(all);
+  resetCourseForm();
+  showAdminTab('courses');
+}
+
+/* ── Reset course form ── */
+function resetCourseForm() {
+  editingCourseId = null;
+  const titleEl = document.getElementById('addCourseTabTitle');
+  if (titleEl) titleEl.textContent = '➕ Add New Course';
+  const btnEl = document.getElementById('saveCourseBtn');
+  if (btnEl) btnEl.textContent = '✦ Save Course';
+
+  ['ac-name','ac-desc','ac-age','ac-price','ac-classes','ac-duration','ac-students','ac-rating'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  const subj = document.getElementById('ac-subject'); if (subj) subj.value = '';
+  const lvl  = document.getElementById('ac-level');   if (lvl)  lvl.value  = '';
+  const bdg  = document.getElementById('ac-badge');   if (bdg)  bdg.value  = '';
+
+  acSelectedEmoji = '💻';
+  acSelectedColor = 'blue';
+  buildCourseForm();
+}
+
+/* ══════════════════════════════════════════════════════
+   SALES PERSONS REGISTRY
+══════════════════════════════════════════════════════ */
+const SP_COLORS = [
+  'linear-gradient(135deg,#ff6b35,#fbbf24)',
+  'linear-gradient(135deg,#7c3aed,#a78bfa)',
+  'linear-gradient(135deg,#0694a2,#67e8f9)',
+  'linear-gradient(135deg,#e63387,#f9a8d4)',
+];
+
+function getSalesPersons() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('sn_sales_persons') || '[]');
+    if (stored.length === 0) {
+      const defaults = [
+        { id:'SP001', name:'Alex Johnson', initials:'AJ', email:'alex.johnson@stemnest.co.uk', phone:'+44 7700 222001', password:'StemNest2024!', region:'UK & Europe', bio:'Senior academic counselor with 3 years experience.', color:SP_COLORS[0], photo:null, createdAt: new Date().toISOString() },
+      ];
+      localStorage.setItem('sn_sales_persons', JSON.stringify(defaults));
+      return defaults;
+    }
+    return stored;
+  } catch { return []; }
+}
+function saveSalesPersons(list) { localStorage.setItem('sn_sales_persons', JSON.stringify(list)); }
+
+function nextSalesId() {
+  const all  = getSalesPersons();
+  const nums = all.map(s => parseInt(s.id.replace('SP','')) || 0);
+  const next = nums.length ? Math.max(...nums) + 1 : 1;
+  return 'SP' + String(next).padStart(3, '0');
+}
+
+/* ── Render sales grid ── */
+function renderSalesGrid() {
+  const grid = document.getElementById('salesGrid');
+  if (!grid) return;
+  const persons = getSalesPersons();
+  setText('salesBadge', persons.length);
+
+  if (!persons.length) {
+    grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--light);font-weight:700;">No sales persons yet.</div>';
+    return;
+  }
+
+  grid.innerHTML = persons.map(s => {
+    const pipeline = JSON.parse(localStorage.getItem('sn_pipeline_' + s.id) || '[]');
+    const converted = pipeline.filter(p => p.status === 'converted').length;
+    const revenue   = pipeline.filter(p => p.status === 'converted').reduce((sum, p) => sum + (parseFloat(p.paymentAmount) || 0), 0);
+    return `
+      <div class="tutor-card">
+        <div class="tutor-card-av" style="background:${s.color||SP_COLORS[0]}">${s.initials}</div>
+        <div class="tutor-card-id">${s.id}</div>
+        <div class="tutor-card-name">${s.name}</div>
+        <div class="tutor-card-subject">Academic Counselor</div>
+        <div class="tutor-card-avail">🌍 ${s.region || '—'}</div>
+        <div class="tutor-card-avail" style="color:var(--green);">✅ ${converted} conversions · £${revenue.toLocaleString()}</div>
+        <div style="display:flex;gap:8px;margin-top:12px;justify-content:center;">
+          <button class="ab-btn ab-btn-view" onclick="viewSalesPerson('${s.id}')">👁 View</button>
+          <button class="ab-btn" style="background:var(--orange-light);color:var(--orange-dark);" onclick="deleteSalesPerson('${s.id}')">🗑 Remove</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function viewSalesPerson(id) {
+  const s = getSalesPersons().find(x => x.id === id);
+  if (!s) return;
+  const pipeline  = JSON.parse(localStorage.getItem('sn_pipeline_' + id) || '[]');
+  const converted = pipeline.filter(p => p.status === 'converted').length;
+  showToast(`${s.name} · ${converted} conversions`, 'info');
+}
+
+function deleteSalesPerson(id) {
+  const s = getSalesPersons().find(x => x.id === id);
+  if (!s || !confirm(`Remove ${s.name} (${s.id})?`)) return;
+  saveSalesPersons(getSalesPersons().filter(x => x.id !== id));
+  renderSalesGrid();
+  showToast(`${s.name} removed.`);
+}
+
+/* ── Add sales person form ── */
+document.addEventListener('DOMContentLoaded', () => {
+  // Auto-generate SP ID on page load
+  const idEl = document.getElementById('sp-id');
+  if (idEl) idEl.value = nextSalesId();
+});
+
+function generateSalesPassword() {
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#';
+  const pw    = 'SN' + Array.from({length:8}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+  const el    = document.getElementById('sp-password');
+  if (el) el.value = pw;
+}
+
+function resetSalesForm() {
+  ['sp-name','sp-email','sp-phone','sp-password','sp-region','sp-bio'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  const idEl = document.getElementById('sp-id');
+  if (idEl) idEl.value = nextSalesId();
+}
+
+function saveNewSalesPerson() {
+  const name     = document.getElementById('sp-name')?.value.trim();
+  const email    = document.getElementById('sp-email')?.value.trim();
+  const password = document.getElementById('sp-password')?.value.trim();
+  if (!name)     { showToast('Please enter a name.', 'error'); return; }
+  if (!email)    { showToast('Please enter an email.', 'error'); return; }
+  if (!password) { showToast('Please set a password.', 'error'); return; }
+
+  const existing = getSalesPersons();
+  if (existing.some(s => s.email.toLowerCase() === email.toLowerCase())) {
+    showToast('A sales person with this email already exists.', 'error'); return;
+  }
+
+  const id       = nextSalesId();
+  const initials = name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+  const newSP    = {
+    id, name, initials, email, password,
+    phone:     document.getElementById('sp-phone')?.value.trim(),
+    region:    document.getElementById('sp-region')?.value.trim(),
+    bio:       document.getElementById('sp-bio')?.value.trim(),
+    color:     SP_COLORS[existing.length % SP_COLORS.length],
+    photo:     null,
+    createdAt: new Date().toISOString(),
+  };
+
+  existing.push(newSP);
+  saveSalesPersons(existing);
+
+  console.log(`📧 WELCOME EMAIL TO: ${email}
+Hi ${name.split(' ')[0]}, your StemNest Academic Counselor account is ready.
+ID: ${id} | Password: ${password}
+Dashboard: ${window.location.origin}/frontend/pages/sales-dashboard.html`);
+
+  showToast(`✅ ${name} (${id}) created! Welcome email sent.`);
+  resetSalesForm();
+  showAdminTab('sales');
+}
+
+/* ── Populate sales select in assign modal ── */
+function populateSalesSelect() {
+  const sel = document.getElementById('assignSalesSelect');
+  if (!sel) return;
+  const persons = getSalesPersons();
+  sel.innerHTML = '<option value="">— Select sales person —</option>' +
+    persons.map(s => `<option value="${s.id}">${s.name} (${s.id}) · ${s.region || 'Global'}</option>`).join('');
+}
+
+/* ── CLASS REPORTS TAB ── */
+function renderClassReports() {
+  const tbody = document.getElementById('classReportsBody');
+  if (!tbody) return;
+  const filter  = document.getElementById('reportFilter')?.value || 'all';
+  const reports = JSON.parse(localStorage.getItem('sn_class_reports') || '[]');
+  const bookings = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+
+  let list = reports;
+  if (filter === 'completed')  list = reports.filter(r => r.outcome === 'completed');
+  if (filter === 'incomplete') list = reports.filter(r => r.outcome === 'incomplete');
+
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--light);">No class reports yet.</td></tr>';
+    return;
+  }
+
+  const qualityLabel = { excellent:'⭐⭐⭐⭐⭐', good:'⭐⭐⭐⭐', average:'⭐⭐⭐', poor:'⭐⭐' };
+  const interestLabel = { very_high:'🔥 Very High', high:'✅ High', medium:'🤔 Medium', low:'😐 Low', none:'❌ None' };
+  const salesStatusLabel = { converted:'✅ Converted', pitched:'📣 Pitched', interested:'🔥 Interested', followup:'📞 Follow-up', lost:'❌ Lost' };
+
+  tbody.innerHTML = list.map(r => {
+    const b = bookings.find(x => x.id === r.bookingId) || {};
+    const pipeline = JSON.parse(localStorage.getItem('sn_pipeline_' + (b.assignedSalesId || '')) || '[]');
+    const pitchRecord = pipeline.find(p => p.bookingId === r.bookingId);
+    return `
+      <tr>
+        <td><strong>${b.studentName || r.bookingId}</strong></td>
+        <td><span class="ab-subject ab-${(b.subject||'').toLowerCase()}">${b.subject||'—'}</span></td>
+        <td style="font-size:12px;">${formatDate(b.date)} ${b.time||''}</td>
+        <td style="font-size:12px;">${r.tutorName||'—'}</td>
+        <td><span class="ab-status ${r.outcome==='completed'?'ab-scheduled':'ab-pending'}">${r.outcome==='completed'?'✅ Complete':'❌ Incomplete'}</span></td>
+        <td>${r.outcome==='completed' ? (qualityLabel[r.classQuality]||r.classQuality||'—') : `<span style="font-size:12px;color:var(--light);">${r.incompleteReason?.slice(0,40)||'—'}</span>`}</td>
+        <td>${r.outcome==='completed' ? (interestLabel[r.studentInterest]||'—') : '—'}</td>
+        <td style="font-size:12px;">${b.assignedSalesName||'—'}</td>
+        <td>${pitchRecord ? `<span class="ab-status ab-${pitchRecord.status==='converted'?'completed':'pending'}">${salesStatusLabel[pitchRecord.status]||pitchRecord.status}</span>` : '—'}</td>
+        <td style="font-size:12px;max-width:160px;">${r.notes||r.incompleteReason||'—'}</td>
+      </tr>`;
+  }).join('');
+}
+
+/* ── Hook sales into showAdminTab and updateStats ── */
+const _origShowAdminTab = showAdminTab;
+showAdminTab = function(tab) {
+  // Extend ADMIN_TABS array if needed
+  if (!ADMIN_TABS.includes('sales'))         ADMIN_TABS.push('sales');
+  if (!ADMIN_TABS.includes('add-sales'))     ADMIN_TABS.push('add-sales');
+  if (!ADMIN_TABS.includes('class-reports')) ADMIN_TABS.push('class-reports');
+  _origShowAdminTab(tab);
+  if (tab === 'sales')         renderSalesGrid();
+  if (tab === 'class-reports') renderClassReports();
+  if (tab === 'add-sales') {
+    const idEl = document.getElementById('sp-id');
+    if (idEl) idEl.value = nextSalesId();
+  }
+};
+
+/* ── Extend confirmAssign to attach sales person ── */
+const _origConfirmAssign = confirmAssign;
+confirmAssign = function() {
+  const salesId = document.getElementById('assignSalesSelect')?.value;
+  const salesPerson = salesId ? getSalesPersons().find(s => s.id === salesId) : null;
+
+  // Patch the booking with sales person before calling original
+  if (salesId && activeAssignId) {
+    updateBooking(activeAssignId, {
+      assignedSalesId:   salesId,
+      assignedSalesName: salesPerson?.name || '—',
+    });
+    // Notify sales person
+    if (salesPerson) {
+      const b = allBookings.find(x => x.id === activeAssignId);
+      console.log(`📧 SALES NOTIFICATION TO: ${salesPerson.email}
+Subject: New Demo Class Assigned — ${b?.subject} with ${b?.studentName}
+
+Hi ${salesPerson.name.split(' ')[0]},
+
+A demo class has been assigned to you for counseling:
+
+🎓 Student:  ${b?.studentName} (${b?.grade}, Age ${b?.age})
+📚 Subject:  ${b?.subject}
+📅 Date:     ${formatDate(b?.date)}
+🕐 Time:     ${b?.time}
+👩‍🏫 Teacher: ${b?.assignedTutor || 'TBD'}
+
+You will join at the END of the class to pitch courses to the parent.
+Dashboard: ${window.location.origin}/frontend/pages/sales-dashboard.html
+
+StemNest Academy`);
+    }
+  }
+  _origConfirmAssign();
+};
+
+/* ── Populate sales select when assign modal opens ── */
+const _origOpenAssignModal = openAssignModal;
+openAssignModal = function(id) {
+  _origOpenAssignModal(id);
+  populateSalesSelect();
+};
+
+/* ── Update stats to include sales count ── */
+const _origUpdateStats = updateStats;
+updateStats = function() {
+  _origUpdateStats();
+  setText('salesBadge', getSalesPersons().length);
+};

@@ -135,7 +135,7 @@
       <div class="dash-panel">
         <div class="session-list">
           <div class="session-item"><div class="sess-time"><div class="sess-time-val">9:00</div><div class="sess-time-label">Today</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">James Okafor</div><div class="sess-subject">Python for Beginners · Year 9 · 60 mins</div></div><span class="sess-badge sb-done">Done</span></div>
-          <div class="session-item live"><div class="sess-time"><div class="sess-time-val">11:00</div><div class="sess-time-label">Today</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">Aisha Taiwo</div><div class="sess-subject">Web Dev: HTML, CSS & JS · Year 11 · 45 mins</div></div><span class="sess-badge sb-live">🔴 Live Now</span><button class="join-btn">Join →</button></div>
+          <div class="session-item live"><div class="sess-time"><div class="sess-time-val">11:00</div><div class="sess-time-label">Today</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">Aisha Taiwo</div><div class="sess-subject">Web Dev: HTML, CSS & JS · Year 11 · 45 mins</div></div><span class="sess-badge sb-live">🔴 Live Now</span><button class="join-btn">Join →</button><button class="end-class-btn" onclick="openEndClassModal('demo-aisha')">🔴 End Class</button></div>
           <div class="session-item"><div class="sess-time"><div class="sess-time-val">2:00</div><div class="sess-time-label">Today</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">Marcus Kofi</div><div class="sess-subject">Scratch & Game Design · Year 5 · 45 mins</div></div><span class="sess-badge sb-upcoming">Upcoming</span></div>
           <div class="session-item"><div class="sess-time"><div class="sess-time-val">4:30</div><div class="sess-time-label">Today</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">Emeka Sule</div><div class="sess-subject">A-Level Computer Science · Year 13 · 60 mins</div></div><span class="sess-badge sb-upcoming">Upcoming</span></div>
           <div class="session-item"><div class="sess-time"><div class="sess-time-val">10:00</div><div class="sess-time-label">Tomorrow</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">Fatima Nwosu</div><div class="sess-subject">Python for Beginners · Year 8 · 60 mins</div></div><span class="sess-badge sb-upcoming">Upcoming</span></div>
@@ -228,6 +228,79 @@
       <div class="pm-footer">
         <button class="btn btn-outline" onclick="closeProfileModal()">Cancel</button>
         <button class="btn btn-primary" onclick="saveProfile()">Save Changes ✦</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ END CLASS MODAL ═══ -->
+<div class="modal-overlay" id="endClassModalOverlay">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <div class="modal-title" id="endClassModalTitle">📋 End Class Report</div>
+      <button class="modal-close" onclick="closeEndClassModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="endClassBookingInfo" style="background:var(--bg);border-radius:12px;padding:14px;margin-bottom:18px;font-size:14px;font-weight:700;color:var(--mid);line-height:1.8;"></div>
+
+      <div class="field">
+        <label>Class Outcome <span style="color:var(--orange);">*</span></label>
+        <div style="display:flex;gap:12px;margin-top:6px;">
+          <label style="display:flex;align-items:center;gap:8px;padding:10px 18px;border:2px solid #e8eaf0;border-radius:12px;cursor:pointer;font-weight:800;font-size:14px;transition:.2s;" id="outcomeCompleteLabel">
+            <input type="radio" name="classOutcome" value="completed" onchange="toggleOutcomeFields()" style="width:auto;"> ✅ Completed
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;padding:10px 18px;border:2px solid #e8eaf0;border-radius:12px;cursor:pointer;font-weight:800;font-size:14px;transition:.2s;" id="outcomeIncompleteLabel">
+            <input type="radio" name="classOutcome" value="incomplete" onchange="toggleOutcomeFields()" style="width:auto;"> ❌ Incomplete
+          </label>
+        </div>
+      </div>
+
+      <!-- Incomplete fields -->
+      <div id="incompleteFields" style="display:none;margin-top:14px;">
+        <div class="field">
+          <label>Reason for Incomplete Class <span style="color:var(--orange);">*</span></label>
+          <textarea id="incompleteReason" style="min-height:80px;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;width:100%;outline:none;resize:vertical;" placeholder="What happened? e.g. Student didn't show up, technical issues, parent cancelled..."></textarea>
+        </div>
+      </div>
+
+      <!-- Completed fields -->
+      <div id="completedFields" style="display:none;margin-top:14px;">
+        <div class="field">
+          <label>How was the class? (Overall quality)</label>
+          <select id="classQuality">
+            <option value="excellent">⭐⭐⭐⭐⭐ Excellent — Student was engaged and progressed well</option>
+            <option value="good">⭐⭐⭐⭐ Good — Solid session, minor issues</option>
+            <option value="average">⭐⭐⭐ Average — Some engagement challenges</option>
+            <option value="poor">⭐⭐ Poor — Student struggled significantly</option>
+          </select>
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Student & Parent Interest Level</label>
+          <select id="studentInterest">
+            <option value="very_high">🔥 Very High — Parent was very enthusiastic, asked about pricing</option>
+            <option value="high">✅ High — Positive response, likely to enrol</option>
+            <option value="medium">🤔 Medium — Interested but undecided</option>
+            <option value="low">😐 Low — Not very engaged</option>
+            <option value="none">❌ None — No interest shown</option>
+          </select>
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Perceived Purchasing Power</label>
+          <select id="purchasingPower">
+            <option value="high">💰 High — Clearly able to afford</option>
+            <option value="medium">💵 Medium — Possible with right pitch</option>
+            <option value="low">💸 Low — Budget may be a concern</option>
+          </select>
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Additional Notes for Sales Team</label>
+          <textarea id="classNotes" style="min-height:80px;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;width:100%;outline:none;resize:vertical;" placeholder="Any useful context for the sales person — parent's concerns, student's goals, best course to pitch..."></textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeEndClassModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="submitEndClassReport()">Submit Report ✦</button>
       </div>
     </div>
   </div>

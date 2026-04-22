@@ -372,3 +372,94 @@ function formatDateSimple(dateStr) {
   try { return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' }); }
   catch { return dateStr; }
 }
+
+/* ══════════════════════════════════════════════════════
+   END CLASS MODAL
+══════════════════════════════════════════════════════ */
+let activeEndClassId = null;
+
+function openEndClassModal(bookingId) {
+  activeEndClassId = bookingId;
+
+  // Try to find booking details
+  const all = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+  const b   = all.find(x => x.id === bookingId);
+
+  const infoEl = document.getElementById('endClassBookingInfo');
+  if (infoEl) {
+    infoEl.innerHTML = b
+      ? `🎓 <strong>${b.studentName}</strong> (${b.grade}) · 📚 <strong>${b.subject}</strong> · 📅 ${b.date} at ${b.time}`
+      : `Session ID: ${bookingId}`;
+  }
+
+  // Reset form
+  document.querySelectorAll('input[name="classOutcome"]').forEach(r => r.checked = false);
+  document.getElementById('incompleteFields').style.display  = 'none';
+  document.getElementById('completedFields').style.display   = 'none';
+  document.getElementById('incompleteReason').value = '';
+  document.getElementById('classNotes').value        = '';
+
+  document.getElementById('endClassModalOverlay').classList.add('open');
+}
+
+function closeEndClassModal() {
+  document.getElementById('endClassModalOverlay').classList.remove('open');
+  activeEndClassId = null;
+}
+
+function toggleOutcomeFields() {
+  const val = document.querySelector('input[name="classOutcome"]:checked')?.value;
+  document.getElementById('incompleteFields').style.display = val === 'incomplete' ? 'block' : 'none';
+  document.getElementById('completedFields').style.display  = val === 'completed'  ? 'block' : 'none';
+}
+
+function submitEndClassReport() {
+  const outcome = document.querySelector('input[name="classOutcome"]:checked')?.value;
+  if (!outcome) { showToast('Please select the class outcome.', 'error'); return; }
+
+  if (outcome === 'incomplete') {
+    const reason = document.getElementById('incompleteReason')?.value.trim();
+    if (!reason) { showToast('Please describe why the class was incomplete.', 'error'); return; }
+  }
+
+  const report = {
+    bookingId:       activeEndClassId,
+    tutorId:         TUTOR.id,
+    tutorName:       TUTOR.name,
+    outcome,
+    incompleteReason: outcome === 'incomplete' ? document.getElementById('incompleteReason')?.value.trim() : '',
+    classQuality:    outcome === 'completed'   ? document.getElementById('classQuality')?.value : '',
+    studentInterest: outcome === 'completed'   ? document.getElementById('studentInterest')?.value : '',
+    purchasingPower: outcome === 'completed'   ? document.getElementById('purchasingPower')?.value : '',
+    notes:           outcome === 'completed'   ? document.getElementById('classNotes')?.value.trim() : '',
+    reportedAt:      new Date().toISOString(),
+  };
+
+  // Save report
+  const reports = JSON.parse(localStorage.getItem('sn_class_reports') || '[]');
+  const idx = reports.findIndex(r => r.bookingId === activeEndClassId);
+  if (idx !== -1) reports[idx] = report;
+  else reports.unshift(report);
+  localStorage.setItem('sn_class_reports', JSON.stringify(reports));
+
+  // Update booking status
+  const all = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+  const bi  = all.findIndex(b => b.id === activeEndClassId);
+  if (bi !== -1) {
+    all[bi].status        = outcome === 'completed' ? 'completed' : 'incomplete';
+    all[bi].classReport   = report;
+    all[bi].tutorNotified = true;
+    localStorage.setItem('sn_bookings', JSON.stringify(all));
+  }
+
+  closeEndClassModal();
+  showToast(outcome === 'completed'
+    ? '✅ Class marked complete! Report saved.'
+    : '📋 Incomplete report submitted to admin.');
+}
+
+// Bind end class modal overlay close
+document.addEventListener('DOMContentLoaded', () => {
+  const overlay = document.getElementById('endClassModalOverlay');
+  overlay?.addEventListener('click', e => { if (e.target === overlay) closeEndClassModal(); });
+});

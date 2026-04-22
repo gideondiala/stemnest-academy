@@ -70,11 +70,34 @@ const loginConfig = {
 
 /* ── INIT ── */
 document.addEventListener('DOMContentLoaded', () => {
-  switchRole('tutor'); // set default state
+  seedRegistries();   // ensure defaults exist before any login attempt
+  switchRole('tutor');
   document.addEventListener('keydown', e => {
     if (e.key === 'Enter') handleLogin();
   });
 });
+
+/* ── SEED DEFAULT REGISTRIES (runs once, skips if already populated) ── */
+function seedRegistries() {
+  // Teachers
+  if (!localStorage.getItem('sn_teachers') || JSON.parse(localStorage.getItem('sn_teachers')).length === 0) {
+    const teachers = [
+      { id:'CT001', name:'Sarah Rahman',  initials:'SR', subject:'Coding',   email:'sarah.rahman@stemnest.co.uk',  password:'StemNest2024!', courses:['Python for Beginners','Scratch & Game Design','Web Dev: HTML/CSS/JS'], gradeGroups:['Year 7–9','Year 10–11'], availability:'Mon–Fri, 9am–6pm', dbs:'yes', color:'linear-gradient(135deg,#1a56db,#4f87f5)', photo:null },
+      { id:'MT001', name:'James Okafor',  initials:'JO', subject:'Maths',    email:'james.okafor@stemnest.co.uk',  password:'StemNest2024!', courses:['Primary Maths Boost','GCSE Maths Prep','A-Level Maths Mastery'],         gradeGroups:['Year 7–9','Year 10–11','Year 12–13'], availability:'Mon–Sat, 10am–7pm', dbs:'yes', color:'linear-gradient(135deg,#0e9f6e,#3dd9a4)', photo:null },
+      { id:'ST001', name:'Lisa Patel',    initials:'LP', subject:'Sciences', email:'lisa.patel@stemnest.co.uk',    password:'StemNest2024!', courses:['GCSE Biology','GCSE Chemistry','A-Level Physics'],                         gradeGroups:['Year 10–11','Year 12–13'], availability:'Tue–Sat, 11am–6pm', dbs:'yes', color:'linear-gradient(135deg,#ff6b35,#ffaa80)', photo:null },
+      { id:'CT002', name:'Marcus King',   initials:'MK', subject:'Coding',   email:'marcus.king@stemnest.co.uk',   password:'StemNest2024!', courses:['Python for Beginners','AI Literacy','A-Level Computer Science'],           gradeGroups:['Year 10–11','Year 12–13'], availability:'Mon–Fri, 2pm–9pm', dbs:'yes', color:'linear-gradient(135deg,#7c3aed,#a78bfa)', photo:null },
+    ];
+    localStorage.setItem('sn_teachers', JSON.stringify(teachers));
+  }
+
+  // Sales persons
+  if (!localStorage.getItem('sn_sales_persons') || JSON.parse(localStorage.getItem('sn_sales_persons')).length === 0) {
+    const salesPersons = [
+      { id:'SP001', name:'Alex Johnson', initials:'AJ', email:'alex.johnson@stemnest.co.uk', password:'StemNest2024!', region:'UK & Europe',   bio:'Senior academic counselor.', color:'linear-gradient(135deg,#ff6b35,#fbbf24)', photo:null },
+    ];
+    localStorage.setItem('sn_sales_persons', JSON.stringify(salesPersons));
+  }
+}
 
 /* ── SWITCH ROLE ── */
 function switchRole(role) {
@@ -159,29 +182,36 @@ function handleLogin() {
         t.email.toLowerCase() === email.toLowerCase() && t.password === pw
       );
 
+      // Check sales persons registry
+      const salesPersons = JSON.parse(localStorage.getItem('sn_sales_persons') || '[]');
+      const salesPerson  = salesPersons.find(s =>
+        s.email.toLowerCase() === email.toLowerCase() && s.password === pw
+      );
+
       if (teacher) {
-        // Store logged-in teacher id for dashboard to read
         localStorage.setItem('sn_logged_in_teacher', teacher.id);
         document.getElementById('btnIcon').textContent = '✅';
         document.getElementById('btnText').textContent = `Welcome back, ${teacher.name.split(' ')[0]}! Redirecting…`;
         setTimeout(() => navigate('tutor-dashboard'), 700);
+      } else if (salesPerson) {
+        localStorage.setItem('sn_logged_in_sales', salesPerson.id);
+        document.getElementById('btnIcon').textContent = '✅';
+        document.getElementById('btnText').textContent = `Welcome, ${salesPerson.name.split(' ')[0]}! Redirecting…`;
+        setTimeout(() => navigate('sales-dashboard'), 700);
+      } else if (email === 'admin@stemnest.co.uk' && pw === 'admin123') {
+        document.getElementById('btnIcon').textContent = '✅';
+        document.getElementById('btnText').textContent = 'Welcome, Admin! Redirecting…';
+        setTimeout(() => navigate('admin-dashboard'), 700);
       } else {
-        // Admin fallback (hardcoded for now — replace with real auth)
-        if (email === 'admin@stemnest.co.uk' && pw === 'admin123') {
-          document.getElementById('btnIcon').textContent = '✅';
-          document.getElementById('btnText').textContent = 'Welcome, Admin! Redirecting…';
-          setTimeout(() => navigate('admin-dashboard'), 700);
-        } else {
-          document.getElementById('btnIcon').textContent = '❌';
-          document.getElementById('btnText').textContent = 'Invalid credentials';
-          btn.style.animation = 'none';
-          btn.offsetHeight;
-          btn.style.animation = 'shake .4s ease';
-          setTimeout(() => {
-            document.getElementById('btnIcon').textContent = loginConfig[currentRole].btnIcon;
-            document.getElementById('btnText').textContent = loginConfig[currentRole].btnText;
-          }, 1500);
-        }
+        document.getElementById('btnIcon').textContent = '❌';
+        document.getElementById('btnText').textContent = 'Invalid credentials';
+        btn.style.animation = 'none';
+        btn.offsetHeight;
+        btn.style.animation = 'shake .4s ease';
+        setTimeout(() => {
+          document.getElementById('btnIcon').textContent = loginConfig[currentRole].btnIcon;
+          document.getElementById('btnText').textContent = loginConfig[currentRole].btnText;
+        }, 1500);
       }
     } else {
       // Student login

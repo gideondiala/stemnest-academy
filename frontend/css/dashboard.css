@@ -148,3 +148,12 @@
   .dash-main    { padding: 24px 5%; }
   .dash-grid-2  { grid-template-columns: 1fr; }
 }
+
+/* ── END CLASS BUTTON ── */
+.end-class-btn {
+  padding: 7px 14px; border-radius: 50px;
+  background: #c53030; color: #fff; border: none;
+  font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 12px;
+  cursor: pointer; transition: .2s; flex-shrink: 0; margin-left: 4px;
+}
+.end-class-btn:hover { background: #9b2c2c; }

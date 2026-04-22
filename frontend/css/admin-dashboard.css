@@ -213,3 +213,30 @@
   .atf-grid { grid-template-columns: 1fr; }
   .atf-full { grid-column: 1; }
 }
+
+/* ── COURSE FORM — emoji & colour pickers ── */
+.ac-emoji-grid {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px;
+}
+.ac-emoji-btn {
+  width: 44px; height: 44px; border-radius: 10px;
+  border: 2px solid #e8eaf0; background: var(--bg);
+  font-size: 22px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: .2s;
+}
+.ac-emoji-btn:hover, .ac-emoji-btn.selected {
+  border-color: var(--blue); background: var(--blue-light);
+}
+
+.ac-color-grid {
+  display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px;
+}
+.ac-color-swatch {
+  width: 36px; height: 36px; border-radius: 10px;
+  cursor: pointer; border: 3px solid transparent;
+  transition: transform .2s, border-color .2s;
+}
+.ac-color-swatch:hover, .ac-color-swatch.selected {
+  border-color: var(--dark); transform: scale(1.15);
+}

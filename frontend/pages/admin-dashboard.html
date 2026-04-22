@@ -40,8 +40,16 @@
       <a class="sidebar-link"        data-tab="scheduled"  onclick="showAdminTab('scheduled')"> <span class="sl-icon">📅</span> Scheduled</a>
       <a class="sidebar-link"        data-tab="completed"  onclick="showAdminTab('completed')"> <span class="sl-icon">✅</span> Completed</a>
       <div class="sidebar-section-label">Teachers</div>
-      <a class="sidebar-link"        data-tab="tutors"     onclick="showAdminTab('tutors')">    <span class="sl-icon">👩‍🏫</span> All Teachers <span class="sl-badge" id="teacherBadge">0</span></a>
-      <a class="sidebar-link"        data-tab="add-teacher" onclick="showAdminTab('add-teacher')"><span class="sl-icon">➕</span> Add Teacher</a>
+      <a class="sidebar-link"        data-tab="tutors"      onclick="showAdminTab('tutors')">      <span class="sl-icon">👩‍🏫</span> All Teachers <span class="sl-badge" id="teacherBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="add-teacher" onclick="showAdminTab('add-teacher')"> <span class="sl-icon">➕</span> Add Teacher</a>
+      <div class="sidebar-section-label">Courses</div>
+      <a class="sidebar-link"        data-tab="courses"     onclick="showAdminTab('courses')">     <span class="sl-icon">📚</span> All Courses <span class="sl-badge" id="courseBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="add-course"  onclick="showAdminTab('add-course')">  <span class="sl-icon">➕</span> Add Course</a>
+      <div class="sidebar-section-label">Sales Team</div>
+      <a class="sidebar-link"        data-tab="sales"       onclick="showAdminTab('sales')">       <span class="sl-icon">💼</span> Sales Persons <span class="sl-badge" id="salesBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="add-sales"   onclick="showAdminTab('add-sales')">   <span class="sl-icon">➕</span> Add Sales Person</a>
+      <div class="sidebar-section-label">Reports</div>
+      <a class="sidebar-link"        data-tab="class-reports" onclick="showAdminTab('class-reports')"><span class="sl-icon">📊</span> Class Reports</a>
       <div class="sidebar-section-label">Links</div>
       <a class="sidebar-link" href="free-trial.html" target="_blank"><span class="sl-icon">🔗</span> Landing Page</a>
     </div>
@@ -70,6 +78,7 @@
       <div class="dstat ds-blue"><div class="dstat-icon di-blue">⏳</div><div class="dstat-val" id="statPending">0</div><div class="dstat-label">Pending</div><div class="dstat-trend trend-neutral">Needs tutor assigned</div></div>
       <div class="dstat ds-green"><div class="dstat-icon di-green">📅</div><div class="dstat-val" id="statScheduled">0</div><div class="dstat-label">Scheduled</div><div class="dstat-trend trend-up">Tutor assigned</div></div>
       <div class="dstat ds-purple"><div class="dstat-icon di-purple">👩‍🏫</div><div class="dstat-val" id="statTeachers">0</div><div class="dstat-label">Teachers</div><div class="dstat-trend trend-up">On platform</div></div>
+      <div class="dstat" style="border-color:rgba(6,148,162,.15);"><div class="dstat-icon" style="background:rgba(6,148,162,.12);">📚</div><div class="dstat-val" id="statCourses">0</div><div class="dstat-label">Courses</div><div class="dstat-trend trend-up">In catalogue</div></div>
     </div>
 
     <!-- ── TAB: ALL BOOKINGS ── -->
@@ -228,6 +237,194 @@
       </div>
     </div>
 
+    <!-- ── TAB: ALL COURSES ── -->
+    <div id="tab-courses" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📚 Course Catalogue</div>
+        <button class="btn btn-primary" style="font-size:13px;padding:9px 20px;" onclick="showAdminTab('add-course')">➕ Add Course</button>
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr>
+            <th>Course ID</th><th>Title</th><th>Category</th><th>Level</th>
+            <th>Age</th><th>Price/mo</th><th>Classes</th>
+            <th>Students</th><th>Rating</th><th>Duration</th><th>Badge</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="coursesTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── TAB: ADD / EDIT COURSE ── -->
+    <div id="tab-add-course" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title" id="addCourseTabTitle">➕ Add New Course</div>
+        <button class="btn btn-outline" style="font-size:13px;" onclick="showAdminTab('courses')">← Back to Courses</button>
+      </div>
+      <div class="add-teacher-form-wrap">
+        <form class="add-teacher-form" id="addCourseForm" onsubmit="return false;">
+
+          <div class="atf-section-title">📋 Course Identity</div>
+          <div class="atf-grid">
+            <div class="atf-field">
+              <label>Course ID (auto-generated)</label>
+              <input type="text" id="ac-id" readonly style="background:var(--bg);color:var(--blue);font-weight:900;" placeholder="e.g. CRS010">
+            </div>
+            <div class="atf-field">
+              <label>Course Title <span class="req">*</span></label>
+              <input type="text" id="ac-name" placeholder="e.g. Python for Beginners" required>
+            </div>
+            <div class="atf-field atf-full">
+              <label>Short Description <span class="req">*</span></label>
+              <textarea id="ac-desc" placeholder="Briefly describe what students will learn in this course..."></textarea>
+            </div>
+          </div>
+
+          <div class="atf-divider"></div>
+          <div class="atf-section-title">🏷️ Classification</div>
+          <div class="atf-grid">
+            <div class="atf-field">
+              <label>Subject Category <span class="req">*</span></label>
+              <select id="ac-subject" required>
+                <option value="">Select category</option>
+                <option value="coding">💻 Coding & Tech</option>
+                <option value="maths">📐 Mathematics</option>
+                <option value="sciences">🔬 Sciences</option>
+              </select>
+            </div>
+            <div class="atf-field">
+              <label>Level <span class="req">*</span></label>
+              <select id="ac-level" required>
+                <option value="">Select level</option>
+                <option value="Beginner">🟢 Beginner</option>
+                <option value="Intermediate">🟡 Intermediate</option>
+                <option value="Advanced">🔴 Advanced</option>
+              </select>
+            </div>
+            <div class="atf-field">
+              <label>Age Range <span class="req">*</span></label>
+              <input type="text" id="ac-age" placeholder="e.g. Ages 10–14" required>
+            </div>
+            <div class="atf-field">
+              <label>Badge</label>
+              <select id="ac-badge">
+                <option value="">None</option>
+                <option value="popular">🔥 Popular</option>
+                <option value="new">✨ New</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="atf-divider"></div>
+          <div class="atf-section-title">💰 Pricing & Stats</div>
+          <div class="atf-grid">
+            <div class="atf-field">
+              <label>Price (£/month) <span class="req">*</span></label>
+              <input type="number" id="ac-price" placeholder="e.g. 99" min="0" required>
+            </div>
+            <div class="atf-field">
+              <label>Number of Classes <span class="req">*</span></label>
+              <input type="number" id="ac-classes" placeholder="e.g. 24" min="1" required>
+            </div>
+            <div class="atf-field">
+              <label>Course Duration</label>
+              <input type="text" id="ac-duration" placeholder="e.g. 6 months">
+            </div>
+            <div class="atf-field">
+              <label>Students Enrolled</label>
+              <input type="number" id="ac-students" placeholder="e.g. 312" min="0">
+            </div>
+            <div class="atf-field">
+              <label>Rating (1.0 – 5.0)</label>
+              <input type="number" id="ac-rating" placeholder="e.g. 4.9" min="1" max="5" step="0.1">
+            </div>
+          </div>
+
+          <div class="atf-divider"></div>
+          <div class="atf-section-title">🎨 Appearance</div>
+          <div class="atf-grid">
+            <div class="atf-field atf-full">
+              <label>Course Icon (emoji)</label>
+              <div class="ac-emoji-grid" id="acEmojiGrid"></div>
+            </div>
+            <div class="atf-field atf-full">
+              <label>Card Accent Colour</label>
+              <div class="ac-color-grid" id="acColorGrid"></div>
+            </div>
+          </div>
+
+          <div class="atf-divider"></div>
+          <div class="atf-actions">
+            <button type="button" class="btn btn-outline" onclick="resetCourseForm()">Clear Form</button>
+            <button type="button" class="btn btn-primary" id="saveCourseBtn" onclick="saveCourse()">✦ Save Course</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ── TAB: ALL SALES PERSONS ── -->
+    <div id="tab-sales" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">💼 Sales Team</div>
+        <button class="btn btn-primary" style="font-size:13px;padding:9px 20px;" onclick="showAdminTab('add-sales')">➕ Add Sales Person</button>
+      </div>
+      <div class="tutor-assign-grid" id="salesGrid"></div>
+    </div>
+
+    <!-- ── TAB: ADD SALES PERSON ── -->
+    <div id="tab-add-sales" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">➕ Add Sales Person / Academic Counselor</div>
+      </div>
+      <div class="add-teacher-form-wrap">
+        <form class="add-teacher-form" onsubmit="return false;">
+          <div class="atf-section-title">👤 Personal Details</div>
+          <div class="atf-grid">
+            <div class="atf-field atf-full"><label>Full Name <span class="req">*</span></label><input type="text" id="sp-name" placeholder="e.g. Alex Johnson" required></div>
+            <div class="atf-field"><label>Email Address <span class="req">*</span></label><input type="email" id="sp-email" placeholder="alex@stemnest.co.uk" required></div>
+            <div class="atf-field"><label>Phone Number</label><input type="tel" id="sp-phone" placeholder="+44 7700 000000"></div>
+            <div class="atf-field atf-full">
+              <label>Default Password <span class="req">*</span></label>
+              <div style="position:relative;"><input type="text" id="sp-password" placeholder="e.g. StemNest2024!" required><button type="button" class="atf-gen-btn" onclick="generateSalesPassword()">🔀 Generate</button></div>
+              <div class="atf-hint">Sales person will be prompted to change this on first login.</div>
+            </div>
+            <div class="atf-field"><label>Sales Person ID (auto)</label><input type="text" id="sp-id" readonly style="background:var(--bg);color:var(--orange);font-weight:900;"></div>
+            <div class="atf-field"><label>Region / Territory</label><input type="text" id="sp-region" placeholder="e.g. UK, West Africa, Global"></div>
+            <div class="atf-field atf-full"><label>Short Bio / Notes</label><textarea id="sp-bio" placeholder="Background, languages spoken, target markets..."></textarea></div>
+          </div>
+          <div class="atf-divider"></div>
+          <div class="atf-actions">
+            <button type="button" class="btn btn-outline" onclick="resetSalesForm()">Clear</button>
+            <button type="button" class="btn btn-primary" onclick="saveNewSalesPerson()">✦ Create Account</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ── TAB: CLASS REPORTS ── -->
+    <div id="tab-class-reports" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📊 Class Reports</div>
+        <div class="admin-filters">
+          <select id="reportFilter" class="admin-filter-sel" onchange="renderClassReports()">
+            <option value="all">All Reports</option>
+            <option value="completed">✅ Completed</option>
+            <option value="incomplete">❌ Incomplete</option>
+          </select>
+        </div>
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr>
+            <th>Student</th><th>Subject</th><th>Date</th><th>Teacher</th>
+            <th>Outcome</th><th>Class Quality</th><th>Sales Potential</th>
+            <th>Sales Person</th><th>Sales Status</th><th>Report</th>
+          </tr></thead>
+          <tbody id="classReportsBody"></tbody>
+        </table>
+      </div>
+    </div>
+
   </div><!-- end dash-main -->
 </div><!-- end dash-wrap -->
 
@@ -259,9 +456,16 @@
         <label>Notes for Teacher (optional)</label>
         <textarea id="assignNotes" style="min-height:60px;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;width:100%;outline:none;" placeholder="Any special notes..."></textarea>
       </div>
+      <div class="field" style="margin-top:12px;">
+        <label>Assign Academic Counselor (Sales Person)</label>
+        <select id="assignSalesSelect">
+          <option value="">— Select sales person —</option>
+        </select>
+        <div style="font-size:11px;color:var(--light);font-weight:700;margin-top:4px;">They will join the class at the end to pitch courses to the parent.</div>
+      </div>
       <div class="modal-footer">
         <button class="btn btn-outline" onclick="closeAssignModal()">Cancel</button>
-        <button class="btn btn-primary" onclick="confirmAssign()">Assign & Notify Teacher ✦</button>
+        <button class="btn btn-primary" onclick="confirmAssign()">Assign & Notify ✦</button>
       </div>
     </div>
   </div>

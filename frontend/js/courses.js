@@ -1,11 +1,9 @@
 /* ═══════════════════════════════════════════════════════
    STEMNEST ACADEMY — COURSES.JS
-   Course data store, grid rendering, filter/sort,
-   add-course modal, right-click delete.
+   Public course catalogue — read-only.
+   All add/edit/delete is handled in the Admin Dashboard.
+   Courses are stored in localStorage (sn_courses).
 ═══════════════════════════════════════════════════════ */
-
-/* ── DATA ── */
-const EMOJIS = ['💻','📐','🔬','⚗️','🧬','🧪','🤖','🧠','📊','📡','🎮','🌍','🏗️','✏️','📱','🛰️'];
 
 const COLORS = [
   { id:'blue',   bg:'linear-gradient(135deg,#1a56db22,#1a56db44)', hex:'#1a56db' },
@@ -22,30 +20,41 @@ const TAG_MAP = {
   sciences: { cls:'tag-o', label:'Sciences'       },
 };
 
-let courses = [
-  { id:1,  name:'Python for Beginners',        desc:'Learn to code from scratch with Python — variables, loops, functions and your first real programs.',                                    subject:'coding',   age:'Ages 10–14', price:99,  classes:24, rating:4.9, students:312, emoji:'💻', color:'blue',   badge:'popular' },
-  { id:2,  name:'Scratch & Game Design',       desc:'Build fun interactive games using Scratch. Perfect intro to computational thinking.',                                                  subject:'coding',   age:'Ages 7–10',  price:79,  classes:16, rating:4.8, students:245, emoji:'🎮', color:'purple', badge:''        },
-  { id:3,  name:'Web Dev: HTML, CSS & JS',     desc:'Design and build real websites from zero. HTML structure, CSS styling and JavaScript interactivity.',                                   subject:'coding',   age:'Ages 13–19', price:129, classes:32, rating:4.9, students:178, emoji:'📱', color:'blue',   badge:'new'     },
-  { id:4,  name:'GCSE Maths Prep',             desc:'Targeted support aligned to the GCSE syllabus. Master number, algebra, geometry and statistics.',                                      subject:'maths',    age:'Ages 14–16', price:109, classes:28, rating:4.9, students:401, emoji:'📐', color:'green',  badge:'popular' },
-  { id:5,  name:'Primary Maths Boost',         desc:'Build strong foundations in numbers, fractions, times tables and problem solving for KS2 learners.',                                   subject:'maths',    age:'Ages 7–11',  price:79,  classes:20, rating:4.8, students:293, emoji:'📊', color:'teal',   badge:''        },
-  { id:6,  name:'A-Level Maths Mastery',       desc:'Deep-dive into pure maths, statistics and mechanics for A-Level students aiming for top grades.',                                      subject:'maths',    age:'Ages 16–19', price:149, classes:40, rating:4.9, students:134, emoji:'🧠', color:'green',  badge:''        },
-  { id:7,  name:'GCSE Biology',                desc:'Cells, genetics, ecosystems and the human body — expert-led sessions covering the full GCSE spec.',                                    subject:'sciences', age:'Ages 14–16', price:109, classes:28, rating:4.7, students:221, emoji:'🧬', color:'orange', badge:''        },
-  { id:8,  name:'GCSE Chemistry',              desc:'From atomic structure to organic chemistry — build exam confidence with a specialist chemistry tutor.',                                 subject:'sciences', age:'Ages 14–16', price:109, classes:28, rating:4.8, students:198, emoji:'⚗️', color:'orange', badge:''        },
-  { id:9,  name:'A-Level Physics',             desc:'Mechanics, waves, electricity and modern physics — for students pushing for top university offers.',                                    subject:'sciences', age:'Ages 16–19', price:149, classes:40, rating:4.9, students:97,  emoji:'🛰️', color:'teal',   badge:'new'     },
+/* Default courses — used only if admin hasn't saved any yet */
+const DEFAULT_COURSES = [
+  { id:'CRS001', name:'Python for Beginners',    desc:'Learn to code from scratch with Python — variables, loops, functions and your first real programs.',                subject:'coding',   age:'Ages 10–14', price:99,  classes:24, rating:4.9, students:312, emoji:'💻', color:'blue',   badge:'popular', level:'Beginner',      duration:'6 months' },
+  { id:'CRS002', name:'Scratch & Game Design',   desc:'Build fun interactive games using Scratch. Perfect intro to computational thinking.',                              subject:'coding',   age:'Ages 7–10',  price:79,  classes:16, rating:4.8, students:245, emoji:'🎮', color:'purple', badge:'',        level:'Beginner',      duration:'4 months' },
+  { id:'CRS003', name:'Web Dev: HTML, CSS & JS', desc:'Design and build real websites from zero. HTML structure, CSS styling and JavaScript interactivity.',               subject:'coding',   age:'Ages 13–19', price:129, classes:32, rating:4.9, students:178, emoji:'📱', color:'blue',   badge:'new',     level:'Intermediate',  duration:'8 months' },
+  { id:'CRS004', name:'GCSE Maths Prep',         desc:'Targeted support aligned to the GCSE syllabus. Master number, algebra, geometry and statistics.',                  subject:'maths',    age:'Ages 14–16', price:109, classes:28, rating:4.9, students:401, emoji:'📐', color:'green',  badge:'popular', level:'Intermediate',  duration:'7 months' },
+  { id:'CRS005', name:'Primary Maths Boost',     desc:'Build strong foundations in numbers, fractions, times tables and problem solving for KS2 learners.',               subject:'maths',    age:'Ages 7–11',  price:79,  classes:20, rating:4.8, students:293, emoji:'📊', color:'teal',   badge:'',        level:'Beginner',      duration:'5 months' },
+  { id:'CRS006', name:'A-Level Maths Mastery',   desc:'Deep-dive into pure maths, statistics and mechanics for A-Level students aiming for top grades.',                  subject:'maths',    age:'Ages 16–19', price:149, classes:40, rating:4.9, students:134, emoji:'🧠', color:'green',  badge:'',        level:'Advanced',      duration:'10 months' },
+  { id:'CRS007', name:'GCSE Biology',            desc:'Cells, genetics, ecosystems and the human body — expert-led sessions covering the full GCSE spec.',                subject:'sciences', age:'Ages 14–16', price:109, classes:28, rating:4.7, students:221, emoji:'🧬', color:'orange', badge:'',        level:'Intermediate',  duration:'7 months' },
+  { id:'CRS008', name:'GCSE Chemistry',          desc:'From atomic structure to organic chemistry — build exam confidence with a specialist chemistry tutor.',             subject:'sciences', age:'Ages 14–16', price:109, classes:28, rating:4.8, students:198, emoji:'⚗️', color:'orange', badge:'',        level:'Intermediate',  duration:'7 months' },
+  { id:'CRS009', name:'A-Level Physics',         desc:'Mechanics, waves, electricity and modern physics — for students pushing for top university offers.',                subject:'sciences', age:'Ages 16–19', price:149, classes:40, rating:4.9, students:97,  emoji:'🛰️', color:'teal',   badge:'new',     level:'Advanced',      duration:'10 months' },
 ];
 
-let nextId         = 10;
-let selectedEmoji  = '💻';
-let selectedColor  = 'blue';
-let activeFilter   = 'all';
-let activeSort     = 'default';
+/* ── Load courses from localStorage (admin-managed) ── */
+function getCourses() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('sn_courses') || '[]');
+    if (stored.length === 0) {
+      localStorage.setItem('sn_courses', JSON.stringify(DEFAULT_COURSES));
+      return DEFAULT_COURSES;
+    }
+    return stored;
+  } catch { return DEFAULT_COURSES; }
+}
+
+let courses      = [];
+let activeFilter = 'all';
+let activeSort   = 'default';
 
 /* ── INIT ── */
 document.addEventListener('DOMContentLoaded', () => {
+  courses = getCourses();
   renderGrid();
   bindFilterTabs();
   bindSortSelect();
-  bindModalClose();
 });
 
 /* ── RENDER ── */
@@ -54,7 +63,6 @@ function renderGrid() {
   if (!grid) return;
 
   let list = [...courses];
-
   if (activeFilter !== 'all') list = list.filter(c => c.subject === activeFilter);
 
   if      (activeSort === 'price-low')  list.sort((a, b) => a.price - b.price);
@@ -67,11 +75,10 @@ function renderGrid() {
 
   grid.innerHTML = '';
   if (list.length === 0) {
-    grid.innerHTML = '<div class="no-results"><p>No courses in this category yet. Add the first one! 🚀</p></div>';
-  } else {
-    list.forEach(c => grid.appendChild(buildCard(c)));
+    grid.innerHTML = '<div class="no-results"><p>No courses in this category yet.</p></div>';
+    return;
   }
-  grid.appendChild(buildAddCard());
+  list.forEach(c => grid.appendChild(buildCard(c)));
 }
 
 function buildCard(c) {
@@ -103,6 +110,7 @@ function buildCard(c) {
         <span class="age-pill">${c.age}</span>
       </div>
       <div class="card-title">${c.name}</div>
+      <div class="card-id-pill">ID: ${c.id}</div>
       <div class="card-desc">${c.desc}</div>
       <div class="card-stats">
         <div class="cstat"><div class="cstat-val">${c.classes}</div><div class="cstat-label">Classes</div></div>
@@ -119,30 +127,10 @@ function buildCard(c) {
           <div class="course-price">£${c.price}<span style="font-size:14px;color:var(--light);font-family:'Nunito',sans-serif;">/mo</span></div>
           <div class="price-note">1-on-1 live sessions</div>
         </div>
-        <button class="enroll-btn">Enrol Now →</button>
+        <a href="free-trial.html" class="enroll-btn">Enrol Now →</a>
       </div>
     </div>`;
 
-  // Right-click to delete
-  div.addEventListener('contextmenu', e => {
-    e.preventDefault();
-    if (confirm(`Remove "${c.name}" from the course list?`)) {
-      courses = courses.filter(x => x.id !== c.id);
-      renderGrid();
-    }
-  });
-
-  return div;
-}
-
-function buildAddCard() {
-  const div = document.createElement('div');
-  div.className = 'add-course-card';
-  div.onclick   = openModal;
-  div.innerHTML = `
-    <div class="add-icon">➕</div>
-    <div class="add-title">Add a New Course</div>
-    <div class="add-sub">Click here to add a course. Fill in the details and it appears instantly.</div>`;
   return div;
 }
 
@@ -164,102 +152,4 @@ function bindSortSelect() {
     activeSort = e.target.value;
     renderGrid();
   });
-}
-
-/* ── MODAL ── */
-function openModal() {
-  // Build emoji picker
-  const eg = document.getElementById('emojiGrid');
-  eg.innerHTML = '';
-  EMOJIS.forEach(em => {
-    const b = document.createElement('button');
-    b.type      = 'button';
-    b.className = 'emoji-opt' + (em === selectedEmoji ? ' selected' : '');
-    b.textContent = em;
-    b.onclick = () => {
-      selectedEmoji = em;
-      document.querySelectorAll('.emoji-opt').forEach(x => x.classList.remove('selected'));
-      b.classList.add('selected');
-    };
-    eg.appendChild(b);
-  });
-
-  // Build colour picker
-  const cg = document.getElementById('colorGrid');
-  cg.innerHTML = '';
-  COLORS.forEach(co => {
-    const b = document.createElement('div');
-    b.className   = 'color-opt' + (co.id === selectedColor ? ' selected' : '');
-    b.style.background = co.hex;
-    b.title = co.id;
-    b.onclick = () => {
-      selectedColor = co.id;
-      document.querySelectorAll('.color-opt').forEach(x => x.classList.remove('selected'));
-      b.classList.add('selected');
-    };
-    cg.appendChild(b);
-  });
-
-  // Reset fields
-  ['f-name','f-desc','f-age','f-price','f-classes','f-rating','f-students']
-    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-  const fSub = document.getElementById('f-subject'); if (fSub) fSub.value = 'coding';
-  const fBad = document.getElementById('f-badge');   if (fBad) fBad.value = '';
-
-  selectedEmoji = '💻';
-  selectedColor = 'blue';
-
-  document.getElementById('modalOverlay')?.classList.add('open');
-}
-
-function closeModal() {
-  document.getElementById('modalOverlay')?.classList.remove('open');
-}
-
-function bindModalClose() {
-  const overlay = document.getElementById('modalOverlay');
-  overlay?.addEventListener('click', e => {
-    if (e.target === overlay) closeModal();
-  });
-}
-
-function saveCourse() {
-  const name  = document.getElementById('f-name')?.value.trim();
-  const desc  = document.getElementById('f-desc')?.value.trim();
-  const price = parseFloat(document.getElementById('f-price')?.value);
-
-  if (!name)             { showToast('Please enter a course name.', 'error'); return; }
-  if (!desc)             { showToast('Please enter a description.', 'error'); return; }
-  if (!price || isNaN(price)) { showToast('Please enter a valid price.', 'error'); return; }
-
-  courses.push({
-    id:       nextId++,
-    name,
-    desc,
-    subject:  document.getElementById('f-subject')?.value || 'coding',
-    age:      document.getElementById('f-age')?.value.trim() || 'All Ages',
-    price,
-    classes:  parseInt(document.getElementById('f-classes')?.value) || 0,
-    rating:   parseFloat(document.getElementById('f-rating')?.value) || 5.0,
-    students: parseInt(document.getElementById('f-students')?.value) || 0,
-    emoji:    selectedEmoji,
-    color:    selectedColor,
-    badge:    document.getElementById('f-badge')?.value || '',
-  });
-
-  closeModal();
-
-  // Reset to show all
-  activeFilter = 'all';
-  document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
-  document.querySelector('[data-filter="all"]')?.classList.add('active');
-
-  renderGrid();
-  showToast('✅ Course added successfully!');
-
-  // Scroll to new card
-  setTimeout(() => {
-    const cards = document.querySelectorAll('#coursesGrid .course-card');
-    if (cards.length) cards[cards.length - 1].scrollIntoView({ behavior:'smooth', block:'center' });
-  }, 100);
 }
