@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Our Team – StemNest Academy</title>
+  <meta name="description" content="Meet the tutors, educators, and team members behind StemNest Academy — the UK's leading 1-on-1 STEM tutoring platform.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/about.css">
+  <link rel="stylesheet" href="../css/mobile.css">
+</head>
+<body>
+
+<!-- ═══ NAV ═══ -->
+<nav>
+  <a class="logo" href="../index.html">
+    <div class="logo-icon">S</div>
+    <div class="logo-text">StemNest<span>Academy</span></div>
+  </a>
+  <ul class="nav-links">
+    <li><a href="../index.html">Home</a></li>
+    <li><a href="courses.html">Courses</a></li>
+    <li><a href="about.html">About</a></li>
+    <li><a href="team.html" class="active">Team</a></li>
+    <li><a href="faq.html">FAQ</a></li>
+    <li><a href="teach-with-us.html">Teach With Us</a></li>
+  </ul>
+  <div class="nav-actions">
+    <a href="login.html"      class="btn btn-outline">Log In</a>
+    <a href="free-trial.html" class="btn btn-primary">Book Free Trial ✦</a>
+  </div>
+  <button class="nav-hamburger" id="navHamburger" onclick="toggleMobileNav()" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile-drawer" id="navDrawer">
+  <a href="../index.html">Home</a>
+  <a href="courses.html">Courses</a>
+  <a href="about.html">About</a>
+  <a href="team.html" class="active">Team</a>
+  <a href="faq.html">FAQ</a>
+  <a href="teach-with-us.html">Teach With Us</a>
+  <div class="nav-mobile-actions">
+    <a href="login.html"      class="btn btn-outline">Log In</a>
+    <a href="free-trial.html" class="btn btn-primary">Book Free Trial ✦</a>
+  </div>
+</div>
+
+<!-- ═══ HERO ═══ -->
+<div class="about-hero">
+  <div class="about-hero-inner">
+    <div class="about-hero-badge">👥 The People Behind StemNest</div>
+    <h1>Meet the <span>Team</span> That<br>Makes It Happen</h1>
+    <p>From our founders to our tutors, every person at StemNest Academy shares one goal — helping young people discover what they're capable of.</p>
+    <div class="about-hero-ctas">
+      <a href="teach-with-us.html" class="btn btn-primary" style="font-size:16px;padding:13px 32px;">✦ Join Our Team</a>
+      <a href="about.html" class="btn" style="background:rgba(255,255,255,.12);color:#fff;border:1.5px solid rgba(255,255,255,.3);font-size:16px;padding:13px 32px;">Our Story →</a>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TUTORS ═══ -->
+<section class="about-section" style="background:var(--bg);">
+  <div class="about-section-inner">
+    <div class="about-section-header">
+      <div class="section-label">Our Tutors</div>
+      <h2 class="section-title">Expert Educators.<br>Passionate Mentors.</h2>
+      <p class="section-sub mx-auto">Every StemNest tutor is rigorously vetted, DBS-checked, and selected not just for their subject knowledge — but for their ability to inspire young people.</p>
+    </div>
+
+    <!-- Filter -->
+    <div class="team-filter-bar">
+      <button class="team-filter-btn active" onclick="filterTeam(this,'all')">All Tutors</button>
+      <button class="team-filter-btn" onclick="filterTeam(this,'coding')">💻 Coding</button>
+      <button class="team-filter-btn" onclick="filterTeam(this,'maths')">📐 Maths</button>
+      <button class="team-filter-btn" onclick="filterTeam(this,'sciences')">🔬 Sciences</button>
+    </div>
+
+    <div class="team-grid" id="tutorGrid">
+      <!-- Rendered by JS from teacher registry -->
+    </div>
+
+    <div class="text-center" style="margin-top:40px;">
+      <a href="teach-with-us.html" class="btn btn-blue">Join as a Tutor →</a>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ OPERATIONS TEAM ═══ -->
+<section class="about-section" style="background:var(--white);">
+  <div class="about-section-inner">
+    <div class="about-section-header">
+      <div class="section-label">Behind the Scenes</div>
+      <h2 class="section-title">The Team That Keeps<br>Everything Running</h2>
+      <p class="section-sub mx-auto">Our operations, sales, and support teams work tirelessly to ensure every student and parent has a seamless, supported experience.</p>
+    </div>
+    <div class="team-grid reveal">
+      <div class="team-card">
+        <div class="team-avatar" style="background:linear-gradient(135deg,var(--orange),#fbbf24);">SP</div>
+        <div class="team-name">Sales Team</div>
+        <div class="team-role">Academic Counselors</div>
+        <div class="team-tags"><span class="team-tag">Demo Classes</span><span class="team-tag">Enrolment</span><span class="team-tag">Parent Support</span></div>
+      </div>
+      <div class="team-card">
+        <div class="team-avatar" style="background:linear-gradient(135deg,var(--purple),#a78bfa);">OPS</div>
+        <div class="team-name">Operations Team</div>
+        <div class="team-role">Platform & Scheduling</div>
+        <div class="team-tags"><span class="team-tag">Scheduling</span><span class="team-tag">Quality</span><span class="team-tag">Reporting</span></div>
+      </div>
+      <div class="team-card">
+        <div class="team-avatar" style="background:linear-gradient(135deg,#0694a2,#67e8f9);">SUP</div>
+        <div class="team-name">Support Team</div>
+        <div class="team-role">Student & Parent Support</div>
+        <div class="team-tags"><span class="team-tag">Help Desk</span><span class="team-tag">Queries</span><span class="team-tag">Feedback</span></div>
+      </div>
+      <div class="team-card">
+        <div class="team-avatar" style="background:linear-gradient(135deg,#e63387,#f9a8d4);">HR</div>
+        <div class="team-name">HR Team</div>
+        <div class="team-role">People & Recruitment</div>
+        <div class="team-tags"><span class="team-tag">Hiring</span><span class="team-tag">Training</span><span class="team-tag">Culture</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ JOIN CTA ═══ -->
+<section style="background:linear-gradient(135deg,#1a56db,#0e9f6e);padding:80px 5%;text-align:center;position:relative;overflow:hidden;">
+  <div style="position:absolute;top:-80px;right:-80px;width:300px;height:300px;background:rgba(255,255,255,.06);border-radius:50%;"></div>
+  <div style="position:relative;z-index:1;">
+    <h2 style="font-family:'Fredoka One',cursive;font-size:clamp(28px,4vw,42px);color:#fff;margin-bottom:14px;">Want to Be Part of This? 🚀</h2>
+    <p style="font-size:17px;color:rgba(255,255,255,.8);margin-bottom:32px;max-width:500px;margin-left:auto;margin-right:auto;">We're always looking for passionate educators and talented people to join the StemNest team.</p>
+    <a href="teach-with-us.html" class="btn btn-primary" style="font-size:17px;padding:14px 36px;">✦ Apply to Teach With Us</a>
+  </div>
+</section>
+
+<!-- ═══ FOOTER ═══ -->
+<footer>
+  <div class="footer-top">
+    <div class="footer-brand">
+      <a class="logo" href="../index.html"><div class="logo-icon">S</div><div class="logo-text">StemNest<span>Academy</span></div></a>
+      <p>Expert 1-on-1 online tutoring in Coding, Maths and Sciences for students aged 7–19. UK-based, globally trusted.</p>
+      <div class="social-links" style="margin-top:20px;">
+        <a class="social-link" href="#">𝕏</a><a class="social-link" href="#">in</a>
+        <a class="social-link" href="#">f</a><a class="social-link" href="#">▶</a>
+      </div>
+    </div>
+    <div class="footer-col">
+      <h4>Courses</h4>
+      <a href="courses.html">Coding</a>
+      <a href="courses.html">Mathematics</a>
+      <a href="courses.html">Sciences</a>
+      <a href="courses.html">All Programmes</a>
+    </div>
+    <div class="footer-col">
+      <h4>Company</h4>
+      <a href="about.html">About Us</a>
+      <a href="team.html">Our Team</a>
+      <a href="teach-with-us.html">Teach With Us</a>
+      <a href="faq.html">FAQ</a>
+    </div>
+    <div class="footer-col">
+      <h4>Account</h4>
+      <a href="login.html">Tutor Login</a>
+      <a href="login.html">Student Login</a>
+      <a href="free-trial.html">Book Free Trial</a>
+      <a href="join-class.html">Join My Class</a>
+    </div>
+    <div class="footer-col">
+      <h4>Legal</h4>
+      <a href="legal/privacy-policy.html">Privacy Policy</a>
+      <a href="legal/terms-of-use.html">Terms of Use</a>
+      <a href="legal/refund-policy.html">Refund &amp; Cancellation</a>
+      <a href="legal/disclaimer.html">Disclaimer</a>
+      <a href="legal/payment-policy.html">Payment Policy</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="footer-copy">© 2025 StemNest Academy Ltd. Registered in England &amp; Wales. All rights reserved.</div>
+    <div class="footer-badges">
+      <div class="footer-badge">🇬🇧 UK Based</div>
+      <div class="footer-badge">🔒 Safeguarding First</div>
+      <div class="footer-badge">✦ DBS Checked Tutors</div>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/utils.js"></script>
+<script>
+const SUBJECT_COLORS = {
+  Coding:   'linear-gradient(135deg,#1a56db,#4f87f5)',
+  Maths:    'linear-gradient(135deg,#0e9f6e,#3dd9a4)',
+  Sciences: 'linear-gradient(135deg,#ff6b35,#ffaa80)',
+};
+
+let allTutors = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadTutors();
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+});
+
+function loadTutors() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('sn_teachers') || '[]');
+    allTutors = stored.length ? stored : [
+      { id:'CT001', name:'Sarah Rahman',  initials:'SR', subject:'Coding',   courses:['Python','Scratch','Web Dev'], photo:null },
+      { id:'MT001', name:'James Okafor',  initials:'JO', subject:'Maths',    courses:['GCSE Maths','A-Level','KS2/3'], photo:null },
+      { id:'ST001', name:'Lisa Patel',    initials:'LP', subject:'Sciences', courses:['Biology','Chemistry','Physics'], photo:null },
+      { id:'CT002', name:'Marcus King',   initials:'MK', subject:'Coding',   courses:['AI/ML','JavaScript','Apps'], photo:null },
+    ];
+  } catch { allTutors = []; }
+  renderTutors('all');
+}
+
+function renderTutors(filter) {
+  const grid = document.getElementById('tutorGrid');
+  if (!grid) return;
+  const list = filter === 'all' ? allTutors : allTutors.filter(t => t.subject?.toLowerCase() === filter);
+  if (!list.length) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--light);font-weight:700;">No tutors in this category yet.</div>';
+    return;
+  }
+  grid.innerHTML = list.map(t => {
+    const color = t.color || SUBJECT_COLORS[t.subject] || 'linear-gradient(135deg,var(--blue),var(--green))';
+    const avatar = t.photo
+      ? `<img src="${t.photo}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" alt="${t.name}">`
+      : t.initials;
+    return `
+      <div class="team-card">
+        <div class="team-avatar" style="background:${color}">${avatar}</div>
+        <div class="team-name">${t.name}</div>
+        <div class="team-role">${t.subject} Tutor</div>
+        <div class="team-id">${t.id}</div>
+        <div class="team-tags">${(t.courses||[]).slice(0,3).map(c=>`<span class="team-tag">${c}</span>`).join('')}</div>
+      </div>`;
+  }).join('');
+}
+
+function filterTeam(btn, filter) {
+  document.querySelectorAll('.team-filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTutors(filter);
+}
+</script>
+</body>
+</html>

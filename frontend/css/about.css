@@ -1,0 +1,259 @@
+/* ═══════════════════════════════════════════════════════
+   STEMNEST ACADEMY — ABOUT / TEAM / FAQ SHARED STYLES
+═══════════════════════════════════════════════════════ */
+
+/* ── PAGE HERO (shared) ── */
+.about-hero {
+  background: linear-gradient(160deg, #0a1628 0%, #1a3a6b 55%, #0d2a1a 100%);
+  padding: 80px 5% 70px;
+  position: relative; overflow: hidden;
+  text-align: center;
+}
+.about-hero::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(26,86,219,.2) 0%, transparent 55%),
+    radial-gradient(ellipse at 80% 30%, rgba(14,159,110,.15) 0%, transparent 50%);
+}
+.about-hero-inner { position: relative; z-index: 1; max-width: 760px; margin: 0 auto; }
+.about-hero-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2);
+  border-radius: 50px; padding: 7px 18px;
+  font-size: 12px; font-weight: 900; color: rgba(255,255,255,.85);
+  text-transform: uppercase; letter-spacing: 1px;
+  margin-bottom: 20px;
+}
+.about-hero h1 {
+  font-family: 'Fredoka One', cursive;
+  font-size: clamp(36px, 5vw, 60px);
+  color: #fff; line-height: 1.12; margin-bottom: 18px;
+}
+.about-hero h1 span {
+  background: linear-gradient(90deg, #ff6b35, #fbbf24);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.about-hero p {
+  font-size: 18px; color: rgba(255,255,255,.72);
+  line-height: 1.75; max-width: 600px; margin: 0 auto 32px;
+}
+.about-hero-ctas { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+
+/* ── SECTION WRAPPER ── */
+.about-section { padding: 80px 5%; }
+.about-section-inner { max-width: 1100px; margin: 0 auto; }
+.about-section-header { text-align: center; margin-bottom: 56px; }
+
+/* ── MISSION / VISION / VALUES ── */
+.mvv-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+.mvv-card {
+  background: var(--white);
+  border-radius: 20px;
+  padding: 36px 28px;
+  border: 1.5px solid #e8eaf0;
+  box-shadow: 0 4px 20px rgba(0,0,0,.05);
+  text-align: center;
+  transition: transform .2s, box-shadow .2s, border-color .2s;
+}
+.mvv-card:hover { transform: translateY(-5px); box-shadow: 0 12px 36px rgba(0,0,0,.1); }
+.mvv-card:nth-child(1):hover { border-color: var(--blue); }
+.mvv-card:nth-child(2):hover { border-color: var(--green); }
+.mvv-card:nth-child(3):hover { border-color: var(--orange); }
+.mvv-icon {
+  width: 64px; height: 64px; border-radius: 18px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; margin: 0 auto 20px;
+}
+.mvv-icon-blue   { background: var(--blue-light); }
+.mvv-icon-green  { background: var(--green-light); }
+.mvv-icon-orange { background: var(--orange-light); }
+.mvv-title { font-family: 'Fredoka One', cursive; font-size: 22px; color: var(--dark); margin-bottom: 12px; }
+.mvv-text  { font-size: 15px; color: var(--mid); line-height: 1.75; }
+
+/* ── CORE VALUES ── */
+.values-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
+}
+.value-card {
+  background: var(--bg);
+  border-radius: 16px;
+  padding: 24px 22px;
+  border: 1.5px solid #e8eaf0;
+  display: flex; align-items: flex-start; gap: 16px;
+  transition: border-color .2s, transform .2s;
+}
+.value-card:hover { border-color: var(--blue); transform: translateX(4px); }
+.value-num {
+  width: 36px; height: 36px; border-radius: 10px;
+  background: var(--blue); color: #fff;
+  font-family: 'Fredoka One', cursive; font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.value-title { font-family: 'Fredoka One', cursive; font-size: 17px; color: var(--dark); margin-bottom: 6px; }
+.value-desc  { font-size: 13px; color: var(--light); line-height: 1.65; }
+
+/* ── STORY SECTION ── */
+.story-wrap {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 60px;
+  align-items: center;
+}
+.story-text h2 { font-family: 'Fredoka One', cursive; font-size: clamp(28px,3.5vw,40px); color: var(--dark); margin-bottom: 20px; line-height: 1.2; }
+.story-text p  { font-size: 16px; color: var(--mid); line-height: 1.8; margin-bottom: 16px; }
+.story-stats {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 32px;
+}
+.story-stat {
+  background: var(--bg); border-radius: 14px; padding: 20px;
+  border: 1.5px solid #e8eaf0; text-align: center;
+}
+.story-stat-num   { font-family: 'Fredoka One', cursive; font-size: 32px; color: var(--blue); line-height: 1; }
+.story-stat-label { font-size: 12px; font-weight: 800; color: var(--light); text-transform: uppercase; letter-spacing: .5px; margin-top: 4px; }
+.story-visual {
+  background: linear-gradient(135deg, var(--blue-light), var(--green-light));
+  border-radius: 24px; padding: 40px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+.story-visual-item {
+  background: var(--white); border-radius: 14px; padding: 18px 20px;
+  display: flex; align-items: center; gap: 14px;
+  box-shadow: 0 2px 12px rgba(0,0,0,.06);
+}
+.svi-icon { font-size: 28px; flex-shrink: 0; }
+.svi-title { font-weight: 800; font-size: 14px; color: var(--dark); }
+.svi-sub   { font-size: 12px; color: var(--light); font-weight: 700; margin-top: 2px; }
+
+/* ── FOUNDERS ── */
+.founders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 28px;
+}
+.founder-card {
+  background: var(--white);
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0,0,0,.07);
+  border: 1.5px solid #e8eaf0;
+  transition: transform .2s, box-shadow .2s;
+}
+.founder-card:hover { transform: translateY(-5px); box-shadow: 0 14px 40px rgba(0,0,0,.12); }
+.founder-banner {
+  height: 120px;
+  display: flex; align-items: flex-end; justify-content: center;
+  padding-bottom: 0; position: relative;
+}
+.founder-avatar {
+  width: 90px; height: 90px; border-radius: 50%;
+  border: 4px solid var(--white);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Fredoka One', cursive; font-size: 30px; color: #fff;
+  position: absolute; bottom: -45px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.15);
+}
+.founder-body { padding: 56px 24px 28px; text-align: center; }
+.founder-name    { font-family: 'Fredoka One', cursive; font-size: 22px; color: var(--dark); margin-bottom: 4px; }
+.founder-role    { font-size: 13px; font-weight: 800; color: var(--blue); margin-bottom: 12px; }
+.founder-bio     { font-size: 14px; color: var(--light); line-height: 1.7; margin-bottom: 16px; }
+.founder-socials { display: flex; gap: 8px; justify-content: center; }
+.founder-social  {
+  width: 34px; height: 34px; border-radius: 8px;
+  background: var(--bg); border: 1.5px solid #e8eaf0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; text-decoration: none; color: var(--mid);
+  transition: .2s;
+}
+.founder-social:hover { background: var(--blue-light); color: var(--blue); border-color: var(--blue); }
+
+/* ── TEAM GRID ── */
+.team-filter-bar {
+  display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
+  margin-bottom: 40px;
+}
+.team-filter-btn {
+  padding: 8px 20px; border-radius: 50px; border: 2px solid #e8eaf0;
+  background: var(--white); font-family: 'Nunito', sans-serif;
+  font-weight: 800; font-size: 14px; color: var(--mid); cursor: pointer;
+  transition: .2s;
+}
+.team-filter-btn:hover  { border-color: var(--blue); color: var(--blue); }
+.team-filter-btn.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 20px;
+}
+.team-card {
+  background: var(--white); border-radius: 20px; padding: 24px 18px;
+  text-align: center; border: 1.5px solid #e8eaf0;
+  box-shadow: 0 2px 12px rgba(0,0,0,.05);
+  transition: transform .2s, box-shadow .2s, border-color .2s;
+}
+.team-card:hover { transform: translateY(-4px); box-shadow: 0 10px 28px rgba(0,0,0,.1); border-color: var(--blue); }
+.team-avatar {
+  width: 72px; height: 72px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Fredoka One', cursive; font-size: 24px; color: #fff;
+  margin: 0 auto 14px;
+}
+.team-name    { font-family: 'Fredoka One', cursive; font-size: 17px; color: var(--dark); margin-bottom: 3px; }
+.team-role    { font-size: 12px; font-weight: 800; color: var(--blue); margin-bottom: 8px; }
+.team-id      { font-size: 10px; font-weight: 900; color: var(--light); background: var(--bg); padding: 2px 10px; border-radius: 50px; display: inline-block; margin-bottom: 8px; }
+.team-tags    { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; }
+.team-tag     { background: var(--bg); color: var(--mid); font-size: 10px; font-weight: 800; padding: 3px 9px; border-radius: 50px; }
+
+/* ── FAQ ── */
+.faq-section { background: var(--bg); padding: 80px 5%; }
+.faq-inner   { max-width: 800px; margin: 0 auto; }
+.faq-category-label {
+  font-family: 'Fredoka One', cursive; font-size: 20px; color: var(--dark);
+  margin: 40px 0 16px; padding-bottom: 10px;
+  border-bottom: 2px solid var(--blue-light);
+}
+.faq-category-label:first-child { margin-top: 0; }
+.faq-item {
+  background: var(--white); border-radius: 14px;
+  border: 1.5px solid #e8eaf0; overflow: hidden;
+  margin-bottom: 10px; transition: border-color .2s;
+}
+.faq-item:hover { border-color: var(--blue); }
+.faq-item.open  { border-color: var(--blue); }
+.faq-q {
+  padding: 18px 22px; font-weight: 800; font-size: 15px; color: var(--dark);
+  cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+  user-select: none; gap: 12px;
+}
+.faq-q-icon {
+  width: 28px; height: 28px; border-radius: 50%; background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; color: var(--light); flex-shrink: 0;
+  transition: background .2s, transform .3s;
+}
+.faq-item.open .faq-q-icon { background: var(--blue-light); color: var(--blue); transform: rotate(45deg); }
+.faq-a {
+  padding: 0 22px; max-height: 0; overflow: hidden;
+  font-size: 14px; color: var(--mid); line-height: 1.75;
+  transition: max-height .35s ease, padding .35s ease;
+}
+.faq-item.open .faq-a { max-height: 300px; padding: 0 22px 18px; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 900px) {
+  .mvv-grid    { grid-template-columns: 1fr; }
+  .story-wrap  { grid-template-columns: 1fr; }
+  .story-visual { display: none; }
+  .founders-grid { grid-template-columns: 1fr; max-width: 400px; margin: 0 auto; }
+}
+@media (max-width: 600px) {
+  .about-section { padding: 60px 5%; }
+  .story-stats   { grid-template-columns: 1fr 1fr; }
+}

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HR Dashboard – StemNest Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/dashboard.css">
+  <link rel="stylesheet" href="../css/admin-dashboard.css">
+</head>
+<body>
+<nav style="position:sticky;top:0;z-index:200;">
+  <a class="logo" href="../index.html"><div class="logo-icon">S</div><div class="logo-text">StemNest<span>Academy</span></div></a>
+  <ul class="nav-links"><li><a href="../index.html">← Back to Website</a></li></ul>
+  <div class="nav-actions">
+    <span style="font-size:13px;font-weight:700;color:var(--light);"><span class="live-dot"></span> HR Team</span>
+    <a href="login.html" class="btn btn-outline" style="font-size:13px;padding:8px 18px;">Log Out</a>
+  </div>
+</nav>
+<div class="dash-wrap">
+  <div class="dash-sidebar">
+    <div class="sidebar-profile">
+      <div class="sidebar-avatar" style="background:linear-gradient(135deg,#e63387,#7c3aed);">HR</div>
+      <div class="sidebar-name">HR Team</div>
+      <div class="sidebar-role">People & Recruitment</div>
+      <div class="sidebar-status"><span class="live-dot"></span> Online</div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="sidebar-section-label">Recruitment</div>
+      <a class="sidebar-link active" data-tab="applications" onclick="showHRTab('applications')"><span class="sl-icon">📋</span> Applications <span class="sl-badge" id="appBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="interviews"   onclick="showHRTab('interviews')"> <span class="sl-icon">📅</span> Interviews</a>
+      <a class="sidebar-link"        data-tab="training"     onclick="showHRTab('training')">   <span class="sl-icon">🎓</span> Training</a>
+      <a class="sidebar-link"        data-tab="adverts"      onclick="showHRTab('adverts')">    <span class="sl-icon">📣</span> Job Adverts</a>
+    </div>
+    <div class="sidebar-bottom">
+      <button class="logout-btn" onclick="window.location.href='login.html'">🚪 Log Out</button>
+    </div>
+  </div>
+  <div class="dash-main">
+    <div class="dash-topbar">
+      <div>
+        <div class="dash-greeting">👥 HR Dashboard</div>
+        <div class="dash-date" id="hrDate"></div>
+      </div>
+      <div class="dash-top-actions">
+        <button class="btn btn-primary" onclick="showHRTab('adverts')">📣 Post Job Advert</button>
+      </div>
+    </div>
+    <div class="dash-stats">
+      <div class="dstat ds-orange"><div class="dstat-icon di-orange">📋</div><div class="dstat-val" id="hrStat1">0</div><div class="dstat-label">Total Applications</div></div>
+      <div class="dstat ds-blue"><div class="dstat-icon di-blue">⏳</div><div class="dstat-val" id="hrStat2">0</div><div class="dstat-label">Pending Review</div></div>
+      <div class="dstat ds-green"><div class="dstat-icon di-green">📅</div><div class="dstat-val" id="hrStat3">0</div><div class="dstat-label">Interviews Scheduled</div></div>
+      <div class="dstat ds-purple"><div class="dstat-icon di-purple">🎓</div><div class="dstat-val" id="hrStat4">0</div><div class="dstat-label">In Training</div></div>
+    </div>
+
+    <!-- APPLICATIONS -->
+    <div id="tab-applications">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📋 Tutor Applications</div>
+        <div class="admin-filters">
+          <select id="appStatusFilter" class="admin-filter-sel" onchange="renderApplications()">
+            <option value="all">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="shortlisted">Shortlisted</option>
+            <option value="interview">Interview</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
+      </div>
+      <div id="applicationsList"></div>
+    </div>
+
+    <!-- INTERVIEWS -->
+    <div id="tab-interviews" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📅 Interview Schedule</div>
+        <button class="btn btn-primary" style="font-size:13px;padding:9px 20px;" onclick="openScheduleModal()">➕ Schedule Interview</button>
+      </div>
+      <div id="interviewsList"></div>
+    </div>
+
+    <!-- TRAINING -->
+    <div id="tab-training" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🎓 Training Schedules</div>
+        <button class="btn btn-primary" style="font-size:13px;padding:9px 20px;" onclick="openTrainingModal()">➕ Add Training</button>
+      </div>
+      <div id="trainingList"></div>
+    </div>
+
+    <!-- JOB ADVERTS -->
+    <div id="tab-adverts" style="display:none;">
+      <div class="dash-section-header"><div class="dash-section-title">📣 Job Adverts</div></div>
+      <div class="add-teacher-form-wrap">
+        <form class="add-teacher-form" onsubmit="return false;">
+          <div class="atf-grid">
+            <div class="atf-field atf-full"><label>Job Title <span class="req">*</span></label><input type="text" id="adv-title" placeholder="e.g. Coding Tutor — Python & Scratch"></div>
+            <div class="atf-field"><label>Subject</label>
+              <select id="adv-subject">
+                <option value="Coding">💻 Coding</option>
+                <option value="Maths">📐 Maths</option>
+                <option value="Sciences">🔬 Sciences</option>
+                <option value="All">All Subjects</option>
+              </select>
+            </div>
+            <div class="atf-field"><label>Pay Range</label><input type="text" id="adv-pay" placeholder="e.g. £25–35/hr"></div>
+            <div class="atf-field atf-full"><label>Job Description <span class="req">*</span></label><textarea id="adv-desc" style="min-height:100px;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;width:100%;outline:none;" placeholder="Describe the role, requirements, and responsibilities..."></textarea></div>
+            <div class="atf-field"><label>Application Deadline</label><input type="date" id="adv-deadline"></div>
+            <div class="atf-field"><label>Status</label>
+              <select id="adv-status">
+                <option value="open">✅ Open</option>
+                <option value="urgent">🔥 Urgent</option>
+                <option value="closed">❌ Closed</option>
+              </select>
+            </div>
+          </div>
+          <div class="atf-divider"></div>
+          <div class="atf-actions">
+            <button type="button" class="btn btn-outline" onclick="clearAdvert()">Clear</button>
+            <button type="button" class="btn btn-primary" onclick="postAdvert()">📣 Post Advert</button>
+          </div>
+        </form>
+      </div>
+      <div style="margin-top:32px;">
+        <div class="dash-section-header"><div class="dash-section-title">Active Adverts</div></div>
+        <div id="advertsList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="../js/utils.js"></script>
+<script src="../js/hr-dashboard.js"></script>
+</body>
+</html>

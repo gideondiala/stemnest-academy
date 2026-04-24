@@ -89,7 +89,7 @@ nav {
 /* ── FOOTER ── */
 footer { background: #0d1117; padding: 60px 5% 30px; color: rgba(255,255,255,.6); }
 .footer-top {
-  display: grid; grid-template-columns: 2fr repeat(3, 1fr); gap: 40px;
+  display: grid; grid-template-columns: 2fr repeat(4, 1fr); gap: 32px;
   margin-bottom: 40px; padding-bottom: 40px;
   border-bottom: 1px solid rgba(255,255,255,.08);
 }
@@ -173,11 +173,11 @@ footer { background: #0d1117; padding: 60px 5% 30px; color: rgba(255,255,255,.6)
 /* ── RESPONSIVE GLOBALS ── */
 @media (max-width: 900px) {
   nav .nav-links  { display: none; }
-  .footer-top     { grid-template-columns: 1fr 1fr; }
+  .footer-top     { grid-template-columns: 1fr 1fr; gap: 24px; }
   .form-grid      { grid-template-columns: 1fr; }
   .form-full      { grid-column: 1; }
 }
 @media (max-width: 600px) {
-  .footer-top     { grid-template-columns: 1fr; }
+  .footer-top     { grid-template-columns: 1fr; gap: 20px; }
   .footer-bottom  { flex-direction: column; text-align: center; }
 }

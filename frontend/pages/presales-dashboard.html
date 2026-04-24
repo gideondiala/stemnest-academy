@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pre-Sales Dashboard – StemNest Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/dashboard.css">
+  <link rel="stylesheet" href="../css/admin-dashboard.css">
+</head>
+<body>
+<nav style="position:sticky;top:0;z-index:200;">
+  <a class="logo" href="../index.html"><div class="logo-icon">S</div><div class="logo-text">StemNest<span>Academy</span></div></a>
+  <ul class="nav-links"><li><a href="../index.html">← Back to Website</a></li></ul>
+  <div class="nav-actions">
+    <span style="font-size:13px;font-weight:700;color:var(--light);"><span class="live-dot"></span> <span id="psNavName">Pre-Sales</span></span>
+    <a href="login.html" class="btn btn-outline" style="font-size:13px;padding:8px 18px;">Log Out</a>
+  </div>
+</nav>
+<div class="dash-wrap">
+  <div class="dash-sidebar">
+    <div class="sidebar-profile">
+      <div class="sidebar-avatar" style="background:linear-gradient(135deg,#1a56db,#0e9f6e);" id="psAvatar">PS</div>
+      <div class="sidebar-name" id="psSidebarName">Pre-Sales</div>
+      <div class="sidebar-role">Academic Counselor</div>
+      <div class="sidebar-status"><span class="live-dot"></span> Online</div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="sidebar-section-label">My Work</div>
+      <a class="sidebar-link active" data-tab="incoming"   onclick="showPSTab('incoming')">  <span class="sl-icon">📥</span> Incoming Demos <span class="sl-badge" id="incomingBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="scheduled"  onclick="showPSTab('scheduled')"> <span class="sl-icon">📅</span> Scheduled</a>
+      <a class="sidebar-link"        data-tab="notes"      onclick="showPSTab('notes')">     <span class="sl-icon">📝</span> Parent Notes</a>
+    </div>
+    <div class="sidebar-bottom">
+      <button class="logout-btn" onclick="window.location.href='login.html'">🚪 Log Out</button>
+    </div>
+  </div>
+  <div class="dash-main">
+    <div class="dash-topbar">
+      <div>
+        <div class="dash-greeting" id="psGreeting">Good morning ☀️</div>
+        <div class="dash-date" id="psDate"></div>
+      </div>
+      <div class="dash-top-actions">
+        <button class="btn btn-primary" onclick="showPSTab('book')">➕ Book Demo Class</button>
+      </div>
+    </div>
+    <div class="dash-stats">
+      <div class="dstat ds-orange"><div class="dstat-icon di-orange">📥</div><div class="dstat-val" id="psStat1">0</div><div class="dstat-label">New Bookings</div><div class="dstat-trend trend-up">Needs scheduling</div></div>
+      <div class="dstat ds-blue"><div class="dstat-icon di-blue">📅</div><div class="dstat-val" id="psStat2">0</div><div class="dstat-label">Scheduled</div><div class="dstat-trend trend-up">Teacher assigned</div></div>
+      <div class="dstat ds-green"><div class="dstat-icon di-green">✅</div><div class="dstat-val" id="psStat3">0</div><div class="dstat-label">Confirmed</div><div class="dstat-trend trend-up">Parent confirmed</div></div>
+      <div class="dstat ds-purple"><div class="dstat-icon di-purple">👩‍🏫</div><div class="dstat-val" id="psStat4">0</div><div class="dstat-label">Available Teachers</div><div class="dstat-trend trend-neutral">Right now</div></div>
+    </div>
+
+    <!-- INCOMING DEMOS -->
+    <div id="tab-incoming">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📥 Incoming Demo Bookings</div>
+        <button class="btn btn-outline" style="font-size:13px;" onclick="renderIncoming()">🔄 Refresh</button>
+      </div>
+      <div id="incomingList"></div>
+    </div>
+
+    <!-- SCHEDULED -->
+    <div id="tab-scheduled" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📅 Scheduled Demo Classes</div>
+      </div>
+      <div id="scheduledList"></div>
+    </div>
+
+    <!-- PARENT NOTES -->
+    <div id="tab-notes" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📝 Parent Confirmation Notes</div>
+      </div>
+      <div id="parentNotesList"></div>
+    </div>
+
+  </div><!-- end dash-main -->
+</div><!-- end dash-wrap -->
+
+<!-- ═══ SCHEDULE DEMO MODAL ═══ -->
+<div class="modal-overlay" id="scheduleModalOverlay">
+  <div class="modal" style="max-width:500px;">
+    <div class="modal-header">
+      <div class="modal-title">📅 Schedule Demo Class</div>
+      <button class="modal-close" onclick="closeScheduleModal()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Student info banner -->
+      <div style="background:var(--blue-light);border-radius:12px;padding:14px 16px;margin-bottom:20px;font-size:13px;font-weight:700;color:var(--dark);line-height:1.7;" id="sm-student-info"></div>
+
+      <!-- Teacher dropdown -->
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">👩‍🏫 Select Teacher <span style="color:#e53e3e;">*</span></label>
+        <select id="sm-teacher" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;background:var(--white);">
+          <option value="">— Select a teacher —</option>
+        </select>
+      </div>
+
+      <!-- Date & Time -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
+        <div class="pm-field" style="margin-bottom:0;">
+          <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">📅 Date <span style="color:#e53e3e;">*</span></label>
+          <input type="date" id="sm-date" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;">
+        </div>
+        <div class="pm-field" style="margin-bottom:0;">
+          <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">🕐 Time <span style="color:#e53e3e;">*</span></label>
+          <input type="time" id="sm-time" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;">
+        </div>
+      </div>
+
+      <!-- Class link -->
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">🔗 Class Link (Meet / Zoom) <span style="color:#e53e3e;">*</span></label>
+        <input type="url" id="sm-link" placeholder="https://meet.google.com/xxx-xxxx-xxx"
+          style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;">
+      </div>
+
+      <!-- Notes -->
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">📝 Notes for Teacher</label>
+        <textarea id="sm-notes" placeholder="Any special notes for the teacher..."
+          style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;min-height:70px;resize:vertical;"></textarea>
+      </div>
+
+      <div style="display:flex;gap:12px;margin-top:4px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="closeScheduleModal()">Cancel</button>
+        <button class="btn btn-primary" style="flex:2;" onclick="confirmScheduleDemo()">✅ Confirm & Schedule</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/utils.js"></script>
+<script src="../js/presales-dashboard.js"></script>
+</body>
+</html>

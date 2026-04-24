@@ -1,0 +1,308 @@
+/* ═══════════════════════════════════════════════════════
+   STEMNEST ACADEMY — MOBILE RESPONSIVE OVERRIDES
+   Applied after all other CSS files.
+   Breakpoints: 768px (tablet), 480px (phone), 360px (small phone)
+═══════════════════════════════════════════════════════ */
+
+/* ══════════════════════════════════════════════════════
+   GLOBAL — NAV, BUTTONS, FOOTER
+══════════════════════════════════════════════════════ */
+
+/* Hamburger menu */
+.nav-hamburger {
+  display: none;
+  flex-direction: column; gap: 5px;
+  cursor: pointer; padding: 8px; border: none; background: none;
+}
+.nav-hamburger span {
+  display: block; width: 24px; height: 2px;
+  background: var(--dark); border-radius: 2px;
+  transition: transform .3s, opacity .3s;
+}
+.nav-mobile-open .nav-hamburger span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.nav-mobile-open .nav-hamburger span:nth-child(2) { opacity: 0; }
+.nav-mobile-open .nav-hamburger span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+/* Mobile nav drawer */
+.nav-mobile-drawer {
+  display: none;
+  position: fixed; top: 70px; left: 0; right: 0;
+  background: var(--white); border-bottom: 1.5px solid #e8eaf0;
+  padding: 16px 5% 24px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.1);
+  z-index: 999;
+  flex-direction: column; gap: 4px;
+}
+.nav-mobile-drawer.open { display: flex; }
+.nav-mobile-drawer a {
+  display: block; padding: 12px 16px; border-radius: 12px;
+  font-weight: 700; font-size: 15px; color: var(--mid);
+  text-decoration: none; transition: background .2s, color .2s;
+}
+.nav-mobile-drawer a:hover, .nav-mobile-drawer a.active {
+  background: var(--blue-light); color: var(--blue);
+}
+.nav-mobile-drawer .nav-mobile-actions {
+  display: flex; flex-direction: column; gap: 10px;
+  margin-top: 12px; padding-top: 12px;
+  border-top: 1px solid #e8eaf0;
+}
+.nav-mobile-drawer .nav-mobile-actions .btn {
+  width: 100%; justify-content: center;
+  padding: 13px 20px; font-size: 15px;
+}
+
+@media (max-width: 900px) {
+  .nav-hamburger { display: flex; }
+  nav .nav-actions { display: none; }
+}
+
+/* Touch-friendly button sizing */
+@media (max-width: 768px) {
+  .btn { padding: 12px 20px; font-size: 14px; min-height: 44px; }
+  .btn-primary, .btn-blue, .btn-green { min-height: 44px; }
+}
+
+/* Footer */
+@media (max-width: 768px) {
+  .footer-top { grid-template-columns: 1fr 1fr; gap: 28px; }
+}
+@media (max-width: 480px) {
+  .footer-top { grid-template-columns: 1fr; gap: 24px; }
+  .footer-bottom { flex-direction: column; text-align: center; }
+  .footer-badges { justify-content: center; flex-wrap: wrap; }
+}
+
+/* ══════════════════════════════════════════════════════
+   HOME PAGE
+══════════════════════════════════════════════════════ */
+
+/* Fix hero h1 clamp on mobile */
+@media (max-width: 480px) {
+  .hero h1 { font-size: clamp(28px, 8vw, 42px); }
+  .hero p  { font-size: 16px; }
+  .hero    { padding: 48px 5% 40px; }
+  .hero-ctas { gap: 10px; }
+  .hero-ctas .btn { width: 100%; justify-content: center; }
+  .hero-trust { gap: 12px; }
+}
+
+/* Stats bar */
+@media (max-width: 480px) {
+  .stats-bar { padding: 24px 5%; gap: 20px; }
+  .stat-num  { font-size: 28px; }
+  .stat-label { font-size: 12px; }
+}
+
+/* Section titles */
+@media (max-width: 480px) {
+  .section-title { font-size: clamp(22px, 6vw, 32px); }
+  .section-sub   { font-size: 15px; margin-bottom: 32px; }
+  section        { padding: 56px 5%; }
+}
+
+/* Why section */
+@media (max-width: 480px) {
+  .why-headline  { font-size: clamp(22px, 6vw, 34px); }
+  .why-sub       { font-size: 15px; }
+  .why-section   { padding: 64px 5%; }
+  .why-header    { margin-bottom: 40px; }
+  .why-cards-grid { grid-template-columns: 1fr; gap: 14px; margin-bottom: 40px; }
+  .why-bottom    { flex-direction: column; align-items: center; text-align: center; gap: 24px; padding-top: 32px; }
+  .why-stats-row { gap: 16px; justify-content: center; }
+  .why-stat-divider { display: none; }
+  .why-cta-btn   { width: 100%; justify-content: center; }
+}
+
+/* Teachers grid */
+@media (max-width: 600px) {
+  .teachers-grid { grid-template-columns: 1fr 1fr; gap: 16px; }
+}
+@media (max-width: 400px) {
+  .teachers-grid { grid-template-columns: 1fr; }
+}
+
+/* Reviews grid */
+@media (max-width: 600px) {
+  .reviews-grid { grid-template-columns: 1fr; }
+}
+
+/* CTA section */
+@media (max-width: 480px) {
+  .cta-btns { flex-direction: column; align-items: center; }
+  .cta-btns .btn { width: 100%; max-width: 320px; justify-content: center; }
+}
+
+/* ══════════════════════════════════════════════════════
+   COURSES PAGE
+══════════════════════════════════════════════════════ */
+
+@media (max-width: 600px) {
+  .filter-bar { flex-direction: column; align-items: stretch; gap: 12px; }
+  .filter-tabs { gap: 6px; }
+  .filter-tab  { padding: 8px 14px; font-size: 13px; }
+  .filter-right { justify-content: space-between; }
+  .sort-select  { flex: 1; }
+  .courses-grid { grid-template-columns: 1fr; }
+  .card-stats   { grid-template-columns: 1fr 1fr 1fr; }
+  .enroll-btn   { padding: 12px 16px; font-size: 14px; min-height: 44px; }
+  .page-hero h1 { font-size: clamp(22px, 6vw, 34px); }
+}
+
+/* ══════════════════════════════════════════════════════
+   LOGIN PAGE
+══════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  .login-page-wrap { flex-direction: column; }
+  .brand-panel     { display: none; }
+  .form-panel      { padding: 40px 5%; }
+  .form-box        { max-width: 100%; }
+}
+@media (max-width: 480px) {
+  .form-title  { font-size: 26px; }
+  .role-btn    { padding: 12px 10px; font-size: 14px; min-height: 44px; }
+  .login-btn   { min-height: 48px; font-size: 15px; }
+  .login-field input { min-height: 48px; font-size: 15px; }
+}
+
+/* ══════════════════════════════════════════════════════
+   FREE TRIAL LANDING PAGE
+══════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  .lp-hero { grid-template-columns: 1fr; min-height: auto; padding: 40px 5%; gap: 32px; }
+  .lp-hero-form-col { max-height: none; overflow-y: visible; }
+  .lp-hero-content  { text-align: center; }
+  .lp-hero-proof    { justify-content: center; }
+  .lp-hero-perks    { align-items: center; }
+  .lp-form-grid     { grid-template-columns: 1fr; }
+  .lp-full          { grid-column: 1; }
+}
+@media (max-width: 480px) {
+  .lp-hero-content h1 { font-size: clamp(24px, 7vw, 36px); }
+  .lp-hero-content p  { font-size: 15px; }
+  .lp-form            { padding: 20px 16px; }
+  .lp-subject-grid    { grid-template-columns: 1fr; }
+  .lp-device-grid     { grid-template-columns: 1fr 1fr; }
+  .lp-time-grid       { grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); }
+  .lp-time-slot       { padding: 10px 4px; font-size: 12px; }
+  .lp-submit-btn      { font-size: 16px; padding: 16px; }
+  .lp-proof-strip     { gap: 12px; padding: 14px 5%; }
+  .lp-proof-strip-item { font-size: 12px; }
+  .lp-reviews-grid    { grid-template-columns: 1fr; }
+  .lp-trust-grid      { grid-template-columns: 1fr 1fr; }
+  .lp-success-box     { padding: 28px 16px; }
+  .lp-success-title   { font-size: 24px; }
+  .lp-success-msg     { font-size: 15px; }
+}
+
+/* ══════════════════════════════════════════════════════
+   JOIN CLASS PAGE
+══════════════════════════════════════════════════════ */
+
+@media (max-width: 480px) {
+  .jc-card          { padding: 28px 18px; }
+  .jc-title         { font-size: 24px; }
+  .jc-sub           { font-size: 14px; }
+  .jc-btn           { font-size: 15px; padding: 14px; }
+  .jc-join-main-btn { font-size: 16px; padding: 14px 24px; }
+  .jc-join-time     { font-size: 22px; }
+  .jc-rules-grid    { grid-template-columns: 1fr; }
+  .jc-student-card  { flex-direction: column; text-align: center; }
+}
+
+/* ══════════════════════════════════════════════════════
+   ABOUT / TEAM / FAQ PAGES
+══════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  .mvv-grid    { grid-template-columns: 1fr; max-width: 480px; margin: 0 auto; }
+  .story-wrap  { grid-template-columns: 1fr; }
+  .story-visual { display: none; }
+}
+@media (max-width: 480px) {
+  .about-hero  { padding: 56px 5% 48px; }
+  .about-hero h1 { font-size: clamp(22px, 7vw, 36px); }
+  .about-hero p  { font-size: 15px; }
+  .about-hero-ctas { flex-direction: column; align-items: center; }
+  .about-hero-ctas .btn { width: 100%; max-width: 300px; justify-content: center; }
+  .about-section { padding: 56px 5%; }
+  .values-grid   { grid-template-columns: 1fr; }
+  .founders-grid { grid-template-columns: 1fr; max-width: 360px; margin: 0 auto; }
+  .team-grid     { grid-template-columns: 1fr 1fr; gap: 14px; }
+  .story-stats   { grid-template-columns: 1fr 1fr; }
+  .faq-q         { font-size: 14px; padding: 14px 16px; }
+  .faq-a         { font-size: 13px; }
+}
+@media (max-width: 360px) {
+  .team-grid { grid-template-columns: 1fr; }
+}
+
+/* ══════════════════════════════════════════════════════
+   TEACH WITH US PAGE
+══════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  .tw-hero         { flex-direction: column; min-height: auto; padding: 56px 5% 48px; gap: 32px; text-align: center; }
+  .tw-hero-cards   { grid-template-columns: 1fr 1fr; max-width: 340px; margin: 0 auto; }
+  .tw-hero-ctas, .tw-hero-trust { justify-content: center; }
+  .tw-perks-grid   { grid-template-columns: 1fr 1fr; }
+  .tw-apply-wrap   { grid-template-columns: 1fr; }
+  .tw-apply-left   { text-align: center; }
+  .tw-apply-checklist { align-items: center; }
+  .tw-faq-grid     { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) {
+  .tw-hero-content h1 { font-size: clamp(26px, 7vw, 38px); }
+  .tw-hero-content p  { font-size: 15px; }
+  .tw-hero-cards   { grid-template-columns: 1fr 1fr; }
+  .tw-perks-grid   { grid-template-columns: 1fr; }
+  .tw-steps        { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .tw-step-arrow   { display: none; }
+  .tw-roles-grid   { grid-template-columns: 1fr; }
+  .tw-testimonials-grid { grid-template-columns: 1fr; }
+  .tw-apply-form   { padding: 24px 18px; }
+  .tw-form-grid    { grid-template-columns: 1fr; }
+  .tw-full         { grid-column: 1; }
+  .tw-subject-checks { flex-direction: column; }
+  .tw-check-label  { width: 100%; }
+  .tw-proof-strip  { gap: 12px; }
+}
+
+/* ══════════════════════════════════════════════════════
+   LEGAL PAGES
+══════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  .legal-wrap { grid-template-columns: 1fr; padding: 40px 5%; }
+  .legal-toc  { position: static; }
+}
+@media (max-width: 480px) {
+  .legal-hero  { padding: 48px 5% 40px; }
+  .legal-hero h1 { font-size: clamp(24px, 7vw, 36px); }
+  .lhb-row     { flex-direction: column; gap: 4px; }
+  .lhb-label   { min-width: auto; }
+}
+
+/* ══════════════════════════════════════════════════════
+   DASHBOARD PAGES (shared)
+══════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  .dash-sidebar  { display: none; }
+  .dash-main     { padding: 20px 4%; }
+  .dash-topbar   { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .dash-top-actions { width: 100%; }
+  .dash-top-actions .btn { flex: 1; justify-content: center; }
+  .dash-stats    { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .dash-grid-2   { grid-template-columns: 1fr; }
+  .quick-actions { grid-template-columns: 1fr 1fr; gap: 12px; }
+}
+@media (max-width: 480px) {
+  .dash-stats    { grid-template-columns: 1fr 1fr; }
+  .dstat-val     { font-size: 24px; }
+  .quick-actions { grid-template-columns: 1fr 1fr; }
+  .session-item  { flex-wrap: wrap; gap: 8px; }
+  .sess-divider  { display: none; }
+}

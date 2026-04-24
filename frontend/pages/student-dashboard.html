@@ -48,6 +48,8 @@
       <a class="sidebar-link"        data-tab="projects"      onclick="showTab('projects')">     <span class="sl-icon">📁</span> My Projects     <span class="sl-badge" id="projBadge">3</span></a>
       <a class="sidebar-link"        data-tab="quizzes"       onclick="showTab('quizzes')">      <span class="sl-icon">🧠</span> My Quizzes      <span class="sl-badge" id="quizBadge">2</span></a>
       <a class="sidebar-link"        data-tab="certificates"  onclick="showTab('certificates')"> <span class="sl-icon">🏆</span> Certificates</a>
+      <a class="sidebar-link"        data-tab="nest"          onclick="showTab('nest')">          <span class="sl-icon">🪺</span> Learning Nest</a>
+      <a class="sidebar-link"        data-tab="chat"          onclick="showTab('chat')">          <span class="sl-icon">💬</span> Chat with Tutor</a>
       <div class="sidebar-section-label">Account</div>
       <a class="sidebar-link" onclick="openProfileModal()"><span class="sl-icon">👤</span> My Profile</a>
       <a class="sidebar-link" href="../index.html"><span class="sl-icon">🌐</span> Back to Website</a>
@@ -105,8 +107,20 @@
     ══════════════════════════════════════ -->
     <div id="tab-overview">
 
+      <!-- PAYMENT LINK SECTION (appears when credits ≤ 3) -->
+      <div id="paymentLinkSection" style="display:none;margin-bottom:24px;"></div>
+
+      <!-- DEMO COUNTDOWN CARD (shown for demo students) -->
+      <div id="demoCountdownSection" style="display:none;margin-bottom:24px;"></div>
+
+      <!-- POST-DEMO FEE CARD (shown after demo is completed) -->
+      <div id="postDemoFeeSection" style="display:none;margin-bottom:24px;"></div>
+
+      <!-- FUN QUIZ WHILE WAITING (shown when student joins early) -->
+      <div id="waitingQuizSection" style="display:none;margin-bottom:24px;"></div>
+
       <!-- JOIN LIVE CLASS CARD -->
-      <div class="join-class-card">
+      <div class="join-class-card" id="joinClassCard">
         <div class="jc-left">
           <div class="jc-live-pill"><span class="live-dot"></span> Live Now</div>
           <div class="jc-title">Python for Beginners</div>
@@ -222,6 +236,41 @@
       </div>
     </div><!-- end tab-certificates -->
 
+    <!-- ══════════════════════════════════════
+         TAB: LEARNING NEST
+    ══════════════════════════════════════ -->
+    <div id="tab-nest" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🪺 Learning Nest</div>
+        <span style="font-size:13px;font-weight:700;color:var(--light);">Your past classes, summaries & recordings</span>
+      </div>
+      <div id="learningNestContent"></div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         TAB: CHAT WITH TUTOR
+    ══════════════════════════════════════ -->
+    <div id="tab-chat" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">💬 Chat with Your Tutor</div>
+        <span style="font-size:13px;font-weight:700;color:var(--light);">Messages include your name & ID automatically</span>
+      </div>
+      <div class="chat-wrap">
+        <div class="chat-messages" id="chatMessages"></div>
+        <div class="chat-input-bar">
+          <label class="chat-attach-btn" title="Attach image or document (max 5MB)">
+            📎
+            <input type="file" accept="image/*,.pdf,.doc,.docx" style="display:none;" onchange="handleChatFileUpload(this)">
+          </label>
+          <input type="text" id="chatInput" class="chat-input" placeholder="Type a message to your tutor..." onkeydown="if(event.key==='Enter')sendChatMessage()">
+          <button class="chat-send-btn" onclick="sendChatMessage()">Send →</button>
+        </div>
+        <div style="font-size:11px;color:var(--light);font-weight:700;padding:6px 16px;">
+          Your messages are sent with your name (<strong>${STUDENT?.name || 'Student'}</strong>) and ID so your tutor can identify you.
+        </div>
+      </div>
+    </div>
+
   </div><!-- end dash-main -->
 </div><!-- end dash-wrap -->
 
@@ -294,6 +343,7 @@
         </select>
       </div>
       <div class="pm-field"><label>Parent / Guardian Email</label><input type="email" placeholder="parent@email.com"></div>
+      <div class="pm-field"><label>Date of Birth</label><input type="date" id="pmDob" placeholder="Date of birth"></div>
       <div class="pm-footer">
         <button class="btn btn-outline" onclick="closeProfileModal()">Cancel</button>
         <button class="btn btn-green" onclick="saveProfile()">Save Changes ✦</button>
@@ -323,7 +373,19 @@
   </div>
 </div>
 
+<!-- ═══ LEARNING NEST CLASS MODAL ═══ -->
+<div class="modal-overlay" id="nestClassModal">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-header">
+      <div class="modal-title">🪺 Class Summary</div>
+      <button class="modal-close" onclick="document.getElementById('nestClassModal').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body" id="nestClassBody"></div>
+  </div>
+</div>
+
 <script src="../js/utils.js"></script>
 <script src="../js/student-dashboard.js"></script>
+<script src="../js/student-upgrades.js"></script>
 </body>
 </html>

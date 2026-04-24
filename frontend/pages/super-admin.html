@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Super Admin – StemNest Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/dashboard.css">
+  <link rel="stylesheet" href="../css/super-admin.css">
+</head>
+<body>
+
+<nav style="position:sticky;top:0;z-index:200;">
+  <a class="logo" href="../index.html">
+    <div class="logo-icon">S</div>
+    <div class="logo-text">StemNest<span>Academy</span></div>
+  </a>
+  <ul class="nav-links"><li><a href="../index.html">← Back to Website</a></li></ul>
+  <div class="nav-actions">
+    <span style="font-size:13px;font-weight:700;color:var(--light);"><span class="live-dot"></span> Founder Portal</span>
+    <a href="login.html" class="btn btn-outline" style="font-size:13px;padding:8px 18px;">Log Out</a>
+  </div>
+</nav>
+
+<div class="dash-wrap">
+
+  <!-- SIDEBAR -->
+  <div class="dash-sidebar">
+    <div class="sidebar-profile">
+      <div class="sidebar-avatar" style="background:linear-gradient(135deg,#7c3aed,#fbbf24);">SA</div>
+      <div class="sidebar-name">Super Admin</div>
+      <div class="sidebar-role">Founder Portal</div>
+      <div class="sidebar-status"><span class="live-dot"></span> Online</div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="sidebar-section-label">Reports</div>
+      <a class="sidebar-link active" data-tab="overview"   onclick="showSATab('overview')">  <span class="sl-icon">📊</span> Overview</a>
+      <a class="sidebar-link"        data-tab="sales"      onclick="showSATab('sales')">     <span class="sl-icon">💰</span> Sales Report</a>
+      <a class="sidebar-link"        data-tab="classes"    onclick="showSATab('classes')">   <span class="sl-icon">📡</span> Class Report</a>
+      <a class="sidebar-link"        data-tab="revenue"    onclick="showSATab('revenue')">   <span class="sl-icon">📈</span> Revenue</a>
+      <a class="sidebar-link"        data-tab="expenses"   onclick="showSATab('expenses')">  <span class="sl-icon">💸</span> Expenses</a>
+      <div class="sidebar-section-label">Platform</div>
+      <a class="sidebar-link"        data-tab="teachers"   onclick="showSATab('teachers')">  <span class="sl-icon">👩‍🏫</span> All Teachers</a>
+      <a class="sidebar-link"        data-tab="students"   onclick="showSATab('students')">  <span class="sl-icon">🎓</span> All Students</a>
+      <a class="sidebar-link"        data-tab="settings"   onclick="showSATab('settings')">  <span class="sl-icon">⚙️</span> Settings</a>
+      <div class="sidebar-section-label">Quick Links</div>
+      <a class="sidebar-link" href="admin-dashboard.html" target="_blank"><span class="sl-icon">📋</span> Admin Dashboard</a>
+      <a class="sidebar-link" href="free-trial.html"      target="_blank"><span class="sl-icon">🔗</span> Landing Page</a>
+    </div>
+    <div class="sidebar-bottom">
+      <button class="logout-btn" onclick="window.location.href='login.html'">🚪 Log Out</button>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="dash-main">
+
+    <div class="dash-topbar">
+      <div>
+        <div class="dash-greeting">📊 Founder Dashboard</div>
+        <div class="dash-date" id="saDate"></div>
+      </div>
+      <div class="dash-top-actions">
+        <select id="reportPeriod" class="sa-period-sel" onchange="refreshAllReports()">
+          <option value="today">Today</option>
+          <option value="week">This Week</option>
+          <option value="month" selected>This Month</option>
+          <option value="year">This Year</option>
+          <option value="all">All Time</option>
+        </select>
+        <button class="btn btn-primary" onclick="exportAllCSV()">⬇ Export All</button>
+      </div>
+    </div>
+
+    <!-- ── TAB: OVERVIEW ── -->
+    <div id="tab-overview">
+      <!-- KPI cards -->
+      <div class="sa-kpi-grid" id="kpiGrid"></div>
+
+      <!-- Charts row -->
+      <div class="dash-grid-2" style="margin-top:28px;">
+        <div class="dash-panel">
+          <div class="dash-section-header"><div class="dash-section-title">📡 Demo Classes</div></div>
+          <div id="demoClassChart"></div>
+        </div>
+        <div class="dash-panel">
+          <div class="dash-section-header"><div class="dash-section-title">💰 Revenue Trend</div></div>
+          <div id="revenueChart"></div>
+        </div>
+      </div>
+
+      <!-- Recent activity -->
+      <div class="dash-panel" style="margin-top:24px;">
+        <div class="dash-section-header"><div class="dash-section-title">🕐 Recent Bookings</div></div>
+        <div id="recentBookings"></div>
+      </div>
+    </div>
+
+    <!-- ── TAB: SALES REPORT ── -->
+    <div id="tab-sales" style="display:none;">
+      <div class="dash-section-header"><div class="dash-section-title">💰 Sales Report</div></div>
+      <div class="sa-kpi-grid" id="salesKpiGrid"></div>
+      <div class="dash-panel" style="margin-top:24px;">
+        <div class="dash-section-header"><div class="dash-section-title">Sales Person Performance</div></div>
+        <div id="salesPersonTable"></div>
+      </div>
+      <div class="dash-panel" style="margin-top:24px;">
+        <div class="dash-section-header"><div class="dash-section-title">Conversion Pipeline</div></div>
+        <div id="conversionTable"></div>
+      </div>
+    </div>
+
+    <!-- ── TAB: CLASS REPORT ── -->
+    <div id="tab-classes" style="display:none;">
+      <div class="dash-section-header"><div class="dash-section-title">📡 Class Report</div></div>
+      <div class="sa-kpi-grid" id="classKpiGrid"></div>
+      <div class="dash-panel" style="margin-top:24px;">
+        <div class="dash-section-header"><div class="dash-section-title">Class Breakdown</div></div>
+        <div id="classBreakdownTable"></div>
+      </div>
+    </div>
+
+    <!-- ── TAB: REVENUE ── -->
+    <div id="tab-revenue" style="display:none;">
+      <div class="dash-section-header"><div class="dash-section-title">📈 Revenue Report</div></div>
+      <div class="sa-kpi-grid" id="revenueKpiGrid"></div>
+      <div class="dash-panel" style="margin-top:24px;">
+        <div class="dash-section-header">
+          <div class="dash-section-title">Revenue by Period</div>
+        </div>
+        <div id="revenueTable"></div>
+      </div>
+    </div>
+
+    <!-- ── TAB: EXPENSES ── -->
+    <div id="tab-expenses" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">💸 Expenses & Profit</div>
+        <button class="btn btn-primary" style="font-size:13px;padding:9px 20px;" onclick="openAddExpenseModal()">➕ Add Expense</button>
+      </div>
+      <div class="sa-kpi-grid" id="expenseKpiGrid"></div>
+      <div class="dash-panel" style="margin-top:24px;">
+        <div class="dash-section-header"><div class="dash-section-title">Expense Log</div></div>
+        <div id="expenseTable"></div>
+      </div>
+    </div>
+
+    <!-- ── TAB: TEACHERS ── -->
+    <div id="tab-teachers" style="display:none;">
+      <div class="dash-section-header"><div class="dash-section-title">👩‍🏫 All Teachers</div></div>
+      <div class="sa-kpi-grid" id="teacherKpiGrid"></div>
+      <div class="dash-panel" style="margin-top:24px;">
+        <div id="teacherFullTable"></div>
+      </div>
+    </div>
+
+    <!-- ── TAB: STUDENTS ── -->
+    <div id="tab-students" style="display:none;">
+      <div class="dash-section-header"><div class="dash-section-title">🎓 All Students / Bookings</div></div>
+      <div class="dash-panel">
+        <div id="studentFullTable"></div>
+      </div>
+    </div>
+
+    <!-- ── TAB: SETTINGS ── -->
+    <div id="tab-settings" style="display:none;">
+      <div class="dash-section-header"><div class="dash-section-title">⚙️ Platform Settings</div></div>
+      <div class="sa-settings-grid">
+        <div class="sa-settings-card">
+          <div class="sa-settings-title">🏛️ Company Seal</div>
+          <div class="sa-settings-desc">Upload the official company seal used on student certificates.</div>
+          <div id="sealPreview" style="margin:12px 0;"></div>
+          <input type="file" id="sealUpload" accept="image/*" style="display:none;" onchange="uploadSeal(this)">
+          <button class="btn btn-outline" style="font-size:13px;" onclick="document.getElementById('sealUpload').click()">📷 Upload Seal</button>
+        </div>
+        <div class="sa-settings-card">
+          <div class="sa-settings-title">✍️ Founder Signature</div>
+          <div class="sa-settings-desc">Upload the founder's signature for certificates.</div>
+          <div id="sigPreview" style="margin:12px 0;"></div>
+          <input type="file" id="sigUpload" accept="image/*" style="display:none;" onchange="uploadSignature(this)">
+          <button class="btn btn-outline" style="font-size:13px;" onclick="document.getElementById('sigUpload').click()">✍️ Upload Signature</button>
+        </div>
+        <div class="sa-settings-card">
+          <div class="sa-settings-title">🎂 Birthday Message</div>
+          <div class="sa-settings-desc">Customise the birthday message sent to all users.</div>
+          <textarea id="birthdayMsg" style="width:100%;min-height:80px;padding:10px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:13px;margin:10px 0;outline:none;" placeholder="Happy Birthday {name}! 🎉 Wishing you a wonderful day from all of us at StemNest Academy!"></textarea>
+          <button class="btn btn-primary" style="font-size:13px;" onclick="saveBirthdayMsg()">Save Message</button>
+        </div>
+        <div class="sa-settings-card">
+          <div class="sa-settings-title">🔑 Super Admin Access</div>
+          <div class="sa-settings-desc">Manage super admin credentials.</div>
+          <div class="pm-field" style="margin-top:10px;"><label>Email</label><input type="email" id="saEmail" placeholder="founder@stemnest.co.uk"></div>
+          <div class="pm-field" style="margin-top:8px;"><label>New Password</label><input type="password" id="saPassword" placeholder="New password"></div>
+          <div class="pm-field" style="margin-top:8px;"><label>Your Date of Birth</label><input type="date" id="saFounderDob" onchange="saveSettings('founderDob',this.value)" title="Used for birthday greeting"></div>
+          <button class="btn btn-primary" style="font-size:13px;margin-top:10px;" onclick="saveSACredentials()">Update Credentials</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ADD EXPENSE MODAL -->
+<div class="modal-overlay" id="expenseModalOverlay">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <div class="modal-title">💸 Add Expense</div>
+      <button class="modal-close" onclick="closeExpenseModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field"><label>Description *</label><input type="text" id="exp-desc" placeholder="e.g. Teacher salary — Sarah Rahman"></div>
+      <div class="field" style="margin-top:12px;"><label>Category *</label>
+        <select id="exp-cat">
+          <option value="salary">💷 Teacher Salary</option>
+          <option value="salary_sales">💷 Sales Staff Salary</option>
+          <option value="salary_ops">💷 Operations Salary</option>
+          <option value="platform">💻 Platform / Software</option>
+          <option value="marketing">📣 Marketing & Ads</option>
+          <option value="admin">📋 Admin & Legal</option>
+          <option value="other">📦 Other</option>
+        </select>
+      </div>
+      <div class="field" style="margin-top:12px;"><label>Amount (£) *</label><input type="number" id="exp-amount" placeholder="e.g. 500" min="0" step="0.01"></div>
+      <div class="field" style="margin-top:12px;"><label>Date *</label><input type="date" id="exp-date"></div>
+      <div class="field" style="margin-top:12px;"><label>Notes</label><textarea id="exp-notes" style="min-height:60px;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;width:100%;outline:none;" placeholder="Optional notes..."></textarea></div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeExpenseModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveExpense()">Save Expense ✦</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/utils.js"></script>
+<script src="../js/super-admin.js"></script>
+</body>
+</html>

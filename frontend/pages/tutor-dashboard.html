@@ -43,10 +43,13 @@
     </div>
     <div class="sidebar-nav">
       <div class="sidebar-section-label">Main</div>
-      <a class="sidebar-link active" data-tab="overview"  onclick="showDashTab('overview')"> <span class="sl-icon">🏠</span> Overview</a>
-      <a class="sidebar-link"        data-tab="sessions"  onclick="showDashTab('sessions')"> <span class="sl-icon">📡</span> Live Sessions <span class="sl-badge">2</span></a>
-      <a class="sidebar-link"        data-tab="projects"  onclick="showDashTab('projects')"> <span class="sl-icon">📁</span> Student Projects <span class="sl-badge">5</span></a>
-      <a class="sidebar-link"        data-tab="calendar"  onclick="showDashTab('calendar')"> <span class="sl-icon">📅</span> Availability</a>
+      <a class="sidebar-link active" data-tab="overview"   onclick="showDashTab('overview')">  <span class="sl-icon">🏠</span> Overview</a>
+      <a class="sidebar-link"        data-tab="sessions"   onclick="showDashTab('sessions')">  <span class="sl-icon">📡</span> Live Sessions <span class="sl-badge">2</span></a>
+      <a class="sidebar-link"        data-tab="projects"   onclick="showDashTab('projects')">  <span class="sl-icon">📁</span> Student Projects <span class="sl-badge">5</span></a>
+      <a class="sidebar-link"        data-tab="calendar"   onclick="showDashTab('calendar')">  <span class="sl-icon">📅</span> Availability</a>
+      <a class="sidebar-link"        data-tab="companion"  onclick="showDashTab('companion')"> <span class="sl-icon">📚</span> My Companion</a>
+      <a class="sidebar-link"        data-tab="leaderboard" onclick="showDashTab('leaderboard')"><span class="sl-icon">🏆</span> Leaderboard</a>
+      <a class="sidebar-link"        data-tab="kyc"        onclick="showDashTab('kyc')">       <span class="sl-icon">🪪</span> My KYC</a>
       <div class="sidebar-section-label">Account</div>
       <a class="sidebar-link" onclick="openProfileModal()"><span class="sl-icon">👤</span> Update Profile</a>
       <a class="sidebar-link" href="../index.html"><span class="sl-icon">🌐</span> Back to Website</a>
@@ -74,9 +77,9 @@
     <!-- Stat cards -->
     <div class="dash-stats">
       <div class="dstat ds-blue"><div class="dstat-icon di-blue">📡</div><div class="dstat-val">4</div><div class="dstat-label">Sessions Today</div><div class="dstat-trend trend-up">↑ 1 more than yesterday</div></div>
-      <div class="dstat ds-green"><div class="dstat-icon di-green">👩‍🎓</div><div class="dstat-val">18</div><div class="dstat-label">Active Students</div><div class="dstat-trend trend-up">↑ 2 new this week</div></div>
+      <div class="dstat ds-green"><div class="dstat-icon di-green">💷</div><div class="dstat-val" id="overviewEarnings">$0</div><div class="dstat-label">Live Earnings</div><div class="dstat-trend trend-up">This month</div></div>
+      <div class="dstat ds-purple"><div class="dstat-icon di-purple">⭐</div><div class="dstat-val" id="overviewPoints">0</div><div class="dstat-label">Points</div><div class="dstat-trend trend-up" onclick="showDashTab('leaderboard')" style="cursor:pointer;color:var(--blue);">View leaderboard →</div></div>
       <div class="dstat ds-orange"><div class="dstat-icon di-orange">📁</div><div class="dstat-val">5</div><div class="dstat-label">Projects to Review</div><div class="dstat-trend trend-neutral">Awaiting your feedback</div></div>
-      <div class="dstat ds-purple"><div class="dstat-icon di-purple">⭐</div><div class="dstat-val">4.9</div><div class="dstat-label">Your Rating</div><div class="dstat-trend trend-up">↑ From 48 reviews</div></div>
     </div>
 
     <!-- Quick Actions -->
@@ -193,6 +196,93 @@
       </div>
     </div>
 
+    <!-- ── TAB: CALENDAR / AVAILABILITY ── -->
+    <div id="tab-calendar" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📅 Set Your Weekly Availability</div>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <span class="wcal-summary" id="availSummary">0 slots marked</span>
+          <button class="btn btn-outline" style="font-size:12px;padding:7px 14px;" onclick="clearWeekAvailability()">Clear Week</button>
+        </div>
+      </div>
+      <div class="wcal-legend">
+        <div class="wcal-legend-item"><div class="wcal-legend-dot wcal-legend-avail"></div> Available</div>
+        <div class="wcal-legend-item"><div class="wcal-legend-dot wcal-legend-paid"></div> Paid Class</div>
+        <div class="wcal-legend-item"><div class="wcal-legend-dot wcal-legend-demo"></div> Demo Class</div>
+        <div class="wcal-legend-item"><div class="wcal-legend-dot wcal-legend-past"></div> Past / Locked</div>
+        <div class="wcal-legend-item"><div class="wcal-legend-dot wcal-legend-empty"></div> Click to mark available</div>
+      </div>
+      <div class="wcal-nav">
+        <button class="cal-nav-btn" onclick="changeWeek(-1)">‹ Prev</button>
+        <div class="wcal-week-label" id="weekLabel">—</div>
+        <button class="cal-nav-btn" onclick="changeWeek(1)">Next ›</button>
+      </div>
+      <div id="weeklyCalContainer"></div>
+      <div class="wcal-hint">💡 Green = available. Blue = paid class booked. Orange = demo class booked. Past slots are locked. Click a booked slot to see details.</div>
+    </div>
+
+    <!-- ── TAB: MY COMPANION ── -->
+    <div id="tab-companion" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📚 My Companion</div>
+        <span style="font-size:13px;font-weight:700;color:var(--light);">Course materials for your assigned courses</span>
+      </div>
+      <div id="companionContent"></div>
+    </div>
+
+    <!-- ── TAB: LEADERBOARD ── -->
+    <div id="tab-leaderboard" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🏆 Leaderboard & Earnings</div>
+      </div>
+      <!-- Earnings cards -->
+      <div class="dash-stats" style="margin-bottom:28px;">
+        <div class="dstat ds-green">
+          <div class="dstat-icon di-green">💷</div>
+          <div class="dstat-val" id="liveEarnings">$0</div>
+          <div class="dstat-label">Live Earnings</div>
+          <div class="dstat-trend trend-up">This month</div>
+        </div>
+        <div class="dstat ds-purple">
+          <div class="dstat-icon di-purple">⭐</div>
+          <div class="dstat-val" id="totalPoints">0</div>
+          <div class="dstat-label">Total Points</div>
+          <div class="dstat-trend trend-up">All time</div>
+        </div>
+        <div class="dstat ds-blue">
+          <div class="dstat-icon di-blue">📡</div>
+          <div class="dstat-val" id="classesCompleted">0</div>
+          <div class="dstat-label">Classes Done</div>
+          <div class="dstat-trend trend-up">This month</div>
+        </div>
+        <div class="dstat ds-orange">
+          <div class="dstat-icon di-orange">⚠️</div>
+          <div class="dstat-val" id="lateJoins">0</div>
+          <div class="dstat-label">Late Joins</div>
+          <div class="dstat-trend trend-neutral" id="lateJoinNote">This month</div>
+        </div>
+      </div>
+      <!-- Points breakdown -->
+      <div class="dash-panel" style="margin-bottom:24px;">
+        <div class="dash-section-header"><div class="dash-section-title">📊 Points System</div></div>
+        <div class="points-breakdown" id="pointsBreakdown"></div>
+      </div>
+      <!-- Leaderboard table -->
+      <div class="dash-panel">
+        <div class="dash-section-header"><div class="dash-section-title">🏆 All Tutors Ranking</div></div>
+        <div id="leaderboardList"></div>
+      </div>
+    </div>
+
+    <!-- ── TAB: KYC ── -->
+    <div id="tab-kyc" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🪪 My KYC — Know Your Profile</div>
+        <span style="font-size:13px;font-weight:700;color:var(--light);">Use this to introduce yourself in Demo classes</span>
+      </div>
+      <div class="kyc-wrap" id="kycContent"></div>
+    </div>
+
   </div><!-- end dash-main -->
 </div><!-- end dash-wrap -->
 
@@ -224,6 +314,7 @@
       <div class="pm-field"><label>Age Groups You Teach</label><input type="text" id="pmFieldAgeGroups" placeholder="e.g. Ages 7–19"></div>
       <div class="pm-field"><label>Short Bio</label><textarea id="pmFieldBio" placeholder="Tell students a bit about yourself..."></textarea></div>
       <div class="pm-field"><label>Change Password</label><input type="password" id="pmFieldPassword" placeholder="Leave blank to keep current password"></div>
+      <div class="pm-field"><label>Date of Birth</label><input type="date" id="pmFieldDob" placeholder="Your date of birth"></div>
 
       <div class="pm-footer">
         <button class="btn btn-outline" onclick="closeProfileModal()">Cancel</button>
@@ -308,5 +399,6 @@
 
 <script src="../js/utils.js"></script>
 <script src="../js/dashboard.js"></script>
+<script src="../js/tutor-companion.js"></script>
 </body>
 </html>

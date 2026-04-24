@@ -8,6 +8,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/global.css">
   <link rel="stylesheet" href="css/home.css">
+  <link rel="stylesheet" href="css/mobile.css">
 </head>
 <body>
 
@@ -20,16 +21,36 @@
   <ul class="nav-links">
     <li><a href="index.html"          data-page="home"    class="active">Home</a></li>
     <li><a href="pages/courses.html"  data-page="courses">Courses</a></li>
+    <li><a href="pages/blog.html"     data-page="blog">Blog</a></li>
+    <li><a href="pages/about.html"    data-page="">About</a></li>
     <li><a href="#how"                data-page="">How It Works</a></li>
     <li><a href="#teachers"           data-page="">Tutors</a></li>
-    <li><a href="#reviews"            data-page="">Reviews</a></li>
+    <li><a href="pages/faq.html"      data-page="">FAQ</a></li>
   </ul>
   <div class="nav-actions">
     <a href="pages/join-class.html" class="btn btn-outline" style="border-color:var(--green);color:var(--green);">📡 Join Class</a>
     <a href="pages/login.html"      class="btn btn-outline">Log In</a>
     <a href="pages/free-trial.html" class="btn btn-primary">Book Free Trial ✦</a>
   </div>
+  <!-- Mobile hamburger -->
+  <button class="nav-hamburger" id="navHamburger" onclick="toggleMobileNav()" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
 </nav>
+<!-- Mobile nav drawer -->
+<div class="nav-mobile-drawer" id="navDrawer">
+  <a href="index.html" class="active">Home</a>
+  <a href="pages/courses.html">Courses</a>
+  <a href="pages/blog.html">Blog</a>
+  <a href="pages/about.html">About</a>
+  <a href="pages/faq.html">FAQ</a>
+  <a href="pages/teach-with-us.html">Teach With Us</a>
+  <div class="nav-mobile-actions">
+    <a href="pages/join-class.html" class="btn btn-outline" style="border-color:var(--green);color:var(--green);">📡 Join Class</a>
+    <a href="pages/login.html"      class="btn btn-outline">Log In</a>
+    <a href="pages/free-trial.html" class="btn btn-primary">Book Free Trial ✦</a>
+  </div>
+</div>
 
 <!-- ═══ HERO ═══ -->
 <section class="hero">
@@ -310,10 +331,11 @@
     </div>
     <div class="footer-col">
       <h4>Company</h4>
-      <a href="#about">About Us</a>
-      <a href="#teachers">Our Tutors</a>
+      <a href="pages/blog.html">Blog</a>
+      <a href="pages/about.html">About Us</a>
+      <a href="pages/team.html">Our Team</a>
       <a href="pages/teach-with-us.html">Teach With Us</a>
-      <a href="#reviews">Reviews</a>
+      <a href="pages/faq.html">FAQ</a>
     </div>
     <div class="footer-col">
       <h4>Account</h4>

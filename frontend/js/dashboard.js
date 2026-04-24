@@ -41,11 +41,32 @@ function saveAvailability(avail) {
   shared[TUTOR.id] = { tutor: TUTOR, slots: avail };
   localStorage.setItem('sn_all_tutor_avail', JSON.stringify(shared));
 }
+
+/* Return the "next :30" key for a given time key, e.g. "9:00" → "9:30", "9:30" → "10:00" */
+function nextHalfKey(timeKey) {
+  const [h, m] = timeKey.split(':').map(Number);
+  if (m === 0)  return `${h}:30`;
+  // m === 30 → next hour
+  return `${h + 1}:00`;
+}
+
+/* Toggle a 1-hour availability block starting at timeKey.
+   Marks both timeKey and timeKey+30min as a pair.
+   If the block is already set, clears both. */
 function toggleSlot(dk, timeKey) {
-  const avail = getAvailability();
-  const key   = dk + '|' + timeKey;
-  if (avail[key]) delete avail[key];
-  else avail[key] = true;
+  const avail    = getAvailability();
+  const key1     = dk + '|' + timeKey;
+  const key2     = dk + '|' + nextHalfKey(timeKey);
+
+  if (avail[key1]) {
+    // Already set — clear the whole 1-hour block
+    delete avail[key1];
+    delete avail[key2];
+  } else {
+    // Mark both halves of the 1-hour block
+    avail[key1] = true;
+    avail[key2] = true;
+  }
   saveAvailability(avail);
   renderWeeklyCalendar();
 }
@@ -120,6 +141,12 @@ function populateProfileModal() {
   if (nameEl) nameEl.textContent = TUTOR.name;
   const idEl = document.getElementById('pmTutorId');
   if (idEl) idEl.textContent = 'ID: ' + TUTOR.id;
+  // Pre-fill DOB (Phase 6)
+  const dobEl = document.getElementById('pmFieldDob');
+  if (dobEl) {
+    const saved = localStorage.getItem('sn_dob_' + TUTOR.id);
+    if (saved) dobEl.value = saved;
+  }
 }
 
 /* ── CHECK FOR NEWLY ASSIGNED CLASSES ── */
@@ -189,16 +216,52 @@ function getWeekDates(offset) {
 
 function toDateKey(d) { return d.toISOString().split('T')[0]; }
 
+/* Convert "HH:MM" string to total minutes since midnight */
+function timeToMins(t) {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + (m || 0);
+}
+
+/* Get all bookings assigned to this tutor */
+function getTutorBookings() {
+  try {
+    const all = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+    return all.filter(b =>
+      b.assignedTutorId === TUTOR.id &&
+      (b.status === 'scheduled' || b.status === 'completed')
+    );
+  } catch { return []; }
+}
+
+/* Parse a booking's time string to 24h "HH:MM" */
+function parseBookingTime(timeStr) {
+  if (!timeStr) return null;
+  // Already 24h
+  if (/^\d{1,2}:\d{2}$/.test(timeStr)) return timeStr.padStart(5, '0');
+  // 12h format e.g. "11:00 AM"
+  const m = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!m) return null;
+  let h = parseInt(m[1]);
+  const min = m[2];
+  const period = m[3].toUpperCase();
+  if (period === 'PM' && h !== 12) h += 12;
+  if (period === 'AM' && h === 12) h = 0;
+  return String(h).padStart(2, '0') + ':' + min;
+}
+
 function renderWeeklyCalendar() {
   const container = document.getElementById('weeklyCalContainer');
   if (!container) return;
 
-  const days     = getWeekDates(weekOffset);
-  const avail    = getAvailability();
-  const today    = new Date();
-  const todayKey = toDateKey(today);
-  const DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const days       = getWeekDates(weekOffset);
+  const avail      = getAvailability();
+  const bookings   = getTutorBookings();
+  const now        = new Date();
+  const todayKey   = toDateKey(now);
+  const nowMins    = now.getHours() * 60 + now.getMinutes();
+  const DAY_NAMES  = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
+  /* ── Week label ── */
   const weekLabel = document.getElementById('weekLabel');
   if (weekLabel) {
     const o = { day:'numeric', month:'short' };
@@ -207,37 +270,159 @@ function renderWeeklyCalendar() {
       days[6].toLocaleDateString('en-GB', o) + ' ' + days[0].getFullYear();
   }
 
-  const totalAvail = Object.keys(avail).length;
+  /* ── Slot count summary — count 1-hour blocks (only the start keys) ── */
+  const totalAvail = Object.keys(avail).filter(k => {
+    if (!avail[k]) return false;
+    // Only count the "start" of each block — key whose previous 30-min is NOT set
+    const parts    = k.split('|');
+    const [h, m]   = parts[1].split(':').map(Number);
+    const prevMins = h * 60 + m - 30;
+    if (prevMins < 0) return true;
+    const prevKey  = parts[0] + '|' + Math.floor(prevMins / 60) + ':' + (prevMins % 60 === 0 ? '00' : '30');
+    return !avail[prevKey];
+  }).length;
   const summaryEl  = document.getElementById('availSummary');
-  if (summaryEl) summaryEl.textContent = `${totalAvail} slot${totalAvail !== 1 ? 's' : ''} marked available`;
+  if (summaryEl) summaryEl.textContent = `${totalAvail} hour slot${totalAvail !== 1 ? 's' : ''} available`;
 
+  /* ── Build booking lookup: dateKey → array of {timeMins, booking} ── */
+  const bookingMap = {};
+  bookings.forEach(b => {
+    if (!b.date) return;
+    // Normalise date key — bookings may store "Mon 21 Apr 2026" or ISO
+    let dk = b.date;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dk)) {
+      try {
+        const cleaned = dk.replace(/^[A-Za-z]+\s/, '');
+        const parsed  = new Date(cleaned);
+        if (!isNaN(parsed)) dk = toDateKey(parsed);
+      } catch { return; }
+    }
+    const t24 = parseBookingTime(b.time);
+    if (!t24) return;
+    if (!bookingMap[dk]) bookingMap[dk] = [];
+    bookingMap[dk].push({ timeMins: timeToMins(t24), booking: b });
+  });
+
+  /* ── HOUR slots: 6:00 → 21:30 (each hour has :00 and :30 row) ── */
+  const HOUR_SLOTS = [];
+  for (let h = 6; h <= 21; h++) {
+    HOUR_SLOTS.push({ label: h < 12 ? `${h}:00 AM` : h === 12 ? '12:00 PM' : `${h-12}:00 PM`, key: `${h}:00`, mins: h * 60 });
+    HOUR_SLOTS.push({ label: '', key: `${h}:30`, mins: h * 60 + 30, isHalf: true });
+  }
+
+  /* ── Build HTML ── */
   let html = `<div class="wcal-wrap"><table class="wcal-table"><thead><tr>
     <th class="wcal-time-col">Time</th>
     ${days.map((d, i) => {
-      const dk = toDateKey(d);
+      const dk      = toDateKey(d);
       const isToday = dk === todayKey;
-      return `<th class="${isToday ? 'wcal-today-col' : ''}">
+      return `<th class="wcal-day-th${isToday ? ' wcal-today-col' : ''}">
         <div class="wcal-day-name">${DAY_NAMES[i]}</div>
-        <div class="wcal-day-num ${isToday ? 'wcal-today-num' : ''}">${d.getDate()}</div>
+        <div class="wcal-day-num-wrap">
+          <div class="wcal-day-num${isToday ? ' wcal-today-num' : ''}">${d.getDate()}</div>
+        </div>
       </th>`;
     }).join('')}
   </tr></thead><tbody>`;
 
-  HOURS.forEach(time => {
-    const isHour = !time.includes(':30');
-    html += `<tr class="${isHour ? 'wcal-hour-row' : 'wcal-half-row'}">
-      <td class="wcal-time-label">${isHour ? time : '<span class="wcal-half-label">:30</span>'}</td>`;
-    days.forEach((d, i) => {
-      const dk  = toDateKey(d);
-      const key = dk + '|' + time;
-      const isAvail = !!avail[key];
-      const isPast  = d < today && dk !== todayKey;
-      const cls     = isAvail ? 'wcal-slot wcal-avail' : isPast ? 'wcal-slot wcal-past' : 'wcal-slot';
-      const click   = isPast ? '' : `onclick="toggleSlot('${dk}','${time}')"`;
-      html += `<td class="${cls}" ${click} title="${DAY_NAMES[i]} ${d.getDate()} at ${time}">
-        ${isAvail ? '<span class="wcal-avail-dot"></span>' : ''}
-      </td>`;
+  HOUR_SLOTS.forEach(slot => {
+    const isHalf = !!slot.isHalf;
+    html += `<tr class="${isHalf ? 'wcal-half-row' : 'wcal-hour-row'}">
+      <td class="wcal-time-label">${isHalf
+        ? '<span class="wcal-half-label">:30</span>'
+        : `<span class="wcal-hour-label">${slot.label}</span>`
+      }</td>`;
+
+    days.forEach((d, di) => {
+      const dk      = toDateKey(d);
+      const key     = dk + '|' + slot.key;
+      const isToday = dk === todayKey;
+
+      /* Is this slot in the past? */
+      const slotDate = new Date(d);
+      slotDate.setHours(0, 0, 0, 0);
+      const todayDate = new Date(now);
+      todayDate.setHours(0, 0, 0, 0);
+      const isPastDay  = slotDate < todayDate;
+      const isPastSlot = isPastDay || (isToday && slot.mins <= nowMins);
+
+      /* Check if a booking occupies this slot */
+      const dayBookings = bookingMap[dk] || [];
+      /* A booking at time T occupies slots T and T+30 (1 hour = 2 half-slots) */
+      const bookedEntry = dayBookings.find(entry => {
+        return slot.mins >= entry.timeMins && slot.mins < entry.timeMins + 60;
+      });
+
+      const isAvail  = !!avail[key];
+
+      /* Is this the SECOND half of a 1-hour availability block?
+         i.e. the previous 30-min slot for this day is also set. */
+      const prevMins = slot.mins - 30;
+      const prevKey  = prevMins >= 0
+        ? dk + '|' + Math.floor(prevMins / 60) + ':' + (prevMins % 60 === 0 ? '00' : '30')
+        : null;
+      const isSecondHalf = isAvail && prevKey && !!avail[prevKey];
+
+      if (bookedEntry) {
+        /* ── BOOKED SLOT ── */
+        const b       = bookedEntry.booking;
+        const isDemo  = b.status === 'demo' || !b.paymentAmount || b.isDemoStudent;
+        const isFirst = slot.mins === bookedEntry.timeMins;
+        const cls     = isDemo ? 'wcal-slot wcal-demo-booked' : 'wcal-slot wcal-paid-booked';
+
+        if (isFirst) {
+          if (isDemo) {
+            html += `<td class="${cls}" onclick="showBookingPopup('${b.id}')" title="Demo: ${b.studentName}">
+              <div class="wcal-booked-inner wcal-booked-demo">
+                <div class="wcal-booked-label">🎓 ${b.studentName}</div>
+                <div class="wcal-booked-sub">${b.grade || ''}</div>
+              </div>
+            </td>`;
+          } else {
+            html += `<td class="${cls}" onclick="showBookingPopup('${b.id}')" title="Paid: ${b.studentName}">
+              <div class="wcal-booked-inner wcal-booked-paid">
+                <div class="wcal-booked-label">📚 ${b.studentName}</div>
+                <div class="wcal-booked-sub">${b.subject || ''}</div>
+              </div>
+            </td>`;
+          }
+        } else {
+          html += `<td class="${cls} wcal-booked-cont" onclick="showBookingPopup('${b.id}')"></td>`;
+        }
+
+      } else if (isPastSlot) {
+        /* ── PAST SLOT — not clickable ── */
+        html += `<td class="wcal-slot wcal-past" title="Past — cannot edit"></td>`;
+
+      } else if (isAvail && isSecondHalf) {
+        /* ── SECOND HALF of a 1-hour availability block — visual continuation, not clickable ── */
+        const todayCls = isToday ? ' wcal-today-slot' : '';
+        html += `<td class="wcal-slot wcal-avail wcal-avail-cont${todayCls}"
+          onclick="toggleSlot('${dk}','${prevKey.split('|')[1]}')"
+          title="Click to remove this 1-hour slot"></td>`;
+
+      } else if (isAvail) {
+        /* ── FIRST HALF of a 1-hour availability block — show label + dot ── */
+        const todayCls = isToday ? ' wcal-today-slot' : '';
+        html += `<td class="wcal-slot wcal-avail wcal-avail-start${todayCls}"
+          onclick="toggleSlot('${dk}','${slot.key}')"
+          title="Click to remove this 1-hour slot">
+          <div class="wcal-avail-block">
+            <span class="wcal-avail-dot"></span>
+            <span class="wcal-avail-time">${slot.label || slot.key}</span>
+          </div>
+        </td>`;
+
+      } else {
+        /* ── OPEN SLOT — click to create a 1-hour block ── */
+        const todayCls = isToday ? ' wcal-today-slot' : '';
+        html += `<td class="wcal-slot${todayCls}"
+          onclick="toggleSlot('${dk}','${slot.key}')"
+          title="Click to mark available: ${slot.label || slot.key} – ${nextHalfKey(slot.key).replace(':00',' hr').replace(':30',' hr 30')}">
+        </td>`;
+      }
     });
+
     html += `</tr>`;
   });
 
@@ -245,12 +430,96 @@ function renderWeeklyCalendar() {
   container.innerHTML = html;
 }
 
+/* ── Show booking detail popup ── */
+function showBookingPopup(bookingId) {
+  const all = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+  const b   = all.find(x => x.id === bookingId);
+  if (!b) return;
+
+  const isDemo = b.status === 'demo' || !b.paymentAmount || b.isDemoStudent;
+
+  // Remove any existing popup
+  document.getElementById('calBookingPopup')?.remove();
+
+  const popup = document.createElement('div');
+  popup.id = 'calBookingPopup';
+  popup.style.cssText = 'position:fixed;inset:0;background:rgba(10,20,50,.6);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
+
+  if (isDemo) {
+    popup.innerHTML = `
+      <div style="background:var(--white);border-radius:20px;padding:28px 32px;max-width:400px;width:100%;box-shadow:0 16px 60px rgba(0,0,0,.25);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <div style="font-family:'Fredoka One',cursive;font-size:20px;color:var(--orange-dark);">🎓 Demo Class</div>
+          <button onclick="document.getElementById('calBookingPopup').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--light);">✕</button>
+        </div>
+        <div style="background:var(--orange-light);border-radius:12px;padding:16px;margin-bottom:16px;">
+          <div style="font-weight:900;font-size:16px;color:var(--dark);margin-bottom:8px;">${b.studentName}</div>
+          <div style="font-size:13px;color:var(--mid);font-weight:700;line-height:1.8;">
+            🎓 Grade: <strong>${b.grade || '—'}</strong><br>
+            📅 ${b.date || '—'} at ${b.time || '—'}<br>
+            📚 Subject: <strong>${b.subject || '—'}</strong>
+          </div>
+        </div>
+        <div style="background:var(--bg);border-radius:12px;padding:14px;margin-bottom:16px;">
+          <div style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:var(--light);margin-bottom:6px;">📱 Parent / Student Phone</div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span id="popupPhone" style="font-size:15px;font-weight:800;color:var(--dark);">${b.whatsapp || b.phone || '—'}</span>
+            ${(b.whatsapp || b.phone) ? `<button onclick="copyPhone('${b.whatsapp || b.phone}')" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:800;cursor:pointer;">📋 Copy</button>` : ''}
+          </div>
+        </div>
+        ${b.classLink ? `<a href="${b.classLink}" target="_blank" style="display:block;background:var(--orange);color:#fff;text-align:center;padding:12px;border-radius:12px;font-weight:900;font-size:14px;text-decoration:none;margin-bottom:10px;">🚀 Join Class</a>` : ''}
+        <button onclick="document.getElementById('calBookingPopup').remove()" style="width:100%;background:var(--bg);border:1.5px solid #e8eaf0;border-radius:12px;padding:10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;cursor:pointer;color:var(--mid);">Close</button>
+      </div>`;
+  } else {
+    popup.innerHTML = `
+      <div style="background:var(--white);border-radius:20px;padding:28px 32px;max-width:400px;width:100%;box-shadow:0 16px 60px rgba(0,0,0,.25);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <div style="font-family:'Fredoka One',cursive;font-size:20px;color:var(--blue);">📚 Paid Class</div>
+          <button onclick="document.getElementById('calBookingPopup').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--light);">✕</button>
+        </div>
+        <div style="background:var(--blue-light);border-radius:12px;padding:16px;margin-bottom:16px;">
+          <div style="font-weight:900;font-size:16px;color:var(--dark);margin-bottom:8px;">${b.studentName}</div>
+          <div style="font-size:13px;color:var(--mid);font-weight:700;line-height:1.8;">
+            📚 Topic: <strong>${b.topic || b.subject || '—'}</strong><br>
+            🎓 Grade: <strong>${b.grade || '—'}</strong><br>
+            📅 ${b.date || '—'} at ${b.time || '—'}<br>
+            ⏱ Duration: <strong>${b.duration || '60 mins'}</strong>
+          </div>
+        </div>
+        ${b.classLink ? `<a href="${b.classLink}" target="_blank" style="display:block;background:var(--blue);color:#fff;text-align:center;padding:12px;border-radius:12px;font-weight:900;font-size:14px;text-decoration:none;margin-bottom:10px;">🚀 Join Class</a>` : ''}
+        <button onclick="openEndClassModal('${b.id}')" style="width:100%;background:var(--green);color:#fff;border:none;border-radius:12px;padding:12px;font-family:'Nunito',sans-serif;font-weight:900;font-size:14px;cursor:pointer;margin-bottom:10px;">✅ End Class</button>
+        <button onclick="document.getElementById('calBookingPopup').remove()" style="width:100%;background:var(--bg);border:1.5px solid #e8eaf0;border-radius:12px;padding:10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;cursor:pointer;color:var(--mid);">Close</button>
+      </div>`;
+  }
+
+  popup.addEventListener('click', e => { if (e.target === popup) popup.remove(); });
+  document.body.appendChild(popup);
+}
+
+function copyPhone(phone) {
+  navigator.clipboard.writeText(phone)
+    .then(() => showToast('📋 Phone number copied!'))
+    .catch(() => {
+      // Fallback
+      const el = document.createElement('textarea');
+      el.value = phone;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+      showToast('📋 Phone number copied!');
+    });
+}
+
 function changeWeek(dir) { weekOffset += dir; renderWeeklyCalendar(); }
 
 function clearWeekAvailability() {
   const days  = getWeekDates(weekOffset);
   const avail = getAvailability();
-  days.forEach(d => HOURS.forEach(t => delete avail[toDateKey(d) + '|' + t]));
+  days.forEach(d => {
+    const dk = toDateKey(d);
+    Object.keys(avail).forEach(k => { if (k.startsWith(dk + '|')) delete avail[k]; });
+  });
   saveAvailability(avail);
   renderWeeklyCalendar();
   showToast('Week availability cleared.');
@@ -360,6 +629,13 @@ function saveProfile() {
   renderSidebarProfile();
   closeProfileModal();
   showToast('✅ Profile updated successfully!');
+  // Save DOB (Phase 6)
+  const dobEl = document.getElementById('pmFieldDob');
+  if (dobEl && dobEl.value) {
+    localStorage.setItem('sn_dob_' + TUTOR.id, dobEl.value);
+  }
+  // Run birthday check after saving
+  checkBirthdayForUser(TUTOR.id, TUTOR.name.split(' ')[0]);
 }
 
 function triggerPhotoUpload() {
@@ -462,4 +738,68 @@ function submitEndClassReport() {
 document.addEventListener('DOMContentLoaded', () => {
   const overlay = document.getElementById('endClassModalOverlay');
   overlay?.addEventListener('click', e => { if (e.target === overlay) closeEndClassModal(); });
+});
+
+/* ── Sync overview earnings badges (called by tutor-companion.js) ── */
+function syncOverviewStats() {
+  try {
+    const data = JSON.parse(localStorage.getItem('sn_earnings_' + TUTOR.id) || '{}');
+    const el1 = document.getElementById('overviewEarnings');
+    const el2 = document.getElementById('overviewPoints');
+    if (el1) el1.textContent = '$' + (data.earnings || 0).toFixed(0);
+    if (el2) el2.textContent = data.points || 0;
+  } catch(e) {}
+}
+
+/* ── Wire earnings into end class report ── */
+const _origSubmitEndClassReport = submitEndClassReport;
+submitEndClassReport = function() {
+  const outcome = document.querySelector('input[name="classOutcome"]:checked')?.value;
+  _origSubmitEndClassReport();
+  // Add earnings if completed (tutor-companion.js must be loaded)
+  if (outcome === 'completed' && typeof addSessionEarning === 'function') {
+    const all = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+    const b   = all.find(x => x.id === activeEndClassId);
+    const sessionType = b?.status === 'demo' ? 'demo' : 'paid';
+    addSessionEarning(sessionType);
+    syncOverviewStats();
+  }
+};
+
+/* ══════════════════════════════════════════════════════
+   PHASE 6 — BIRTHDAY CHECK (shared utility)
+   Used by tutor dashboard; same function reused in all
+   staff dashboards via their own JS files.
+══════════════════════════════════════════════════════ */
+function checkBirthdayForUser(userId, firstName) {
+  const dob = localStorage.getItem('sn_dob_' + userId);
+  if (!dob) return;
+  const today = new Date();
+  const birth = new Date(dob);
+  if (today.getDate() !== birth.getDate() || today.getMonth() !== birth.getMonth()) return;
+
+  const settings = JSON.parse(localStorage.getItem('sn_sa_settings') || '{}');
+  const template = settings.birthdayMsg ||
+    'Happy Birthday {name}! 🎉 Wishing you a wonderful day from all of us at StemNest Academy!';
+  const msg = template.replace('{name}', firstName || 'there');
+
+  setTimeout(() => {
+    const popup = document.createElement('div');
+    popup.style.cssText = 'position:fixed;inset:0;background:rgba(10,20,50,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+    popup.innerHTML = `
+      <div style="background:var(--white);border-radius:28px;padding:48px 40px;max-width:440px;width:100%;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.35);">
+        <div style="font-size:72px;margin-bottom:16px;">🎂</div>
+        <div style="font-family:'Fredoka One',cursive;font-size:28px;color:var(--dark);margin-bottom:12px;">Happy Birthday, ${firstName}!</div>
+        <div style="font-size:16px;color:var(--mid);line-height:1.7;margin-bottom:24px;">${msg}</div>
+        <button onclick="this.closest('div[style]').remove()" style="background:var(--blue);color:#fff;border:none;padding:12px 32px;border-radius:50px;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;cursor:pointer;">Thank you! 🎉</button>
+      </div>`;
+    document.body.appendChild(popup);
+  }, 2000);
+}
+
+// Run birthday check on load for the logged-in tutor
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    checkBirthdayForUser(TUTOR.id, TUTOR.name.split(' ')[0]);
+  }, 1500);
 });

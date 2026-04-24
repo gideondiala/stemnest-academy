@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Operations Dashboard – StemNest Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/dashboard.css">
+  <link rel="stylesheet" href="../css/admin-dashboard.css">
+</head>
+<body>
+<nav style="position:sticky;top:0;z-index:200;">
+  <a class="logo" href="../index.html"><div class="logo-icon">S</div><div class="logo-text">StemNest<span>Academy</span></div></a>
+  <ul class="nav-links"><li><a href="../index.html">← Back to Website</a></li></ul>
+  <div class="nav-actions">
+    <span style="font-size:13px;font-weight:700;color:var(--light);"><span class="live-dot"></span> Operations</span>
+    <a href="login.html" class="btn btn-outline" style="font-size:13px;padding:8px 18px;">Log Out</a>
+  </div>
+</nav>
+<div class="dash-wrap">
+  <div class="dash-sidebar">
+    <div class="sidebar-profile">
+      <div class="sidebar-avatar" style="background:linear-gradient(135deg,#0694a2,#67e8f9);">OPS</div>
+      <div class="sidebar-name">Operations</div>
+      <div class="sidebar-role">StemNest Operations</div>
+      <div class="sidebar-status"><span class="live-dot"></span> Online</div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="sidebar-section-label">Monitoring</div>
+      <a class="sidebar-link active" data-tab="late-joins"  onclick="showOpsTab('late-joins')"> <span class="sl-icon">⏰</span> Late Joins <span class="sl-badge" id="lateJoinBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="penalties"   onclick="showOpsTab('penalties')">  <span class="sl-icon">⚠️</span> Penalties</a>
+      <a class="sidebar-link"        data-tab="class-log"   onclick="showOpsTab('class-log')">  <span class="sl-icon">📋</span> Class Log</a>
+    </div>
+    <div class="sidebar-bottom">
+      <button class="logout-btn" onclick="window.location.href='login.html'">🚪 Log Out</button>
+    </div>
+  </div>
+  <div class="dash-main">
+    <div class="dash-topbar">
+      <div>
+        <div class="dash-greeting">⚙️ Operations Dashboard</div>
+        <div class="dash-date" id="opsDate"></div>
+      </div>
+      <div class="dash-top-actions">
+        <button class="btn btn-outline" onclick="exportLateJoinsCSV()">⬇ Export CSV</button>
+        <button class="btn btn-primary" onclick="refreshOps()">🔄 Refresh</button>
+      </div>
+    </div>
+    <div class="dash-stats">
+      <div class="dstat ds-orange"><div class="dstat-icon di-orange">⏰</div><div class="dstat-val" id="opsStat1">0</div><div class="dstat-label">Late Joins (Month)</div><div class="dstat-trend trend-neutral">All teachers</div></div>
+      <div class="dstat ds-blue"><div class="dstat-icon di-blue">⚠️</div><div class="dstat-val" id="opsStat2">0</div><div class="dstat-label">Penalties Logged</div><div class="dstat-trend trend-neutral">$2 each</div></div>
+      <div class="dstat ds-green"><div class="dstat-icon di-green">✅</div><div class="dstat-val" id="opsStat3">0</div><div class="dstat-label">Pardoned</div><div class="dstat-trend trend-up">1st & 2nd per month</div></div>
+      <div class="dstat ds-purple"><div class="dstat-icon di-purple">👩‍🏫</div><div class="dstat-val" id="opsStat4">0</div><div class="dstat-label">Teachers Affected</div><div class="dstat-trend trend-neutral">This month</div></div>
+    </div>
+
+    <!-- LATE JOINS TAB -->
+    <div id="tab-late-joins">
+      <div class="dash-section-header">
+        <div class="dash-section-title">⏰ Late Join Log</div>
+        <div class="admin-filters">
+          <input type="text" id="lateSearchInput" placeholder="🔍 Search teacher name or ID..." class="admin-search" oninput="filterLateJoins()">
+          <select id="lateMonthFilter" class="admin-filter-sel" onchange="filterLateJoins()">
+            <option value="">All Months</option>
+          </select>
+        </div>
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr><th>Teacher ID</th><th>Teacher Name</th><th>Session ID</th><th>Join Time</th><th>Date</th><th>Month</th><th>Status</th><th>Penalty</th></tr></thead>
+          <tbody id="lateJoinsBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PENALTIES TAB -->
+    <div id="tab-penalties" style="display:none;">
+      <div class="dash-section-header"><div class="dash-section-title">⚠️ Penalty Records</div></div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr><th>Teacher ID</th><th>Teacher Name</th><th>Month</th><th>Late Joins</th><th>Pardoned</th><th>Penalties</th><th>Total Penalty ($)</th></tr></thead>
+          <tbody id="penaltiesBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CLASS LOG TAB -->
+    <div id="tab-class-log" style="display:none;">
+      <div class="dash-section-header"><div class="dash-section-title">📋 Class Completion Log</div></div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr><th>Student</th><th>Subject</th><th>Teacher</th><th>Date</th><th>Outcome</th><th>Reason / Notes</th></tr></thead>
+          <tbody id="classLogBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="../js/utils.js"></script>
+<script src="../js/operations-dashboard.js"></script>
+</body>
+</html>

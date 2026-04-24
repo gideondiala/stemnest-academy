@@ -97,6 +97,17 @@ function seedRegistries() {
     ];
     localStorage.setItem('sn_sales_persons', JSON.stringify(salesPersons));
   }
+
+  // Operations, Pre-Sales, Post-Sales, HR staff
+  if (!localStorage.getItem('sn_staff') || JSON.parse(localStorage.getItem('sn_staff')).length === 0) {
+    const staff = [
+      { id:'OPS001', name:'Operations Team', email:'ops@stemnest.co.uk',      password:'StemNest2024!', role:'operations' },
+      { id:'PS001',  name:'Pre-Sales Team',  email:'presales@stemnest.co.uk', password:'StemNest2024!', role:'presales'   },
+      { id:'POS001', name:'Post-Sales Team', email:'postsales@stemnest.co.uk',password:'StemNest2024!', role:'postsales'  },
+      { id:'HR001',  name:'HR Team',         email:'hr@stemnest.co.uk',       password:'StemNest2024!', role:'hr'         },
+    ];
+    localStorage.setItem('sn_staff', JSON.stringify(staff));
+  }
 }
 
 /* ── SWITCH ROLE ── */
@@ -188,6 +199,12 @@ function handleLogin() {
         s.email.toLowerCase() === email.toLowerCase() && s.password === pw
       );
 
+      // Check staff registry (ops, presales, postsales, hr)
+      const staff = JSON.parse(localStorage.getItem('sn_staff') || '[]');
+      const staffMember = staff.find(s =>
+        s.email.toLowerCase() === email.toLowerCase() && s.password === pw
+      );
+
       if (teacher) {
         localStorage.setItem('sn_logged_in_teacher', teacher.id);
         document.getElementById('btnIcon').textContent = '✅';
@@ -198,10 +215,18 @@ function handleLogin() {
         document.getElementById('btnIcon').textContent = '✅';
         document.getElementById('btnText').textContent = `Welcome, ${salesPerson.name.split(' ')[0]}! Redirecting…`;
         setTimeout(() => navigate('sales-dashboard'), 700);
+      } else if (staffMember) {
+        document.getElementById('btnIcon').textContent = '✅';
+        document.getElementById('btnText').textContent = `Welcome! Redirecting…`;
+        setTimeout(() => navigate(staffMember.role), 700);
       } else if (email === 'admin@stemnest.co.uk' && pw === 'admin123') {
         document.getElementById('btnIcon').textContent = '✅';
         document.getElementById('btnText').textContent = 'Welcome, Admin! Redirecting…';
         setTimeout(() => navigate('admin-dashboard'), 700);
+      } else if (email === 'founder@stemnest.co.uk' && pw === 'Founder2024!') {
+        document.getElementById('btnIcon').textContent = '✅';
+        document.getElementById('btnText').textContent = 'Welcome, Founder! Redirecting…';
+        setTimeout(() => navigate('super-admin'), 700);
       } else {
         document.getElementById('btnIcon').textContent = '❌';
         document.getElementById('btnText').textContent = 'Invalid credentials';

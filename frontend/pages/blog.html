@@ -1,0 +1,182 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Learning Hub â€“ StemNest Academy Blog</title>
+  <meta name="description" content="The StemNest Academy Student Learning Hub â€” tutorials, tech comparisons, coding guides and EdTech insights for students aged 7â€“19.">
+  <meta name="keywords" content="coding for kids, python tutorial, scratch vs roblox, learn programming, edtech blog, stemnest academy">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/blog.css">
+  <link rel="stylesheet" href="../css/mobile.css">
+</head>
+<body>
+
+<!-- â•â•â• NAV â•â•â• -->
+<nav>
+  <a class="logo" href="../index.html">
+    <div class="logo-icon">S</div>
+    <div class="logo-text">StemNest<span>Academy</span></div>
+  </a>
+  <ul class="nav-links">
+    <li><a href="../index.html">Home</a></li>
+    <li><a href="courses.html">Courses</a></li>
+    <li><a href="blog.html" class="active">Blog</a></li>
+    <li><a href="about.html">About</a></li>
+    <li><a href="faq.html">FAQ</a></li>
+    <li><a href="teach-with-us.html">Teach With Us</a></li>
+  </ul>
+  <div class="nav-actions">
+    <a href="login.html"      class="btn btn-outline">Log In</a>
+    <a href="free-trial.html" class="btn btn-primary">Book Free Trial âœ¦</a>
+  </div>
+  <button class="nav-hamburger" id="navHamburger" onclick="toggleMobileNav()" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile-drawer" id="navDrawer">
+  <a href="../index.html">Home</a>
+  <a href="courses.html">Courses</a>
+  <a href="blog.html" class="active">Blog</a>
+  <a href="about.html">About</a>
+  <a href="faq.html">FAQ</a>
+  <a href="teach-with-us.html">Teach With Us</a>
+  <div class="nav-mobile-actions">
+    <a href="login.html"      class="btn btn-outline">Log In</a>
+    <a href="free-trial.html" class="btn btn-primary">Book Free Trial âœ¦</a>
+  </div>
+</div>
+
+<!-- â•â•â• HERO â•â•â• -->
+<div class="blog-hero">
+  <div class="blog-hero-badge">ðŸ“š Student Learning Hub</div>
+  <h1>Learn Beyond the <span>Classroom</span></h1>
+  <p>Tutorials, tech guides, and coding insights for students aged 7â€“19. Written by our expert tutors to help you grow every day.</p>
+
+  <!-- Search -->
+  <div class="blog-search-wrap">
+    <input type="text" id="blogSearchInput" class="blog-search-input"
+      placeholder="Search tutorials, topics, toolsâ€¦" autocomplete="off">
+    <button class="blog-search-btn" id="blogSearchBtn" aria-label="Search">ðŸ”</button>
+  </div>
+
+  <!-- Category pills -->
+  <div class="blog-cat-pills">
+    <div class="blog-cat-pill active" data-cat="all"            onclick="filterByCategory('all')">ðŸ“š All Posts</div>
+    <div class="blog-cat-pill"        data-cat="learn-by-doing" onclick="filterByCategory('learn-by-doing')">ðŸ› ï¸ Learn by Doing</div>
+    <div class="blog-cat-pill"        data-cat="tech-explained" onclick="filterByCategory('tech-explained')">ðŸ’¡ Tech Explained</div>
+    <div class="blog-cat-pill"        data-cat="news"           onclick="filterByCategory('news')">ðŸ“° EdTech News</div>
+    <div class="blog-cat-pill"        data-cat="tips"           onclick="filterByCategory('tips')">âœï¸ Study Tips</div>
+  </div>
+</div>
+
+<!-- â•â•â• MAIN LAYOUT â•â•â• -->
+<div class="blog-layout" id="blogLayout">
+
+  <!-- â”€â”€ MAIN CONTENT â”€â”€ -->
+  <main>
+
+    <!-- LIST VIEW -->
+    <div id="blogListView">
+      <div class="blog-results-header">
+        <div class="blog-results-count" id="blogResultsCount">Loadingâ€¦</div>
+        <select class="blog-sort-sel" onchange="renderBlogList()">
+          <option value="newest">Newest First</option>
+        </select>
+      </div>
+      <div class="blog-post-grid" id="blogPostGrid"></div>
+      <div class="blog-pagination" id="blogPagination"></div>
+    </div>
+
+  </main>
+
+  <!-- â”€â”€ SIDEBAR â”€â”€ -->
+  <aside class="blog-sidebar">
+
+    <!-- CTA Widget -->
+    <div class="sidebar-widget sidebar-cta">
+      <div class="sidebar-widget-title">ðŸŽ“ New to StemNest?</div>
+      <p>Book a completely free demo class and learn 1-on-1 with an expert tutor. No commitment, no card required.</p>
+      <a href="free-trial.html" class="sidebar-cta-btn">Book a Free Trial â†’</a>
+    </div>
+
+    <!-- Categories -->
+    <div class="sidebar-widget">
+      <div class="sidebar-widget-title">ðŸ“‚ Categories</div>
+      <div class="sidebar-cat-list" id="sidebarCats"></div>
+    </div>
+
+    <!-- Recent Posts -->
+    <div class="sidebar-widget">
+      <div class="sidebar-widget-title">ðŸ• Recent Posts</div>
+      <div class="sidebar-recent-list" id="sidebarRecent"></div>
+    </div>
+
+    <!-- Tags -->
+    <div class="sidebar-widget">
+      <div class="sidebar-widget-title">ðŸ·ï¸ Popular Tags</div>
+      <div class="sidebar-tags" id="sidebarTags"></div>
+    </div>
+
+  </aside>
+
+</div><!-- end blog-layout -->
+
+<!-- â•â•â• FOOTER â•â•â• -->
+<footer>
+  <div class="footer-top">
+    <div class="footer-brand">
+      <a class="logo" href="../index.html"><div class="logo-icon">S</div><div class="logo-text">StemNest<span>Academy</span></div></a>
+      <p>Expert 1-on-1 online tutoring in Coding, Maths and Sciences for students aged 7â€“19. UK-based, globally trusted.</p>
+      <div class="social-links" style="margin-top:20px;">
+        <a class="social-link" href="#">ð•</a><a class="social-link" href="#">in</a>
+        <a class="social-link" href="#">f</a><a class="social-link" href="#">â–¶</a>
+      </div>
+    </div>
+    <div class="footer-col">
+      <h4>Courses</h4>
+      <a href="courses.html">Coding</a>
+      <a href="courses.html">Mathematics</a>
+      <a href="courses.html">Sciences</a>
+      <a href="courses.html">All Programmes</a>
+    </div>
+    <div class="footer-col">
+      <h4>Company</h4>
+      <a href="about.html">About Us</a>
+      <a href="team.html">Our Team</a>
+      <a href="teach-with-us.html">Teach With Us</a>
+      <a href="faq.html">FAQ</a>
+    </div>
+    <div class="footer-col">
+      <h4>Account</h4>
+      <a href="login.html">Tutor Login</a>
+      <a href="login.html">Student Login</a>
+      <a href="free-trial.html">Book Free Trial</a>
+      <a href="join-class.html">Join My Class</a>
+    </div>
+    <div class="footer-col">
+      <h4>Legal</h4>
+      <a href="legal/privacy-policy.html">Privacy Policy</a>
+      <a href="legal/terms-of-use.html">Terms of Use</a>
+      <a href="legal/refund-policy.html">Refund &amp; Cancellation</a>
+      <a href="legal/disclaimer.html">Disclaimer</a>
+      <a href="legal/payment-policy.html">Payment Policy</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="footer-copy">Â© 2025 StemNest Academy Ltd. Registered in England &amp; Wales. All rights reserved.</div>
+    <div class="footer-badges">
+      <div class="footer-badge">ðŸ‡¬ðŸ‡§ UK Based</div>
+      <div class="footer-badge">ðŸ”’ Safeguarding First</div>
+      <div class="footer-badge">âœ¦ DBS Checked Tutors</div>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/utils.js"></script>
+<script src="../js/blog.js"></script>
+</body>
+</html>
+

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Post-Sales Dashboard – StemNest Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/dashboard.css">
+  <link rel="stylesheet" href="../css/admin-dashboard.css">
+</head>
+<body>
+<nav style="position:sticky;top:0;z-index:200;">
+  <a class="logo" href="../index.html"><div class="logo-icon">S</div><div class="logo-text">StemNest<span>Academy</span></div></a>
+  <ul class="nav-links"><li><a href="../index.html">← Back to Website</a></li></ul>
+  <div class="nav-actions">
+    <span style="font-size:13px;font-weight:700;color:var(--light);"><span class="live-dot"></span> Post-Sales</span>
+    <a href="login.html" class="btn btn-outline" style="font-size:13px;padding:8px 18px;">Log Out</a>
+  </div>
+</nav>
+<div class="dash-wrap">
+  <div class="dash-sidebar">
+    <div class="sidebar-profile">
+      <div class="sidebar-avatar" style="background:linear-gradient(135deg,var(--green),#0694a2);">POS</div>
+      <div class="sidebar-name">Post-Sales</div>
+      <div class="sidebar-role">Finance & Enrolment</div>
+      <div class="sidebar-status"><span class="live-dot"></span> Online</div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="sidebar-section-label">Finance</div>
+      <a class="sidebar-link active" data-tab="students"  onclick="showPOSTab('students')"> <span class="sl-icon">🎓</span> Paid Students <span class="sl-badge" id="posBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="scheduled" onclick="showPOSTab('scheduled')"><span class="sl-icon">📅</span> Scheduled Classes</a>
+      <a class="sidebar-link"        data-tab="paylinks"  onclick="showPOSTab('paylinks')"> <span class="sl-icon">🔗</span> Payment Links</a>
+      <a class="sidebar-link"        data-tab="converted" onclick="showPOSTab('converted')"><span class="sl-icon">✅</span> Converted</a>
+    </div>
+    <div class="sidebar-bottom">
+      <button class="logout-btn" onclick="window.location.href='login.html'">🚪 Log Out</button>
+    </div>
+  </div>
+  <div class="dash-main">
+    <div class="dash-topbar">
+      <div>
+        <div class="dash-greeting">💼 Post-Sales Dashboard</div>
+        <div class="dash-date" id="posDate"></div>
+      </div>
+    </div>
+    <div class="dash-stats">
+      <div class="dstat ds-orange"><div class="dstat-icon di-orange">🎓</div><div class="dstat-val" id="posStat1">0</div><div class="dstat-label">Awaiting Schedule</div><div class="dstat-trend trend-neutral">Paid, not yet booked</div></div>
+      <div class="dstat ds-blue"><div class="dstat-icon di-blue">📅</div><div class="dstat-val" id="posStat2">0</div><div class="dstat-label">Classes Scheduled</div><div class="dstat-trend trend-up">On teacher calendar</div></div>
+      <div class="dstat ds-green"><div class="dstat-icon di-green">✅</div><div class="dstat-val" id="posStat3">0</div><div class="dstat-label">Converted</div><div class="dstat-trend trend-up">Paid</div></div>
+      <div class="dstat ds-purple"><div class="dstat-icon di-purple">💰</div><div class="dstat-val" id="posStat4">£0</div><div class="dstat-label">Revenue Won</div><div class="dstat-trend trend-up">This month</div></div>
+    </div>
+
+    <!-- PAID STUDENTS -->
+    <div id="tab-students">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🎓 Paid Students</div>
+        <button class="btn btn-outline" style="font-size:13px;" onclick="renderPaidStudents()">🔄 Refresh</button>
+      </div>
+      <div id="paidStudentsList"></div>
+    </div>
+
+    <!-- SCHEDULED PAID CLASSES -->
+    <div id="tab-scheduled" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📅 Scheduled Paid Classes</div>
+      </div>
+      <div id="scheduledPaidList"></div>
+    </div>
+
+    <!-- PAYMENT LINKS -->
+    <div id="tab-paylinks" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🔗 Generate Payment Link</div>
+      </div>
+      <div class="add-teacher-form-wrap">
+        <form class="add-teacher-form" onsubmit="return false;">
+          <div class="atf-grid">
+            <div class="atf-field"><label>Student Name <span class="req">*</span></label><input type="text" id="pl-student" placeholder="e.g. James Okafor"></div>
+            <div class="atf-field"><label>Parent Email <span class="req">*</span></label><input type="email" id="pl-email" placeholder="parent@gmail.com"></div>
+            <div class="atf-field"><label>WhatsApp</label><input type="tel" id="pl-whatsapp" placeholder="+44 7700 000000"></div>
+            <div class="atf-field"><label>Course <span class="req">*</span></label><select id="pl-course"><option value="">Select course</option></select></div>
+            <div class="atf-field"><label>Amount <span class="req">*</span></label><input type="number" id="pl-amount" placeholder="e.g. 99" min="0"></div>
+            <div class="atf-field"><label>Credits (classes)</label><input type="number" id="pl-credits" placeholder="e.g. 4" min="1"></div>
+            <div class="atf-field"><label>Currency</label>
+              <select id="pl-currency">
+                <option value="GBP">🇬🇧 GBP (£)</option>
+                <option value="NGN">🇳🇬 NGN (₦)</option>
+                <option value="GHS">🇬🇭 GHS (₵)</option>
+                <option value="USD">🇺🇸 USD ($)</option>
+                <option value="AED">🇦🇪 AED</option>
+                <option value="ZAR">🇿🇦 ZAR (R)</option>
+              </select>
+            </div>
+            <div class="atf-field"><label>Notes</label><input type="text" id="pl-notes" placeholder="e.g. Python for Beginners — 4 sessions"></div>
+          </div>
+          <div class="atf-divider"></div>
+          <div class="atf-actions">
+            <button type="button" class="btn btn-outline" onclick="clearPayLink()">Clear</button>
+            <button type="button" class="btn btn-primary" onclick="generatePaymentLink()">🔗 Generate & Send Link</button>
+          </div>
+          <div id="generatedLinkBox" style="display:none;margin-top:20px;background:var(--green-light);border-radius:14px;padding:16px 20px;">
+            <div style="font-family:'Fredoka One',cursive;font-size:16px;color:var(--green-dark);margin-bottom:8px;">✅ Payment Link Generated</div>
+            <div id="generatedLinkText" style="font-size:13px;color:var(--mid);word-break:break-all;margin-bottom:12px;"></div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <button class="btn btn-green" style="font-size:13px;" onclick="copyPayLink()">📋 Copy Link</button>
+              <button class="btn btn-outline" style="font-size:13px;" onclick="sendPayLinkEmail()">📧 Send via Email</button>
+              <button class="btn btn-outline" style="font-size:13px;" onclick="sendPayLinkWhatsApp()">💬 Send via WhatsApp</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- CONVERTED -->
+    <div id="tab-converted" style="display:none;">
+      <div class="dash-section-header"><div class="dash-section-title">✅ Converted Students</div></div>
+      <div id="posConvertedList"></div>
+    </div>
+
+  </div><!-- end dash-main -->
+</div><!-- end dash-wrap -->
+
+<!-- ═══ SCHEDULE PAID CLASSES MODAL ═══ -->
+<div class="modal-overlay" id="posScheduleModalOverlay">
+  <div class="modal" style="max-width:540px;">
+    <div class="modal-header">
+      <div class="modal-title">📅 Schedule Paid Classes</div>
+      <button class="modal-close" onclick="closePOSScheduleModal()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Student info -->
+      <div style="background:var(--green-light);border-radius:12px;padding:14px 16px;margin-bottom:20px;font-size:13px;font-weight:700;color:var(--dark);line-height:1.7;" id="pos-sm-info"></div>
+
+      <!-- Teacher dropdown -->
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">👩‍🏫 Select Teacher <span style="color:#e53e3e;">*</span></label>
+        <select id="pos-sm-teacher" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;background:var(--white);">
+          <option value="">— Select a teacher —</option>
+        </select>
+      </div>
+
+      <!-- Course -->
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">📚 Course</label>
+        <select id="pos-sm-course" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;background:var(--white);">
+          <option value="">Select course</option>
+        </select>
+      </div>
+
+      <!-- Day of week + Time -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
+        <div class="pm-field" style="margin-bottom:0;">
+          <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">📆 Day of Week <span style="color:#e53e3e;">*</span></label>
+          <select id="pos-sm-day" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;background:var(--white);">
+            <option value="1">Monday</option>
+            <option value="2">Tuesday</option>
+            <option value="3">Wednesday</option>
+            <option value="4">Thursday</option>
+            <option value="5">Friday</option>
+            <option value="6">Saturday</option>
+            <option value="0">Sunday</option>
+          </select>
+        </div>
+        <div class="pm-field" style="margin-bottom:0;">
+          <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">🕐 Class Time <span style="color:#e53e3e;">*</span></label>
+          <input type="time" id="pos-sm-time" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;">
+        </div>
+      </div>
+
+      <!-- Start date + Weeks -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
+        <div class="pm-field" style="margin-bottom:0;">
+          <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">📅 Start Date <span style="color:#e53e3e;">*</span></label>
+          <input type="date" id="pos-sm-start" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;">
+        </div>
+        <div class="pm-field" style="margin-bottom:0;">
+          <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">🔁 Number of Weeks <span style="color:#e53e3e;">*</span></label>
+          <input type="number" id="pos-sm-weeks" min="1" max="52" placeholder="e.g. 12"
+            style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;">
+        </div>
+      </div>
+
+      <!-- Class link -->
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">🔗 Class Link (Meet / Zoom) <span style="color:#e53e3e;">*</span></label>
+        <input type="url" id="pos-sm-link" placeholder="https://meet.google.com/xxx-xxxx-xxx"
+          style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;">
+      </div>
+
+      <div style="background:var(--orange-light);border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:12px;font-weight:700;color:var(--orange-dark);">
+        💡 All weekly sessions will be automatically added to the teacher's calendar for the selected number of weeks.
+      </div>
+
+      <div style="display:flex;gap:12px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="closePOSScheduleModal()">Cancel</button>
+        <button class="btn btn-green" style="flex:2;" onclick="confirmPOSSchedule()">✅ Schedule All Classes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/utils.js"></script>
+<script src="../js/postsales-dashboard.js"></script>
+</body>
+</html>

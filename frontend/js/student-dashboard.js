@@ -752,3 +752,19 @@ function saveProfile() {
   closeProfileModal();
   showToast('✅ Profile updated successfully!');
 }
+
+/* ── Extend tab switching for new tabs ── */
+const _origShowTab = showTab;
+showTab = function(tab) {
+  const extraTabs = ['nest','chat'];
+  extraTabs.forEach(t => { const el = document.getElementById('tab-' + t); if (el) el.style.display = 'none'; });
+  _origShowTab(tab);
+  if (extraTabs.includes(tab)) {
+    ALL_TABS.forEach(t => { const el = document.getElementById('tab-' + t); if (el) el.style.display = 'none'; });
+    const el = document.getElementById('tab-' + tab);
+    if (el) el.style.display = 'block';
+    document.querySelectorAll('.sidebar-link[data-tab]').forEach(l => l.classList.toggle('active', l.dataset.tab === tab));
+    if (tab === 'nest') renderLearningNest();
+    if (tab === 'chat') { initChat(); loadChatMessages(); }
+  }
+};

@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FAQ – StemNest Academy</title>
+  <meta name="description" content="Frequently asked questions about StemNest Academy — for parents, students, and tutors.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/about.css">
+  <link rel="stylesheet" href="../css/mobile.css">
+</head>
+<body>
+
+<!-- ═══ NAV ═══ -->
+<nav>
+  <a class="logo" href="../index.html">
+    <div class="logo-icon">S</div>
+    <div class="logo-text">StemNest<span>Academy</span></div>
+  </a>
+  <ul class="nav-links">
+    <li><a href="../index.html">Home</a></li>
+    <li><a href="courses.html">Courses</a></li>
+    <li><a href="about.html">About</a></li>
+    <li><a href="team.html">Team</a></li>
+    <li><a href="faq.html" class="active">FAQ</a></li>
+    <li><a href="teach-with-us.html">Teach With Us</a></li>
+  </ul>
+  <div class="nav-actions">
+    <a href="login.html"      class="btn btn-outline">Log In</a>
+    <a href="free-trial.html" class="btn btn-primary">Book Free Trial ✦</a>
+  </div>
+  <button class="nav-hamburger" id="navHamburger" onclick="toggleMobileNav()" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile-drawer" id="navDrawer">
+  <a href="../index.html">Home</a>
+  <a href="courses.html">Courses</a>
+  <a href="about.html">About</a>
+  <a href="team.html">Team</a>
+  <a href="faq.html" class="active">FAQ</a>
+  <a href="teach-with-us.html">Teach With Us</a>
+  <div class="nav-mobile-actions">
+    <a href="login.html"      class="btn btn-outline">Log In</a>
+    <a href="free-trial.html" class="btn btn-primary">Book Free Trial ✦</a>
+  </div>
+</div>
+
+<!-- ═══ HERO ═══ -->
+<div class="about-hero">
+  <div class="about-hero-inner">
+    <div class="about-hero-badge">❓ Got Questions?</div>
+    <h1>We've Got <span>Answers</span></h1>
+    <p>Everything you need to know about StemNest Academy — from booking your first class to how our tutors are selected.</p>
+  </div>
+</div>
+
+<!-- ═══ FAQ CONTENT ═══ -->
+<section class="faq-section">
+  <div class="faq-inner">
+
+    <!-- Search -->
+    <div style="margin-bottom:36px;">
+      <input type="text" id="faqSearch" placeholder="🔍 Search questions..." oninput="searchFAQ()"
+        style="width:100%;padding:14px 18px;border:2px solid #e8eaf0;border-radius:14px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:600;color:var(--dark);outline:none;transition:border-color .2s;">
+    </div>
+
+    <div id="faqContainer"></div>
+
+    <!-- No results -->
+    <div id="faqNoResults" style="display:none;text-align:center;padding:40px;color:var(--light);font-weight:700;">
+      No questions match your search. Try different keywords or <a href="mailto:hello@stemnest.co.uk" style="color:var(--blue);">contact us directly</a>.
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══ STILL HAVE QUESTIONS ═══ -->
+<section style="background:var(--white);padding:60px 5%;text-align:center;">
+  <div style="max-width:600px;margin:0 auto;">
+    <div style="font-size:48px;margin-bottom:16px;">💬</div>
+    <h2 style="font-family:'Fredoka One',cursive;font-size:32px;color:var(--dark);margin-bottom:12px;">Still Have Questions?</h2>
+    <p style="font-size:16px;color:var(--mid);line-height:1.7;margin-bottom:28px;">Our team is happy to help. Reach out and we'll get back to you within 24 hours.</p>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+      <a href="mailto:hello@stemnest.co.uk" class="btn btn-blue">📧 Email Us</a>
+      <a href="free-trial.html" class="btn btn-primary">🎓 Book a Free Trial</a>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FOOTER ═══ -->
+<footer>
+  <div class="footer-top">
+    <div class="footer-brand">
+      <a class="logo" href="../index.html"><div class="logo-icon">S</div><div class="logo-text">StemNest<span>Academy</span></div></a>
+      <p>Expert 1-on-1 online tutoring in Coding, Maths and Sciences for students aged 7–19. UK-based, globally trusted.</p>
+      <div class="social-links" style="margin-top:20px;">
+        <a class="social-link" href="#">𝕏</a><a class="social-link" href="#">in</a>
+        <a class="social-link" href="#">f</a><a class="social-link" href="#">▶</a>
+      </div>
+    </div>
+    <div class="footer-col">
+      <h4>Courses</h4>
+      <a href="courses.html">Coding</a>
+      <a href="courses.html">Mathematics</a>
+      <a href="courses.html">Sciences</a>
+      <a href="courses.html">All Programmes</a>
+    </div>
+    <div class="footer-col">
+      <h4>Company</h4>
+      <a href="about.html">About Us</a>
+      <a href="team.html">Our Team</a>
+      <a href="teach-with-us.html">Teach With Us</a>
+      <a href="faq.html">FAQ</a>
+    </div>
+    <div class="footer-col">
+      <h4>Account</h4>
+      <a href="login.html">Tutor Login</a>
+      <a href="login.html">Student Login</a>
+      <a href="free-trial.html">Book Free Trial</a>
+      <a href="join-class.html">Join My Class</a>
+    </div>
+    <div class="footer-col">
+      <h4>Legal</h4>
+      <a href="legal/privacy-policy.html">Privacy Policy</a>
+      <a href="legal/terms-of-use.html">Terms of Use</a>
+      <a href="legal/refund-policy.html">Refund &amp; Cancellation</a>
+      <a href="legal/disclaimer.html">Disclaimer</a>
+      <a href="legal/payment-policy.html">Payment Policy</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="footer-copy">© 2025 StemNest Academy Ltd. Registered in England &amp; Wales. All rights reserved.</div>
+    <div class="footer-badges">
+      <div class="footer-badge">🇬🇧 UK Based</div>
+      <div class="footer-badge">🔒 Safeguarding First</div>
+      <div class="footer-badge">✦ DBS Checked Tutors</div>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/utils.js"></script>
+<script>
+const FAQ_DATA = [
+  {
+    category: '🎓 Getting Started',
+    items: [
+      { q: 'What is StemNest Academy?', a: 'StemNest Academy is a UK-based online tutoring platform offering live 1-on-1 sessions in Coding, Maths, and Sciences for students aged 7–19. Every session is delivered by a qualified, DBS-checked tutor — tailored entirely to your child.' },
+      { q: 'How do I get started?', a: 'Simply book a free Demo Class on our website. No payment, no commitment. Your child attends a live 1-on-1 session with one of our tutors, and you can decide afterwards whether to enrol.' },
+      { q: 'Is the Demo Class really free?', a: 'Yes — completely free. No credit card required, no hidden fees. It\'s our way of letting you experience the quality of our teaching before making any decision.' },
+      { q: 'What age groups do you teach?', a: 'We teach students aged 7 to 19 — from primary school through to sixth form and A-Level. We have tutors and curriculum pathways for every stage.' },
+      { q: 'Which subjects do you offer?', a: 'We currently offer Coding & Technology (Python, Scratch, Web Development, AI Literacy), Mathematics (KS2, GCSE, A-Level), and Sciences (Biology, Chemistry, Physics — GCSE and A-Level).' },
+    ]
+  },
+  {
+    category: '📚 Classes & Sessions',
+    items: [
+      { q: 'How long is each session?', a: 'Standard sessions are 45–60 minutes. The exact duration is agreed at the point of booking based on your child\'s age and subject.' },
+      { q: 'How often will my child have classes?', a: 'This is entirely up to you. Most students have 1–2 sessions per week. We recommend consistency for the best results, but we work around your family\'s schedule.' },
+      { q: 'What platform do you use for live classes?', a: 'We use a secure video conferencing platform for all live sessions. The joining link is sent to you by email and WhatsApp before each class. No downloads are required — it works in any modern browser.' },
+      { q: 'What does my child need for a session?', a: 'A laptop or desktop computer (not a phone), a reliable internet connection, a webcam, and a microphone. We recommend finding a quiet spot with good lighting.' },
+      { q: 'What happens if a session is missed?', a: 'If you give more than 24 hours\' notice, the session will be rescheduled at no charge. For cancellations with less than 24 hours\' notice, the session may be forfeited. If your tutor cancels, the session is always rescheduled or credited.' },
+      { q: 'Will my child have the same tutor every time?', a: 'Yes. We match your child with a dedicated tutor and aim to keep that relationship consistent. Continuity is important for learning progress.' },
+    ]
+  },
+  {
+    category: '💷 Pricing & Payments',
+    items: [
+      { q: 'How much does it cost?', a: 'Pricing varies by subject and level. Our courses start from £79/month for beginner programmes and go up to £149/month for advanced A-Level courses. Full pricing is available on our Courses page.' },
+      { q: 'How do I pay?', a: 'All payments are processed securely through Stripe. We accept Visa, Mastercard, American Express, Apple Pay, and Google Pay. We do not store your card details.' },
+      { q: 'Can I pay in instalments?', a: 'Yes. Instalment payment options are available for some course packages. Details are shown at the point of purchase.' },
+      { q: 'Do you offer discounts?', a: 'We run promotional offers from time to time. Sign up to our newsletter or follow us on social media to be the first to hear about them.' },
+      { q: 'What is your refund policy?', a: 'We offer refunds on unused sessions within 10 days of payment. Please see our full Refund & Cancellation Policy for details.' },
+    ]
+  },
+  {
+    category: '👩‍🏫 Our Tutors',
+    items: [
+      { q: 'How are tutors selected?', a: 'Every StemNest tutor goes through a rigorous application process including subject knowledge assessment, a demo teaching session, and a full DBS (criminal record) check. We accept fewer than 10% of applicants.' },
+      { q: 'Are tutors DBS checked?', a: 'Yes. All UK-based tutors are DBS-checked before they teach any student. This is non-negotiable.' },
+      { q: 'What qualifications do tutors have?', a: 'Our tutors hold degrees or equivalent qualifications in their subject area. Many also hold teaching qualifications (PGCE) or have significant industry experience. Full tutor profiles are available on our Team page.' },
+      { q: 'Can I request a specific tutor?', a: 'Yes. If you have a preference after your Demo Class, you can request to continue with the same tutor. We will always do our best to accommodate this.' },
+      { q: 'What if I\'m not happy with my tutor?', a: 'Please contact us at hello@stemnest.co.uk and we will arrange a tutor change. Your child\'s learning experience is our priority.' },
+    ]
+  },
+  {
+    category: '🔒 Safety & Privacy',
+    items: [
+      { q: 'Is StemNest Academy safe for children?', a: 'Absolutely. Child safety is our highest priority. All tutors are DBS-checked, all sessions are conducted through our secure platform, and we have strict safeguarding policies in place.' },
+      { q: 'Are sessions recorded?', a: 'Sessions may be recorded for quality assurance and safeguarding purposes. Parents are informed of this at the point of registration. Recordings are stored securely and not shared publicly.' },
+      { q: 'How is my child\'s data protected?', a: 'We comply fully with the UK GDPR and Data Protection Act 2018. We never sell or share your personal data with third parties for marketing purposes. See our Privacy Policy for full details.' },
+      { q: 'Can my child use StemNest on a phone?', a: 'We strongly recommend using a laptop or desktop for the best experience. Phones make it difficult to see the tutor\'s screen and share work. Tablets may work but are not ideal.' },
+    ]
+  },
+  {
+    category: '🌍 International Students',
+    items: [
+      { q: 'Do you teach students outside the UK?', a: 'Yes. We have students in Nigeria, Ghana, South Africa, Kenya, UAE, the US, Canada, and many other countries. Our platform works anywhere with a reliable internet connection.' },
+      { q: 'What timezone are sessions in?', a: 'Sessions are scheduled in your local timezone. When you book, you select your country and preferred time, and we match you with a tutor who is available at that time.' },
+      { q: 'Can I pay in my local currency?', a: 'All prices are in GBP (£). Your bank will convert the amount to your local currency at their prevailing exchange rate. International transaction fees may apply — please check with your bank.' },
+    ]
+  },
+  {
+    category: '👩‍🏫 For Tutors',
+    items: [
+      { q: 'How do I apply to become a StemNest tutor?', a: 'Visit our Teach With Us page and complete the application form. The process takes less than 5 minutes. We review every application personally and respond within 48 hours.' },
+      { q: 'How much do tutors earn?', a: 'Tutors earn £25–£45 per hour depending on subject and experience. Payments are made weekly.' },
+      { q: 'Do I need to be based in the UK?', a: 'No. We welcome tutors from anywhere in the world, as long as you are available during UK-friendly hours for at least some sessions.' },
+      { q: 'What support do tutors receive?', a: 'All tutors receive structured curriculum materials, lesson plans, and ongoing support from our academic team. You focus on teaching — we handle the admin.' },
+    ]
+  },
+];
+
+let openFaqId = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderFAQ(FAQ_DATA);
+  document.getElementById('faqSearch')?.addEventListener('focus', e => {
+    e.target.style.borderColor = 'var(--blue)';
+  });
+  document.getElementById('faqSearch')?.addEventListener('blur', e => {
+    e.target.style.borderColor = '#e8eaf0';
+  });
+});
+
+function renderFAQ(data) {
+  const container = document.getElementById('faqContainer');
+  if (!container) return;
+  container.innerHTML = data.map((cat, ci) => `
+    <div class="faq-category-label">${cat.category}</div>
+    ${cat.items.map((item, ii) => {
+      const id = `faq-${ci}-${ii}`;
+      return `
+        <div class="faq-item" id="${id}">
+          <div class="faq-q" onclick="toggleFAQ('${id}')">
+            ${item.q}
+            <div class="faq-q-icon">+</div>
+          </div>
+          <div class="faq-a">${item.a}</div>
+        </div>`;
+    }).join('')}
+  `).join('');
+}
+
+function toggleFAQ(id) {
+  const item = document.getElementById(id);
+  if (!item) return;
+  const isOpen = item.classList.contains('open');
+  // Close all
+  document.querySelectorAll('.faq-item.open').forEach(el => el.classList.remove('open'));
+  if (!isOpen) item.classList.add('open');
+}
+
+function searchFAQ() {
+  const q = document.getElementById('faqSearch')?.value.toLowerCase().trim();
+  if (!q) { renderFAQ(FAQ_DATA); document.getElementById('faqNoResults').style.display = 'none'; return; }
+
+  const filtered = FAQ_DATA.map(cat => ({
+    ...cat,
+    items: cat.items.filter(item =>
+      item.q.toLowerCase().includes(q) || item.a.toLowerCase().includes(q)
+    )
+  })).filter(cat => cat.items.length > 0);
+
+  if (!filtered.length) {
+    document.getElementById('faqContainer').innerHTML = '';
+    document.getElementById('faqNoResults').style.display = 'block';
+  } else {
+    document.getElementById('faqNoResults').style.display = 'none';
+    renderFAQ(filtered);
+  }
+}
+</script>
+</body>
+</html>

@@ -8,6 +8,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../css/global.css">
   <link rel="stylesheet" href="../css/courses.css">
+  <link rel="stylesheet" href="../css/mobile.css">
 </head>
 <body>
 
@@ -28,7 +29,21 @@
     <a href="login.html"         class="btn btn-outline">Log In</a>
     <a href="../index.html#cta"  class="btn btn-primary">Book Free Trial ✦</a>
   </div>
+  <button class="nav-hamburger" id="navHamburger" onclick="toggleMobileNav()" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
 </nav>
+<div class="nav-mobile-drawer" id="navDrawer">
+  <a href="../index.html">Home</a>
+  <a href="courses.html" class="active">Courses</a>
+  <a href="about.html">About</a>
+  <a href="faq.html">FAQ</a>
+  <a href="teach-with-us.html">Teach With Us</a>
+  <div class="nav-mobile-actions">
+    <a href="login.html"        class="btn btn-outline">Log In</a>
+    <a href="free-trial.html"   class="btn btn-primary">Book Free Trial ✦</a>
+  </div>
+</div>
 
 <!-- ═══ PAGE HERO ═══ -->
 <div class="page-hero">
@@ -92,15 +107,17 @@
     </div>
     <div class="footer-col">
       <h4>Company</h4>
-      <a href="../index.html#about">About Us</a>
-      <a href="../index.html#teachers">Our Tutors</a>
-      <a href="teach-with-us.html">Join as a Tutor</a>
-      <a href="../index.html#reviews">Reviews</a>
+      <a href="about.html">About Us</a>
+      <a href="team.html">Our Team</a>
+      <a href="teach-with-us.html">Teach With Us</a>
+      <a href="faq.html">FAQ</a>
     </div>
     <div class="footer-col">
       <h4>Account</h4>
       <a href="login.html">Tutor Login</a>
       <a href="login.html">Student Login</a>
+      <a href="free-trial.html">Book Free Trial</a>
+      <a href="join-class.html">Join My Class</a>
     </div>
     <div class="footer-col">
       <h4>Legal</h4>

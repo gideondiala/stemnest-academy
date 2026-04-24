@@ -494,7 +494,7 @@ function generatePassword() {
 }
 
 function resetAddTeacherForm() {
-  ['at-name','at-email','at-phone','at-password','at-bio','at-id'].forEach(id => {
+  ['at-name','at-email','at-phone','at-password','at-bio','at-id','at-dob'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
   const subj = document.getElementById('at-subject'); if (subj) subj.value = '';
@@ -545,6 +545,10 @@ function saveNewTeacher() {
   existing.push(newTeacher);
   saveTeachers(existing);
   updateStats();
+
+  // Save DOB if provided (Phase 6)
+  const dob = document.getElementById('at-dob')?.value;
+  if (dob) localStorage.setItem('sn_dob_' + id, dob);
 
   // Simulate welcome email
   console.log(`📧 WELCOME EMAIL TO: ${email}
@@ -1112,3 +1116,109 @@ updateStats = function() {
   _origUpdateStats();
   setText('salesBadge', getSalesPersons().length);
 };
+
+/* ══════════════════════════════════════════════════════
+   COMPANION MATERIALS (Admin uploads for teachers)
+══════════════════════════════════════════════════════ */
+
+function getMaterials() {
+  try { return JSON.parse(localStorage.getItem('sn_companion_materials') || '[]'); }
+  catch { return []; }
+}
+function saveMaterials(list) { localStorage.setItem('sn_companion_materials', JSON.stringify(list)); }
+
+function nextMaterialId() {
+  const all  = getMaterials();
+  const nums = all.map(m => parseInt(m.id?.replace('MAT','')) || 0);
+  const next = nums.length ? Math.max(...nums) + 1 : 1;
+  return 'MAT' + String(next).padStart(3,'0');
+}
+
+function renderMaterialsTable() {
+  const tbody = document.getElementById('materialsTableBody');
+  if (!tbody) return;
+  const list = getMaterials();
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--light);">No materials uploaded yet. Click "Upload Material" to add the first one.</td></tr>';
+    return;
+  }
+  const typeLabel = { curriculum:'📋 Curriculum', lesson_plan:'📝 Lesson Plan', notes:'📓 Notes', quiz_solution:'✅ Quiz Solutions', activity:'🎯 Activity', tool:'🔧 Tool', other:'📄 Other' };
+  tbody.innerHTML = list.map(m => `
+    <tr>
+      <td><span style="font-family:'Fredoka One',cursive;font-size:12px;color:var(--blue);">${m.id}</span></td>
+      <td><strong>${m.title}</strong></td>
+      <td>${typeLabel[m.type] || m.type}</td>
+      <td>${m.course || 'All Courses'}</td>
+      <td style="font-size:12px;max-width:160px;">${m.description || '—'}</td>
+      <td>${m.url ? `<a href="${m.url}" target="_blank" style="color:var(--blue);font-weight:700;font-size:12px;">Open ↗</a>` : '—'}</td>
+      <td style="font-size:12px;">${formatDateTime(m.uploadedAt)}</td>
+      <td>
+        <button class="ab-btn" style="background:var(--orange-light);color:var(--orange-dark);" onclick="deleteMaterial('${m.id}')">🗑 Delete</button>
+      </td>
+    </tr>`).join('');
+}
+
+function openAddMaterialModal() {
+  // Populate course dropdown
+  const sel = document.getElementById('mat-course');
+  if (sel) {
+    const courses = getAdminCourses();
+    sel.innerHTML = '<option value="">All Courses</option>' +
+      courses.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+  }
+  ['mat-title','mat-url','mat-desc'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  const typeEl = document.getElementById('mat-type'); if (typeEl) typeEl.value = 'curriculum';
+  document.getElementById('addMaterialOverlay')?.classList.add('open');
+}
+
+function closeAddMaterialModal() {
+  document.getElementById('addMaterialOverlay')?.classList.remove('open');
+}
+
+function saveMaterial() {
+  const title = document.getElementById('mat-title')?.value.trim();
+  const url   = document.getElementById('mat-url')?.value.trim();
+  const type  = document.getElementById('mat-type')?.value;
+  if (!title) { showToast('Please enter a title.', 'error'); return; }
+  if (!url)   { showToast('Please enter a URL.', 'error'); return; }
+
+  const material = {
+    id:          nextMaterialId(),
+    title,
+    type,
+    course:      document.getElementById('mat-course')?.value || '',
+    url,
+    description: document.getElementById('mat-desc')?.value.trim(),
+    uploadedAt:  new Date().toISOString(),
+  };
+
+  const all = getMaterials();
+  all.unshift(material);
+  saveMaterials(all);
+  closeAddMaterialModal();
+  renderMaterialsTable();
+  showToast(`✅ "${title}" uploaded! Teachers can now access it in My Companion.`);
+}
+
+function deleteMaterial(id) {
+  const m = getMaterials().find(x => x.id === id);
+  if (!m || !confirm(`Delete "${m.title}"?`)) return;
+  saveMaterials(getMaterials().filter(x => x.id !== id));
+  renderMaterialsTable();
+  showToast(`"${m.title}" deleted.`);
+}
+
+/* Hook companion-admin into showAdminTab */
+const _origShowAdminTab2 = showAdminTab;
+showAdminTab = function(tab) {
+  // Add companion-admin to tabs list
+  if (!ADMIN_TABS.includes('companion-admin')) ADMIN_TABS.push('companion-admin');
+  _origShowAdminTab2(tab);
+  if (tab === 'companion-admin') renderMaterialsTable();
+};
+
+/* Bind add material modal close on overlay */
+document.addEventListener('DOMContentLoaded', () => {
+  const overlay = document.getElementById('addMaterialOverlay');
+  overlay?.addEventListener('click', e => { if (e.target === overlay) closeAddMaterialModal(); });
+});

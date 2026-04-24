@@ -42,7 +42,7 @@
 .remember label { font-size: 14px; font-weight: 700; color: var(--mid); cursor: pointer; }
 
 /* ── LOGIN BUTTON ── */
-.login-btn     { width: 100%; padding: 15px; border-radius: 50px; border: none; font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 16px; cursor: pointer; transition: transform .15s, box-shadow .15s; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 20px; color: #fff; }
+.login-btn     { width: 100%; padding: 15px; border-radius: 50px; border: none; font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 16px; cursor: pointer; transition: transform .15s, box-shadow .15s; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 20px; color: #fff; background: var(--blue); box-shadow: 0 6px 20px rgba(26,86,219,.35); }
 .login-btn:hover { transform: translateY(-2px); }
 .btn-tutor-login   { background: var(--blue); box-shadow: 0 6px 20px rgba(26,86,219,.35); }
 .btn-tutor-login:hover   { box-shadow: 0 8px 26px rgba(26,86,219,.45); }

@@ -52,7 +52,7 @@
 /* ── Week nav ── */
 .wcal-nav {
   display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 12px; flex-wrap: wrap; gap: 8px;
 }
 .wcal-week-label {
   font-family: 'Fredoka One', cursive; font-size: 18px; color: var(--dark);
@@ -62,20 +62,22 @@
   background: var(--green-light); padding: 4px 12px; border-radius: 50px;
 }
 .wcal-legend {
-  display: flex; gap: 20px; margin-bottom: 12px; flex-wrap: wrap;
+  display: flex; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; align-items: center;
 }
 .wcal-legend-item {
   display: flex; align-items: center; gap: 6px;
   font-size: 12px; font-weight: 700; color: var(--mid);
 }
 .wcal-legend-dot {
-  width: 14px; height: 14px; border-radius: 4px;
+  width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0;
 }
 .wcal-legend-avail { background: var(--green); }
 .wcal-legend-past  { background: #e8eaf0; }
 .wcal-legend-empty { background: var(--white); border: 2px solid #e8eaf0; }
+.wcal-legend-paid  { background: rgba(26,86,219,.35); }
+.wcal-legend-demo  { background: rgba(255,107,53,.45); }
 
-/* ── Calendar table wrapper (horizontal scroll) ── */
+/* ── Calendar table wrapper ── */
 .wcal-wrap {
   overflow-x: auto;
   border-radius: 16px;
@@ -83,87 +85,225 @@
   border: 1.5px solid #e8eaf0;
   background: var(--white);
   margin-bottom: 16px;
+  /* Constrain height so it scrolls vertically too */
+  max-height: 72vh;
+  overflow-y: auto;
 }
 
-/* ── Table ── */
+/* ── Table — equal columns is the key fix ── */
 .wcal-table {
   border-collapse: collapse;
+  /* table-layout fixed + explicit widths = equal day columns */
+  table-layout: fixed;
   width: 100%;
-  min-width: 700px;
+  min-width: 680px;
   font-size: 12px;
 }
 
-/* Header row */
+/* ── Header ── */
+.wcal-table thead {
+  position: sticky; top: 0; z-index: 10;
+}
 .wcal-table thead th {
   background: var(--bg);
-  padding: 10px 6px;
+  padding: 10px 4px;
   text-align: center;
   border-bottom: 2px solid #e8eaf0;
   border-right: 1px solid #e8eaf0;
-  position: sticky; top: 0; z-index: 2;
+  /* Fixed widths: time col narrow, 7 day cols equal */
 }
 .wcal-table thead th:last-child { border-right: none; }
-.wcal-time-col { width: 56px; min-width: 56px; }
-.wcal-today-col { background: var(--blue-light) !important; }
+
+/* Time column — fixed narrow width */
+.wcal-time-col {
+  width: 64px;
+  min-width: 64px;
+}
+
+/* Day columns — equal width (fills remaining space) */
+.wcal-day-th {
+  width: calc((100% - 64px) / 7);
+}
+
+/* Today column highlight */
+.wcal-today-col {
+  background: #eef4ff !important;
+}
+.wcal-today-col .wcal-day-name { color: var(--blue) !important; }
+
 .wcal-day-name {
   font-size: 11px; font-weight: 900; color: var(--light);
   text-transform: uppercase; letter-spacing: .5px;
 }
+.wcal-day-num-wrap {
+  display: flex; align-items: center; justify-content: center;
+  margin-top: 4px;
+}
 .wcal-day-num {
-  font-family: 'Fredoka One', cursive; font-size: 20px; color: var(--dark);
-  margin-top: 2px;
-}
-.wcal-today-num {
-  width: 32px; height: 32px; background: var(--blue); color: #fff;
-  border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  margin: 2px auto 0; font-size: 16px;
-}
-
-/* Time label column */
-.wcal-time-label {
-  padding: 0 8px; text-align: right;
-  font-size: 11px; font-weight: 800; color: var(--light);
-  white-space: nowrap; border-right: 2px solid #e8eaf0;
-  background: var(--bg);
-  position: sticky; left: 0; z-index: 1;
-}
-.wcal-half-label { color: #c0c8d8; font-size: 10px; }
-
-/* Hour / half-hour rows */
-.wcal-hour-row td { border-top: 1.5px solid #e8eaf0; }
-.wcal-half-row td { border-top: 1px dashed #f0f2f8; }
-
-/* Slot cells */
-.wcal-slot {
-  height: 28px; width: 100%;
-  border-right: 1px solid #f0f2f8;
-  cursor: pointer;
-  transition: background .15s;
-  position: relative;
-  text-align: center;
-  vertical-align: middle;
-}
-.wcal-slot:last-child { border-right: none; }
-.wcal-slot:hover { background: var(--blue-light); }
-
-.wcal-avail {
-  background: var(--green-light) !important;
-  cursor: pointer;
-}
-.wcal-avail:hover { background: #b7f0dc !important; }
-
-.wcal-past {
-  background: #f7f8fa !important;
-  cursor: not-allowed;
-  opacity: .5;
-}
-
-.wcal-avail-dot {
-  display: inline-block;
-  width: 8px; height: 8px;
-  background: var(--green);
+  font-family: 'Fredoka One', cursive; font-size: 18px; color: var(--dark);
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
   border-radius: 50%;
 }
+.wcal-today-num {
+  background: var(--blue); color: #fff !important;
+}
+
+/* ── Time label column ── */
+.wcal-time-label {
+  padding: 0 8px; text-align: right;
+  white-space: nowrap;
+  border-right: 2px solid #e8eaf0;
+  background: var(--bg);
+  position: sticky; left: 0; z-index: 5;
+  vertical-align: middle;
+}
+.wcal-hour-label {
+  font-size: 10px; font-weight: 900; color: var(--mid);
+  display: block;
+}
+.wcal-half-label {
+  font-size: 10px; font-weight: 700; color: #c0c8d8;
+  display: block;
+}
+
+/* ── Row heights ── */
+/* Each slot = 30 mins. 1 hour = 2 rows = 56px total */
+.wcal-hour-row td {
+  height: 28px;
+  border-top: 1.5px solid #e8eaf0;
+}
+.wcal-half-row td {
+  height: 28px;
+  border-top: 1px dashed #f0f2f8;
+}
+
+/* ── Slot cells ── */
+.wcal-slot {
+  border-right: 1px solid #f0f2f8;
+  cursor: pointer;
+  transition: background .12s;
+  position: relative;
+  vertical-align: top;
+  padding: 0;
+  overflow: hidden;
+}
+.wcal-slot:last-child { border-right: none; }
+
+/* Today column body cells — subtle tint */
+.wcal-today-slot {
+  background: #f5f8ff;
+}
+.wcal-today-slot:hover { background: #dbeafe !important; }
+
+/* Available slot — START of 1-hour block */
+.wcal-avail {
+  background: #d1fae5 !important;
+}
+.wcal-avail-start {
+  background: #d1fae5 !important;
+  border-top: 2px solid #059669 !important;
+}
+.wcal-avail-start:hover { background: #a7f3d0 !important; }
+
+/* Available slot — CONTINUATION (second 30-min half) */
+.wcal-avail-cont {
+  background: #d1fae5 !important;
+  border-top: none !important;   /* merge with row above */
+  cursor: pointer !important;
+}
+.wcal-avail-cont:hover { background: #a7f3d0 !important; }
+
+/* Content inside the start cell */
+.wcal-avail-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 2px;
+  padding: 2px 0;
+}
+.wcal-avail-dot {
+  display: block;
+  width: 7px; height: 7px;
+  background: #059669;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.wcal-avail-time {
+  font-size: 9px;
+  font-weight: 900;
+  color: #065f46;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+/* Hover on empty open slot */
+.wcal-slot:not(.wcal-past):not(.wcal-avail):not(.wcal-avail-start):not(.wcal-avail-cont):not(.wcal-paid-booked):not(.wcal-demo-booked):not(.wcal-booked-cont):hover {
+  background: #eff6ff;
+}
+
+/* Past slot — greyed, no cursor */
+.wcal-past {
+  background: #f4f5f7 !important;
+  cursor: not-allowed !important;
+}
+.wcal-past::after {
+  content: '';
+  display: block;
+  width: 100%; height: 100%;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 4px,
+    rgba(0,0,0,.03) 4px,
+    rgba(0,0,0,.03) 8px
+  );
+}
+
+/* ── PAID CLASS slot ── */
+.wcal-paid-booked {
+  background: rgba(26,86,219,.12) !important;
+  border-left: 3px solid var(--blue) !important;
+  cursor: pointer !important;
+}
+.wcal-paid-booked:hover { background: rgba(26,86,219,.2) !important; }
+
+/* ── DEMO CLASS slot ── */
+.wcal-demo-booked {
+  background: rgba(255,107,53,.12) !important;
+  border-left: 3px solid var(--orange) !important;
+  cursor: pointer !important;
+}
+.wcal-demo-booked:hover { background: rgba(255,107,53,.22) !important; }
+
+/* Continuation slot (2nd half of a booking) */
+.wcal-booked-cont {
+  border-top: none !important;
+}
+
+/* Booking info inside first slot */
+.wcal-booked-inner {
+  padding: 2px 4px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.wcal-booked-label {
+  font-size: 10px; font-weight: 900;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  line-height: 1.3;
+}
+.wcal-booked-sub {
+  font-size: 9px; font-weight: 700; opacity: .7;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.wcal-booked-paid .wcal-booked-label { color: var(--blue); }
+.wcal-booked-paid .wcal-booked-sub   { color: var(--blue); }
+.wcal-booked-demo .wcal-booked-label { color: #c2410c; }
+.wcal-booked-demo .wcal-booked-sub   { color: #c2410c; }
 
 /* ── Hint text ── */
 .wcal-hint {
@@ -175,4 +315,140 @@
 /* ── Responsive ── */
 @media (max-width: 900px) {
   .wcal-table { min-width: 560px; }
+  .wcal-time-col { width: 48px; min-width: 48px; }
+  .wcal-day-th { width: calc((100% - 48px) / 7); }
+}
+@media (max-width: 600px) {
+  .wcal-table { min-width: 480px; }
+  .wcal-time-col { width: 40px; min-width: 40px; }
+  .wcal-day-th { width: calc((100% - 40px) / 7); }
+  .wcal-hour-label { font-size: 9px; }
+}
+/* ══════════════════════════════════════════════════════
+   MY COMPANION
+══════════════════════════════════════════════════════ */
+.companion-empty {
+  text-align: center; padding: 60px 20px;
+  background: var(--bg); border-radius: 20px; border: 1.5px dashed #e8eaf0;
+}
+.companion-course-section { margin-bottom: 32px; }
+.companion-course-title {
+  font-family: 'Fredoka One', cursive; font-size: 20px; color: var(--dark);
+  margin-bottom: 16px; padding-bottom: 10px; border-bottom: 2px solid var(--blue-light);
+}
+.companion-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px;
+}
+.companion-card {
+  background: var(--white); border-radius: 14px; padding: 16px 18px;
+  border: 1.5px solid #e8eaf0; display: flex; align-items: flex-start; gap: 14px;
+  text-decoration: none; transition: border-color .2s, transform .2s, box-shadow .2s;
+  cursor: pointer;
+}
+.companion-card:hover { border-color: var(--blue); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(26,86,219,.1); }
+.companion-card-icon { font-size: 28px; flex-shrink: 0; }
+.companion-card-body { flex: 1; }
+.companion-card-title { font-weight: 800; font-size: 14px; color: var(--dark); margin-bottom: 3px; }
+.companion-card-meta  { font-size: 11px; font-weight: 800; color: var(--blue); background: var(--blue-light); padding: 2px 8px; border-radius: 50px; display: inline-block; margin-bottom: 4px; }
+.companion-card-desc  { font-size: 12px; color: var(--light); line-height: 1.5; }
+.companion-card-arrow { font-size: 18px; color: var(--light); flex-shrink: 0; }
+
+/* ══════════════════════════════════════════════════════
+   LEADERBOARD
+══════════════════════════════════════════════════════ */
+.points-log-header {
+  display: grid; grid-template-columns: 1fr 80px 80px;
+  padding: 8px 16px; font-size: 11px; font-weight: 900;
+  color: var(--light); text-transform: uppercase; letter-spacing: .5px;
+  border-bottom: 1.5px solid #e8eaf0;
+}
+.points-log-row {
+  display: grid; grid-template-columns: 1fr 80px 80px;
+  padding: 12px 16px; border-bottom: 1px solid #f0f2f8;
+  align-items: center;
+}
+.points-log-row:last-child { border-bottom: none; }
+.points-log-note { font-size: 13px; font-weight: 700; color: var(--dark); }
+.points-log-pts  { font-family: 'Fredoka One', cursive; font-size: 16px; text-align: center; }
+.pts-pos { color: var(--green); }
+.pts-neg { color: #c53030; }
+.points-log-date { font-size: 12px; color: var(--light); font-weight: 700; text-align: right; }
+
+.lb-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 16px; border-bottom: 1px solid #f0f2f8;
+  transition: background .2s;
+}
+.lb-row:last-child { border-bottom: none; }
+.lb-row:hover { background: var(--bg); }
+.lb-me { background: var(--blue-light) !important; border-radius: 12px; }
+.lb-rank { font-family: 'Fredoka One', cursive; font-size: 20px; min-width: 36px; text-align: center; }
+.lb-av {
+  width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Fredoka One', cursive; font-size: 16px; color: #fff;
+  overflow: hidden;
+}
+.lb-info { flex: 1; }
+.lb-name { font-weight: 800; font-size: 14px; color: var(--dark); }
+.lb-sub  { font-size: 12px; color: var(--light); font-weight: 700; margin-top: 2px; }
+.lb-you  { font-size: 10px; font-weight: 900; background: var(--blue); color: #fff; padding: 2px 8px; border-radius: 50px; margin-left: 6px; }
+.lb-points { font-family: 'Fredoka One', cursive; font-size: 22px; color: var(--purple); text-align: right; }
+.lb-points span { font-size: 12px; color: var(--light); font-family: 'Nunito', sans-serif; font-weight: 700; }
+
+/* ══════════════════════════════════════════════════════
+   KYC
+══════════════════════════════════════════════════════ */
+.kyc-wrap { max-width: 700px; }
+.kyc-card {
+  background: var(--white); border-radius: 20px; padding: 32px;
+  border: 1.5px solid #e8eaf0; box-shadow: 0 4px 20px rgba(0,0,0,.06);
+}
+.kyc-header {
+  display: flex; align-items: flex-start; gap: 24px; margin-bottom: 24px;
+  padding-bottom: 24px; border-bottom: 1.5px solid #e8eaf0;
+}
+.kyc-avatar-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; flex-shrink: 0; }
+.kyc-avatar-img {
+  width: 90px; height: 90px; border-radius: 50%; object-fit: cover;
+  border: 3px solid var(--blue-light);
+}
+.kyc-avatar-initials {
+  width: 90px; height: 90px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--blue), var(--green));
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Fredoka One', cursive; font-size: 30px; color: #fff;
+}
+.kyc-photo-btn {
+  font-size: 12px; font-weight: 800; color: var(--blue);
+  background: var(--blue-light); border: none; border-radius: 50px;
+  padding: 5px 12px; cursor: pointer; transition: .2s;
+}
+.kyc-photo-btn:hover { background: var(--blue); color: #fff; }
+.kyc-name    { font-family: 'Fredoka One', cursive; font-size: 26px; color: var(--dark); }
+.kyc-id-badge { display: inline-block; font-size: 12px; font-weight: 900; color: var(--blue); background: var(--blue-light); padding: 3px 12px; border-radius: 50px; margin: 6px 0; }
+.kyc-role    { font-size: 13px; font-weight: 800; color: var(--light); }
+.kyc-intro-tip {
+  background: var(--orange-light); border-radius: 12px; padding: 12px 16px;
+  font-size: 13px; color: var(--orange-dark); font-weight: 700; margin-bottom: 24px;
+}
+.kyc-fields {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;
+}
+.kyc-full { grid-column: 1 / -1; }
+.kyc-field-group { background: var(--bg); border-radius: 12px; padding: 14px 16px; }
+.kyc-field-label { font-size: 11px; font-weight: 900; color: var(--light); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+.kyc-field-value { font-size: 14px; font-weight: 700; color: var(--dark); line-height: 1.5; }
+.kyc-intro-script {
+  background: linear-gradient(135deg, var(--blue-light), var(--green-light));
+  border-radius: 14px; padding: 20px;
+}
+.kyc-script-title { font-family: 'Fredoka One', cursive; font-size: 16px; color: var(--dark); margin-bottom: 10px; }
+.kyc-script-text  { font-size: 14px; color: var(--mid); line-height: 1.8; font-style: italic; }
+
+@media (max-width: 600px) {
+  .kyc-fields { grid-template-columns: 1fr; }
+  .kyc-full   { grid-column: 1; }
+  .kyc-header { flex-direction: column; align-items: center; text-align: center; }
+  .companion-grid { grid-template-columns: 1fr; }
 }

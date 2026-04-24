@@ -21,6 +21,11 @@ function navigate(page) {
     'admin-dashboard':   root + 'pages/admin-dashboard.html',
     'teach-with-us':     root + 'pages/teach-with-us.html',
     'sales-dashboard':   root + 'pages/sales-dashboard.html',
+    'super-admin':       root + 'pages/super-admin.html',
+    'operations':        root + 'pages/operations-dashboard.html',
+    'presales':          root + 'pages/presales-dashboard.html',
+    'postsales':         root + 'pages/postsales-dashboard.html',
+    'hr':                root + 'pages/hr-dashboard.html',
   };
   if (map[page]) window.location.href = map[page];
 }
@@ -97,5 +102,37 @@ document.addEventListener('DOMContentLoaded', () => {
       const el = document.getElementById(hash);
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 200);
+  }
+});
+
+/**
+ * Toggle mobile navigation drawer.
+ * Called by the hamburger button on all public pages.
+ */
+function toggleMobileNav() {
+  const drawer = document.getElementById('navDrawer');
+  const nav    = document.querySelector('nav');
+  if (!drawer) return;
+  const isOpen = drawer.classList.contains('open');
+  drawer.classList.toggle('open', !isOpen);
+  nav?.classList.toggle('nav-mobile-open', !isOpen);
+}
+
+// Close drawer when clicking outside
+document.addEventListener('click', e => {
+  const drawer = document.getElementById('navDrawer');
+  const btn    = document.getElementById('navHamburger');
+  if (!drawer || !drawer.classList.contains('open')) return;
+  if (!drawer.contains(e.target) && !btn?.contains(e.target)) {
+    drawer.classList.remove('open');
+    document.querySelector('nav')?.classList.remove('nav-mobile-open');
+  }
+});
+
+// Close drawer on resize back to desktop
+window.addEventListener('resize', () => {
+  if (window.innerWidth > 900) {
+    document.getElementById('navDrawer')?.classList.remove('open');
+    document.querySelector('nav')?.classList.remove('nav-mobile-open');
   }
 });
