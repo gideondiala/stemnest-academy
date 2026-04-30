@@ -32,6 +32,7 @@
       <a class="sidebar-link active" data-tab="late-joins"  onclick="showOpsTab('late-joins')"> <span class="sl-icon">⏰</span> Late Joins <span class="sl-badge" id="lateJoinBadge">0</span></a>
       <a class="sidebar-link"        data-tab="penalties"   onclick="showOpsTab('penalties')">  <span class="sl-icon">⚠️</span> Penalties</a>
       <a class="sidebar-link"        data-tab="class-log"   onclick="showOpsTab('class-log')">  <span class="sl-icon">📋</span> Class Log</a>
+      <a class="sidebar-link"        data-tab="absent"      onclick="showOpsTab('absent')">     <span class="sl-icon">🚨</span> No-Show Teachers</a>
     </div>
     <div class="sidebar-bottom">
       <button class="logout-btn" onclick="window.location.href='login.html'">🚪 Log Out</button>
@@ -99,5 +100,14 @@
 </div>
 <script src="../js/utils.js"></script>
 <script src="../js/operations-dashboard.js"></script>
+
+<!-- Absent tab HTML injected here -->
+<div id="tab-absent" style="display:none;">
+  <div class="dash-section-header">
+    <div class="dash-section-title">🚨 No-Show Teachers</div>
+    <button class="btn btn-outline" style="font-size:13px;" onclick="renderAbsentTeachers()">🔄 Refresh</button>
+  </div>
+  <div id="absentTeachersList"></div>
+</div>
 </body>
 </html>

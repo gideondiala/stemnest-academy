@@ -1,0 +1,44 @@
+Lets Work on this more
+
+After A demo class is completed, The leads go to the sales department dashboard.There we can update the status of every lead, e.g Paid, parent promising, no much interest, Lost
+attchd to each lead(Demo class completed). On the chart/list should be the lead owner(Lead owner could be a sales person / academic counselor or a teacher) after each demo class.
+When Demo class is booked by the presales team and it appears on the teachers dashboard, the teacher should see Join class and also end Demo. If the Join class has not been clicked and through it the class is joined. 
+Then the end class cannot be active or clickable till after 15mins of class start time(Meaning you cannot end a class you havent started).
+After each demo class when the End Demo is clicked, it should bring up some dialogue, Demo completed? or Incomplete? If Demo is incomplete then the student details should return back to presales dashboard in a different section by the left of the presales menu we can have incomplete demo
+the reason for incomplete demo should also be appended to each student details that appears in the incomplete demo section.(Reason for incomplete demo will be added by teacher while ending the Demo class), There should be a Rebook Demo Button
+for each incomplete demo that allows the presales team to rebook the demo again for any available teacher.
+
+Also make sure teachers dasboard has the End class for Paid student classes. Same principle the end class also only allows the teacher to click after 15mins. So if teacher has not clicked on the Join class till 15mins after the class starts.it should be considered that the teacher is absent and the system should atomatically mark session as end and Absent for the teacher and send the details of the class and the teacher to the operations team dashboard.
+a new section should be created for No join by teacher/Absent. Recording link for each completed class should be sent by the teacher as well.
+
+When a demo class or course class is booked. it should also appear on the hour slot of the teacher who it is booked with, also with a click on the slot the teacher should see the details of the student and also be able to join class with same link(Button) on the dashboard (Remember Paid class Booked slot color on the calendar should be different from demo class booked slot)
+
+A demo student should be able to cancel or request a reschedule for their class. When they click on cancel class there should be a dialogue that asks to be tripple sure they really want to cancel before cancelling(This is to avoid mistake cancellation by students who dont know how to click)
+and a reason why class is cancelled should be recieved at the presales interface as cancelled classes.
+
+When the student clicks on reschedule then it should prompt a date and a time they would want the class to be rescheduled to, and the details of that reschedule should be recieved in another section of the presales dasboard.
+Things on the presales dasboard should be sorted with dates and also allow for a seach with name or gmail.
+
+
+I also want to be sure the payment and credit system is well implemented. When a counselor/sales person or teacher converts or win a student. the converted student details should be sent to the post sales dashboard. The Post sales should recieve confirmation of payment, student details, amount paid and number of credits paid for.
+the Post sales should be able to add that credit to the student when the dashboard is created. This should be easy in such a way that all paid studentcomes to the paid section in the post sales dashboard. if its a brand new student then with a click of a button the post sales should be able to onboard the studen, Just a click, confirm email, phone, name, age, course and other details also with number of credits paid for
+once the proceed to onboard is clicked the student should have dashboard ready.
+The Post sales should have a txt file generated containing the login details of the student with username, password, Phone number and a short guide on how to login should be sent to the parent as a mail or any other format that is best.
+
+the system should allow for forgot password feature where students or teachers who forgot their password can recover it via their registered mail.
+
+The founders/super admin should have a chart of all the current password of all users of the platform in a chart. this should be updated everytime a user updates their password.This chart should only strictly be visible to the founders/superadmin
+
+ALso the Chat with student/teacher feature that is already implemented... the chat comes with student name and ID. a name is ok and the chat should be formatted well so that a student knows when a teacher has sent read and responded to the chat. The chat icon should have notification on the number of messages pending replies
+
+I also want us to build a robust mailing system in this platform. when a demo class is booked for a teacher the teacher should recieve a mail notification stating the demo booked , Time, student details, and a brief note.If Demo is also cancelled a mail should be sent to the teacher
+
+
+The Admin teacm or operations, founders can send Bulk mails to staff, all Coding teachers, all maths teachers, everyone, students e.g all students, all maths students, all coding students, All students in Nigeria, all students in UK, we should be able to filter it that way
+
+
+This whole Stemnest dasboard system we are building should be built with forward compatibilty in mind, we are just a start up company and as operations starts we will definitely see lopholes and want to modify them, The system should allow for that midifcation without loosing data in the database or the system generally.
+we also want to be able to make changes and push to git and from git push to our hosting server without the website going down.
+
+
+after this we will start working on the backend and database... But lets work on this as the most experienced developer. understand all i have said here and implement them.

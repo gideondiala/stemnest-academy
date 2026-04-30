@@ -153,35 +153,33 @@ function populateProfileModal() {
 function checkAssignedClasses() {
   const banner = document.getElementById('assignedClassBanner');
   if (!banner) return;
+  const tutorId = localStorage.getItem('sn_logged_in_teacher') || (typeof TUTOR !== 'undefined' ? TUTOR.id : 'CT001');
   const bookings = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
   const mine = bookings.filter(b =>
-    b.status === 'scheduled' &&
-    b.assignedTutorId === TUTOR.id &&
-    !b.tutorNotified
+    b.status === 'scheduled' && b.assignedTutorId === tutorId
   );
   if (mine.length === 0) { banner.style.display = 'none'; return; }
-  const b = mine[0]; // show most recent
   banner.style.display = 'block';
-  banner.innerHTML = `
-    <div class="assigned-banner">
-      <div class="assigned-banner-icon">🎉</div>
-      <div class="assigned-banner-body">
-        <div class="assigned-banner-title">New class assigned to you!</div>
-        <div class="assigned-banner-meta">
-          📚 <strong>${b.subject}</strong> &nbsp;·&nbsp;
-          🎓 <strong>${b.studentName}</strong> (${b.grade}) &nbsp;·&nbsp;
-          📅 <strong>${formatDateSimple(b.date)}</strong> at <strong>${b.time}</strong>
-          ${mine.length > 1 ? `<br>+${mine.length - 1} more new assignment${mine.length > 2 ? 's' : ''}` : ''}
-        </div>
-      </div>
-      ${b.classLink ? `<a href="${b.classLink}" target="_blank" class="assigned-banner-btn">🚀 Join Class</a>` : ''}
-    </div>`;
-  // Mark as notified
-  mine.forEach(bk => {
-    const all = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
-    const idx = all.findIndex(x => x.id === bk.id);
-    if (idx !== -1) { all[idx].tutorNotified = true; localStorage.setItem('sn_bookings', JSON.stringify(all)); }
-  });
+  const rows = mine.slice(0, 3).map(b =>
+    '📚 <strong>' + b.subject + '</strong> &nbsp;·&nbsp; 🎓 <strong>' + b.studentName + '</strong> &nbsp;·&nbsp; 📅 ' + (b.date || '—') + ' at ' + (b.time || '—')
+  ).join('<br>');
+  const extra = mine.length > 3 ? '<br>+' + (mine.length - 3) + ' more' : '';
+  banner.innerHTML = [
+    '<div class="assigned-banner">',
+      '<div class="assigned-banner-icon">📅</div>',
+      '<div class="assigned-banner-body">',
+        '<div class="assigned-banner-title">' + mine.length + ' upcoming class' + (mine.length > 1 ? 'es' : '') + ' assigned to you</div>',
+        '<div class="assigned-banner-meta">' + rows + extra + '</div>',
+      '</div>',
+      '<div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0;">',
+        '<button class="assigned-banner-btn" onclick="showDashTab(\'sessions\')">📡 View Sessions</button>',
+        '<button onclick="document.getElementById(\'assignedClassBanner\').style.display=\'none\'"',
+          ' style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:50px;padding:7px 16px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:12px;cursor:pointer;">',
+          '✕ Dismiss',
+        '</button>',
+      '</div>',
+    '</div>',
+  ].join('');
 }
 
 /* ── TAB SWITCHING ── */

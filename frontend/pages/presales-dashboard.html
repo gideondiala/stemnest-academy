@@ -28,9 +28,12 @@
     </div>
     <div class="sidebar-nav">
       <div class="sidebar-section-label">My Work</div>
-      <a class="sidebar-link active" data-tab="incoming"   onclick="showPSTab('incoming')">  <span class="sl-icon">📥</span> Incoming Demos <span class="sl-badge" id="incomingBadge">0</span></a>
-      <a class="sidebar-link"        data-tab="scheduled"  onclick="showPSTab('scheduled')"> <span class="sl-icon">📅</span> Scheduled</a>
-      <a class="sidebar-link"        data-tab="notes"      onclick="showPSTab('notes')">     <span class="sl-icon">📝</span> Parent Notes</a>
+      <a class="sidebar-link active" data-tab="incoming"    onclick="showPSTab('incoming')">   <span class="sl-icon">📥</span> Incoming Demos <span class="sl-badge" id="incomingBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="scheduled"   onclick="showPSTab('scheduled')">  <span class="sl-icon">📅</span> Scheduled</a>
+      <a class="sidebar-link"        data-tab="incomplete"  onclick="showPSTab('incomplete')"> <span class="sl-icon">❌</span> Incomplete Demos <span class="sl-badge" id="incompleteBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="cancelled"   onclick="showPSTab('cancelled')">  <span class="sl-icon">🚫</span> Cancelled <span class="sl-badge" id="cancelledBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="reschedule"  onclick="showPSTab('reschedule')"> <span class="sl-icon">🔄</span> Reschedule Requests <span class="sl-badge" id="rescheduleBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="notes"       onclick="showPSTab('notes')">      <span class="sl-icon">📝</span> Parent Notes</a>
     </div>
     <div class="sidebar-bottom">
       <button class="logout-btn" onclick="window.location.href='login.html'">🚪 Log Out</button>
@@ -76,6 +79,33 @@
         <div class="dash-section-title">📝 Parent Confirmation Notes</div>
       </div>
       <div id="parentNotesList"></div>
+    </div>
+
+    <!-- INCOMPLETE DEMOS -->
+    <div id="tab-incomplete" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">❌ Incomplete Demos</div>
+        <span style="font-size:13px;font-weight:700;color:var(--light);">Demos marked incomplete by teachers — rebook as needed</span>
+      </div>
+      <div id="incompleteDemosList"></div>
+    </div>
+
+    <!-- CANCELLED CLASSES -->
+    <div id="tab-cancelled" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🚫 Cancelled Classes</div>
+        <span style="font-size:13px;font-weight:700;color:var(--light);">Student-cancelled demo requests</span>
+      </div>
+      <div id="cancelledClassesList"></div>
+    </div>
+
+    <!-- RESCHEDULE REQUESTS -->
+    <div id="tab-reschedule" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🔄 Reschedule Requests</div>
+        <span style="font-size:13px;font-weight:700;color:var(--light);">Students requesting a new date/time</span>
+      </div>
+      <div id="rescheduleRequestsList"></div>
     </div>
 
   </div><!-- end dash-main -->
@@ -137,5 +167,6 @@
 
 <script src="../js/utils.js"></script>
 <script src="../js/presales-dashboard.js"></script>
+<script src="../js/mail-system.js"></script>
 </body>
 </html>

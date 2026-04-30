@@ -55,7 +55,13 @@
     <div id="tab-students">
       <div class="dash-section-header">
         <div class="dash-section-title">🎓 Paid Students</div>
-        <button class="btn btn-outline" style="font-size:13px;" onclick="renderPaidStudents()">🔄 Refresh</button>
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-primary" style="font-size:13px;" onclick="openManualOnboardModal()">➕ Manual Onboard</button>
+          <button class="btn btn-outline" style="font-size:13px;" onclick="renderPaidStudents()">🔄 Refresh</button>
+        </div>
+      </div>
+      <div style="background:var(--blue-light);border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13px;font-weight:700;color:var(--blue);">
+        💡 Students who came via demo class appear here automatically. For walk-in or referral students, click <strong>Manual Onboard</strong>.
       </div>
       <div id="paidStudentsList"></div>
     </div>
@@ -203,5 +209,82 @@
 
 <script src="../js/utils.js"></script>
 <script src="../js/postsales-dashboard.js"></script>
+
+<!-- MANUAL ONBOARD MODAL (walk-in / referral students) -->
+<div class="modal-overlay" id="manualOnboardOverlay">
+  <div class="modal" style="max-width:540px;">
+    <div class="modal-header">
+      <div class="modal-title">➕ Manual Student Onboard</div>
+      <button class="modal-close" onclick="closeManualOnboardModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--orange-light);border-radius:12px;padding:12px 16px;margin-bottom:20px;font-size:13px;font-weight:700;color:var(--orange-dark);">
+        Use this for walk-in students, referrals, or anyone who didn't go through the demo booking flow.
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Full Name *</label><input type="text" id="mob-name" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Email *</label><input type="email" id="mob-email" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Phone / WhatsApp</label><input type="tel" id="mob-phone" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Age</label><input type="text" id="mob-age" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Year Group</label><input type="text" id="mob-grade" placeholder="e.g. Year 9" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Subject</label>
+          <select id="mob-subject" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;background:var(--white);">
+            <option value="Coding">💻 Coding</option>
+            <option value="Maths">📐 Maths</option>
+            <option value="Sciences">🔬 Sciences</option>
+          </select>
+        </div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Course</label><input type="text" id="mob-course" placeholder="e.g. Python for Beginners" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Credits (classes)</label><input type="number" id="mob-credits" min="1" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Amount Paid</label><input type="text" id="mob-amount" placeholder="e.g. £99" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Login Password *</label>
+          <input type="text" id="mob-password" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
+          <div style="font-size:11px;color:var(--light);font-weight:700;margin-top:4px;">Auto-generated. Student should change on first login.</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:20px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="closeManualOnboardModal()">Cancel</button>
+        <button class="btn btn-primary" style="flex:2;" onclick="confirmManualOnboard()">🎓 Onboard Student</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ONBOARD STUDENT MODAL -->
+<div class="modal-overlay" id="onboardModalOverlay">
+  <div class="modal" style="max-width:540px;">
+    <div class="modal-header">
+      <div class="modal-title">🎓 Onboard Student</div>
+      <button class="modal-close" onclick="closeOnboardModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--blue-light);border-radius:12px;padding:12px 16px;margin-bottom:20px;font-size:13px;font-weight:700;color:var(--blue);">
+        ✅ Confirm the student's details below, then click Onboard. A login credential file will be downloaded and an email will be sent to the parent.
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Full Name *</label><input type="text" id="ob-name" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Email *</label><input type="email" id="ob-email" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Phone / WhatsApp</label><input type="tel" id="ob-phone" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Age</label><input type="text" id="ob-age" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Year Group</label><input type="text" id="ob-grade" placeholder="e.g. Year 9" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Subject</label><input type="text" id="ob-subject" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Course</label><input type="text" id="ob-course" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Credits (classes)</label><input type="number" id="ob-credits" min="1" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Amount Paid</label><input type="text" id="ob-amount" placeholder="e.g. 99" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Login Password *</label>
+          <div style="position:relative;">
+            <input type="text" id="ob-password" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
+          </div>
+          <div style="font-size:11px;color:var(--light);font-weight:700;margin-top:4px;">Auto-generated. Student should change on first login.</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:20px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="closeOnboardModal()">Cancel</button>
+        <button class="btn btn-primary" style="flex:2;" onclick="confirmOnboard()">🎓 Confirm & Onboard Student</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

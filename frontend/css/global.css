@@ -49,10 +49,11 @@ body {
 /* ── SHARED BUTTONS ── */
 .btn {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 10px 22px; border-radius: 50px;
-  font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 15px;
+  padding: 9px 16px; border-radius: 50px;
+  font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 13px;
   cursor: pointer; border: none; text-decoration: none;
   transition: transform 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
 }
 .btn:hover             { transform: translateY(-2px); }
 .btn-outline           { background: transparent; border: 2px solid var(--blue); color: var(--blue); }
@@ -79,8 +80,9 @@ nav {
 .logo-text span    { color: var(--orange); }
 .nav-links         { display: flex; align-items: center; gap: 6px; list-style: none; }
 .nav-links a {
-  text-decoration: none; color: var(--mid); font-weight: 700; font-size: 15px;
-  padding: 8px 14px; border-radius: 10px; transition: background .2s, color .2s;
+  text-decoration: none; color: var(--mid); font-weight: 700; font-size: 13px;
+  padding: 6px 10px; border-radius: 10px; transition: background .2s, color .2s;
+  white-space: nowrap;
 }
 .nav-links a:hover,
 .nav-links a.active { background: var(--blue-light); color: var(--blue); }

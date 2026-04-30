@@ -478,3 +478,135 @@ window.saveSettings = function(key, val) {
     localStorage.setItem('sn_dob_founder', val);
   }
 };
+
+/* ══════════════════════════════════════════════════════
+   PRIORITY 7 — USER CREDENTIALS CHART (Founder Only)
+══════════════════════════════════════════════════════ */
+
+/* Add credentials tab to SA_TABS */
+SA_TABS.push('credentials');
+
+/* Extend showSATab to handle credentials */
+const _origShowSATab = window.showSATab;
+window.showSATab = function(tab) {
+  _origShowSATab(tab);
+  if (tab === 'credentials') renderCredentialsChart();
+};
+
+function renderCredentialsChart() {
+  const el = document.getElementById('credentialsChart');
+  if (!el) return;
+
+  const q = (document.getElementById('credSearch')?.value || '').toLowerCase();
+
+  // Collect all users from all registries
+  const allUsers = [];
+
+  // Teachers
+  JSON.parse(localStorage.getItem('sn_teachers') || '[]').forEach(t => {
+    allUsers.push({ id: t.id, name: t.name, email: t.email, role: t.subject + ' Teacher', password: t.password || '—' });
+  });
+
+  // Sales persons
+  JSON.parse(localStorage.getItem('sn_sales_persons') || '[]').forEach(s => {
+    allUsers.push({ id: s.id, name: s.name, email: s.email, role: 'Sales / Counselor', password: s.password || '—' });
+  });
+
+  // Staff
+  const roleLabel = { operations: 'Operations', presales: 'Pre-Sales', postsales: 'Post-Sales', hr: 'HR' };
+  JSON.parse(localStorage.getItem('sn_staff') || '[]').forEach(s => {
+    allUsers.push({ id: s.id, name: s.name, email: s.email, role: roleLabel[s.role] || s.role, password: s.password || '—' });
+  });
+
+  // Students
+  JSON.parse(localStorage.getItem('sn_students') || '[]').forEach(s => {
+    allUsers.push({ id: s.id, name: s.name, email: s.email, role: 'Student', password: s.password || '—' });
+  });
+
+  // Admin + Founder (from settings or hardcoded)
+  const settings = JSON.parse(localStorage.getItem('sn_sa_settings') || '{}');
+  allUsers.push({ id: 'ADMIN', name: 'Admin', email: 'admin@stemnest.co.uk', role: 'Admin', password: settings.adminPassword || 'admin123' });
+  allUsers.push({ id: 'FOUNDER', name: 'Founder', email: settings.saEmail || 'founder@stemnest.co.uk', role: 'Founder / Super Admin', password: settings.saPassword || 'Founder2024!' });
+
+  // Also merge from password registry (catches password changes)
+  const registry = JSON.parse(localStorage.getItem('sn_password_registry') || '[]');
+  registry.forEach(r => {
+    const idx = allUsers.findIndex(u => u.email === r.email);
+    if (idx !== -1) allUsers[idx].password = r.password;
+  });
+
+  // Filter
+  const filtered = q
+    ? allUsers.filter(u =>
+        u.name.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        u.role.toLowerCase().includes(q)
+      )
+    : allUsers;
+
+  if (!filtered.length) {
+    el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--light);font-weight:700;">No users found.</div>';
+    return;
+  }
+
+  const roleColors = {
+    'Founder / Super Admin': 'background:linear-gradient(135deg,#1a56db,#7c3aed);color:#fff;',
+    'Admin':                 'background:var(--blue-light);color:var(--blue);',
+    'Student':               'background:var(--green-light);color:var(--green-dark);',
+    'Sales / Counselor':     'background:#fff3e0;color:#e65100;',
+    'Operations':            'background:#ede9fe;color:#5b21b6;',
+    'Pre-Sales':             'background:#fce7f3;color:#9d174d;',
+    'Post-Sales':            'background:#d1fae5;color:#065f46;',
+    'HR':                    'background:#fef3c7;color:#92400e;',
+  };
+
+  const thS = 'padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;letter-spacing:.5px;';
+  const tdS = 'padding:13px 16px;vertical-align:middle;';
+
+  el.innerHTML = `
+    <div style="overflow-x:auto;border-radius:16px;border:1.5px solid #e8eaf0;background:var(--white);">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">
+            <th style="${thS}">ID</th>
+            <th style="${thS}">Name</th>
+            <th style="${thS}">Email</th>
+            <th style="${thS}">Role</th>
+            <th style="${thS}">Password</th>
+            <th style="${thS}">Last Updated</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filtered.map((u, i) => {
+            const reg = registry.find(r => r.email === u.email);
+            const updated = reg ? new Date(reg.updatedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—';
+            const roleCss = Object.entries(roleColors).find(([k]) => u.role.includes(k.split(' ')[0]))?.[1] || 'background:var(--bg);color:var(--mid);';
+            return `<tr style="border-bottom:1px solid #f0f2f8;${i%2===0?'':'background:#fafbff;'}">
+              <td style="${tdS};font-family:'Fredoka One',cursive;color:var(--blue);font-size:12px;">${u.id}</td>
+              <td style="${tdS};font-weight:800;color:var(--dark);">${u.name}</td>
+              <td style="${tdS};font-size:12px;color:var(--mid);font-weight:700;">${u.email}</td>
+              <td style="${tdS}"><span style="font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;${roleCss}">${u.role}</span></td>
+              <td style="${tdS}">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span id="pw-${i}" style="font-family:'Courier New',monospace;font-size:13px;font-weight:700;color:var(--dark);filter:blur(4px);transition:.2s;">${u.password}</span>
+                  <button onclick="togglePwVisibility('pw-${i}',this)" style="background:var(--bg);border:1.5px solid #e8eaf0;border-radius:8px;padding:3px 8px;font-size:11px;font-weight:800;cursor:pointer;color:var(--mid);">👁 Show</button>
+                </div>
+              </td>
+              <td style="${tdS};font-size:12px;color:var(--light);font-weight:700;">${updated}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div style="margin-top:12px;font-size:12px;color:var(--light);font-weight:700;text-align:right;">
+      ${filtered.length} user${filtered.length !== 1 ? 's' : ''} · Passwords are blurred by default for security
+    </div>`;
+}
+
+function togglePwVisibility(spanId, btn) {
+  const span = document.getElementById(spanId);
+  if (!span) return;
+  const isBlurred = span.style.filter === 'blur(4px)';
+  span.style.filter = isBlurred ? 'none' : 'blur(4px)';
+  btn.textContent   = isBlurred ? '🙈 Hide' : '👁 Show';
+}

@@ -126,41 +126,130 @@ function openNestClass(classId) {
 }
 
 /* ══════════════════════════════════════════════════════
-   CHAT WITH TEACHER
+   CHAT WITH TEACHER — IMPROVED (Priority 8)
+   - Read receipts (sent/read indicators)
+   - Unread badge on sidebar icon
+   - Better message styling with timestamps
+   - Teacher name clearly shown on teacher messages
 ══════════════════════════════════════════════════════ */
 function initChat() {
   const chatEl = document.getElementById('chatMessages');
   if (!chatEl) return;
   loadChatMessages();
+  updateChatUnreadBadge();
+}
+
+function getChatMessages() {
+  try { return JSON.parse(localStorage.getItem('sn_chat_' + STUDENT.id) || '[]'); } catch { return []; }
+}
+function saveChatMessages(msgs) { localStorage.setItem('sn_chat_' + STUDENT.id, JSON.stringify(msgs)); }
+
+function updateChatUnreadBadge() {
+  const msgs    = getChatMessages();
+  const unread  = msgs.filter(m => m.from === 'tutor' && !m.readByStudent).length;
+  // Update sidebar badge
+  let badge = document.getElementById('chatUnreadBadge');
+  if (!badge) {
+    const chatLink = document.querySelector('.sidebar-link[data-tab="chat"]');
+    if (chatLink) {
+      badge = document.createElement('span');
+      badge.id = 'chatUnreadBadge';
+      badge.className = 'sl-badge';
+      chatLink.appendChild(badge);
+    }
+  }
+  if (badge) {
+    badge.textContent = unread > 0 ? unread : '';
+    badge.style.display = unread > 0 ? 'inline-flex' : 'none';
+  }
 }
 
 function loadChatMessages() {
   const chatEl = document.getElementById('chatMessages');
   if (!chatEl) return;
-  const messages = JSON.parse(localStorage.getItem('sn_chat_' + STUDENT.id) || '[]');
+  const messages = getChatMessages();
+
+  // Mark all tutor messages as read when chat is opened
+  let changed = false;
+  messages.forEach(m => {
+    if (m.from === 'tutor' && !m.readByStudent) { m.readByStudent = true; changed = true; }
+  });
+  if (changed) { saveChatMessages(messages); updateChatUnreadBadge(); }
+
   if (!messages.length) {
-    chatEl.innerHTML = '<div style="text-align:center;padding:32px;color:var(--light);font-size:13px;font-weight:700;">No messages yet. Send your first message to your tutor!</div>';
+    chatEl.innerHTML = `
+      <div style="text-align:center;padding:40px 20px;">
+        <div style="font-size:48px;margin-bottom:12px;">💬</div>
+        <div style="font-family:'Fredoka One',cursive;font-size:18px;color:var(--dark);margin-bottom:6px;">No messages yet</div>
+        <div style="font-size:13px;color:var(--light);font-weight:700;">Send your first message to your tutor below.</div>
+      </div>`;
     return;
   }
-  chatEl.innerHTML = messages.map(m => `
-    <div class="chat-msg ${m.from === 'student' ? 'chat-msg-student' : 'chat-msg-tutor'}">
-      <div class="chat-msg-bubble">
-        ${m.type === 'image' ? `<img src="${m.content}" style="max-width:200px;border-radius:8px;" alt="Image">` :
-          m.type === 'file'  ? `<a href="${m.content}" target="_blank" style="color:inherit;font-weight:800;">📎 ${m.fileName}</a>` :
-          m.content}
-      </div>
-      <div class="chat-msg-meta">${m.from === 'student' ? STUDENT.name + ' · ' + STUDENT.id : 'Tutor'} · ${new Date(m.timestamp).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</div>
-    </div>`).join('');
+
+  // Group messages by date
+  const grouped = {};
+  messages.forEach(m => {
+    const day = new Date(m.timestamp).toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' });
+    if (!grouped[day]) grouped[day] = [];
+    grouped[day].push(m);
+  });
+
+  chatEl.innerHTML = Object.entries(grouped).map(([day, msgs]) => `
+    <div class="chat-date-divider"><span>${day}</span></div>
+    ${msgs.map(m => buildChatMessage(m)).join('')}
+  `).join('');
+
   chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+function buildChatMessage(m) {
+  const isStudent = m.from === 'student';
+  const time      = new Date(m.timestamp).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+  const senderName = isStudent ? STUDENT.name : (m.tutorName || 'Tutor');
+  const senderId   = isStudent ? STUDENT.id : '';
+
+  let content = '';
+  if (m.type === 'image') {
+    content = `<img src="${m.content}" style="max-width:220px;border-radius:10px;display:block;" alt="Image">`;
+  } else if (m.type === 'file') {
+    content = `<a href="${m.content}" target="_blank" style="color:inherit;font-weight:800;display:flex;align-items:center;gap:6px;">📎 ${m.fileName}</a>`;
+  } else {
+    content = m.content;
+  }
+
+  // Read receipt for student messages
+  let receipt = '';
+  if (isStudent) {
+    receipt = m.readByTutor
+      ? '<span style="color:#60a5fa;font-size:11px;font-weight:800;">✓✓ Read</span>'
+      : '<span style="color:rgba(255,255,255,.5);font-size:11px;font-weight:800;">✓ Sent</span>';
+  }
+
+  return `
+    <div class="chat-msg ${isStudent ? 'chat-msg-student' : 'chat-msg-tutor'}">
+      ${!isStudent ? `<div class="chat-msg-sender">${senderName}</div>` : ''}
+      <div class="chat-msg-bubble">${content}</div>
+      <div class="chat-msg-meta">
+        ${isStudent ? `<span>${STUDENT.name} · ${STUDENT.id}</span>` : `<span>${senderName}</span>`}
+        <span>${time}</span>
+        ${receipt}
+      </div>
+    </div>`;
 }
 
 function sendChatMessage() {
   const input = document.getElementById('chatInput');
   const text  = input?.value.trim();
   if (!text) return;
-  const messages = JSON.parse(localStorage.getItem('sn_chat_' + STUDENT.id) || '[]');
-  messages.push({ from:'student', type:'text', content:text, timestamp:new Date().toISOString() });
-  localStorage.setItem('sn_chat_' + STUDENT.id, JSON.stringify(messages));
+  const messages = getChatMessages();
+  messages.push({
+    from:      'student',
+    type:      'text',
+    content:   text,
+    timestamp: new Date().toISOString(),
+    readByTutor: false,
+  });
+  saveChatMessages(messages);
   input.value = '';
   loadChatMessages();
 }
@@ -171,10 +260,17 @@ function handleChatFileUpload(input) {
   if (file.size > 5 * 1024 * 1024) { showToast('File must be under 5MB.', 'error'); return; }
   const reader = new FileReader();
   reader.onload = ev => {
-    const messages = JSON.parse(localStorage.getItem('sn_chat_' + STUDENT.id) || '[]');
+    const messages = getChatMessages();
     const isImage  = file.type.startsWith('image/');
-    messages.push({ from:'student', type: isImage ? 'image' : 'file', content: ev.target.result, fileName: file.name, timestamp: new Date().toISOString() });
-    localStorage.setItem('sn_chat_' + STUDENT.id, JSON.stringify(messages));
+    messages.push({
+      from:        'student',
+      type:        isImage ? 'image' : 'file',
+      content:     ev.target.result,
+      fileName:    file.name,
+      timestamp:   new Date().toISOString(),
+      readByTutor: false,
+    });
+    saveChatMessages(messages);
     loadChatMessages();
     showToast(`✅ ${isImage ? 'Image' : 'File'} sent!`);
   };
@@ -639,3 +735,200 @@ window.openProfileModal = function() {
 document.addEventListener('DOMContentLoaded', () => {
   initDemoFeatures();
 });
+
+/* ══════════════════════════════════════════════════════
+   STUDENT CANCEL / RESCHEDULE CLASS
+══════════════════════════════════════════════════════ */
+
+/* Inject Cancel + Reschedule buttons into the demo countdown card */
+function injectCancelRescheduleButtons() {
+  const section = document.getElementById('demoCountdownSection');
+  if (!section || section.style.display === 'none') return;
+
+  // Don't add twice
+  if (document.getElementById('cancelRescheduleBar')) return;
+
+  const bar = document.createElement('div');
+  bar.id = 'cancelRescheduleBar';
+  bar.style.cssText = 'display:flex;gap:12px;margin-top:12px;flex-wrap:wrap;';
+  bar.innerHTML = `
+    <button onclick="openCancelDialog()"
+      style="flex:1;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.3);color:#fff;padding:10px 16px;border-radius:12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;transition:.2s;"
+      onmouseover="this.style.background='rgba(255,255,255,.25)'" onmouseout="this.style.background='rgba(255,255,255,.15)'">
+      🚫 Cancel Class
+    </button>
+    <button onclick="openRescheduleDialog()"
+      style="flex:1;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.3);color:#fff;padding:10px 16px;border-radius:12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;transition:.2s;"
+      onmouseover="this.style.background='rgba(255,255,255,.25)'" onmouseout="this.style.background='rgba(255,255,255,.15)'">
+      🔄 Reschedule
+    </button>`;
+
+  const inner = section.querySelector('div');
+  if (inner) inner.appendChild(bar);
+}
+
+/* ── CANCEL DIALOG (triple confirmation) ── */
+let cancelStep = 0;
+
+function openCancelDialog() {
+  cancelStep = 1;
+  showCancelStep();
+}
+
+function showCancelStep() {
+  document.getElementById('cancelClassModal')?.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'cancelClassModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(10,20,50,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+
+  if (cancelStep === 1) {
+    modal.innerHTML = `
+      <div style="background:var(--white);border-radius:20px;padding:32px;max-width:400px;width:100%;text-align:center;box-shadow:0 16px 60px rgba(0,0,0,.25);">
+        <div style="font-size:48px;margin-bottom:12px;">🚫</div>
+        <div style="font-family:'Fredoka One',cursive;font-size:22px;color:var(--dark);margin-bottom:8px;">Cancel your class?</div>
+        <div style="font-size:14px;color:var(--mid);margin-bottom:24px;line-height:1.6;">Are you sure you want to cancel your demo class? Your teacher has prepared for this session.</div>
+        <div style="display:flex;gap:12px;">
+          <button onclick="document.getElementById('cancelClassModal').remove()" style="flex:1;background:var(--bg);border:1.5px solid #e8eaf0;border-radius:12px;padding:12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;cursor:pointer;color:var(--mid);">Keep My Class</button>
+          <button onclick="cancelStep=2;showCancelStep()" style="flex:1;background:#fde8e8;border:none;border-radius:12px;padding:12px;font-family:'Nunito',sans-serif;font-weight:900;font-size:14px;cursor:pointer;color:#c53030;">Yes, Cancel</button>
+        </div>
+      </div>`;
+  } else if (cancelStep === 2) {
+    modal.innerHTML = `
+      <div style="background:var(--white);border-radius:20px;padding:32px;max-width:400px;width:100%;text-align:center;box-shadow:0 16px 60px rgba(0,0,0,.25);">
+        <div style="font-size:48px;margin-bottom:12px;">⚠️</div>
+        <div style="font-family:'Fredoka One',cursive;font-size:22px;color:var(--dark);margin-bottom:8px;">Really sure?</div>
+        <div style="font-size:14px;color:var(--mid);margin-bottom:24px;line-height:1.6;">This will cancel your class and notify our team. You can always rebook a new demo class.</div>
+        <div style="display:flex;gap:12px;">
+          <button onclick="document.getElementById('cancelClassModal').remove()" style="flex:1;background:var(--bg);border:1.5px solid #e8eaf0;border-radius:12px;padding:12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;cursor:pointer;color:var(--mid);">Keep My Class</button>
+          <button onclick="cancelStep=3;showCancelStep()" style="flex:1;background:#fde8e8;border:none;border-radius:12px;padding:12px;font-family:'Nunito',sans-serif;font-weight:900;font-size:14px;cursor:pointer;color:#c53030;">Yes, I'm Sure</button>
+        </div>
+      </div>`;
+  } else if (cancelStep === 3) {
+    modal.innerHTML = `
+      <div style="background:var(--white);border-radius:20px;padding:32px;max-width:400px;width:100%;box-shadow:0 16px 60px rgba(0,0,0,.25);">
+        <div style="font-size:48px;margin-bottom:12px;text-align:center;">📝</div>
+        <div style="font-family:'Fredoka One',cursive;font-size:20px;color:var(--dark);margin-bottom:8px;text-align:center;">Final Step</div>
+        <div style="font-size:14px;color:var(--mid);margin-bottom:16px;line-height:1.6;">Please tell us why you're cancelling so we can improve:</div>
+        <textarea id="cancelReasonInput" placeholder="e.g. I have a conflict, I need to reschedule, technical issues..."
+          style="width:100%;padding:12px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;min-height:80px;outline:none;resize:vertical;margin-bottom:16px;"></textarea>
+        <div style="display:flex;gap:12px;">
+          <button onclick="document.getElementById('cancelClassModal').remove()" style="flex:1;background:var(--bg);border:1.5px solid #e8eaf0;border-radius:12px;padding:12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;cursor:pointer;color:var(--mid);">Go Back</button>
+          <button onclick="confirmCancelClass()" style="flex:1;background:#c53030;border:none;border-radius:12px;padding:12px;font-family:'Nunito',sans-serif;font-weight:900;font-size:14px;cursor:pointer;color:#fff;">Confirm Cancel</button>
+        </div>
+      </div>`;
+  }
+
+  document.body.appendChild(modal);
+}
+
+function confirmCancelClass() {
+  const reason = document.getElementById('cancelReasonInput')?.value.trim();
+  if (!reason) { showToast('Please enter a reason for cancellation.', 'error'); return; }
+
+  const booking = getStudentBooking();
+  if (!booking) return;
+
+  // Save to cancelled classes store
+  const cancelled = JSON.parse(localStorage.getItem('sn_cancelled_classes') || '[]');
+  cancelled.unshift({
+    id:          'CAN-' + Date.now().toString(36).toUpperCase(),
+    bookingId:   booking.id,
+    studentName: STUDENT.name,
+    email:       STUDENT.email || booking.email,
+    whatsapp:    booking.whatsapp,
+    subject:     booking.subject,
+    date:        booking.date,
+    time:        booking.time,
+    reason,
+    cancelledAt: new Date().toISOString(),
+  });
+  localStorage.setItem('sn_cancelled_classes', JSON.stringify(cancelled));
+
+  // Update booking status
+  const all = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+  const idx = all.findIndex(b => b.id === booking.id);
+  if (idx !== -1) { all[idx].status = 'cancelled'; all[idx].cancelReason = reason; localStorage.setItem('sn_bookings', JSON.stringify(all)); }
+
+  document.getElementById('cancelClassModal')?.remove();
+
+  // Hide countdown
+  const section = document.getElementById('demoCountdownSection');
+  if (section) section.innerHTML = `
+    <div style="background:var(--bg);border:1.5px solid #e8eaf0;border-radius:20px;padding:28px;text-align:center;">
+      <div style="font-size:48px;margin-bottom:12px;">✅</div>
+      <div style="font-family:'Fredoka One',cursive;font-size:20px;color:var(--dark);margin-bottom:8px;">Class Cancelled</div>
+      <div style="font-size:14px;color:var(--light);">Your cancellation has been received. Our team will be in touch to help you rebook.</div>
+      <a href="free-trial.html" class="btn btn-primary" style="margin-top:16px;font-size:14px;">📅 Book a New Demo</a>
+    </div>`;
+
+  showToast('Class cancelled. Our team has been notified.', 'info');
+}
+
+/* ── RESCHEDULE DIALOG ── */
+function openRescheduleDialog() {
+  document.getElementById('rescheduleModal')?.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'rescheduleModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(10,20,50,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  modal.innerHTML = `
+    <div style="background:var(--white);border-radius:20px;padding:32px;max-width:420px;width:100%;box-shadow:0 16px 60px rgba(0,0,0,.25);">
+      <div style="font-family:'Fredoka One',cursive;font-size:22px;color:var(--dark);margin-bottom:6px;">🔄 Reschedule Request</div>
+      <div style="font-size:14px;color:var(--mid);margin-bottom:20px;line-height:1.6;">Tell us when you'd prefer to have your demo class and we'll do our best to accommodate.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
+        <div>
+          <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Preferred Date</label>
+          <input type="date" id="rescheduleDate" min="${new Date().toISOString().split('T')[0]}"
+            style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Preferred Time</label>
+          <input type="time" id="rescheduleTime"
+            style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;">
+        <button onclick="document.getElementById('rescheduleModal').remove()" style="flex:1;background:var(--bg);border:1.5px solid #e8eaf0;border-radius:12px;padding:12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;cursor:pointer;color:var(--mid);">Cancel</button>
+        <button onclick="submitRescheduleRequest()" style="flex:2;background:var(--blue);border:none;border-radius:12px;padding:12px;font-family:'Nunito',sans-serif;font-weight:900;font-size:14px;cursor:pointer;color:#fff;">Send Request →</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(modal);
+}
+
+function submitRescheduleRequest() {
+  const date = document.getElementById('rescheduleDate')?.value;
+  const time = document.getElementById('rescheduleTime')?.value;
+  if (!date || !time) { showToast('Please select both a date and time.', 'error'); return; }
+
+  const booking = getStudentBooking();
+  if (!booking) return;
+
+  const requests = JSON.parse(localStorage.getItem('sn_reschedule_requests') || '[]');
+  requests.unshift({
+    id:            'RSC-' + Date.now().toString(36).toUpperCase(),
+    bookingId:     booking.id,
+    studentName:   STUDENT.name,
+    email:         STUDENT.email || booking.email,
+    whatsapp:      booking.whatsapp,
+    subject:       booking.subject,
+    originalDate:  booking.date,
+    originalTime:  booking.time,
+    preferredDate: date,
+    preferredTime: time,
+    status:        'pending',
+    requestedAt:   new Date().toISOString(),
+  });
+  localStorage.setItem('sn_reschedule_requests', JSON.stringify(requests));
+
+  document.getElementById('rescheduleModal')?.remove();
+  showToast('✅ Reschedule request sent! Our team will confirm your new slot shortly.', 'success');
+}
+
+/* Extend initDemoFeatures to inject buttons after countdown renders */
+const _origInitDemoFeatures = window.initDemoFeatures;
+window.initDemoFeatures = function() {
+  if (typeof _origInitDemoFeatures === 'function') _origInitDemoFeatures();
+  setTimeout(injectCancelRescheduleButtons, 500);
+};

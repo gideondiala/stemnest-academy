@@ -513,3 +513,358 @@ document.addEventListener('DOMContentLoaded', () => {
   const pos = staff.find(s => s.role === 'postsales');
   if (pos) setTimeout(() => checkBirthdayForUser(pos.id, pos.name.split(' ')[0]), 1500);
 });
+
+/* ══════════════════════════════════════════════════════
+   PRIORITY 5 — STUDENT ONBOARDING
+   One-click onboard from paid students list.
+   Creates student account, generates credential file,
+   simulates email to parent.
+══════════════════════════════════════════════════════ */
+
+let onboardingStudentId = null;
+
+function openOnboardModal(bookingId) {
+  onboardingStudentId = bookingId;
+  const booking  = getBookings().find(b => b.id === bookingId);
+  const pipeline = getAllPipeline().find(p => p.bookingId === bookingId);
+  const s = booking || pipeline || {};
+
+  // Pre-fill fields
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+  set('ob-name',     s.studentName || '');
+  set('ob-email',    s.email || '');
+  set('ob-phone',    s.whatsapp || '');
+  set('ob-age',      s.age || '');
+  set('ob-grade',    s.grade || '');
+  set('ob-subject',  s.subject || '');
+  set('ob-course',   s.course || '');
+  set('ob-credits',  s.studentCredits || s.credits || '');
+  set('ob-amount',   s.paymentAmount || '');
+
+  // Generate a suggested password
+  const suggestedPw = 'SN' + Math.random().toString(36).slice(2, 8).toUpperCase() + '!';
+  set('ob-password', suggestedPw);
+
+  document.getElementById('onboardModalOverlay').classList.add('open');
+}
+
+function closeOnboardModal() {
+  document.getElementById('onboardModalOverlay')?.classList.remove('open');
+  onboardingStudentId = null;
+}
+
+function confirmOnboard() {
+  const name     = document.getElementById('ob-name')?.value.trim();
+  const email    = document.getElementById('ob-email')?.value.trim();
+  const phone    = document.getElementById('ob-phone')?.value.trim();
+  const age      = document.getElementById('ob-age')?.value.trim();
+  const grade    = document.getElementById('ob-grade')?.value.trim();
+  const subject  = document.getElementById('ob-subject')?.value.trim();
+  const course   = document.getElementById('ob-course')?.value.trim();
+  const credits  = parseInt(document.getElementById('ob-credits')?.value || '0');
+  const password = document.getElementById('ob-password')?.value.trim();
+
+  if (!name || !email || !password) {
+    showToast('Name, email and password are required.', 'error');
+    return;
+  }
+
+  // Generate student ID
+  const existing = JSON.parse(localStorage.getItem('sn_students') || '[]');
+  const studentId = 'SN-' + new Date().getFullYear() + '-' + String(existing.length + 1).padStart(4, '0');
+  const initials  = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+
+  const student = {
+    id:          studentId,
+    name,
+    initials,
+    email,
+    phone,
+    age,
+    grade,
+    subject,
+    course,
+    password,
+    credits,
+    enrolledAt:  new Date().toISOString(),
+    bookingId:   onboardingStudentId,
+    status:      'active',
+  };
+
+  // Save to students registry
+  existing.push(student);
+  localStorage.setItem('sn_students', JSON.stringify(existing));
+
+  // Mark booking as onboarded
+  const all = getBookings();
+  const idx = all.findIndex(b => b.id === onboardingStudentId);
+  if (idx !== -1) {
+    all[idx].studentOnboarded = true;
+    all[idx].studentId        = studentId;
+    all[idx].studentCredits   = credits;
+    saveBookings(all);
+  }
+
+  // Update password registry (for Super Admin chart)
+  updatePasswordRegistry({ id: studentId, name, email, role: 'student', password });
+
+  // Generate credential text content
+  const credText = generateCredentialText(student);
+
+  // Simulate email to parent
+  logEmail(email,
+    'Welcome to StemNest Academy — Your Child\'s Login Details',
+    credText
+  );
+
+  // Trigger download of credential file
+  downloadCredentialFile(student, credText);
+
+  closeOnboardModal();
+  updatePOSStats();
+  renderPaidStudents();
+  showToast(`✅ ${name} onboarded! Student ID: ${studentId}. Credentials sent.`);
+}
+
+function generateCredentialText(student) {
+  return [
+    '═══════════════════════════════════════════════',
+    '  STEMNEST ACADEMY — STUDENT LOGIN DETAILS',
+    '═══════════════════════════════════════════════',
+    '',
+    `  Student Name:  ${student.name}`,
+    `  Student ID:    ${student.id}`,
+    `  Email:         ${student.email}`,
+    `  Password:      ${student.password}`,
+    `  Phone:         ${student.phone || '—'}`,
+    `  Course:        ${student.course || student.subject || '—'}`,
+    `  Credits:       ${student.credits} classes`,
+    '',
+    '───────────────────────────────────────────────',
+    '  HOW TO LOG IN',
+    '───────────────────────────────────────────────',
+    '',
+    '  1. Go to: https://stemnest.co.uk/pages/login.html',
+    '  2. Click "I\'m a Student"',
+    '  3. Enter the email and password above',
+    '  4. Click "Log In & Join Class"',
+    '',
+    '  Your dashboard will show your upcoming classes,',
+    '  projects, quizzes, and certificates.',
+    '',
+    '───────────────────────────────────────────────',
+    '  NEED HELP?',
+    '───────────────────────────────────────────────',
+    '',
+    '  Email:    support@stemnest.co.uk',
+    '  WhatsApp: Available on your dashboard',
+    '',
+    '  We recommend changing your password after',
+    '  your first login.',
+    '',
+    '═══════════════════════════════════════════════',
+    '  StemNest Academy Ltd · UK-Based · Globally Trusted',
+    '═══════════════════════════════════════════════',
+  ].join('\n');
+}
+
+function downloadCredentialFile(student, content) {
+  const blob = new Blob([content], { type: 'text/plain' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `StemNest-Login-${student.name.replace(/\s+/g, '-')}-${student.id}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function logEmail(to, subject, body) {
+  const log = JSON.parse(localStorage.getItem('sn_email_log') || '[]');
+  log.unshift({ to, subject, body, sentAt: new Date().toISOString(), status: 'simulated' });
+  localStorage.setItem('sn_email_log', JSON.stringify(log));
+  console.log('📧 EMAIL TO:', to, '\nSUBJECT:', subject, '\n\n', body);
+}
+
+/* Update the paid students table to show Onboard button */
+const _origRenderPaidStudents = window.renderPaidStudents;
+window.renderPaidStudents = function() {
+  _origRenderPaidStudents();
+  // Add Onboard button to rows that aren't yet onboarded
+  // (handled inline in the table — we patch the action column)
+};
+
+// Override renderPaidStudents to include onboard button
+function renderPaidStudents() {
+  const el = document.getElementById('paidStudentsList');
+  if (!el) return;
+
+  const pipeline = getAllPipeline().filter(p => p.status === 'converted');
+  const bookings = getBookings().filter(b => b.salesStatus === 'converted');
+
+  const seen = new Set();
+  const students = [];
+  bookings.forEach(b => { seen.add(b.id); students.push({ ...b, _source: 'booking' }); });
+  pipeline.forEach(p => {
+    if (!seen.has(p.bookingId)) students.push({ ...p, id: p.bookingId, _source: 'pipeline' });
+  });
+
+  if (!students.length) {
+    el.innerHTML = `<div style="text-align:center;padding:60px 20px;">
+      <div style="font-size:48px;margin-bottom:12px;">💼</div>
+      <div style="font-family:'Fredoka One',cursive;font-size:20px;color:var(--dark);">No paid students yet</div>
+      <div style="font-size:14px;color:var(--light);margin-top:6px;">Converted students from the sales pipeline will appear here.</div>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = `
+    <div style="overflow-x:auto;border-radius:16px;border:1.5px solid #e8eaf0;background:var(--white);">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">
+            <th style="${thStyle()}">Student</th>
+            <th style="${thStyle()}">Subject</th>
+            <th style="${thStyle()}">Contact</th>
+            <th style="${thStyle()}">Amount</th>
+            <th style="${thStyle()}">Credits</th>
+            <th style="${thStyle()}">Onboarded</th>
+            <th style="${thStyle('center')}">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${students.map((s, i) => `
+            <tr style="border-bottom:1px solid #f0f2f8;${i%2===0?'':'background:#fafbff;'}">
+              <td style="${tdStyle()}">
+                <div style="font-weight:800;color:var(--dark);">${s.studentName||'—'}</div>
+                <div style="font-size:11px;color:var(--light);">${s.id||'—'}</div>
+              </td>
+              <td style="${tdStyle()};font-weight:700;color:var(--mid);">${s.subject||'—'}${s.course?'<div style="font-size:11px;color:var(--light);">'+s.course+'</div>':''}</td>
+              <td style="${tdStyle()}">
+                <div style="font-size:12px;font-weight:700;color:var(--mid);">📧 ${s.email||'—'}</div>
+                <div style="font-size:12px;font-weight:700;color:var(--mid);">📱 ${s.whatsapp||'—'}</div>
+              </td>
+              <td style="${tdStyle()};font-weight:800;color:var(--green-dark);">${s.paymentAmount?'£'+s.paymentAmount:'—'}</td>
+              <td style="${tdStyle()};font-weight:800;color:var(--blue);">${s.studentCredits||s.credits||'—'}</td>
+              <td style="${tdStyle()}">
+                ${s.studentOnboarded
+                  ? `<span style="background:var(--green-light);color:var(--green-dark);font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">✅ Done · ${s.studentId||''}</span>`
+                  : `<span style="background:#fff3e0;color:#e65100;font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">⏳ Pending</span>`}
+              </td>
+              <td style="${tdStyle('center')}">
+                <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">
+                  ${!s.studentOnboarded ? `
+                    <button onclick="openOnboardModal('${s.id}')"
+                      style="background:var(--blue);color:#fff;border:none;border-radius:10px;padding:8px 14px;font-family:'Nunito',sans-serif;font-weight:900;font-size:12px;cursor:pointer;white-space:nowrap;">
+                      🎓 Onboard
+                    </button>` : `
+                    <button onclick="redownloadCredentials('${s.id}')"
+                      style="background:var(--bg);color:var(--mid);border:1.5px solid #e8eaf0;border-radius:10px;padding:7px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;">
+                      📄 Re-download
+                    </button>`}
+                  ${!s.paidScheduled ? `
+                    <button onclick="openPOSScheduleModal('${s.id}')"
+                      style="background:var(--green);color:#fff;border:none;border-radius:10px;padding:8px 14px;font-family:'Nunito',sans-serif;font-weight:900;font-size:12px;cursor:pointer;white-space:nowrap;">
+                      📅 Schedule
+                    </button>` : ''}
+                </div>
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function redownloadCredentials(bookingId) {
+  const students = JSON.parse(localStorage.getItem('sn_students') || '[]');
+  const student  = students.find(s => s.bookingId === bookingId);
+  if (!student) { showToast('Student record not found.', 'error'); return; }
+  const text = generateCredentialText(student);
+  downloadCredentialFile(student, text);
+  showToast('📄 Credentials file downloaded!');
+}
+
+/* Bind onboard modal */
+document.addEventListener('DOMContentLoaded', () => {
+  const overlay = document.getElementById('onboardModalOverlay');
+  overlay?.addEventListener('click', e => { if (e.target === overlay) closeOnboardModal(); });
+});
+
+/* ══════════════════════════════════════════════════════
+   MANUAL ONBOARD — walk-in / referral students
+   No demo booking required
+══════════════════════════════════════════════════════ */
+function openManualOnboardModal() {
+  // Generate suggested password
+  const pw = 'SN' + Math.random().toString(36).slice(2, 8).toUpperCase() + '!';
+  const el = document.getElementById('mob-password');
+  if (el) el.value = pw;
+  // Clear other fields
+  ['mob-name','mob-email','mob-phone','mob-age','mob-grade','mob-course','mob-credits','mob-amount'].forEach(id => {
+    const f = document.getElementById(id); if (f) f.value = '';
+  });
+  document.getElementById('manualOnboardOverlay').classList.add('open');
+}
+
+function closeManualOnboardModal() {
+  document.getElementById('manualOnboardOverlay')?.classList.remove('open');
+}
+
+function confirmManualOnboard() {
+  const name     = document.getElementById('mob-name')?.value.trim();
+  const email    = document.getElementById('mob-email')?.value.trim();
+  const phone    = document.getElementById('mob-phone')?.value.trim();
+  const age      = document.getElementById('mob-age')?.value.trim();
+  const grade    = document.getElementById('mob-grade')?.value.trim();
+  const subject  = document.getElementById('mob-subject')?.value;
+  const course   = document.getElementById('mob-course')?.value.trim();
+  const credits  = parseInt(document.getElementById('mob-credits')?.value || '0');
+  const amount   = document.getElementById('mob-amount')?.value.trim();
+  const password = document.getElementById('mob-password')?.value.trim();
+
+  if (!name || !email || !password) {
+    showToast('Name, email and password are required.', 'error');
+    return;
+  }
+
+  // Generate student ID
+  const existing  = JSON.parse(localStorage.getItem('sn_students') || '[]');
+  const studentId = 'SN-' + new Date().getFullYear() + '-' + String(existing.length + 1).padStart(4, '0');
+  const initials  = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+
+  const student = {
+    id: studentId, name, initials, email, phone, age, grade,
+    subject, course, password, credits, paymentAmount: amount,
+    enrolledAt: new Date().toISOString(),
+    bookingId: null,
+    status: 'active',
+    isManualOnboard: true,
+  };
+
+  existing.push(student);
+  localStorage.setItem('sn_students', JSON.stringify(existing));
+
+  // Update password registry
+  if (typeof updatePasswordRegistry === 'function') {
+    updatePasswordRegistry({ id: studentId, name, email, role: 'student', password });
+  }
+
+  // Generate and download credential file
+  if (typeof generateCredentialText === 'function' && typeof downloadCredentialFile === 'function') {
+    const text = generateCredentialText(student);
+    downloadCredentialFile(student, text);
+    if (typeof logEmail === 'function') {
+      logEmail(email, 'Welcome to StemNest Academy — Your Login Details', text, 'onboarding');
+    }
+  }
+
+  closeManualOnboardModal();
+  updatePOSStats();
+  renderPaidStudents();
+  showToast('✅ ' + name + ' onboarded! ID: ' + studentId + '. Credentials downloaded.');
+}
+
+// Bind manual onboard modal overlay close
+document.addEventListener('DOMContentLoaded', function() {
+  const overlay = document.getElementById('manualOnboardOverlay');
+  overlay?.addEventListener('click', function(e) { if (e.target === overlay) closeManualOnboardModal(); });
+});

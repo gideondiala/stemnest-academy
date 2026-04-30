@@ -452,3 +452,18 @@
   .kyc-header { flex-direction: column; align-items: center; text-align: center; }
   .companion-grid { grid-template-columns: 1fr; }
 }
+
+/* ── Session type badges ── */
+.sb-demo { background: rgba(255,107,53,.15); color: #c2410c; border: 1px solid rgba(255,107,53,.3); }
+.sb-paid { background: var(--blue-light); color: var(--blue); border: 1px solid #c3d4f5; }
+
+/* ── End class button states ── */
+.end-class-btn {
+  background: #fde8e8; color: #c53030;
+  border: none; border-radius: 10px;
+  padding: 7px 14px; font-family: 'Nunito', sans-serif;
+  font-weight: 900; font-size: 12px; cursor: pointer;
+  transition: .15s; white-space: nowrap;
+}
+.end-class-btn:not([disabled]):hover { background: #c53030; color: #fff; }
+.end-class-btn[disabled] { cursor: not-allowed !important; }

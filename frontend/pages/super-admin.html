@@ -45,6 +45,9 @@
       <a class="sidebar-link"        data-tab="teachers"   onclick="showSATab('teachers')">  <span class="sl-icon">👩‍🏫</span> All Teachers</a>
       <a class="sidebar-link"        data-tab="students"   onclick="showSATab('students')">  <span class="sl-icon">🎓</span> All Students</a>
       <a class="sidebar-link"        data-tab="settings"   onclick="showSATab('settings')">  <span class="sl-icon">⚙️</span> Settings</a>
+      <a class="sidebar-link"        data-tab="credentials" onclick="showSATab('credentials')"><span class="sl-icon">🔐</span> User Credentials</a>
+      <div class="sidebar-section-label">Communications</div>
+      <a class="sidebar-link"        data-tab="bulk-email"  onclick="showSATab('bulk-email')"> <span class="sl-icon">📧</span> Bulk Email</a>
       <div class="sidebar-section-label">Quick Links</div>
       <a class="sidebar-link" href="admin-dashboard.html" target="_blank"><span class="sl-icon">📋</span> Admin Dashboard</a>
       <a class="sidebar-link" href="free-trial.html"      target="_blank"><span class="sl-icon">🔗</span> Landing Page</a>
@@ -199,6 +202,25 @@
       </div>
     </div>
 
+    <!-- ── TAB: USER CREDENTIALS (Founder Only) ── -->
+    <div id="tab-credentials" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🔐 User Credentials</div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="background:#fde8e8;color:#c53030;font-size:12px;font-weight:900;padding:4px 12px;border-radius:50px;border:1px solid #fca5a5;">🔒 Strictly Confidential — Founder Only</span>
+          <button class="btn btn-outline" style="font-size:13px;" onclick="renderCredentialsChart()">🔄 Refresh</button>
+        </div>
+      </div>
+      <div style="background:#fde8e8;border:1.5px solid #fca5a5;border-radius:12px;padding:14px 18px;margin-bottom:20px;font-size:13px;font-weight:700;color:#c53030;">
+        ⚠️ This page contains all platform user passwords. Do not share, screenshot, or leave unattended. This data is stored locally and is only visible to the Super Admin.
+      </div>
+      <div style="margin-bottom:16px;">
+        <input type="text" id="credSearch" placeholder="Search by name, email or role…" oninput="renderCredentialsChart()"
+          style="width:100%;max-width:360px;padding:10px 16px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
+      </div>
+      <div id="credentialsChart"></div>
+    </div>
+
   </div>
 </div>
 
@@ -235,5 +257,17 @@
 
 <script src="../js/utils.js"></script>
 <script src="../js/super-admin.js"></script>
+<script src="../js/mail-system.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  SA_TABS.push('bulk-email');
+  injectBulkEmailTab(document.querySelector('.dash-main'));
+  const _origSA = window.showSATab;
+  window.showSATab = function(tab) {
+    _origSA(tab);
+    if (tab === 'bulk-email') renderEmailLog();
+  };
+});
+</script>
 </body>
 </html>

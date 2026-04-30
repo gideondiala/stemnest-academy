@@ -4,7 +4,7 @@
    assigns teachers, writes directly to teacher calendar.
 ═══════════════════════════════════════════════════════ */
 
-const PS_TABS = ['incoming', 'scheduled', 'notes'];
+const PS_TABS = ['incoming', 'scheduled', 'incomplete', 'cancelled', 'reschedule', 'notes'];
 let psScheduleBookingId = null; // booking being scheduled in modal
 
 /* ── INIT ── */
@@ -70,19 +70,28 @@ function showPSTab(tab) {
   });
   document.querySelectorAll('.sidebar-link[data-tab]').forEach(l => l.classList.toggle('active', l.dataset.tab === tab));
   updatePSStats();
-  if (tab === 'incoming')  renderIncoming();
-  if (tab === 'scheduled') renderScheduled();
-  if (tab === 'notes')     renderParentNotes();
+  if (tab === 'incoming')   renderIncoming();
+  if (tab === 'scheduled')  renderScheduled();
+  if (tab === 'incomplete') renderIncomplete();
+  if (tab === 'cancelled')  renderCancelled();
+  if (tab === 'reschedule') renderReschedule();
+  if (tab === 'notes')      renderParentNotes();
 }
 
 /* ── STATS ── */
 function updatePSStats() {
   const bookings = getBookings();
+  const incomplete  = JSON.parse(localStorage.getItem('sn_incomplete_demos') || '[]');
+  const cancelled   = JSON.parse(localStorage.getItem('sn_cancelled_classes') || '[]');
+  const reschedules = JSON.parse(localStorage.getItem('sn_reschedule_requests') || '[]');
   setText('psStat1', bookings.filter(b => b.status === 'pending').length);
   setText('psStat2', bookings.filter(b => b.status === 'scheduled').length);
   setText('psStat3', bookings.filter(b => b.psConfirmed).length);
   setText('psStat4', getTeachers().length);
-  setText('incomingBadge', bookings.filter(b => b.status === 'pending').length);
+  setText('incomingBadge',   bookings.filter(b => b.status === 'pending').length);
+  setText('incompleteBadge', incomplete.filter(i => !i.rebooked).length);
+  setText('cancelledBadge',  cancelled.length);
+  setText('rescheduleBadge', reschedules.filter(r => r.status === 'pending').length);
 }
 
 /* ══════════════════════════════════════════════════════
@@ -246,6 +255,12 @@ function confirmScheduleDemo() {
   // Write directly to teacher's calendar
   writeTeacherCalendarSlot(teacherId, date, timeKey, psScheduleBookingId);
 
+  // Send email notification to teacher
+  if (typeof emailDemoBookedToTeacher === 'function') {
+    const updatedBooking = getBookings().find(b => b.id === psScheduleBookingId) || {};
+    emailDemoBookedToTeacher({ ...updatedBooking, date, time: to12h(time), classLink: link, notes }, teacher);
+  }
+
   closeScheduleModal();
   updatePSStats();
   renderIncoming();
@@ -372,3 +387,221 @@ document.addEventListener('DOMContentLoaded', () => {
   const ps = staff.find(s => s.role === 'presales');
   if (ps) setTimeout(() => checkBirthdayForUser(ps.id, ps.name.split(' ')[0]), 1500);
 });
+
+/* ══════════════════════════════════════════════════════
+   INCOMPLETE DEMOS
+══════════════════════════════════════════════════════ */
+function renderIncomplete() {
+  const el   = document.getElementById('incompleteDemosList');
+  if (!el) return;
+  const list = JSON.parse(localStorage.getItem('sn_incomplete_demos') || '[]')
+    .sort((a, b) => new Date(b.loggedAt) - new Date(a.loggedAt));
+
+  if (!list.length) {
+    el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--light);font-weight:700;">No incomplete demos. 🎉</div>';
+    return;
+  }
+
+  el.innerHTML = `
+    <div style="overflow-x:auto;border-radius:16px;border:1.5px solid #e8eaf0;background:var(--white);">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">
+            <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;">Student</th>
+            <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;">Subject</th>
+            <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;">Teacher</th>
+            <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;">Date</th>
+            <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;">Reason</th>
+            <th style="padding:12px 16px;text-align:center;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${list.map((item, i) => `
+            <tr style="border-bottom:1px solid #f0f2f8;${i%2===0?'':'background:#fafbff;'}">
+              <td style="padding:14px 16px;">
+                <div style="font-weight:800;color:var(--dark);">${item.studentName}</div>
+                <div style="font-size:11px;color:var(--light);">📧 ${item.email} · 📱 ${item.whatsapp||'—'}</div>
+              </td>
+              <td style="padding:14px 16px;font-weight:700;color:var(--mid);">${item.subject}</td>
+              <td style="padding:14px 16px;font-weight:700;color:var(--mid);">${item.tutorName}</td>
+              <td style="padding:14px 16px;font-size:12px;color:var(--mid);">${item.date||'—'}<br>${item.time||'—'}</td>
+              <td style="padding:14px 16px;font-size:12px;color:var(--mid);max-width:200px;">
+                <div style="background:#fde8e8;border-radius:8px;padding:6px 10px;color:#c53030;font-weight:700;">${item.reason||'—'}</div>
+              </td>
+              <td style="padding:14px 16px;text-align:center;">
+                ${!item.rebooked ? `
+                  <button onclick="rebookIncomplete('${item.id}')"
+                    style="background:var(--blue);color:#fff;border:none;border-radius:10px;padding:8px 16px;font-family:'Nunito',sans-serif;font-weight:900;font-size:12px;cursor:pointer;">
+                    🔄 Rebook Demo
+                  </button>` : `
+                  <span style="background:var(--green-light);color:var(--green-dark);font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">✅ Rebooked</span>`}
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function rebookIncomplete(incId) {
+  const list = JSON.parse(localStorage.getItem('sn_incomplete_demos') || '[]');
+  const item = list.find(i => i.id === incId);
+  if (!item) return;
+
+  // Pre-fill the schedule modal with this student's details
+  psScheduleBookingId = item.bookingId;
+  const infoEl = document.getElementById('sm-student-info');
+  if (infoEl) infoEl.innerHTML =
+    `<strong>${item.studentName}</strong> · ${item.grade||'—'} · Age ${item.age||'—'}<br>` +
+    `📚 ${item.subject} &nbsp;·&nbsp; 📧 ${item.email} &nbsp;·&nbsp; 📱 ${item.whatsapp||'—'}<br>` +
+    `<span style="color:#c53030;font-weight:800;">Previous reason: ${item.reason}</span>`;
+
+  populateTeacherDropdown(item.subject);
+
+  const dateEl = document.getElementById('sm-date');
+  if (dateEl) dateEl.min = new Date().toISOString().split('T')[0];
+
+  ['sm-time','sm-link'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+
+  // Mark as rebooked after scheduling
+  const _origConfirm = window.confirmScheduleDemo;
+  window.confirmScheduleDemo = function() {
+    _origConfirm();
+    const idx = list.findIndex(i => i.id === incId);
+    if (idx !== -1) { list[idx].rebooked = true; localStorage.setItem('sn_incomplete_demos', JSON.stringify(list)); }
+    window.confirmScheduleDemo = _origConfirm;
+  };
+
+  document.getElementById('scheduleModalOverlay').classList.add('open');
+}
+
+/* ══════════════════════════════════════════════════════
+   CANCELLED CLASSES
+══════════════════════════════════════════════════════ */
+function renderCancelled() {
+  const el   = document.getElementById('cancelledClassesList');
+  if (!el) return;
+  const list = JSON.parse(localStorage.getItem('sn_cancelled_classes') || '[]')
+    .sort((a, b) => new Date(b.cancelledAt) - new Date(a.cancelledAt));
+
+  if (!list.length) {
+    el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--light);font-weight:700;">No cancelled classes.</div>';
+    return;
+  }
+
+  el.innerHTML = list.map((item, i) => `
+    <div style="background:var(--white);border:1.5px solid #e8eaf0;border-radius:14px;padding:18px 20px;margin-bottom:12px;${i%2===0?'':'background:#fafbff;'}">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+        <div>
+          <div style="font-weight:800;color:var(--dark);font-size:15px;">${item.studentName}</div>
+          <div style="font-size:12px;color:var(--mid);font-weight:700;margin-top:4px;">
+            📚 ${item.subject} · 📅 ${item.date||'—'} at ${item.time||'—'}<br>
+            📧 ${item.email} · 📱 ${item.whatsapp||'—'}
+          </div>
+          <div style="background:#fde8e8;border-radius:8px;padding:6px 10px;margin-top:8px;font-size:12px;color:#c53030;font-weight:700;display:inline-block;">
+            🚫 Reason: ${item.reason||'No reason given'}
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--light);font-weight:700;white-space:nowrap;">
+          ${new Date(item.cancelledAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+/* ══════════════════════════════════════════════════════
+   RESCHEDULE REQUESTS
+══════════════════════════════════════════════════════ */
+function renderReschedule() {
+  const el   = document.getElementById('rescheduleRequestsList');
+  if (!el) return;
+  const list = JSON.parse(localStorage.getItem('sn_reschedule_requests') || '[]')
+    .sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt));
+
+  if (!list.length) {
+    el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--light);font-weight:700;">No reschedule requests.</div>';
+    return;
+  }
+
+  el.innerHTML = `
+    <div style="overflow-x:auto;border-radius:16px;border:1.5px solid #e8eaf0;background:var(--white);">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">
+            <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;">Student</th>
+            <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;">Subject</th>
+            <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;">Original Slot</th>
+            <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;">Preferred New Slot</th>
+            <th style="padding:12px 16px;text-align:center;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;">Status</th>
+            <th style="padding:12px 16px;text-align:center;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${list.map((item, i) => `
+            <tr style="border-bottom:1px solid #f0f2f8;${i%2===0?'':'background:#fafbff;'}">
+              <td style="padding:14px 16px;">
+                <div style="font-weight:800;color:var(--dark);">${item.studentName}</div>
+                <div style="font-size:11px;color:var(--light);">📧 ${item.email}</div>
+              </td>
+              <td style="padding:14px 16px;font-weight:700;color:var(--mid);">${item.subject}</td>
+              <td style="padding:14px 16px;font-size:12px;color:var(--mid);">${item.originalDate||'—'}<br>${item.originalTime||'—'}</td>
+              <td style="padding:14px 16px;">
+                <div style="font-weight:800;color:var(--blue);">📅 ${item.preferredDate||'—'}</div>
+                <div style="font-size:12px;color:var(--mid);">🕐 ${item.preferredTime||'—'}</div>
+              </td>
+              <td style="padding:14px 16px;text-align:center;">
+                <span style="background:${item.status==='actioned'?'var(--green-light)':'#fff3e0'};color:${item.status==='actioned'?'var(--green-dark)':'#e65100'};font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">
+                  ${item.status==='actioned'?'✅ Actioned':'⏳ Pending'}
+                </span>
+              </td>
+              <td style="padding:14px 16px;text-align:center;">
+                ${item.status!=='actioned' ? `
+                  <button onclick="actionReschedule('${item.id}')"
+                    style="background:var(--blue);color:#fff;border:none;border-radius:10px;padding:7px 14px;font-family:'Nunito',sans-serif;font-weight:900;font-size:12px;cursor:pointer;">
+                    📅 Schedule
+                  </button>` : '—'}
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function actionReschedule(reqId) {
+  const list = JSON.parse(localStorage.getItem('sn_reschedule_requests') || '[]');
+  const item = list.find(r => r.id === reqId);
+  if (!item) return;
+
+  // Pre-fill schedule modal
+  psScheduleBookingId = item.bookingId;
+  const infoEl = document.getElementById('sm-student-info');
+  if (infoEl) infoEl.innerHTML =
+    `<strong>${item.studentName}</strong> · 📚 ${item.subject}<br>` +
+    `📧 ${item.email} · Preferred: <strong>${item.preferredDate} at ${item.preferredTime}</strong>`;
+
+  populateTeacherDropdown(item.subject);
+
+  const dateEl = document.getElementById('sm-date');
+  if (dateEl) { dateEl.min = new Date().toISOString().split('T')[0]; dateEl.value = item.preferredDate || ''; }
+  const timeEl = document.getElementById('sm-time');
+  if (timeEl && item.preferredTime) {
+    const m = item.preferredTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    if (m) {
+      let h = parseInt(m[1]);
+      if (m[3].toUpperCase()==='PM' && h!==12) h+=12;
+      if (m[3].toUpperCase()==='AM' && h===12) h=0;
+      timeEl.value = String(h).padStart(2,'0')+':'+m[2];
+    }
+  }
+
+  // Mark as actioned after scheduling
+  const _origConfirm = window.confirmScheduleDemo;
+  window.confirmScheduleDemo = function() {
+    _origConfirm();
+    const idx = list.findIndex(r => r.id === reqId);
+    if (idx !== -1) { list[idx].status = 'actioned'; localStorage.setItem('sn_reschedule_requests', JSON.stringify(list)); }
+    window.confirmScheduleDemo = _origConfirm;
+    updatePSStats();
+  };
+
+  document.getElementById('scheduleModalOverlay').classList.add('open');
+}

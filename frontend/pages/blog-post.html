@@ -1,11 +1,10 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Student Learning Hub – StemNest Academy Blog</title>
-  <meta name="description" content="The StemNest Academy Student Learning Hub — tutorials, tech comparisons, coding guides and EdTech insights for students aged 7–19.">
-  <meta name="keywords" content="coding for kids, python tutorial, scratch vs roblox, learn programming, edtech blog, stemnest academy">
+  <title id="postPageTitle">Blog Post – StemNest Academy</title>
+  <meta name="description" id="postPageDesc" content="StemNest Academy Student Learning Hub">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../css/global.css">
@@ -49,38 +48,32 @@
   </div>
 </div>
 
-<!-- HERO -->
-<div class="blog-hero">
+<!-- BLOG HERO (same as listing page) -->
+<div class="blog-hero" style="padding-bottom:36px;">
   <div class="blog-hero-badge">📚 Student Learning Hub</div>
   <h1>Learn Beyond the <span>Classroom</span></h1>
-  <p>Tutorials, tech guides, and coding insights for students aged 7–19. Written by our expert tutors to help you grow every day.</p>
+  <p>Tutorials, tech guides, and coding insights for students aged 7–19.</p>
   <div class="blog-search-wrap">
     <input type="text" id="blogSearchInput" class="blog-search-input" placeholder="Search tutorials, topics, tools…" autocomplete="off">
     <button class="blog-search-btn" id="blogSearchBtn" aria-label="Search">🔍</button>
-  </div>
-  <div class="blog-cat-pills">
-    <div class="blog-cat-pill active" data-cat="all"            onclick="filterByCategory('all')">📚 All Posts</div>
-    <div class="blog-cat-pill"        data-cat="learn-by-doing" onclick="filterByCategory('learn-by-doing')">🛠️ Learn by Doing</div>
-    <div class="blog-cat-pill"        data-cat="tech-explained" onclick="filterByCategory('tech-explained')">💡 Tech Explained</div>
-    <div class="blog-cat-pill"        data-cat="news"           onclick="filterByCategory('news')">📰 EdTech News</div>
-    <div class="blog-cat-pill"        data-cat="tips"           onclick="filterByCategory('tips')">✏️ Study Tips</div>
   </div>
 </div>
 
 <!-- MAIN LAYOUT -->
 <div class="blog-layout" id="blogLayout">
 
+  <!-- POST CONTENT -->
   <main>
-    <div class="blog-results-header">
-      <div class="blog-results-count" id="blogResultsCount">Loading…</div>
-      <select class="blog-sort-sel" onchange="renderBlogList()">
-        <option value="newest">Newest First</option>
-      </select>
+    <div id="postContent">
+      <!-- Rendered by blog-post.js -->
+      <div style="text-align:center;padding:60px 20px;">
+        <div style="font-size:48px;margin-bottom:16px;">⏳</div>
+        <div style="font-family:'Fredoka One',cursive;font-size:22px;color:var(--dark);">Loading post…</div>
+      </div>
     </div>
-    <div class="blog-post-grid" id="blogPostGrid"></div>
-    <div class="blog-pagination" id="blogPagination"></div>
   </main>
 
+  <!-- SIDEBAR -->
   <aside class="blog-sidebar">
     <div class="sidebar-widget sidebar-cta">
       <div class="sidebar-widget-title">🎓 New to StemNest?</div>
@@ -155,6 +148,6 @@
 </footer>
 
 <script src="../js/utils.js"></script>
-<script src="../js/blog.js"></script>
+<script src="../js/blog-post.js"></script>
 </body>
 </html>

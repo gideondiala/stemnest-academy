@@ -64,7 +64,7 @@
       <div class="login-field">
         <div class="field-row">
           <label style="margin-bottom:0;">Password</label>
-          <a href="#" class="forgot">Forgot password?</a>
+          <a href="#" class="forgot" onclick="openForgotPassword();return false;">Forgot password?</a>
         </div>
         <div class="input-wrap">
           <span class="input-icon">🔑</span>
@@ -178,5 +178,36 @@
 
 <script src="../js/utils.js"></script>
 <script src="../js/login.js"></script>
+
+<!-- FORGOT PASSWORD MODAL -->
+<div class="modal-overlay" id="forgotPwOverlay">
+  <div class="modal" style="max-width:440px;">
+    <div class="modal-header">
+      <div class="modal-title">🔑 Reset Password</div>
+      <button class="modal-close" onclick="closeForgotPassword()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="forgotStep1">
+        <p style="font-size:14px;color:var(--mid);margin-bottom:20px;line-height:1.6;">Enter your registered email address and we'll send you a new temporary password.</p>
+        <div class="login-field">
+          <label>Email Address</label>
+          <div class="input-wrap">
+            <span class="input-icon">✉️</span>
+            <input type="email" id="forgotEmail" placeholder="you@stemnest.co.uk" style="padding:13px 14px 13px 44px;border:2px solid #e8eaf0;border-radius:14px;font-family:'Nunito',sans-serif;font-size:15px;width:100%;outline:none;">
+          </div>
+        </div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px;" onclick="submitForgotPassword()">Send Reset Email →</button>
+      </div>
+      <div id="forgotStep2" style="display:none;text-align:center;padding:20px 0;">
+        <div style="font-size:56px;margin-bottom:16px;">📧</div>
+        <div style="font-family:'Fredoka One',cursive;font-size:22px;color:var(--dark);margin-bottom:8px;">Check your email!</div>
+        <div style="font-size:14px;color:var(--mid);line-height:1.7;margin-bottom:8px;" id="forgotSuccessMsg"></div>
+        <div style="background:var(--bg);border-radius:12px;padding:14px;margin:16px 0;font-size:13px;color:var(--mid);font-weight:700;" id="forgotTempPwBox" style="display:none;"></div>
+        <button class="btn btn-blue" style="margin-top:8px;" onclick="closeForgotPassword()">Back to Login</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

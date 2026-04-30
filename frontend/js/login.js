@@ -246,3 +246,121 @@ function handleLogin() {
     }
   }, 1200);
 }
+
+/* ══════════════════════════════════════════════════════
+   FORGOT PASSWORD
+══════════════════════════════════════════════════════ */
+function openForgotPassword() {
+  document.getElementById('forgotStep1').style.display = 'block';
+  document.getElementById('forgotStep2').style.display = 'none';
+  const emailEl = document.getElementById('forgotEmail');
+  if (emailEl) emailEl.value = '';
+  document.getElementById('forgotPwOverlay').classList.add('open');
+}
+
+function closeForgotPassword() {
+  document.getElementById('forgotPwOverlay').classList.remove('open');
+}
+
+function submitForgotPassword() {
+  const email = document.getElementById('forgotEmail')?.value.trim().toLowerCase();
+  if (!email) { showToast('Please enter your email address.', 'error'); return; }
+
+  // Search all user registries
+  let found = null;
+  let registry = null;
+  let registryKey = null;
+
+  // Teachers
+  const teachers = JSON.parse(localStorage.getItem('sn_teachers') || '[]');
+  const teacher  = teachers.find(t => t.email.toLowerCase() === email);
+  if (teacher) { found = teacher; registry = teachers; registryKey = 'sn_teachers'; }
+
+  // Sales persons
+  if (!found) {
+    const sales = JSON.parse(localStorage.getItem('sn_sales_persons') || '[]');
+    const sp    = sales.find(s => s.email.toLowerCase() === email);
+    if (sp) { found = sp; registry = sales; registryKey = 'sn_sales_persons'; }
+  }
+
+  // Staff
+  if (!found) {
+    const staff = JSON.parse(localStorage.getItem('sn_staff') || '[]');
+    const sm    = staff.find(s => s.email.toLowerCase() === email);
+    if (sm) { found = sm; registry = staff; registryKey = 'sn_staff'; }
+  }
+
+  // Students
+  if (!found) {
+    const students = JSON.parse(localStorage.getItem('sn_students') || '[]');
+    const st       = students.find(s => s.email.toLowerCase() === email);
+    if (st) { found = st; registry = students; registryKey = 'sn_students'; }
+  }
+
+  // Admin / Founder (hardcoded — update via settings)
+  if (!found) {
+    if (email === 'admin@stemnest.co.uk') {
+      found = { name: 'Admin', email, password: 'admin123', _isAdmin: true };
+    } else if (email === 'founder@stemnest.co.uk') {
+      found = { name: 'Founder', email, password: 'Founder2024!', _isFounder: true };
+    }
+  }
+
+  if (!found) {
+    showToast('No account found with that email address.', 'error');
+    return;
+  }
+
+  // Generate temp password
+  const tempPw = 'SN' + Math.random().toString(36).slice(2, 8).toUpperCase() + '!';
+
+  // Update password in registry
+  if (registry && registryKey) {
+    const idx = registry.findIndex(u => u.email.toLowerCase() === email);
+    if (idx !== -1) {
+      registry[idx].password = tempPw;
+      localStorage.setItem(registryKey, JSON.stringify(registry));
+    }
+  }
+
+  // Update password registry for Super Admin chart
+  updatePasswordRegistry({ id: found.id || email, name: found.name, email, role: found.role || (found._isAdmin ? 'admin' : found._isFounder ? 'founder' : 'user'), password: tempPw });
+
+  // Log simulated email
+  const emailLog = JSON.parse(localStorage.getItem('sn_email_log') || '[]');
+  emailLog.unshift({
+    to:      email,
+    subject: 'StemNest Academy — Your Temporary Password',
+    body:    `Hi ${found.name},\n\nYour temporary password is: ${tempPw}\n\nPlease log in and change your password immediately.\n\nLogin: https://stemnest.co.uk/pages/login.html\n\nStemNest Academy`,
+    sentAt:  new Date().toISOString(),
+    status:  'simulated',
+  });
+  localStorage.setItem('sn_email_log', JSON.stringify(emailLog));
+
+  // Show success step
+  document.getElementById('forgotStep1').style.display = 'none';
+  document.getElementById('forgotStep2').style.display = 'block';
+  document.getElementById('forgotSuccessMsg').textContent =
+    `A temporary password has been sent to ${email}. Use it to log in, then change your password from your profile settings.`;
+  const tempBox = document.getElementById('forgotTempPwBox');
+  if (tempBox) {
+    tempBox.style.display = 'block';
+    tempBox.innerHTML = `<strong>Temp Password (demo mode):</strong><br><span style="font-family:'Courier New',monospace;font-size:16px;color:var(--blue);font-weight:900;">${tempPw}</span>`;
+  }
+}
+
+/* Bind overlay close */
+document.addEventListener('DOMContentLoaded', () => {
+  const overlay = document.getElementById('forgotPwOverlay');
+  overlay?.addEventListener('click', e => { if (e.target === overlay) closeForgotPassword(); });
+});
+
+/* ── PASSWORD REGISTRY (for Super Admin chart) ── */
+function updatePasswordRegistry(user) {
+  const reg = JSON.parse(localStorage.getItem('sn_password_registry') || '[]');
+  const idx = reg.findIndex(u => u.id === user.id || u.email === user.email);
+  const entry = { id: user.id || user.email, name: user.name, email: user.email, role: user.role || 'user', password: user.password, updatedAt: new Date().toISOString() };
+  if (idx !== -1) reg[idx] = entry;
+  else reg.unshift(entry);
+  localStorage.setItem('sn_password_registry', JSON.stringify(reg));
+}

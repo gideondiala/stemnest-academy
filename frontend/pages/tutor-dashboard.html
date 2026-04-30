@@ -102,12 +102,7 @@
             <div class="dash-section-title">📡 Today's Sessions</div>
             <a class="dash-section-link" onclick="showDashTab('sessions')">See all →</a>
           </div>
-          <div class="session-list">
-            <div class="session-item"><div class="sess-time"><div class="sess-time-val">9:00</div><div class="sess-time-label">AM</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">James Okafor</div><div class="sess-subject">Python · Year 9</div></div><span class="sess-badge sb-done">Done</span></div>
-            <div class="session-item live"><div class="sess-time"><div class="sess-time-val">11:00</div><div class="sess-time-label">AM</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">Aisha Taiwo</div><div class="sess-subject">Web Dev · Year 11</div></div><span class="sess-badge sb-live">🔴 Live</span><button class="join-btn">Join →</button></div>
-            <div class="session-item"><div class="sess-time"><div class="sess-time-val">2:00</div><div class="sess-time-label">PM</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">Marcus Kofi</div><div class="sess-subject">Scratch · Year 5</div></div><span class="sess-badge sb-upcoming">Upcoming</span></div>
-            <div class="session-item"><div class="sess-time"><div class="sess-time-val">4:30</div><div class="sess-time-label">PM</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">Emeka Sule</div><div class="sess-subject">A-Level CS · Year 13</div></div><span class="sess-badge sb-upcoming">Upcoming</span></div>
-          </div>
+          <div class="session-list" id="overviewSessionsList"><div style="text-align:center;padding:24px;color:var(--light);font-size:13px;font-weight:700;">Loading sessions…</div></div>
         </div>
         <div class="dash-panel">
           <div class="dash-section-header">
@@ -133,19 +128,10 @@
     <div id="tab-sessions" style="display:none;">
       <div class="dash-section-header">
         <div class="dash-section-title">📡 Manage Live Sessions</div>
-        <button class="btn btn-blue" style="font-size:13px;padding:9px 20px;">+ Schedule Session</button>
+        <button class="btn btn-outline" style="font-size:13px;" onclick="renderSessionsTab()">🔄 Refresh</button>
       </div>
-      <div class="dash-panel">
-        <div class="session-list">
-          <div class="session-item"><div class="sess-time"><div class="sess-time-val">9:00</div><div class="sess-time-label">Today</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">James Okafor</div><div class="sess-subject">Python for Beginners · Year 9 · 60 mins</div></div><span class="sess-badge sb-done">Done</span></div>
-          <div class="session-item live"><div class="sess-time"><div class="sess-time-val">11:00</div><div class="sess-time-label">Today</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">Aisha Taiwo</div><div class="sess-subject">Web Dev: HTML, CSS & JS · Year 11 · 45 mins</div></div><span class="sess-badge sb-live">🔴 Live Now</span><button class="join-btn">Join →</button><button class="end-class-btn" onclick="openEndClassModal('demo-aisha')">🔴 End Class</button></div>
-          <div class="session-item"><div class="sess-time"><div class="sess-time-val">2:00</div><div class="sess-time-label">Today</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">Marcus Kofi</div><div class="sess-subject">Scratch & Game Design · Year 5 · 45 mins</div></div><span class="sess-badge sb-upcoming">Upcoming</span></div>
-          <div class="session-item"><div class="sess-time"><div class="sess-time-val">4:30</div><div class="sess-time-label">Today</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">Emeka Sule</div><div class="sess-subject">A-Level Computer Science · Year 13 · 60 mins</div></div><span class="sess-badge sb-upcoming">Upcoming</span></div>
-          <div class="session-item"><div class="sess-time"><div class="sess-time-val">10:00</div><div class="sess-time-label">Tomorrow</div></div><div class="sess-divider"></div><div class="sess-info"><div class="sess-student">Fatima Nwosu</div><div class="sess-subject">Python for Beginners · Year 8 · 60 mins</div></div><span class="sess-badge sb-upcoming">Upcoming</span></div>
-        </div>
-      </div>
+      <div class="session-list" id="sessionsListDynamic"></div>
     </div>
-
     <!-- ── TAB: PROJECTS ── -->
     <div id="tab-projects" style="display:none;">
       <div class="dash-section-header">
@@ -387,6 +373,10 @@
           <label>Additional Notes for Sales Team</label>
           <textarea id="classNotes" style="min-height:80px;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;width:100%;outline:none;resize:vertical;" placeholder="Any useful context for the sales person — parent's concerns, student's goals, best course to pitch..."></textarea>
         </div>
+        <div class="field" style="margin-top:12px;">
+          <label>🎥 Recording Link (paste after class ends)</label>
+          <input type="url" id="recordingLink" placeholder="https://drive.google.com/... or Zoom recording link" style="padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;width:100%;outline:none;">
+        </div>
       </div>
 
       <div class="modal-footer">
@@ -400,5 +390,6 @@
 <script src="../js/utils.js"></script>
 <script src="../js/dashboard.js"></script>
 <script src="../js/tutor-companion.js"></script>
+<script src="../js/tutor-sessions.js"></script>
 </body>
 </html>

@@ -53,7 +53,8 @@
       <div class="sidebar-section-label">Blog</div>
       <a class="sidebar-link"        data-tab="blog-posts"    onclick="showAdminTab('blog-posts')">  <span class="sl-icon">✍️</span> All Posts <span class="sl-badge" id="blogBadge">0</span></a>
       <a class="sidebar-link"        data-tab="blog-new"      onclick="showAdminTab('blog-new')">    <span class="sl-icon">➕</span> New Post</a>
-      <a class="sidebar-link"        data-tab="blog-settings" onclick="showAdminTab('blog-settings')"><span class="sl-icon">⚙️</span> Ad Settings</a>
+      <div class="sidebar-section-label">Communications</div>
+      <a class="sidebar-link"        data-tab="bulk-email"    onclick="showAdminTab('bulk-email')">  <span class="sl-icon">📧</span> Bulk Email</a>
       <div class="sidebar-section-label">Links</div>
       <a class="sidebar-link" href="free-trial.html" target="_blank"><span class="sl-icon">🔗</span> Landing Page</a>
       <a class="sidebar-link" href="blog.html" target="_blank"><span class="sl-icon">📰</span> View Blog</a>
@@ -571,5 +572,17 @@
 <script src="../js/utils.js"></script>
 <script src="../js/admin-dashboard.js"></script>
 <script src="../js/admin-blog.js"></script>
+<script src="../js/mail-system.js"></script>
+<script>
+// Wire bulk email tab into admin showAdminTab
+document.addEventListener('DOMContentLoaded', () => {
+  injectBulkEmailTab(document.querySelector('.dash-main'));
+  const _origAdmin = window.showAdminTab;
+  window.showAdminTab = function(tab) {
+    _origAdmin(tab);
+    if (tab === 'bulk-email') renderEmailLog();
+  };
+});
+</script>
 </body>
 </html>

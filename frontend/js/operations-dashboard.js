@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════
    STEMNEST ACADEMY — OPERATIONS DASHBOARD JS
 ═══════════════════════════════════════════════════════ */
-const OPS_TABS = ['late-joins','penalties','class-log'];
+const OPS_TABS = ['late-joins','penalties','class-log','absent'];
 
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('opsDate').textContent = new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
@@ -15,6 +15,7 @@ function showOpsTab(tab) {
   if (tab === 'late-joins') renderLateJoins();
   if (tab === 'penalties')  renderPenalties();
   if (tab === 'class-log')  renderClassLog();
+  if (tab === 'absent')     renderAbsentTeachers();
   updateOpsStats();
 }
 
@@ -160,3 +161,53 @@ document.addEventListener('DOMContentLoaded', () => {
   const ops = staff.find(s => s.role === 'operations');
   if (ops) setTimeout(() => checkBirthdayForUser(ops.id, ops.name.split(' ')[0]), 1500);
 });
+
+/* ══════════════════════════════════════════════════════
+   PRIORITY 10 — ABSENT TEACHERS (No-Show)
+══════════════════════════════════════════════════════ */
+function renderAbsentTeachers() {
+  const el   = document.getElementById('tab-absent');
+  if (!el) return;
+  const list = JSON.parse(localStorage.getItem('sn_absent_teachers') || '[]')
+    .sort((a, b) => new Date(b.loggedAt) - new Date(a.loggedAt));
+
+  const thS = 'padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;letter-spacing:.5px;';
+  const tdS = 'padding:13px 16px;font-size:13px;vertical-align:middle;';
+
+  const tableHtml = !list.length
+    ? '<div style="text-align:center;padding:40px;color:var(--light);font-weight:700;">No absent teacher records. 🎉</div>'
+    : `<div style="overflow-x:auto;border-radius:16px;border:1.5px solid #e8eaf0;background:var(--white);">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">
+              <th style="${thS}">Teacher</th>
+              <th style="${thS}">Student</th>
+              <th style="${thS}">Subject</th>
+              <th style="${thS}">Date & Time</th>
+              <th style="${thS}">Logged At</th>
+              <th style="${thS}">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${list.map((r, i) => `
+              <tr style="border-bottom:1px solid #f0f2f8;${i%2===0?'':'background:#fafbff;'}">
+                <td style="${tdS}">
+                  <div style="font-weight:800;color:var(--dark);">${r.tutorName}</div>
+                  <div style="font-size:11px;color:var(--light);">${r.tutorId}</div>
+                </td>
+                <td style="${tdS};font-weight:700;color:var(--mid);">${r.studentName || '—'}</td>
+                <td style="${tdS};font-weight:700;color:var(--mid);">${r.subject || '—'}</td>
+                <td style="${tdS};font-size:12px;color:var(--mid);">${r.date || '—'}<br>${r.time || '—'}</td>
+                <td style="${tdS};font-size:12px;color:var(--light);font-weight:700;">${new Date(r.loggedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</td>
+                <td style="${tdS}">
+                  <span style="background:#fde8e8;color:#c53030;font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">⚠️ No-Show</span>
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+
+  // Inject content into the tab
+  const contentEl = document.getElementById('absentTeachersList');
+  if (contentEl) contentEl.innerHTML = tableHtml;
+}
