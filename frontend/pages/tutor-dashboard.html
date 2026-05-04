@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <link rel="icon" type="image/png" sizes="32x32" href="../assets/icons/icon.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="../assets/icons/icon.png">
+  <link rel="apple-touch-icon" href="../assets/icons/icon.png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Tutor Dashboard – StemNest Academy</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -15,8 +18,7 @@
 <!-- ═══ TOP NAV ═══ -->
 <nav style="position:sticky;top:0;z-index:200;">
   <a class="logo" href="../index.html">
-    <div class="logo-icon">S</div>
-    <div class="logo-text">StemNest<span>Academy</span></div>
+    <img src="../assets/images/logo.png" alt="StemNest Academy" class="logo-img">
   </a>
   <ul class="nav-links">
     <li><a href="../index.html">← Back to Website</a></li>
@@ -49,6 +51,7 @@
       <a class="sidebar-link"        data-tab="calendar"   onclick="showDashTab('calendar')">  <span class="sl-icon">📅</span> Availability</a>
       <a class="sidebar-link"        data-tab="companion"  onclick="showDashTab('companion')"> <span class="sl-icon">📚</span> My Companion</a>
       <a class="sidebar-link"        data-tab="leaderboard" onclick="showDashTab('leaderboard')"><span class="sl-icon">🏆</span> Leaderboard</a>
+      <a class="sidebar-link"        data-tab="records"     onclick="showDashTab('records')">    <span class="sl-icon">📋</span> Class Records</a>
       <a class="sidebar-link"        data-tab="kyc"        onclick="showDashTab('kyc')">       <span class="sl-icon">🪪</span> My KYC</a>
       <div class="sidebar-section-label">Account</div>
       <a class="sidebar-link" onclick="openProfileModal()"><span class="sl-icon">👤</span> Update Profile</a>
@@ -96,6 +99,52 @@
       <!-- Assigned class notification banner -->
       <div id="assignedClassBanner" style="display:none;"></div>
 
+      <!-- UPCOMING SESSIONS — 3 cards always visible -->
+      <div class="dash-section-header" style="margin-bottom:16px;">
+        <div class="dash-section-title">📡 Upcoming Sessions</div>
+        <button class="btn btn-outline" style="font-size:12px;" onclick="renderUpcomingCards()">🔄 Refresh</button>
+      </div>
+      <div id="upcomingSessionCards" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px;">
+
+        <!-- Card 1: Current Class -->
+        <div id="sessionCard0" style="background:var(--white);border-radius:20px;padding:24px;box-shadow:0 4px 20px rgba(0,0,0,.08);display:flex;flex-direction:column;gap:10px;border-top:4px solid var(--blue);">
+          <div style="font-family:'Fredoka One',cursive;font-size:12px;color:var(--blue);text-transform:uppercase;letter-spacing:.5px;">Current Class</div>
+          <div style="font-family:'Fredoka One',cursive;font-size:18px;color:var(--dark);">—</div>
+          <div style="font-size:13px;font-weight:700;color:var(--light);">🕐 No session scheduled</div>
+          <div style="font-size:12px;color:var(--light);">Sessions appear once Pre-Sales schedules a class for you.</div>
+          <div style="display:flex;gap:8px;margin-top:auto;">
+            <button style="background:var(--green);color:#fff;border:none;border-radius:12px;padding:10px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:not-allowed;flex:1;opacity:.5;" disabled>🚀 Join</button>
+            <button style="background:#c53030;color:rgba(255,255,255,.5);border:none;border-radius:12px;padding:10px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:not-allowed;flex:1;opacity:.5;" disabled>🔴 End</button>
+          </div>
+        </div>
+
+        <!-- Card 2: Next Class -->
+        <div id="sessionCard1" style="background:var(--white);border-radius:20px;padding:24px;box-shadow:0 4px 20px rgba(0,0,0,.08);display:flex;flex-direction:column;gap:10px;border-top:4px solid var(--green);">
+          <div style="font-family:'Fredoka One',cursive;font-size:12px;color:var(--green);text-transform:uppercase;letter-spacing:.5px;">Next Class</div>
+          <div style="font-family:'Fredoka One',cursive;font-size:18px;color:var(--dark);">—</div>
+          <div style="font-size:13px;font-weight:700;color:var(--light);">🕐 No session scheduled</div>
+          <div style="font-size:12px;color:var(--light);">Sessions appear once Pre-Sales schedules a class for you.</div>
+          <div style="display:flex;gap:8px;margin-top:auto;">
+            <button style="background:var(--green);color:#fff;border:none;border-radius:12px;padding:10px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:not-allowed;flex:1;opacity:.5;" disabled>🚀 Join</button>
+            <button style="background:#c53030;color:rgba(255,255,255,.5);border:none;border-radius:12px;padding:10px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:not-allowed;flex:1;opacity:.5;" disabled>🔴 End</button>
+          </div>
+        </div>
+
+        <!-- Card 3: Next Class -->
+        <div id="sessionCard2" style="background:var(--white);border-radius:20px;padding:24px;box-shadow:0 4px 20px rgba(0,0,0,.08);display:flex;flex-direction:column;gap:10px;border-top:4px solid var(--orange);">
+          <div style="font-family:'Fredoka One',cursive;font-size:12px;color:var(--orange);text-transform:uppercase;letter-spacing:.5px;">Next Class</div>
+          <div style="font-family:'Fredoka One',cursive;font-size:18px;color:var(--dark);">—</div>
+          <div style="font-size:13px;font-weight:700;color:var(--light);">🕐 No session scheduled</div>
+          <div style="font-size:12px;color:var(--light);">Sessions appear once Pre-Sales schedules a class for you.</div>
+          <div style="display:flex;gap:8px;margin-top:auto;">
+            <button style="background:var(--green);color:#fff;border:none;border-radius:12px;padding:10px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:not-allowed;flex:1;opacity:.5;" disabled>🚀 Join</button>
+            <button style="background:#c53030;color:rgba(255,255,255,.5);border:none;border-radius:12px;padding:10px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:not-allowed;flex:1;opacity:.5;" disabled>🔴 End</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Quick Actions + rest of overview -->
       <div class="dash-grid-2">
         <div class="dash-panel">
           <div class="dash-section-header">
@@ -128,8 +177,12 @@
     <div id="tab-sessions" style="display:none;">
       <div class="dash-section-header">
         <div class="dash-section-title">📡 Manage Live Sessions</div>
-        <button class="btn btn-outline" style="font-size:13px;" onclick="renderSessionsTab()">🔄 Refresh</button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-outline" style="font-size:13px;" onclick="seedTestSession()">🧪 Add Test Session</button>
+          <button class="btn btn-outline" style="font-size:13px;" onclick="renderSessionsTab()">🔄 Refresh</button>
+        </div>
       </div>
+      <div id="sessionsDiagnostic"></div>
       <div class="session-list" id="sessionsListDynamic"></div>
     </div>
     <!-- ── TAB: PROJECTS ── -->
@@ -269,6 +322,22 @@
       <div class="kyc-wrap" id="kycContent"></div>
     </div>
 
+    <!-- ── TAB: CLASS RECORDS ── -->
+    <div id="tab-records" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📋 Class Records</div>
+        <span style="font-size:13px;font-weight:700;color:var(--light);">All your classes — completed, incomplete, demo and paid</span>
+      </div>
+      <!-- Filter buttons -->
+      <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
+        <button id="recFilter-today" class="rec-filter-btn rec-filter-active" onclick="filterClassRecords('today')">📅 Today</button>
+        <button id="recFilter-week"  class="rec-filter-btn" onclick="filterClassRecords('week')">📆 This Week</button>
+        <button id="recFilter-month" class="rec-filter-btn" onclick="filterClassRecords('month')">🗓️ This Month</button>
+        <button id="recFilter-all"   class="rec-filter-btn" onclick="filterClassRecords('all')">📚 All Classes</button>
+      </div>
+      <div id="classRecordsTable"></div>
+    </div>
+
   </div><!-- end dash-main -->
 </div><!-- end dash-wrap -->
 
@@ -391,5 +460,6 @@
 <script src="../js/dashboard.js"></script>
 <script src="../js/tutor-companion.js"></script>
 <script src="../js/tutor-sessions.js"></script>
+<script src="../js/tutor-sessions-v2.js"></script>
 </body>
 </html>

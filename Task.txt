@@ -42,3 +42,97 @@ we also want to be able to make changes and push to git and from git push to our
 
 
 after this we will start working on the backend and database... But lets work on this as the most experienced developer. understand all i have said here and implement them.
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Let us Work on the teachers dasboard properly.
+
+On the Overview section of the tutors dashboard We should have "Upcoming sessions" This section Should Be Immediately above the Quick Action Section of the Overview
+It should display as three cards: 
+1. Current Class
+2. Next Class
+3. NExt class(This should be the class after no.2)
+This should be pulled from the calendar availability schedule on each tutors calendar
+Each card should display student name, Class time, Lesson topic(If it is a demo class then the topic should be Demo), Join class button and End class Button.
+- the Join class button opens the class link.
+- the end class button for both paid and demo classes is only active after 15mins of class start time( The logic behind this is that a tutor cannot end a class until after 15mins) the button should be visible but ot clickable(Grayed out) Until after 15 mins. And the Button background color should be red
+# CONSIDER THE BELOW LOGIC FOR PAID CLASSES
+When the end class button is clicked:
+- It should ask "Are you sure you want to end class?"
+- There should be yes or no Buttons.
+- if No is selected then the popup should close(So the tutor continues teaching) 
+- if yes, then it asks if class is completed, incomplete, partially completed.
+- if the class is completed then the live earning is automatically updated. the dasboard should refresh automatically and the class just ended should disappear from the overview section
+   and the next 3 sessions is adjusted again.
+- else if class is partially completed, then there should be a textbox for the teacher to state if at least 50% of lesson content is covered?. If yes, then a text box to state why class ended partially should be fllled. Then the class ends and 1/3  of the class pay is added to the tutors earning and the partially completed lesson is marked as completed by the system and 1 class credit is deducted from the student.
+- If class is marked as incomplete. Then ask the reason?
+- if reason in ["Student Not Joined","student Power failure","Student Internet", "Student Network", "Student PC issue", "Student Medical", "No Show"], Then the class ends and no credit deducted from student and no class pay added to the teachers earnig and that lesson is Automatically rescheduled to the next class date
+
+# CONSIDER THIS LOGIC BELOW FOR DEMO CLASSES
+When end class button is clicked:
+- It should ask "Are you sure you want to end class?"
+- There should be yes or no Buttons.
+- if No is selected the popup closes and class continues(This is a situation where there is a click on the end class button by mistake)
+- if Yes, Then Ask if class is Completed, Incomplete or partially completed
+- if completed the class pay will be automatically added to the tutors earning. The class should end and the dashboard refreshed with the next 3 classes visible.
+  the details of the completed class should be sent to the presales dashboard on the completed class section.
+- If class is marked as incomplete. Then ask the reason?
+- if reason in ["Student Not Joined","student Power failure","Student Internet", "Student Network", "Student PC issue", "Student Medical", "No Show"], Then the class ends. No pay is added to the tutor. The details of this incomplete class should  appear under the incomplete section of the presales dashboard for follow up and possible reschedule
+
+This two logic for demo and paid classes should apply for every demo class and paid class es for all tutors
+The amount to be paid by the company to teachers for demo and paid class should be set at the Founders dashboard. Demo class pay and Paid class pay per class.
+
+
+Also Work on Live earning sheet. for each teacher.
+
+the live earning should  have a download button which downloads an Excel sheet that shows all details of classes taken by the teacher from 1st of each month(time 00:00:00) to last day of the month(time 11:59:00 pm UK time)
+incomplete class should also be available on the sheet showing its incomplete and pay cell empty(The idea is for teacher to see transparency in how they worked and earned)
+There should be time stamp each session showing when class ends, type of class as well.
+
+At the end of the month the previous months pay sheet should be saved at on section of the dashboard where a teacher can click and download the immediate previous months paysheet 
+immediately a new month begins. the old sheet is saved and a new sheet starts recording.
+
+
+________________________________________________________________________________________________________________________________
+
+To keep our teaching method standard and trasparent for monitoring. We want to create a section of the teachers dashboard where all the classes that are completed are populated. e.g student name, topic, class start time & endtime. Recording link.
+
+the idea is that teachers should record their screen during class and upload it on their google drive and share the link copy and paste it on this section. so on that row of each student we should have class recodring. on each record it should show if the recorded link is pending, or uploaded.
+the idea is to be able to have records of each class done by teacher both completed and incomple class and demo and paid.
+It should also have buttons that allows us to filter by today(to see all classes done today), this week,(to see classes done this week), this month(to see all classes done in the month), and all classes.
+
+we want to follow up all learning so our students can get the best value for their money in quality teaching.
+
+the start time and end time is picked when the Join class button was clicked immediatelyafter class time and also the time the end time is picked when the tutor successfully ends the class
+
+________________________________________________________________________________________________________________________________
+Number of student credit is not visible on the Paid student dasboard.
+there should be a place where the number of credits remaining is always visible.
+after each completed class the credit should reduce by 1. i.e -1.
+also there schould be a setion on the students dashboard where the student can see their payment records. 
+each payment made is shown there and the amount and number of credits added is reflected.
+this strictly can nvever be editable is just for student view. the security to this must be very strong to avoid manipulation of the credit system
+it should be pulled from the Post sales department. WHen the Post sales adds a payment for a student then it should populate there. After each completed class a record of the class with date is shown there and the 1 credit deducted recorded. so the remaining credit is updated(-1) this only applies for completed sessions
+Also when a student credit gets to -2(This means the student is owing fees, we can only allow for 2 classs if pending fees is not paid).
+
+and when the student credit gets to -2. The Join class button should not be visible. student can still access their dasboard and do projects and quizes if they have any. but they cannot Join class.
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+ 
+
+When credit reduces to 2. The payment Link for the new credit should be made available by the right end of the section that shows a credit card showing 0credit remaining there should be a button to Top up credits.
+on click of that button it should lead to the payment portal. where they pay with their credit card and if successful it will be confirmed by the Post sales team and once confirmed credits are topped for the student. and the Topup button should be temporarily hidden till credits runds down to 2 and BELOW
+also in the Post sales dashboard the section where paid students rcords are monitored. we can add a feature where as students credits reduces its updated there. once a student credit is 2, the student details appear in a seperate section e.g studnt needing payment or somethingmore appropraite 
+from that section the post sales team can generate a payment link based on the amount the student normally pays and update it there. It should have a part at the right where you have payment link pending or payment link generated. once the payment link is pasted there and saved it shows payment link sent.
+now the same payment link should be what is visible by the student when the student clicks on top up.
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Lets also fix this. When a demo class is booked. as the teacher is selected. the Sales person(Academic Counselor) should also be selected. 
+this booking should also be availabilityfor the sales person in their dashboard. the joining Link should also be there.
+
+so each demo is assigned to specific sales person and that helps the follow up to be more effective.
+
+
+the sales person should also have a section for each completed sales pitch. and a recording uploaded and saved just as teacher dashboardhas a record of each session with the recording link.
+the helps the sales team lead to watch  videos of how the sales person pitched the course. and also be sure the job was done

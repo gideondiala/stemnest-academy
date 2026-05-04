@@ -42,12 +42,13 @@ function saveAvailability(avail) {
   localStorage.setItem('sn_all_tutor_avail', JSON.stringify(shared));
 }
 
-/* Return the "next :30" key for a given time key, e.g. "9:00" → "9:30", "9:30" → "10:00" */
+/* Return the "next :30" key for a given time key, e.g. "9:00" → "9:30", "9:30" → "10:00", "23:30" → "0:00" */
 function nextHalfKey(timeKey) {
   const [h, m] = timeKey.split(':').map(Number);
   if (m === 0)  return `${h}:30`;
-  // m === 30 → next hour
-  return `${h + 1}:00`;
+  // m === 30 → next hour (wrap at 24)
+  const nextH = (h + 1) % 24;
+  return `${nextH}:00`;
 }
 
 /* Toggle a 1-hour availability block starting at timeKey.
@@ -301,10 +302,10 @@ function renderWeeklyCalendar() {
     bookingMap[dk].push({ timeMins: timeToMins(t24), booking: b });
   });
 
-  /* ── HOUR slots: 6:00 → 21:30 (each hour has :00 and :30 row) ── */
+  /* ── HOUR slots: 00:00 → 23:30 — full 24 hours ── */
   const HOUR_SLOTS = [];
-  for (let h = 6; h <= 21; h++) {
-    HOUR_SLOTS.push({ label: h < 12 ? `${h}:00 AM` : h === 12 ? '12:00 PM' : `${h-12}:00 PM`, key: `${h}:00`, mins: h * 60 });
+  for (let h = 0; h <= 23; h++) {
+    HOUR_SLOTS.push({ label: h < 12 ? `${h === 0 ? 12 : h}:00 AM` : h === 12 ? '12:00 PM' : `${h-12}:00 PM`, key: `${h}:00`, mins: h * 60 });
     HOUR_SLOTS.push({ label: '', key: `${h}:30`, mins: h * 60 + 30, isHalf: true });
   }
 

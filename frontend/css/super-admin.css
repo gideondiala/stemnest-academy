@@ -76,3 +76,24 @@
   .sa-kpi-grid { grid-template-columns: 1fr 1fr; }
   .sa-settings-grid { grid-template-columns: 1fr; }
 }
+
+/* ── Sub-tabs (Teachers / Students sections) ── */
+.sa-subtab {
+  padding: 9px 20px;
+  border-radius: 50px;
+  border: 2px solid #e8eaf0;
+  background: var(--white);
+  font-family: 'Nunito', sans-serif;
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--mid);
+  cursor: pointer;
+  transition: .15s;
+}
+.sa-subtab:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-light); }
+.sa-subtab-active {
+  background: var(--blue);
+  color: #fff;
+  border-color: var(--blue);
+  box-shadow: 0 4px 12px rgba(26,86,219,.25);
+}

@@ -3,7 +3,7 @@
    Role switcher, form validation, login handler.
 ═══════════════════════════════════════════════════════ */
 
-let currentRole = 'tutor';
+let currentRole = 'student';
 
 const loginConfig = {
   tutor: {
@@ -71,7 +71,7 @@ const loginConfig = {
 /* ── INIT ── */
 document.addEventListener('DOMContentLoaded', () => {
   seedRegistries();   // ensure defaults exist before any login attempt
-  switchRole('tutor');
+  switchRole('student');
   document.addEventListener('keydown', e => {
     if (e.key === 'Enter') handleLogin();
   });

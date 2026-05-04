@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <link rel="icon" type="image/png" sizes="32x32" href="../assets/icons/icon.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="../assets/icons/icon.png">
+  <link rel="apple-touch-icon" href="../assets/icons/icon.png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Student Dashboard – StemNest Academy</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -15,8 +18,7 @@
 <!-- ═══ TOP NAV ═══ -->
 <nav style="position:sticky;top:0;z-index:200;">
   <a class="logo" href="../index.html">
-    <div class="logo-icon">S</div>
-    <div class="logo-text">StemNest<span>Academy</span></div>
+    <img src="../assets/images/logo.png" alt="StemNest Academy" class="logo-img">
   </a>
   <ul class="nav-links">
     <li><a href="../index.html">← Back to Website</a></li>
@@ -49,7 +51,14 @@
       <a class="sidebar-link"        data-tab="quizzes"       onclick="showTab('quizzes')">      <span class="sl-icon">🧠</span> My Quizzes      <span class="sl-badge" id="quizBadge">2</span></a>
       <a class="sidebar-link"        data-tab="certificates"  onclick="showTab('certificates')"> <span class="sl-icon">🏆</span> Certificates</a>
       <a class="sidebar-link"        data-tab="nest"          onclick="showTab('nest')">          <span class="sl-icon">🪺</span> Learning Nest</a>
+      <a class="sidebar-link"        data-tab="payments"      onclick="showTab('payments')">     <span class="sl-icon">💳</span> Payment Records</a>
       <a class="sidebar-link"        data-tab="chat"          onclick="showTab('chat')">          <span class="sl-icon">💬</span> Chat with Tutor</a>
+      <!-- Credits badge — always visible -->
+      <div id="sidebarCreditsBox" style="margin:12px 12px 4px;background:linear-gradient(135deg,var(--blue),var(--green));border-radius:14px;padding:12px 16px;text-align:center;">
+        <div style="font-size:11px;font-weight:900;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Class Credits</div>
+        <div id="sidebarCreditsVal" style="font-family:'Fredoka One',cursive;font-size:28px;color:#fff;line-height:1;">—</div>
+        <div id="sidebarCreditsLabel" style="font-size:11px;font-weight:700;color:rgba(255,255,255,.7);margin-top:2px;">remaining</div>
+      </div>
       <div class="sidebar-section-label">Account</div>
       <a class="sidebar-link" onclick="openProfileModal()"><span class="sl-icon">👤</span> My Profile</a>
       <a class="sidebar-link" href="../index.html"><span class="sl-icon">🌐</span> Back to Website</a>
@@ -245,6 +254,17 @@
         <span style="font-size:13px;font-weight:700;color:var(--light);">Your past classes, summaries & recordings</span>
       </div>
       <div id="learningNestContent"></div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         TAB: PAYMENT RECORDS
+    ══════════════════════════════════════ -->
+    <div id="tab-payments" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">💳 Payment Records</div>
+        <span style="font-size:13px;font-weight:700;color:var(--light);">Read-only · Managed by StemNest Finance Team</span>
+      </div>
+      <div id="paymentRecordsContent"></div>
     </div>
 
     <!-- ══════════════════════════════════════

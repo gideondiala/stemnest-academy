@@ -1,7 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" sizes="32x32" href="../assets/icons/icon.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="../assets/icons/icon.png">
+  <link rel="apple-touch-icon" href="../assets/icons/icon.png"><meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pre-Sales Dashboard – StemNest Academy</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
@@ -11,7 +14,7 @@
 </head>
 <body>
 <nav style="position:sticky;top:0;z-index:200;">
-  <a class="logo" href="../index.html"><div class="logo-icon">S</div><div class="logo-text">StemNest<span>Academy</span></div></a>
+  <a class="logo" href="../index.html"><img src="../assets/images/logo.png" alt="StemNest Academy" class="logo-img"></a>
   <ul class="nav-links"><li><a href="../index.html">← Back to Website</a></li></ul>
   <div class="nav-actions">
     <span style="font-size:13px;font-weight:700;color:var(--light);"><span class="live-dot"></span> <span id="psNavName">Pre-Sales</span></span>
@@ -30,6 +33,7 @@
       <div class="sidebar-section-label">My Work</div>
       <a class="sidebar-link active" data-tab="incoming"    onclick="showPSTab('incoming')">   <span class="sl-icon">📥</span> Incoming Demos <span class="sl-badge" id="incomingBadge">0</span></a>
       <a class="sidebar-link"        data-tab="scheduled"   onclick="showPSTab('scheduled')">  <span class="sl-icon">📅</span> Scheduled</a>
+      <a class="sidebar-link"        data-tab="completed"   onclick="showPSTab('completed')">  <span class="sl-icon">✅</span> Completed Demos <span class="sl-badge" id="completedBadge">0</span></a>
       <a class="sidebar-link"        data-tab="incomplete"  onclick="showPSTab('incomplete')"> <span class="sl-icon">❌</span> Incomplete Demos <span class="sl-badge" id="incompleteBadge">0</span></a>
       <a class="sidebar-link"        data-tab="cancelled"   onclick="showPSTab('cancelled')">  <span class="sl-icon">🚫</span> Cancelled <span class="sl-badge" id="cancelledBadge">0</span></a>
       <a class="sidebar-link"        data-tab="reschedule"  onclick="showPSTab('reschedule')"> <span class="sl-icon">🔄</span> Reschedule Requests <span class="sl-badge" id="rescheduleBadge">0</span></a>
@@ -81,6 +85,15 @@
       <div id="parentNotesList"></div>
     </div>
 
+    <!-- COMPLETED DEMOS -->
+    <div id="tab-completed" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">✅ Completed Demos</div>
+        <span style="font-size:13px;font-weight:700;color:var(--light);">Demos completed by teachers — ready for sales follow-up</span>
+      </div>
+      <div id="completedDemosList"></div>
+    </div>
+
     <!-- INCOMPLETE DEMOS -->
     <div id="tab-incomplete" style="display:none;">
       <div class="dash-section-header">
@@ -128,6 +141,14 @@
         <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">👩‍🏫 Select Teacher <span style="color:#e53e3e;">*</span></label>
         <select id="sm-teacher" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;background:var(--white);">
           <option value="">— Select a teacher —</option>
+        </select>
+      </div>
+
+      <!-- Sales Person dropdown -->
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">💼 Assign Sales Person (Academic Counselor) <span style="color:#e53e3e;">*</span></label>
+        <select id="sm-sales" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;background:var(--white);">
+          <option value="">— Select a sales person —</option>
         </select>
       </div>
 

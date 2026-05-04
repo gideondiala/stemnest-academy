@@ -932,3 +932,310 @@ window.initDemoFeatures = function() {
   if (typeof _origInitDemoFeatures === 'function') _origInitDemoFeatures();
   setTimeout(injectCancelRescheduleButtons, 500);
 };
+
+/* ══════════════════════════════════════════════════════
+   TASK2 — CREDIT SYSTEM + PAYMENT RECORDS
+   1. Credits always visible in sidebar
+   2. Credits reduce by 1 after each completed class
+   3. Payment Records tab — read-only
+   4. Credits ≤ -2 → hide Join Class button
+══════════════════════════════════════════════════════ */
+
+/* ── Get student credits from booking or students registry ── */
+function getStudentCredits() {
+  // Try sn_students registry first (onboarded students)
+  try {
+    const students = JSON.parse(localStorage.getItem('sn_students') || '[]');
+    const me = students.find(s => s.email === STUDENT.email || s.id === STUDENT.id);
+    if (me && me.credits !== undefined) return parseInt(me.credits) || 0;
+  } catch(e) {}
+
+  // Fall back to booking record
+  const booking = getStudentBooking();
+  if (booking && booking.studentCredits !== undefined) return parseInt(booking.studentCredits) || 0;
+
+  return 0;
+}
+
+/* ── Save updated credits ── */
+function setStudentCredits(newVal) {
+  // Update sn_students
+  try {
+    const students = JSON.parse(localStorage.getItem('sn_students') || '[]');
+    const idx = students.findIndex(s => s.email === STUDENT.email || s.id === STUDENT.id);
+    if (idx !== -1) {
+      students[idx].credits = newVal;
+      localStorage.setItem('sn_students', JSON.stringify(students));
+    }
+  } catch(e) {}
+
+  // Update booking record
+  try {
+    const bookings = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+    const idx = bookings.findIndex(b => b.email === STUDENT.email);
+    if (idx !== -1) {
+      bookings[idx].studentCredits = newVal;
+      localStorage.setItem('sn_bookings', JSON.stringify(bookings));
+    }
+  } catch(e) {}
+}
+
+/* ── Update sidebar credits display ── */
+function updateSidebarCredits() {
+  const credits = getStudentCredits();
+  const valEl   = document.getElementById('sidebarCreditsVal');
+  const lblEl   = document.getElementById('sidebarCreditsLabel');
+  const box     = document.getElementById('sidebarCreditsBox');
+
+  if (valEl) valEl.textContent = credits;
+
+  if (credits <= 0) {
+    if (box) box.style.background = 'linear-gradient(135deg,#c53030,#e53e3e)';
+    if (lblEl) lblEl.textContent = credits < 0 ? 'OVERDUE' : 'No credits left';
+  } else if (credits <= 2) {
+    if (box) box.style.background = 'linear-gradient(135deg,#e65100,#ff6b35)';
+    if (lblEl) lblEl.textContent = 'Low — top up now';
+  } else if (credits <= 3) {
+    if (box) box.style.background = 'linear-gradient(135deg,#e65100,#ff6b35)';
+    if (lblEl) lblEl.textContent = 'Low — renew soon';
+  } else {
+    if (box) box.style.background = 'linear-gradient(135deg,var(--blue),var(--green))';
+    if (lblEl) lblEl.textContent = 'remaining';
+  }
+
+  // Show/hide Top Up button (visible when credits ≤ 2)
+  renderTopUpButton(credits);
+
+  // If credits ≤ -2, hide Join Class button
+  enforceJoinClassBlock(credits);
+}
+
+/* ── Top Up Credits button ── */
+function renderTopUpButton(credits) {
+  // Remove existing button
+  const existing = document.getElementById('topUpCreditsBtn');
+  if (existing) existing.remove();
+
+  if (credits > 2) return; // only show when ≤ 2
+
+  // Find the payment link for this student from Post-Sales
+  const links = JSON.parse(localStorage.getItem('sn_payment_links') || '[]');
+  const myLink = links.find(l =>
+    (l.email === STUDENT.email || l.student === STUDENT.name) &&
+    l.status === 'pending' && l.url
+  );
+
+  const box = document.getElementById('sidebarCreditsBox');
+  if (!box) return;
+
+  const btn = document.createElement('a');
+  btn.id = 'topUpCreditsBtn';
+  btn.style.cssText = 'display:block;margin-top:10px;background:#fff;color:#e65100;text-align:center;' +
+    'padding:9px 14px;border-radius:10px;font-family:\'Nunito\',sans-serif;font-weight:900;font-size:13px;' +
+    'text-decoration:none;transition:.2s;';
+  btn.textContent = '💳 Top Up Credits';
+
+  if (myLink && myLink.url) {
+    btn.href   = myLink.url;
+    btn.target = '_blank';
+  } else {
+    btn.href = '#';
+    btn.onclick = function(e) {
+      e.preventDefault();
+      showToast('Your payment link is being prepared. Our team will notify you shortly.', 'info');
+    };
+    btn.style.opacity = '0.75';
+    btn.textContent = '💳 Top Up (link pending)';
+  }
+
+  box.appendChild(btn);
+}
+
+/* ── Block Join Class if credits ≤ -2 ── */
+function enforceJoinClassBlock(credits) {
+  if (credits <= -2) {
+    // Hide the join class card
+    const joinCard = document.getElementById('joinClassCard');
+    if (joinCard) joinCard.style.display = 'none';
+
+    // Show a warning banner instead
+    let banner = document.getElementById('creditBlockBanner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'creditBlockBanner';
+      banner.style.cssText = 'background:linear-gradient(135deg,#c53030,#e53e3e);border-radius:20px;padding:24px 28px;margin-bottom:24px;color:#fff;';
+      banner.innerHTML = '<div style="font-family:\'Fredoka One\',cursive;font-size:20px;margin-bottom:8px;">⚠️ Classes Paused</div>' +
+        '<div style="font-size:14px;font-weight:700;color:rgba(255,255,255,.85);line-height:1.7;">' +
+        'Your class credits have run out. You have <strong>' + credits + ' credits</strong> (2 classes attended without payment).<br>' +
+        'Please contact our team to renew your subscription and resume classes.' +
+        '</div>' +
+        '<a href="../pages/free-trial.html" style="display:inline-block;margin-top:14px;background:#fff;color:#c53030;padding:10px 24px;border-radius:50px;font-family:\'Nunito\',sans-serif;font-weight:900;font-size:14px;text-decoration:none;">💳 Renew Now</a>';
+      const overview = document.getElementById('tab-overview');
+      if (overview) overview.insertBefore(banner, overview.firstChild);
+    }
+  } else {
+    const banner = document.getElementById('creditBlockBanner');
+    if (banner) banner.remove();
+  }
+}
+
+/* ── Deduct 1 credit after a completed class ── */
+function deductStudentCreditAfterClass() {
+  const current = getStudentCredits();
+  const newVal  = current - 1;
+  setStudentCredits(newVal);
+
+  // Log the deduction to payment records
+  logCreditTransaction({
+    type:        'class_deduction',
+    description: 'Class completed — 1 credit used',
+    credits:     -1,
+    date:        new Date().toISOString(),
+  });
+
+  updateSidebarCredits();
+  return newVal;
+}
+
+/* ── Log a credit transaction (tamper-resistant: append-only) ── */
+function logCreditTransaction(entry) {
+  // Use a hash-like key to make it harder to manipulate
+  const key = 'sn_credit_log_' + STUDENT.id;
+  const log = JSON.parse(localStorage.getItem(key) || '[]');
+  log.push({
+    ...entry,
+    id:        'TXN-' + Date.now().toString(36).toUpperCase(),
+    loggedAt:  new Date().toISOString(),
+    _readonly: true,
+  });
+  localStorage.setItem(key, JSON.stringify(log));
+}
+
+/* ── Render Payment Records tab ── */
+function renderPaymentRecords() {
+  const el = document.getElementById('paymentRecordsContent');
+  if (!el) return;
+
+  const credits = getStudentCredits();
+
+  // Get payment records from sn_payment_links (added by Post-Sales)
+  const allLinks = JSON.parse(localStorage.getItem('sn_payment_links') || '[]');
+  const myPayments = allLinks.filter(p => p.email === STUDENT.email || p.student === STUDENT.name);
+
+  // Get credit transaction log
+  const key = 'sn_credit_log_' + STUDENT.id;
+  const txnLog = JSON.parse(localStorage.getItem(key) || '[]').reverse(); // newest first
+
+  const thS = 'padding:11px 14px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;letter-spacing:.5px;';
+  const tdS = 'padding:12px 14px;font-size:13px;vertical-align:middle;';
+
+  // Credits summary card
+  const summaryColor = credits <= -2 ? '#c53030' : credits <= 0 ? '#e65100' : credits <= 3 ? '#e65100' : 'var(--green-dark)';
+  const summaryBg    = credits <= -2 ? '#fde8e8' : credits <= 0 ? '#fff3e0' : credits <= 3 ? '#fff3e0' : 'var(--green-light)';
+
+  // Check if a top-up payment link exists for this student
+  const topUpLinks = JSON.parse(localStorage.getItem('sn_payment_links') || '[]');
+  const topUpLink = topUpLinks.find(function(l) {
+    return (l.email === STUDENT.email || l.student === STUDENT.name) && l.status === 'pending' && l.url;
+  });
+  const showTopUp = credits <= 2;
+
+  const topUpBtnHtml = showTopUp
+    ? '<a href="' + (topUpLink ? topUpLink.url : '#') + '" ' +
+      (topUpLink ? 'target="_blank"' : 'onclick="showToast(\'Your payment link is being prepared. Our team will notify you shortly.\',\'info\');return false;"') +
+      ' style="display:inline-flex;align-items:center;gap:8px;background:#e65100;color:#fff;padding:12px 24px;border-radius:50px;' +
+      'font-family:\'Nunito\',sans-serif;font-weight:900;font-size:14px;text-decoration:none;white-space:nowrap;flex-shrink:0;">' +
+      '💳 ' + (topUpLink ? 'Top Up Credits' : 'Top Up (link pending)') + '</a>'
+    : '';
+
+  let html = '<div style="background:' + summaryBg + ';border-radius:16px;padding:20px 24px;margin-bottom:24px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;">' +
+    '<div style="font-size:48px;flex-shrink:0;">💳</div>' +
+    '<div style="flex:1;">' +
+      '<div style="font-family:\'Fredoka One\',cursive;font-size:22px;color:' + summaryColor + ';">' + credits + ' Credits Remaining</div>' +
+      '<div style="font-size:13px;font-weight:700;color:var(--mid);margin-top:4px;">Each completed class uses 1 credit. Contact us to top up.</div>' +
+    '</div>' +
+    topUpBtnHtml +
+  '</div>';
+
+  // Payments received
+  if (myPayments.length) {
+    html += '<div style="font-family:\'Fredoka One\',cursive;font-size:18px;color:var(--dark);margin-bottom:12px;">💰 Payments Received</div>';
+    html += '<div style="overflow-x:auto;border-radius:14px;border:1.5px solid #e8eaf0;background:var(--white);margin-bottom:24px;">' +
+      '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+      '<thead><tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">' +
+        '<th style="' + thS + '">Date</th>' +
+        '<th style="' + thS + '">Course</th>' +
+        '<th style="' + thS + '">Amount</th>' +
+        '<th style="' + thS + '">Credits Added</th>' +
+        '<th style="' + thS + '">Status</th>' +
+      '</tr></thead><tbody>' +
+      myPayments.map(function(p, i) {
+        var bg = i % 2 === 0 ? '' : 'background:#fafbff;';
+        var date = p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }) : '—';
+        return '<tr style="border-bottom:1px solid #f0f2f8;' + bg + '">' +
+          '<td style="' + tdS + ';font-size:12px;color:var(--light);font-weight:700;">' + date + '</td>' +
+          '<td style="' + tdS + ';font-weight:700;color:var(--dark);">' + (p.course || '—') + '</td>' +
+          '<td style="' + tdS + ';font-weight:800;color:var(--green-dark);">' + (p.currency || '£') + (p.amount || '—') + '</td>' +
+          '<td style="' + tdS + ';font-weight:800;color:var(--blue);">+' + (p.credits || '—') + ' credits</td>' +
+          '<td style="' + tdS + '"><span style="background:var(--green-light);color:var(--green-dark);font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">✅ Confirmed</span></td>' +
+        '</tr>';
+      }).join('') +
+      '</tbody></table></div>';
+  }
+
+  // Credit transaction log
+  html += '<div style="font-family:\'Fredoka One\',cursive;font-size:18px;color:var(--dark);margin-bottom:12px;">📋 Credit Activity Log</div>';
+
+  if (!txnLog.length) {
+    html += '<div style="text-align:center;padding:32px;color:var(--light);font-weight:700;background:var(--white);border-radius:14px;border:1.5px solid #e8eaf0;">No credit activity yet. Credits are deducted after each completed class.</div>';
+  } else {
+    html += '<div style="overflow-x:auto;border-radius:14px;border:1.5px solid #e8eaf0;background:var(--white);">' +
+      '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+      '<thead><tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">' +
+        '<th style="' + thS + '">Date</th>' +
+        '<th style="' + thS + '">Description</th>' +
+        '<th style="' + thS + '">Credits</th>' +
+        '<th style="' + thS + '">Balance After</th>' +
+      '</tr></thead><tbody>' +
+      (function() {
+        var balance = credits;
+        // Rebuild balance from log (newest first, so reverse to calculate)
+        var rows = [];
+        var runningBalance = credits;
+        txnLog.forEach(function(t, i) {
+          var bg = i % 2 === 0 ? '' : 'background:#fafbff;';
+          var date = t.loggedAt ? new Date(t.loggedAt).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }) : '—';
+          var creditVal = t.credits || 0;
+          var creditColor = creditVal > 0 ? 'var(--green-dark)' : '#c53030';
+          var creditLabel = (creditVal > 0 ? '+' : '') + creditVal;
+          rows.push('<tr style="border-bottom:1px solid #f0f2f8;' + bg + '">' +
+            '<td style="' + tdS + ';font-size:12px;color:var(--light);font-weight:700;">' + date + '</td>' +
+            '<td style="' + tdS + ';font-weight:700;color:var(--dark);">' + (t.description || '—') + '</td>' +
+            '<td style="' + tdS + ';font-weight:900;color:' + creditColor + ';">' + creditLabel + '</td>' +
+            '<td style="' + tdS + ';font-weight:800;color:var(--mid);">' + runningBalance + '</td>' +
+          '</tr>');
+          runningBalance -= creditVal; // going backwards
+        });
+        return rows.join('');
+      })() +
+      '</tbody></table></div>';
+  }
+
+  html += '<div style="margin-top:16px;padding:12px 16px;background:var(--bg);border-radius:10px;font-size:12px;font-weight:700;color:var(--light);">' +
+    '🔒 This record is read-only and managed by the StemNest Finance Team. Contact support@stemnest.co.uk for any queries.' +
+  '</div>';
+
+  el.innerHTML = html;
+}
+
+/* ── Wire showTab to render payment records ── */
+const _origShowTabForPayments = window.showTab;
+window.showTab = function(tab) {
+  if (typeof _origShowTabForPayments === 'function') _origShowTabForPayments(tab);
+  if (tab === 'payments') renderPaymentRecords();
+};
+
+/* ── INIT: update credits on load ── */
+document.addEventListener('DOMContentLoaded', function() {
+  setTimeout(updateSidebarCredits, 300);
+});

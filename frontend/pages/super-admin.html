@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <link rel="icon" type="image/png" sizes="32x32" href="../assets/icons/icon.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="../assets/icons/icon.png">
+  <link rel="apple-touch-icon" href="../assets/icons/icon.png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Super Admin – StemNest Academy</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -14,8 +17,7 @@
 
 <nav style="position:sticky;top:0;z-index:200;">
   <a class="logo" href="../index.html">
-    <div class="logo-icon">S</div>
-    <div class="logo-text">StemNest<span>Academy</span></div>
+    <img src="../assets/images/logo.png" alt="StemNest Academy" class="logo-img">
   </a>
   <ul class="nav-links"><li><a href="../index.html">← Back to Website</a></li></ul>
   <div class="nav-actions">
@@ -49,8 +51,12 @@
       <div class="sidebar-section-label">Communications</div>
       <a class="sidebar-link"        data-tab="bulk-email"  onclick="showSATab('bulk-email')"> <span class="sl-icon">📧</span> Bulk Email</a>
       <div class="sidebar-section-label">Quick Links</div>
-      <a class="sidebar-link" href="admin-dashboard.html" target="_blank"><span class="sl-icon">📋</span> Admin Dashboard</a>
-      <a class="sidebar-link" href="free-trial.html"      target="_blank"><span class="sl-icon">🔗</span> Landing Page</a>
+      <a class="sidebar-link" href="admin-dashboard.html"    target="_blank"><span class="sl-icon">📋</span> Admin Dashboard</a>
+      <a class="sidebar-link" href="presales-dashboard.html" target="_blank"><span class="sl-icon">📥</span> Pre-Sales</a>
+      <a class="sidebar-link" href="postsales-dashboard.html" target="_blank"><span class="sl-icon">💳</span> Post-Sales</a>
+      <a class="sidebar-link" href="operations-dashboard.html" target="_blank"><span class="sl-icon">⚙️</span> Operations</a>
+      <a class="sidebar-link" href="hr-dashboard.html"       target="_blank"><span class="sl-icon">👥</span> HR</a>
+      <a class="sidebar-link" href="free-trial.html"         target="_blank"><span class="sl-icon">🔗</span> Landing Page</a>
     </div>
     <div class="sidebar-bottom">
       <button class="logout-btn" onclick="window.location.href='login.html'">🚪 Log Out</button>
@@ -152,19 +158,57 @@
 
     <!-- ── TAB: TEACHERS ── -->
     <div id="tab-teachers" style="display:none;">
-      <div class="dash-section-header"><div class="dash-section-title">👩‍🏫 All Teachers</div></div>
-      <div class="sa-kpi-grid" id="teacherKpiGrid"></div>
-      <div class="dash-panel" style="margin-top:24px;">
-        <div id="teacherFullTable"></div>
+      <div class="dash-section-header">
+        <div class="dash-section-title">👩‍🏫 Teachers</div>
       </div>
+      <!-- KPI row -->
+      <div class="sa-kpi-grid" id="teacherKpiGrid"></div>
+      <!-- Sub-tabs -->
+      <div style="display:flex;gap:8px;margin:20px 0 16px;flex-wrap:wrap;">
+        <button id="teacherSubTab-active" class="sa-subtab sa-subtab-active" onclick="switchTeacherSubTab('active')">✅ Active Teachers</button>
+        <button id="teacherSubTab-discontinued" class="sa-subtab" onclick="switchTeacherSubTab('discontinued')">🚫 Discontinued</button>
+      </div>
+      <!-- Search -->
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+        <input type="text" id="teacherSearch" placeholder="Search by ID, name, email, subject, country…"
+          oninput="renderTeachersReport()"
+          style="flex:1;min-width:220px;padding:10px 16px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
+        <select id="teacherSubjectFilter" onchange="renderTeachersReport()"
+          style="padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;background:var(--white);">
+          <option value="">All Subjects</option>
+          <option value="Coding">💻 Coding</option>
+          <option value="Maths">📐 Maths</option>
+          <option value="Sciences">🔬 Sciences</option>
+        </select>
+      </div>
+      <div id="teacherFullTable"></div>
     </div>
 
     <!-- ── TAB: STUDENTS ── -->
     <div id="tab-students" style="display:none;">
-      <div class="dash-section-header"><div class="dash-section-title">🎓 All Students / Bookings</div></div>
-      <div class="dash-panel">
-        <div id="studentFullTable"></div>
+      <div class="dash-section-header">
+        <div class="dash-section-title">🎓 Students</div>
       </div>
+      <!-- Sub-tabs -->
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+        <button id="studentSubTab-demo" class="sa-subtab sa-subtab-active" onclick="switchStudentSubTab('demo')">🎓 Demo Students</button>
+        <button id="studentSubTab-paid" class="sa-subtab" onclick="switchStudentSubTab('paid')">💳 Paid Students</button>
+        <button id="studentSubTab-discontinued" class="sa-subtab" onclick="switchStudentSubTab('discontinued')">🚫 Discontinued</button>
+      </div>
+      <!-- Search -->
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+        <input type="text" id="studentSearch" placeholder="Search by ID, name, email, country, subject…"
+          oninput="renderStudentsReport()"
+          style="flex:1;min-width:220px;padding:10px 16px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
+        <select id="studentSubjectFilter" onchange="renderStudentsReport()"
+          style="padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;background:var(--white);">
+          <option value="">All Subjects</option>
+          <option value="Coding">💻 Coding</option>
+          <option value="Maths">📐 Maths</option>
+          <option value="Sciences">🔬 Sciences</option>
+        </select>
+      </div>
+      <div id="studentFullTable"></div>
     </div>
 
     <!-- ── TAB: SETTINGS ── -->
@@ -184,6 +228,21 @@
           <div id="sigPreview" style="margin:12px 0;"></div>
           <input type="file" id="sigUpload" accept="image/*" style="display:none;" onchange="uploadSignature(this)">
           <button class="btn btn-outline" style="font-size:13px;" onclick="document.getElementById('sigUpload').click()">✍️ Upload Signature</button>
+        </div>
+        <div class="sa-settings-card">
+          <div class="sa-settings-title">💷 Teacher Pay Rates</div>
+          <div class="sa-settings-desc">Set the amount paid to teachers per class. Applied automatically when a class is marked complete.</div>
+          <div class="pm-field" style="margin-top:10px;">
+            <label>Demo Class Pay (£ per class)</label>
+            <input type="number" id="demoClassPay" placeholder="e.g. 5" min="0" step="0.50"
+              onchange="saveSettings('demoClassPay', this.value)">
+          </div>
+          <div class="pm-field" style="margin-top:8px;">
+            <label>Paid Class Pay (£ per class)</label>
+            <input type="number" id="paidClassPay" placeholder="e.g. 20" min="0" step="0.50"
+              onchange="saveSettings('paidClassPay', this.value)">
+          </div>
+          <button class="btn btn-primary" style="font-size:13px;margin-top:10px;" onclick="savePayRates()">💾 Save Pay Rates</button>
         </div>
         <div class="sa-settings-card">
           <div class="sa-settings-title">🎂 Birthday Message</div>

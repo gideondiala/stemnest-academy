@@ -4,7 +4,7 @@
    assigns teachers, writes directly to teacher calendar.
 ═══════════════════════════════════════════════════════ */
 
-const PS_TABS = ['incoming', 'scheduled', 'incomplete', 'cancelled', 'reschedule', 'notes'];
+const PS_TABS = ['incoming', 'scheduled', 'completed', 'incomplete', 'cancelled', 'reschedule', 'notes'];
 let psScheduleBookingId = null; // booking being scheduled in modal
 
 /* ── INIT ── */
@@ -72,6 +72,7 @@ function showPSTab(tab) {
   updatePSStats();
   if (tab === 'incoming')   renderIncoming();
   if (tab === 'scheduled')  renderScheduled();
+  if (tab === 'completed')  renderCompletedDemos();
   if (tab === 'incomplete') renderIncomplete();
   if (tab === 'cancelled')  renderCancelled();
   if (tab === 'reschedule') renderReschedule();
@@ -84,11 +85,13 @@ function updatePSStats() {
   const incomplete  = JSON.parse(localStorage.getItem('sn_incomplete_demos') || '[]');
   const cancelled   = JSON.parse(localStorage.getItem('sn_cancelled_classes') || '[]');
   const reschedules = JSON.parse(localStorage.getItem('sn_reschedule_requests') || '[]');
+  const completed   = JSON.parse(localStorage.getItem('sn_completed_demos') || '[]');
   setText('psStat1', bookings.filter(b => b.status === 'pending').length);
   setText('psStat2', bookings.filter(b => b.status === 'scheduled').length);
   setText('psStat3', bookings.filter(b => b.psConfirmed).length);
   setText('psStat4', getTeachers().length);
   setText('incomingBadge',   bookings.filter(b => b.status === 'pending').length);
+  setText('completedBadge',  completed.length);
   setText('incompleteBadge', incomplete.filter(i => !i.rebooked).length);
   setText('cancelledBadge',  cancelled.length);
   setText('rescheduleBadge', reschedules.filter(r => r.status === 'pending').length);
@@ -195,6 +198,9 @@ function openScheduleModal(bookingId) {
   // Populate teacher dropdown filtered by subject
   populateTeacherDropdown(b.subject);
 
+  // Populate sales person dropdown
+  populateSalesDropdown();
+
   // Clear link/notes
   const linkEl = document.getElementById('sm-link');
   if (linkEl) linkEl.value = '';
@@ -213,49 +219,61 @@ function populateTeacherDropdown(subject) {
   sel.innerHTML = '<option value="">— Select a teacher —</option>' +
     teachers.map(t => {
       const avail = getTeacherAvailability(t.id);
-      const slotCount = Object.keys(avail).filter(k => avail[k] === true || (avail[k] && !avail[k].booked)).length / 2; // 1-hr blocks
+      const slotCount = Object.keys(avail).filter(k => avail[k] === true || (avail[k] && !avail[k].booked)).length / 2;
       return `<option value="${t.id}">${t.name} (${t.id}) · ${t.subject} · ${Math.round(slotCount)} slots available</option>`;
     }).join('');
 }
 
+function populateSalesDropdown() {
+  const sel = document.getElementById('sm-sales');
+  if (!sel) return;
+  const salesPersons = JSON.parse(localStorage.getItem('sn_sales_persons') || '[]');
+  sel.innerHTML = '<option value="">— Select a sales person —</option>' +
+    salesPersons.map(s => `<option value="${s.id}">${s.name} (${s.id})</option>`).join('');
+}
+
 function confirmScheduleDemo() {
-  const teacherId = document.getElementById('sm-teacher')?.value;
-  const date      = document.getElementById('sm-date')?.value;
-  const time      = document.getElementById('sm-time')?.value;
-  const link      = document.getElementById('sm-link')?.value.trim();
-  const notes     = document.getElementById('sm-notes')?.value.trim();
+  const teacherId  = document.getElementById('sm-teacher')?.value;
+  const salesId    = document.getElementById('sm-sales')?.value;
+  const date       = document.getElementById('sm-date')?.value;
+  const time       = document.getElementById('sm-time')?.value;
+  const link       = document.getElementById('sm-link')?.value.trim();
+  const notes      = document.getElementById('sm-notes')?.value.trim();
 
   if (!teacherId) { showToast('Please select a teacher.', 'error'); return; }
+  if (!salesId)   { showToast('Please select a sales person.', 'error'); return; }
   if (!date)      { showToast('Please select a date.', 'error'); return; }
   if (!time)      { showToast('Please select a time.', 'error'); return; }
   if (!link)      { showToast('Please enter a class link.', 'error'); return; }
 
-  const teacher = getTeachers().find(t => t.id === teacherId);
-  const timeKey = time; // already "HH:MM"
+  const teacher      = getTeachers().find(t => t.id === teacherId);
+  const salesPersons = JSON.parse(localStorage.getItem('sn_sales_persons') || '[]');
+  const salesPerson  = salesPersons.find(s => s.id === salesId);
+  const timeKey      = time;
 
-  // Update booking record
   const all = getBookings();
   const idx = all.findIndex(b => b.id === psScheduleBookingId);
   if (idx !== -1) {
     all[idx] = {
       ...all[idx],
-      status:          'scheduled',
-      assignedTutor:   teacher?.name,
-      assignedTutorId: teacherId,
-      classLink:       link,
+      status:            'scheduled',
+      assignedTutor:     teacher?.name,
+      assignedTutorId:   teacherId,
+      assignedSalesId:   salesId,
+      assignedSalesName: salesPerson?.name || '',
+      classLink:         link,
       date,
-      time:            to12h(time),
+      time:              to12h(time),
       notes,
-      tutorNotified:   false,
-      scheduledAt:     new Date().toISOString(),
+      tutorNotified:     false,
+      salesNotified:     false,
+      scheduledAt:       new Date().toISOString(),
     };
     saveBookings(all);
   }
 
-  // Write directly to teacher's calendar
   writeTeacherCalendarSlot(teacherId, date, timeKey, psScheduleBookingId);
 
-  // Send email notification to teacher
   if (typeof emailDemoBookedToTeacher === 'function') {
     const updatedBooking = getBookings().find(b => b.id === psScheduleBookingId) || {};
     emailDemoBookedToTeacher({ ...updatedBooking, date, time: to12h(time), classLink: link, notes }, teacher);
@@ -264,7 +282,7 @@ function confirmScheduleDemo() {
   closeScheduleModal();
   updatePSStats();
   renderIncoming();
-  showToast(`✅ Demo class scheduled with ${teacher?.name} on ${date} at ${to12h(time)}!`);
+  showToast('Demo scheduled with ' + (teacher?.name || 'teacher') + ' & ' + (salesPerson?.name || 'sales team') + ' on ' + date + ' at ' + to12h(time) + '!');
 }
 
 function closeScheduleModal() {
@@ -488,24 +506,56 @@ function renderCancelled() {
     return;
   }
 
-  el.innerHTML = list.map((item, i) => `
-    <div style="background:var(--white);border:1.5px solid #e8eaf0;border-radius:14px;padding:18px 20px;margin-bottom:12px;${i%2===0?'':'background:#fafbff;'}">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">
-        <div>
-          <div style="font-weight:800;color:var(--dark);font-size:15px;">${item.studentName}</div>
-          <div style="font-size:12px;color:var(--mid);font-weight:700;margin-top:4px;">
-            📚 ${item.subject} · 📅 ${item.date||'—'} at ${item.time||'—'}<br>
-            📧 ${item.email} · 📱 ${item.whatsapp||'—'}
-          </div>
-          <div style="background:#fde8e8;border-radius:8px;padding:6px 10px;margin-top:8px;font-size:12px;color:#c53030;font-weight:700;display:inline-block;">
-            🚫 Reason: ${item.reason||'No reason given'}
-          </div>
-        </div>
-        <div style="font-size:11px;color:var(--light);font-weight:700;white-space:nowrap;">
-          ${new Date(item.cancelledAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}
-        </div>
-      </div>
-    </div>`).join('');
+  const thS = 'padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;letter-spacing:.5px;';
+  const tdS = 'padding:14px 16px;vertical-align:middle;';
+
+  el.innerHTML = `
+    <div style="overflow-x:auto;border-radius:16px;border:1.5px solid #e8eaf0;background:var(--white);">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">
+            <th style="${thS}">Booking ID</th>
+            <th style="${thS}">Student</th>
+            <th style="${thS}">Subject</th>
+            <th style="${thS}">Original Slot</th>
+            <th style="${thS}">Contact</th>
+            <th style="${thS}">Reason</th>
+            <th style="${thS}">Cancelled</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${list.map((item, i) => `
+            <tr style="border-bottom:1px solid #f0f2f8;${i%2===0?'':'background:#fafbff;'}">
+              <td style="${tdS}">
+                <span style="font-family:'Fredoka One',cursive;font-size:12px;color:var(--blue);">${item.bookingId||item.id||'—'}</span>
+              </td>
+              <td style="${tdS}">
+                <div style="font-weight:800;color:var(--dark);">${item.studentName||'—'}</div>
+                <div style="font-size:11px;color:var(--light);font-weight:700;">${item.grade||'—'} · Age ${item.age||'—'}</div>
+              </td>
+              <td style="${tdS}">
+                <span style="font-weight:700;color:var(--mid);">${item.subject||'—'}</span>
+              </td>
+              <td style="${tdS}">
+                <div style="font-weight:700;color:var(--mid);">${item.date||'—'}</div>
+                <div style="font-size:12px;color:var(--light);">${item.time||'—'}</div>
+              </td>
+              <td style="${tdS}">
+                <div style="font-size:12px;font-weight:700;color:var(--mid);">📧 ${item.email||'—'}</div>
+                <div style="font-size:12px;font-weight:700;color:var(--mid);margin-top:2px;">📱 ${item.whatsapp||'—'}</div>
+              </td>
+              <td style="${tdS};max-width:220px;">
+                <div style="background:#fde8e8;border-radius:8px;padding:6px 10px;font-size:12px;color:#c53030;font-weight:700;line-height:1.5;">
+                  🚫 ${item.reason||'No reason given'}
+                </div>
+              </td>
+              <td style="${tdS};font-size:12px;color:var(--light);font-weight:700;white-space:nowrap;">
+                ${new Date(item.cancelledAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
 }
 
 /* ══════════════════════════════════════════════════════
@@ -604,4 +654,62 @@ function actionReschedule(reqId) {
   };
 
   document.getElementById('scheduleModalOverlay').classList.add('open');
+}
+
+/* ══════════════════════════════════════════════════════
+   COMPLETED DEMOS — from teacher end-class reports
+══════════════════════════════════════════════════════ */
+function renderCompletedDemos() {
+  const el   = document.getElementById('completedDemosList');
+  if (!el) return;
+  const list = JSON.parse(localStorage.getItem('sn_completed_demos') || '[]')
+    .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt));
+
+  if (!list.length) {
+    el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--light);font-weight:700;">No completed demos yet. Completed demo classes will appear here.</div>';
+    return;
+  }
+
+  const thS = 'padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;letter-spacing:.5px;';
+  const tdS = 'padding:14px 16px;vertical-align:middle;';
+
+  el.innerHTML = `
+    <div style="overflow-x:auto;border-radius:16px;border:1.5px solid #e8eaf0;background:var(--white);">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">
+            <th style="${thS}">Student</th>
+            <th style="${thS}">Subject</th>
+            <th style="${thS}">Teacher</th>
+            <th style="${thS}">Date & Time</th>
+            <th style="${thS}">Quality</th>
+            <th style="${thS}">Interest</th>
+            <th style="${thS}">Notes</th>
+            <th style="${thS}">Completed</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${list.map((item, i) => `
+            <tr style="border-bottom:1px solid #f0f2f8;${i%2===0?'':'background:#fafbff;'}">
+              <td style="${tdS}">
+                <div style="font-weight:800;color:var(--dark);">${item.studentName||'—'}</div>
+                <div style="font-size:11px;color:var(--light);">📧 ${item.email||'—'} · 📱 ${item.whatsapp||'—'}</div>
+              </td>
+              <td style="${tdS};font-weight:700;color:var(--mid);">${item.subject||'—'}</td>
+              <td style="${tdS};font-weight:700;color:var(--mid);">${item.tutorName||'—'}</td>
+              <td style="${tdS};font-size:12px;color:var(--mid);">${item.date||'—'}<br>${item.time||'—'}</td>
+              <td style="${tdS}">
+                <span style="background:var(--green-light);color:var(--green-dark);font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">${item.classQuality||'—'}</span>
+              </td>
+              <td style="${tdS}">
+                <span style="background:var(--blue-light);color:var(--blue);font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">${item.studentInterest||'—'}</span>
+              </td>
+              <td style="${tdS};font-size:12px;color:var(--mid);max-width:180px;">${item.notes||'—'}</td>
+              <td style="${tdS};font-size:12px;color:var(--light);font-weight:700;white-space:nowrap;">
+                ${new Date(item.completedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
 }

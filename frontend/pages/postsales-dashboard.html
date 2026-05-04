@@ -1,7 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" sizes="32x32" href="../assets/icons/icon.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="../assets/icons/icon.png">
+  <link rel="apple-touch-icon" href="../assets/icons/icon.png"><meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Post-Sales Dashboard – StemNest Academy</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
@@ -11,7 +14,7 @@
 </head>
 <body>
 <nav style="position:sticky;top:0;z-index:200;">
-  <a class="logo" href="../index.html"><div class="logo-icon">S</div><div class="logo-text">StemNest<span>Academy</span></div></a>
+  <a class="logo" href="../index.html"><img src="../assets/images/logo.png" alt="StemNest Academy" class="logo-img"></a>
   <ul class="nav-links"><li><a href="../index.html">← Back to Website</a></li></ul>
   <div class="nav-actions">
     <span style="font-size:13px;font-weight:700;color:var(--light);"><span class="live-dot"></span> Post-Sales</span>
@@ -29,6 +32,7 @@
     <div class="sidebar-nav">
       <div class="sidebar-section-label">Finance</div>
       <a class="sidebar-link active" data-tab="students"  onclick="showPOSTab('students')"> <span class="sl-icon">🎓</span> Paid Students <span class="sl-badge" id="posBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="topup"     onclick="showPOSTab('topup')">    <span class="sl-icon">⚠️</span> Needs Top-Up <span class="sl-badge" id="topupBadge">0</span></a>
       <a class="sidebar-link"        data-tab="scheduled" onclick="showPOSTab('scheduled')"><span class="sl-icon">📅</span> Scheduled Classes</a>
       <a class="sidebar-link"        data-tab="paylinks"  onclick="showPOSTab('paylinks')"> <span class="sl-icon">🔗</span> Payment Links</a>
       <a class="sidebar-link"        data-tab="converted" onclick="showPOSTab('converted')"><span class="sl-icon">✅</span> Converted</a>
@@ -64,6 +68,18 @@
         💡 Students who came via demo class appear here automatically. For walk-in or referral students, click <strong>Manual Onboard</strong>.
       </div>
       <div id="paidStudentsList"></div>
+    </div>
+
+    <!-- STUDENTS NEEDING TOP-UP -->
+    <div id="tab-topup" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">⚠️ Students Needing Top-Up</div>
+        <span style="font-size:13px;font-weight:700;color:var(--light);">Students with 2 or fewer credits remaining</span>
+      </div>
+      <div style="background:#fff3e0;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13px;font-weight:700;color:#e65100;">
+        💡 Generate a payment link for each student and paste it here. The student will see a "Top Up Credits" button linking directly to their payment page.
+      </div>
+      <div id="topupStudentsList"></div>
     </div>
 
     <!-- SCHEDULED PAID CLASSES -->

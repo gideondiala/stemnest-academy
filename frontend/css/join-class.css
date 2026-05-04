@@ -101,7 +101,7 @@
 .jc-join-date    { font-size: 14px; color: rgba(255,255,255,.8); font-weight: 700; margin-bottom: 24px; }
 .jc-join-main-btn {
   display: inline-flex; align-items: center; gap: 10px;
-  background: #fff; color: var(--green-dark);
+  background: #fff; color: var(--orange);
   font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 20px;
   padding: 16px 48px; border-radius: 50px; text-decoration: none;
   box-shadow: 0 6px 24px rgba(0,0,0,.2);
@@ -139,4 +139,48 @@
   .jc-card { padding: 32px 20px; }
   .jc-student-card { flex-direction: column; text-align: center; }
   .jc-rules-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Cancel / Reschedule action row ── */
+.jc-action-row {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.jc-cancel-btn {
+  padding: 9px 20px;
+  border-radius: 50px;
+  border: 2px solid rgba(255,255,255,.3);
+  background: rgba(255,255,255,.1);
+  color: rgba(255,255,255,.85);
+  font-family: 'Nunito', sans-serif;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  transition: .2s;
+}
+.jc-cancel-btn:hover {
+  background: rgba(197,48,48,.7);
+  border-color: rgba(197,48,48,.5);
+  color: #fff;
+}
+
+.jc-reschedule-btn {
+  padding: 9px 20px;
+  border-radius: 50px;
+  border: 2px solid rgba(255,255,255,.3);
+  background: rgba(255,255,255,.1);
+  color: rgba(255,255,255,.85);
+  font-family: 'Nunito', sans-serif;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  transition: .2s;
+}
+.jc-reschedule-btn:hover {
+  background: rgba(255,255,255,.25);
+  color: #fff;
 }

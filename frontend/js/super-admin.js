@@ -40,7 +40,7 @@ function refreshAllReports() {
   if (tab === 'revenue')   renderRevenueReport(period);
   if (tab === 'expenses')  renderExpensesReport(period);
   if (tab === 'teachers')  renderTeachersReport();
-  if (tab === 'students')  renderStudentsReport(period);
+  if (tab === 'students')  renderStudentsReport();
 }
 
 /* ── DATA HELPERS ── */
@@ -239,34 +239,187 @@ function renderExpensesReport(period) {
 }
 
 /* ── TEACHERS REPORT ── */
-function renderTeachersReport() {
-  const teachers = getTeachers();
-  document.getElementById('teacherKpiGrid').innerHTML =
-    kpiCard('👩‍🏫', teachers.length, 'Total Teachers', null, '') +
-    kpiCard('💻', teachers.filter(t => t.subject === 'Coding').length,   'Coding', null, '') +
-    kpiCard('📐', teachers.filter(t => t.subject === 'Maths').length,    'Maths',  null, '') +
-    kpiCard('🔬', teachers.filter(t => t.subject === 'Sciences').length, 'Sciences', null, '');
+let saTeacherSubTab = 'active';
+let saStudentSubTab = 'demo';
 
-  const rows = teachers.map(t => {
-    const data = JSON.parse(localStorage.getItem('sn_earnings_' + t.id) || '{}');
-    return [t.id, `<strong>${t.name}</strong>`, t.subject, t.availability || '—', data.classes || 0, '$' + (data.earnings || 0), data.points || 0];
+function switchTeacherSubTab(tab) {
+  saTeacherSubTab = tab;
+  document.querySelectorAll('[id^="teacherSubTab-"]').forEach(function(btn) {
+    btn.classList.toggle('sa-subtab-active', btn.id === 'teacherSubTab-' + tab);
   });
-  document.getElementById('teacherFullTable').innerHTML = simpleTable(
-    ['ID','Name','Subject','Availability','Classes','Earnings','Points'], rows, 'No teachers yet.'
-  );
+  renderTeachersReport();
+}
+
+function switchStudentSubTab(tab) {
+  saStudentSubTab = tab;
+  document.querySelectorAll('[id^="studentSubTab-"]').forEach(function(btn) {
+    btn.classList.toggle('sa-subtab-active', btn.id === 'studentSubTab-' + tab);
+  });
+  renderStudentsReport();
+}
+
+function renderTeachersReport() {
+  var teachers = getTeachers();
+  var q    = (document.getElementById('teacherSearch') ? document.getElementById('teacherSearch').value : '').toLowerCase();
+  var subj = document.getElementById('teacherSubjectFilter') ? document.getElementById('teacherSubjectFilter').value : '';
+
+  document.getElementById('teacherKpiGrid').innerHTML =
+    kpiCard('\u{1F469}\u200D\u{1F3EB}', teachers.length, 'Total Teachers', null, '') +
+    kpiCard('\u{1F4BB}', teachers.filter(function(t){return t.subject==='Coding';}).length, 'Coding', null, '') +
+    kpiCard('\u{1F4D0}', teachers.filter(function(t){return t.subject==='Maths';}).length, 'Maths', null, '') +
+    kpiCard('\u{1F52C}', teachers.filter(function(t){return t.subject==='Sciences';}).length, 'Sciences', null, '');
+
+  var list = teachers.filter(function(t) {
+    var isDisc = !!t.discontinued;
+    return saTeacherSubTab === 'discontinued' ? isDisc : !isDisc;
+  });
+
+  if (q) {
+    list = list.filter(function(t) {
+      return (t.id||'').toLowerCase().includes(q) ||
+             (t.name||'').toLowerCase().includes(q) ||
+             (t.email||'').toLowerCase().includes(q) ||
+             (t.subject||'').toLowerCase().includes(q) ||
+             (t.country||'').toLowerCase().includes(q);
+    });
+  }
+  if (subj) list = list.filter(function(t){ return t.subject === subj; });
+
+  var thS = 'padding:11px 14px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;letter-spacing:.5px;';
+  var tdS = 'padding:12px 14px;font-size:13px;vertical-align:middle;';
+
+  if (!list.length) {
+    document.getElementById('teacherFullTable').innerHTML = '<div style="text-align:center;padding:40px;color:var(--light);font-weight:700;">No teachers found.</div>';
+    return;
+  }
+
+  var rows = list.map(function(t, i) {
+    var data = JSON.parse(localStorage.getItem('sn_earnings_' + t.id) || '{}');
+    var bg   = i % 2 === 0 ? '' : 'background:#fafbff;';
+    var statusBadge = t.discontinued
+      ? '<span style="background:#fde8e8;color:#c53030;font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">Discontinued</span>'
+      : '<span style="background:var(--green-light);color:var(--green-dark);font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">Active</span>';
+    var actionBtn = '<button onclick="toggleTeacherStatus(\''+t.id+'\')" style="background:var(--bg);border:1.5px solid #e8eaf0;border-radius:8px;padding:5px 10px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:11px;cursor:pointer;color:var(--mid);">'+(t.discontinued?'Reinstate':'Discontinue')+'</button>';
+    return '<tr style="border-bottom:1px solid #f0f2f8;'+bg+'">'
+      +'<td style="'+tdS+'"><span style="font-family:\'Fredoka One\',cursive;color:var(--blue);font-size:12px;">'+t.id+'</span></td>'
+      +'<td style="'+tdS+'"><div style="font-weight:800;color:var(--dark);">'+t.name+'</div><div style="font-size:11px;color:var(--light);">'+(t.email||'—')+'</div></td>'
+      +'<td style="'+tdS+';font-weight:700;color:var(--mid);">'+t.subject+'</td>'
+      +'<td style="'+tdS+';font-size:12px;color:var(--mid);">'+(t.country||'—')+'</td>'
+      +'<td style="'+tdS+';font-size:12px;color:var(--mid);">'+(t.availability||'—')+'</td>'
+      +'<td style="'+tdS+';font-weight:700;color:var(--mid);">'+(data.classes||0)+'</td>'
+      +'<td style="'+tdS+';font-weight:800;color:var(--green-dark);">£'+(data.earnings||0).toFixed(0)+'</td>'
+      +'<td style="'+tdS+';font-weight:700;color:var(--purple);">'+(data.points||0)+'</td>'
+      +'<td style="'+tdS+'">'+statusBadge+'</td>'
+      +'<td style="'+tdS+'">'+actionBtn+'</td>'
+      +'</tr>';
+  }).join('');
+
+  document.getElementById('teacherFullTable').innerHTML =
+    '<div style="overflow-x:auto;border-radius:16px;border:1.5px solid #e8eaf0;background:var(--white);">'
+    +'<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+    +'<thead><tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">'
+    +'<th style="'+thS+'">ID</th><th style="'+thS+'">Name / Email</th><th style="'+thS+'">Subject</th>'
+    +'<th style="'+thS+'">Country</th><th style="'+thS+'">Availability</th>'
+    +'<th style="'+thS+'">Classes</th><th style="'+thS+'">Earnings</th><th style="'+thS+'">Points</th>'
+    +'<th style="'+thS+'">Status</th><th style="'+thS+'">Action</th>'
+    +'</tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+
+function toggleTeacherStatus(teacherId) {
+  var teachers = getTeachers();
+  var idx = teachers.findIndex(function(t){ return t.id === teacherId; });
+  if (idx === -1) return;
+  teachers[idx].discontinued = !teachers[idx].discontinued;
+  localStorage.setItem('sn_teachers', JSON.stringify(teachers));
+  renderTeachersReport();
+  showToast(teachers[idx].discontinued ? 'Teacher discontinued.' : 'Teacher reinstated.');
 }
 
 /* ── STUDENTS REPORT ── */
-function renderStudentsReport(period) {
-  const bookings = filterByPeriod(getBookings(), 'bookedAt', period);
-  const rows = bookings.map(b => [
-    `<strong>${b.studentName}</strong>`, b.grade, b.age, b.subject,
-    b.email, b.whatsapp, `<span class="ab-status ab-${b.status}">${capitalise(b.status)}</span>`,
-    formatSADate(b.bookedAt),
-  ]);
-  document.getElementById('studentFullTable').innerHTML = simpleTable(
-    ['Student','Grade','Age','Subject','Email','WhatsApp','Status','Booked'], rows, 'No students yet.'
-  );
+function renderStudentsReport() {
+  var q    = (document.getElementById('studentSearch') ? document.getElementById('studentSearch').value : '').toLowerCase();
+  var subj = document.getElementById('studentSubjectFilter') ? document.getElementById('studentSubjectFilter').value : '';
+
+  var bookings = getBookings();
+  var students = JSON.parse(localStorage.getItem('sn_students') || '[]');
+
+  var thS = 'padding:11px 14px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;letter-spacing:.5px;';
+  var tdS = 'padding:12px 14px;font-size:13px;vertical-align:middle;';
+
+  var list = [];
+  var headers = [];
+
+  if (saStudentSubTab === 'demo') {
+    list = bookings.filter(function(b){ return b.status === 'pending' || b.status === 'scheduled' || b.status === 'demo'; });
+    headers = ['ID','Student','Grade','Age','Subject','Email','WhatsApp','Date','Status','Booked'];
+  } else if (saStudentSubTab === 'paid') {
+    list = bookings.filter(function(b){ return b.salesStatus === 'converted' || b.studentOnboarded; });
+    headers = ['ID','Student','Grade','Subject','Email','Credits','Amount','Onboarded'];
+  } else {
+    list = bookings.filter(function(b){ return b.status === 'cancelled' || b.status === 'discontinued'; });
+    headers = ['ID','Student','Subject','Email','Status','Date'];
+  }
+
+  if (q) {
+    list = list.filter(function(b) {
+      return (b.id||'').toLowerCase().includes(q) ||
+             (b.studentName||'').toLowerCase().includes(q) ||
+             (b.email||'').toLowerCase().includes(q) ||
+             (b.country||'').toLowerCase().includes(q) ||
+             (b.subject||'').toLowerCase().includes(q);
+    });
+  }
+  if (subj) list = list.filter(function(b){ return b.subject === subj; });
+
+  if (!list.length) {
+    document.getElementById('studentFullTable').innerHTML = '<div style="text-align:center;padding:40px;color:var(--light);font-weight:700;">No students found.</div>';
+    return;
+  }
+
+  var rows = list.map(function(b, i) {
+    var bg = i % 2 === 0 ? '' : 'background:#fafbff;';
+    if (saStudentSubTab === 'demo') {
+      return '<tr style="border-bottom:1px solid #f0f2f8;'+bg+'">'
+        +'<td style="'+tdS+'"><span style="font-family:\'Fredoka One\',cursive;color:var(--blue);font-size:11px;">'+b.id+'</span></td>'
+        +'<td style="'+tdS+'"><div style="font-weight:800;color:var(--dark);">'+(b.studentName||'—')+'</div></td>'
+        +'<td style="'+tdS+';font-size:12px;color:var(--mid);">'+(b.grade||'—')+'</td>'
+        +'<td style="'+tdS+';font-size:12px;color:var(--mid);">'+(b.age||'—')+'</td>'
+        +'<td style="'+tdS+';font-weight:700;color:var(--mid);">'+(b.subject||'—')+'</td>'
+        +'<td style="'+tdS+';font-size:12px;color:var(--mid);">'+(b.email||'—')+'</td>'
+        +'<td style="'+tdS+';font-size:12px;color:var(--mid);">'+(b.whatsapp||'—')+'</td>'
+        +'<td style="'+tdS+';font-size:12px;color:var(--mid);">'+(b.date||'—')+'</td>'
+        +'<td style="'+tdS+'"><span class="ab-status ab-'+(b.status||'pending')+'">'+capitalise(b.status||'pending')+'</span></td>'
+        +'<td style="'+tdS+';font-size:11px;color:var(--light);">'+formatSADate(b.bookedAt)+'</td>'
+        +'</tr>';
+    } else if (saStudentSubTab === 'paid') {
+      return '<tr style="border-bottom:1px solid #f0f2f8;'+bg+'">'
+        +'<td style="'+tdS+'"><span style="font-family:\'Fredoka One\',cursive;color:var(--blue);font-size:11px;">'+(b.studentId||b.id)+'</span></td>'
+        +'<td style="'+tdS+'"><div style="font-weight:800;color:var(--dark);">'+(b.studentName||'—')+'</div><div style="font-size:11px;color:var(--light);">'+(b.email||'—')+'</div></td>'
+        +'<td style="'+tdS+';font-size:12px;color:var(--mid);">'+(b.grade||'—')+'</td>'
+        +'<td style="'+tdS+';font-weight:700;color:var(--mid);">'+(b.subject||'—')+'</td>'
+        +'<td style="'+tdS+';font-size:12px;color:var(--mid);">'+(b.email||'—')+'</td>'
+        +'<td style="'+tdS+';font-weight:800;color:var(--blue);">'+(b.studentCredits||'—')+'</td>'
+        +'<td style="'+tdS+';font-weight:800;color:var(--green-dark);">'+(b.paymentAmount?'£'+b.paymentAmount:'—')+'</td>'
+        +'<td style="'+tdS+'"><span style="background:var(--green-light);color:var(--green-dark);font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">'+(b.studentOnboarded?'Onboarded':'Converted')+'</span></td>'
+        +'</tr>';
+    } else {
+      return '<tr style="border-bottom:1px solid #f0f2f8;'+bg+'">'
+        +'<td style="'+tdS+'"><span style="font-family:\'Fredoka One\',cursive;color:var(--blue);font-size:11px;">'+b.id+'</span></td>'
+        +'<td style="'+tdS+'"><div style="font-weight:800;color:var(--dark);">'+(b.studentName||'—')+'</div></td>'
+        +'<td style="'+tdS+';font-weight:700;color:var(--mid);">'+(b.subject||'—')+'</td>'
+        +'<td style="'+tdS+';font-size:12px;color:var(--mid);">'+(b.email||'—')+'</td>'
+        +'<td style="'+tdS+'"><span class="ab-status ab-'+(b.status||'cancelled')+'">'+capitalise(b.status||'cancelled')+'</span></td>'
+        +'<td style="'+tdS+';font-size:11px;color:var(--light);">'+formatSADate(b.bookedAt)+'</td>'
+        +'</tr>';
+    }
+  }).join('');
+
+  document.getElementById('studentFullTable').innerHTML =
+    '<div style="overflow-x:auto;border-radius:16px;border:1.5px solid #e8eaf0;background:var(--white);">'
+    +'<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+    +'<thead><tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">'
+    +headers.map(function(h){ return '<th style="'+thS+'">'+h+'</th>'; }).join('')
+    +'</tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
 
 /* ── BAR CHART (CSS-only) ── */
@@ -356,6 +509,14 @@ function loadSettings() {
     const el = document.getElementById('saFounderDob');
     if (el) el.value = settings.founderDob;
   }
+  if (settings.demoClassPay !== undefined) {
+    const el = document.getElementById('demoClassPay');
+    if (el) el.value = settings.demoClassPay;
+  }
+  if (settings.paidClassPay !== undefined) {
+    const el = document.getElementById('paidClassPay');
+    if (el) el.value = settings.paidClassPay;
+  }
 }
 
 function saveSettings(key, val) {
@@ -388,6 +549,22 @@ function uploadSignature(input) {
     showToast('✅ Founder signature saved!');
   };
   reader.readAsDataURL(file);
+}
+
+function savePayRates() {
+  const demo = parseFloat(document.getElementById('demoClassPay')?.value || '5');
+  const paid = parseFloat(document.getElementById('paidClassPay')?.value || '20');
+  saveSettings('demoClassPay', demo);
+  saveSettings('paidClassPay', paid);
+  showToast('✅ Pay rates saved! Demo: £' + demo + ' · Paid: £' + paid);
+}
+
+function getPayRates() {
+  const s = JSON.parse(localStorage.getItem('sn_sa_settings') || '{}');
+  return {
+    demo: parseFloat(s.demoClassPay || '5'),
+    paid: parseFloat(s.paidClassPay || '20'),
+  };
 }
 
 function saveBirthdayMsg() {

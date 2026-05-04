@@ -76,11 +76,29 @@ function renderSessionsTab() {
   if (!el) return;
 
   const tutor    = getCurrentTutor();
+  const allBooks = getBookings();
   const bookings = getMyBookings().sort((a, b) => {
     const da = parseClassDateTime(a.date, a.time) || new Date(0);
     const db = parseClassDateTime(b.date, b.time) || new Date(0);
     return da - db;
   });
+
+  // ── DIAGNOSTIC PANEL ──
+  // Shows what's in localStorage so we can see if IDs match
+  const diagEl = document.getElementById('sessionsDiagnostic');
+  if (diagEl) {
+    const myId = tutor.id;
+    const allAssigned = allBooks.filter(b => b.assignedTutorId);
+    diagEl.innerHTML = allBooks.length === 0
+      ? '<div style="background:#fff3e0;border-radius:10px;padding:12px 16px;font-size:13px;font-weight:700;color:#e65100;margin-bottom:12px;">⚠️ No bookings in localStorage at all. Book a demo class first via the free-trial page, then schedule it in Pre-Sales.</div>'
+      : bookings.length === 0
+        ? '<div style="background:#fde8e8;border-radius:10px;padding:12px 16px;font-size:13px;font-weight:700;color:#c53030;margin-bottom:12px;">' +
+          '⚠️ ' + allBooks.length + ' booking(s) exist but none are assigned to teacher ID: <strong>' + myId + '</strong><br>' +
+          'Assigned IDs in bookings: <strong>' + (allAssigned.map(b => b.assignedTutorId).join(', ') || 'none') + '</strong><br>' +
+          'Make sure Pre-Sales selects this teacher when scheduling.' +
+          '</div>'
+        : '';
+  }
 
   if (!bookings.length) {
     el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--light);font-weight:700;">No sessions assigned yet.</div>';
@@ -147,15 +165,25 @@ function renderSessionsTab() {
 
 /* ── TEACHER JOINS CLASS ── */
 function teacherJoinClass(bookingId, classLink) {
+  // If already joined this session, just re-open the link — no penalty re-log
+  const alreadyJoined = joinedSessions.has(bookingId);
   joinedSessions.add(bookingId);
 
-  // Check if late (> 4 mins after start)
-  const b = getBookings().find(x => x.id === bookingId);
-  if (b) {
-    const classTime   = parseClassDateTime(b.date, b.time);
-    const minsElapsed = classTime ? Math.floor((new Date() - classTime) / 60000) : 0;
-    if (minsElapsed > 4 && typeof logLateJoin === 'function') {
-      logLateJoin(bookingId, new Date().toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' }));
+  if (!alreadyJoined) {
+    // Record join (start) time for this session
+    const startTimes = JSON.parse(localStorage.getItem('sn_session_start_times') || '{}');
+    startTimes[bookingId] = new Date().toISOString();
+    localStorage.setItem('sn_session_start_times', JSON.stringify(startTimes));
+
+    // First join — check if late (> 4 mins after class start time)
+    const b = getBookings().find(x => x.id === bookingId);
+    if (b) {
+      const classTime   = parseClassDateTime(b.date, b.time);
+      const minsElapsed = classTime ? Math.floor((new Date() - classTime) / 60000) : 0;
+      // Late = joined more than 4 mins after start
+      if (minsElapsed > 4 && typeof logLateJoin === 'function') {
+        logLateJoin(bookingId, new Date().toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' }));
+      }
     }
   }
   // Cancel auto-absent timer
@@ -267,121 +295,8 @@ function closeEndSessionModal() {
   activeEndSessionId = null;
 }
 
-/* Override the existing submitEndClassReport to add new logic */
-const _origSubmitEndClassReport = window.submitEndClassReport;
-window.submitEndClassReport = function() {
-  const outcome = document.querySelector('input[name="classOutcome"]:checked')?.value;
-  if (!outcome) { showToast('Please select the class outcome.', 'error'); return; }
 
-  if (outcome === 'incomplete') {
-    const reason = document.getElementById('incompleteReason')?.value.trim();
-    if (!reason) { showToast('Please describe why the class was incomplete.', 'error'); return; }
-  }
 
-  const bookingId = activeEndSessionId;
-  const all       = getBookings();
-  const b         = all.find(x => x.id === bookingId);
-  if (!b) return;
-
-  const tutor        = getCurrentTutor();
-  const isDemo       = b.isDemoClass || !b.paymentAmount;
-  const recordingLink = document.getElementById('recordingLink')?.value.trim() || '';
-  const reason        = document.getElementById('incompleteReason')?.value.trim() || '';
-  const notes         = document.getElementById('classNotes')?.value.trim() || '';
-  const quality       = document.getElementById('classQuality')?.value || '';
-  const interest      = document.getElementById('studentInterest')?.value || '';
-  const power         = document.getElementById('purchasingPower')?.value || '';
-
-  const report = {
-    bookingId,
-    tutorId:          tutor.id,
-    tutorName:        tutor.name,
-    outcome,
-    incompleteReason: reason,
-    classQuality:     quality,
-    studentInterest:  interest,
-    purchasingPower:  power,
-    notes,
-    recordingLink,
-    reportedAt:       new Date().toISOString(),
-  };
-
-  // Save class report
-  const reports = JSON.parse(localStorage.getItem('sn_class_reports') || '[]');
-  const ri = reports.findIndex(r => r.bookingId === bookingId);
-  if (ri !== -1) reports[ri] = report; else reports.unshift(report);
-  localStorage.setItem('sn_class_reports', JSON.stringify(reports));
-
-  // Update booking
-  const bi = all.findIndex(x => x.id === bookingId);
-  if (bi !== -1) {
-    all[bi].status        = outcome === 'completed' ? 'completed' : 'incomplete';
-    all[bi].classReport   = report;
-    all[bi].recordingLink = recordingLink;
-    all[bi].tutorNotified = true;
-    saveBookings(all);
-  }
-
-  if (outcome === 'incomplete') {
-    // Send back to Pre-Sales incomplete section
-    const incomplete = JSON.parse(localStorage.getItem('sn_incomplete_demos') || '[]');
-    incomplete.unshift({
-      id:             'INC-' + Date.now().toString(36).toUpperCase(),
-      bookingId,
-      studentName:    b.studentName,
-      grade:          b.grade,
-      age:            b.age,
-      subject:        b.subject,
-      email:          b.email,
-      whatsapp:       b.whatsapp,
-      date:           b.date,
-      time:           b.time,
-      tutorName:      tutor.name,
-      tutorId:        tutor.id,
-      reason,
-      loggedAt:       new Date().toISOString(),
-    });
-    localStorage.setItem('sn_incomplete_demos', JSON.stringify(incomplete));
-    showToast('📋 Incomplete demo reported. Pre-Sales team notified.', 'info');
-  } else {
-    // Completed demo → send to Sales dashboard as lead
-    if (isDemo) {
-      const leads = JSON.parse(localStorage.getItem('sn_sales_leads') || '[]');
-      leads.unshift({
-        id:             'LEAD-' + Date.now().toString(36).toUpperCase(),
-        bookingId,
-        studentName:    b.studentName,
-        grade:          b.grade,
-        age:            b.age,
-        subject:        b.subject,
-        email:          b.email,
-        whatsapp:       b.whatsapp,
-        date:           b.date,
-        time:           b.time,
-        leadOwner:      tutor.name,
-        leadOwnerId:    tutor.id,
-        leadOwnerType:  'teacher',
-        classQuality:   quality,
-        studentInterest: interest,
-        purchasingPower: power,
-        notes,
-        recordingLink,
-        status:         'new',
-        createdAt:      new Date().toISOString(),
-      });
-      localStorage.setItem('sn_sales_leads', JSON.stringify(leads));
-      showToast('✅ Demo complete! Lead sent to Sales team.', 'success');
-    } else {
-      // Paid class completed — add earnings
-      if (typeof addSessionEarning === 'function') addSessionEarning('paid');
-      if (typeof syncOverviewStats === 'function') syncOverviewStats();
-      showToast('✅ Class marked complete! Report saved.', 'success');
-    }
-  }
-
-  closeEndSessionModal();
-  renderSessionsTab();
-};
 
 /* ══════════════════════════════════════════════════════
    INIT
@@ -513,3 +428,50 @@ renderSessionsTab = function() {
   debugSessions();
   _origRenderSessionsTab();
 };
+
+/* ══════════════════════════════════════════════════════
+   SEED TEST SESSION — creates a real booking for this
+   teacher so sessions tab can be tested immediately
+══════════════════════════════════════════════════════ */
+function seedTestSession() {
+  const tutor = getCurrentTutor();
+
+  // Create a demo booking 1 hour from now
+  const classTime = new Date();
+  classTime.setHours(classTime.getHours() + 1, 0, 0, 0);
+
+  const dateISO = classTime.toISOString().split('T')[0];
+  const h       = classTime.getHours();
+  const period  = h >= 12 ? 'PM' : 'AM';
+  const h12     = h % 12 === 0 ? 12 : h % 12;
+  const timeStr = h12 + ':00 ' + period;
+
+  const booking = {
+    id:              'TEST-' + Date.now().toString(36).toUpperCase(),
+    studentName:     'Test Student',
+    grade:           'Year 9',
+    age:             '14',
+    subject:         tutor.subject || 'Coding',
+    email:           'test@stemnest.co.uk',
+    whatsapp:        '+44 7700 000000',
+    status:          'scheduled',
+    assignedTutor:   tutor.name,
+    assignedTutorId: tutor.id,
+    classLink:       'https://meet.google.com/test-link',
+    date:            dateISO,
+    time:            timeStr,
+    isDemoClass:     true,
+    tutorNotified:   false,
+    bookedAt:        new Date().toISOString(),
+    scheduledAt:     new Date().toISOString(),
+  };
+
+  const all = getBookings();
+  all.unshift(booking);
+  saveBookings(all);
+
+  renderSessionsTab();
+  renderOverviewSessions();
+  if (typeof renderUpcomingCards === 'function') renderUpcomingCards();
+  showToast('✅ Test session added for ' + tutor.name + ' at ' + timeStr + '!');
+}

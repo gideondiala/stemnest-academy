@@ -168,7 +168,7 @@
 }
 
 /* ── Row heights ── */
-/* Each slot = 30 mins. 1 hour = 2 rows = 56px total */
+/* Each slot = 30 mins. 1 hour = 2 rows = 56px total. Full 24h = 48 rows */
 .wcal-hour-row td {
   height: 28px;
   border-top: 1.5px solid #e8eaf0;
@@ -467,3 +467,42 @@
 }
 .end-class-btn:not([disabled]):hover { background: #c53030; color: #fff; }
 .end-class-btn[disabled] { cursor: not-allowed !important; }
+
+/* ── Upcoming session cards grid ── */
+#upcomingSessionCards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 32px;
+}
+@media (max-width: 900px) {
+  #upcomingSessionCards { grid-template-columns: 1fr; }
+}
+@media (min-width: 901px) and (max-width: 1200px) {
+  #upcomingSessionCards { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── Class Records filter buttons ── */
+.rec-filter-btn {
+  padding: 9px 18px;
+  border-radius: 50px;
+  border: 2px solid #e8eaf0;
+  background: var(--white);
+  font-family: 'Nunito', sans-serif;
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--mid);
+  cursor: pointer;
+  transition: .15s;
+}
+.rec-filter-btn:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-light); }
+.rec-filter-active {
+  background: var(--blue);
+  color: #fff;
+  border-color: var(--blue);
+  box-shadow: 0 4px 12px rgba(26,86,219,.25);
+}
+
+/* ── Recording link status badges ── */
+.rec-status-pending  { background: #fff3e0; color: #e65100; font-size: 11px; font-weight: 900; padding: 3px 10px; border-radius: 50px; }
+.rec-status-uploaded { background: var(--green-light); color: var(--green-dark); font-size: 11px; font-weight: 900; padding: 3px 10px; border-radius: 50px; }

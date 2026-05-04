@@ -76,6 +76,16 @@ nav {
   border-radius: 12px; display: flex; align-items: center; justify-content: center;
   color: #fff; font-family: 'Fredoka One', cursive; font-size: 20px;
 }
+.logo-img          {
+  height: 56px; width: auto;
+  object-fit: contain; display: block;
+}
+
+/* Footer logo — ensure it's visible on the dark footer background */
+.footer-brand .logo-img {
+  height: 48px; width: auto;
+  object-fit: contain; display: block;
+}
 .logo-text         { font-family: 'Fredoka One', cursive; font-size: 22px; color: var(--blue); }
 .logo-text span    { color: var(--orange); }
 .nav-links         { display: flex; align-items: center; gap: 6px; list-style: none; }
@@ -97,6 +107,7 @@ footer { background: #0d1117; padding: 60px 5% 30px; color: rgba(255,255,255,.6)
 }
 .footer-brand .logo-text     { color: #fff; }
 .footer-brand p              { font-size: 14px; line-height: 1.7; margin-top: 16px; max-width: 260px; }
+.footer-brand .logo          { display: block; }
 .footer-col h4               { color: #fff; font-weight: 800; font-size: 14px; margin-bottom: 16px; text-transform: uppercase; letter-spacing: .5px; }
 .footer-col a                { display: block; color: rgba(255,255,255,.5); text-decoration: none; font-size: 14px; font-weight: 600; margin-bottom: 10px; transition: color .2s; }
 .footer-col a:hover          { color: #fff; }

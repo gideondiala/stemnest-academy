@@ -4,7 +4,7 @@
    paid classes, writes slots to teacher calendar.
 ═══════════════════════════════════════════════════════ */
 
-const POS_TABS = ['students', 'scheduled', 'paylinks', 'converted'];
+const POS_TABS = ['students', 'topup', 'scheduled', 'paylinks', 'converted'];
 let generatedLink       = null;
 let posScheduleStudentId = null; // booking ID being scheduled
 
@@ -76,6 +76,7 @@ function showPOSTab(tab) {
   document.querySelectorAll('.sidebar-link[data-tab]').forEach(l => l.classList.toggle('active', l.dataset.tab === tab));
   updatePOSStats();
   if (tab === 'students')  renderPaidStudents();
+  if (tab === 'topup')     renderTopUpStudents();
   if (tab === 'scheduled') renderScheduledPaid();
   if (tab === 'converted') renderPOSConverted();
 }
@@ -86,11 +87,17 @@ function updatePOSStats() {
   const converted = pipeline.filter(p => p.status === 'converted');
   const rev       = converted.reduce((s, p) => s + (parseFloat(p.paymentAmount) || 0), 0);
   const bookings  = getBookings();
+  const students  = JSON.parse(localStorage.getItem('sn_students') || '[]');
+
+  // Count students needing top-up (credits ≤ 2)
+  const needingTopUp = students.filter(s => (parseInt(s.credits) || 0) <= 2).length;
+
   setText('posStat1', bookings.filter(b => b.salesStatus === 'converted' && !b.paidScheduled).length);
   setText('posStat2', bookings.filter(b => b.paidScheduled).length);
   setText('posStat3', converted.length);
   setText('posStat4', '£' + rev.toFixed(0));
-  setText('posBadge', bookings.filter(b => b.salesStatus === 'converted' && !b.paidScheduled).length);
+  setText('posBadge',   bookings.filter(b => b.salesStatus === 'converted' && !b.paidScheduled).length);
+  setText('topupBadge', needingTopUp);
 }
 
 /* ══════════════════════════════════════════════════════
@@ -868,3 +875,152 @@ document.addEventListener('DOMContentLoaded', function() {
   const overlay = document.getElementById('manualOnboardOverlay');
   overlay?.addEventListener('click', function(e) { if (e.target === overlay) closeManualOnboardModal(); });
 });
+
+/* ══════════════════════════════════════════════════════
+   STUDENTS NEEDING TOP-UP
+   Shows students with ≤ 2 credits. Post-Sales can
+   generate and paste a payment link per student.
+══════════════════════════════════════════════════════ */
+function renderTopUpStudents() {
+  const el = document.getElementById('topupStudentsList');
+  if (!el) return;
+
+  const students = JSON.parse(localStorage.getItem('sn_students') || '[]');
+  const bookings = getBookings();
+
+  // Merge students from both sources
+  const seen = new Set();
+  const list = [];
+
+  students.forEach(s => {
+    if ((parseInt(s.credits) || 0) <= 2) {
+      seen.add(s.email);
+      list.push({ ...s, _source: 'students' });
+    }
+  });
+
+  bookings.forEach(b => {
+    if (!seen.has(b.email) && (parseInt(b.studentCredits) || 0) <= 2 && b.studentOnboarded) {
+      list.push({
+        id:       b.studentId || b.id,
+        name:     b.studentName,
+        email:    b.email,
+        phone:    b.whatsapp,
+        subject:  b.subject,
+        credits:  parseInt(b.studentCredits) || 0,
+        _source:  'booking',
+      });
+    }
+  });
+
+  if (!list.length) {
+    el.innerHTML = '<div style="text-align:center;padding:48px 20px;background:var(--white);border-radius:16px;border:1.5px solid #e8eaf0;">' +
+      '<div style="font-size:48px;margin-bottom:12px;">🎉</div>' +
+      '<div style="font-family:\'Fredoka One\',cursive;font-size:20px;color:var(--dark);">All students have sufficient credits</div>' +
+      '<div style="font-size:14px;color:var(--light);margin-top:6px;">Students with 2 or fewer credits will appear here.</div>' +
+      '</div>';
+    return;
+  }
+
+  const thS = 'padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;letter-spacing:.5px;';
+  const tdS = 'padding:14px 16px;vertical-align:middle;';
+
+  el.innerHTML = `
+    <div style="overflow-x:auto;border-radius:16px;border:1.5px solid #e8eaf0;background:var(--white);">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">
+            <th style="${thS}">Student</th>
+            <th style="${thS}">Subject</th>
+            <th style="${thS}">Credits Left</th>
+            <th style="${thS}">Contact</th>
+            <th style="${thS}">Payment Link</th>
+            <th style="${thS}">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${list.map((s, i) => {
+            const credits = parseInt(s.credits) || 0;
+            const creditColor = credits <= 0 ? '#c53030' : '#e65100';
+            const creditBg    = credits <= 0 ? '#fde8e8' : '#fff3e0';
+
+            // Check if a payment link already exists for this student
+            const allLinks = JSON.parse(localStorage.getItem('sn_payment_links') || '[]');
+            const existingLink = allLinks.find(l =>
+              (l.email === s.email || l.student === s.name) && l.status === 'pending'
+            );
+
+            const linkStatus = existingLink && existingLink.url
+              ? `<span style="background:var(--green-light);color:var(--green-dark);font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">✅ Link Sent</span>`
+              : existingLink
+                ? `<span style="background:#fff3e0;color:#e65100;font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">⏳ Link Pending</span>`
+                : `<span style="background:#fde8e8;color:#c53030;font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">❌ No Link Yet</span>`;
+
+            return `<tr style="border-bottom:1px solid #f0f2f8;${i%2===0?'':'background:#fafbff;'}">
+              <td style="${tdS}">
+                <div style="font-weight:800;color:var(--dark);">${s.name || s.studentName || '—'}</div>
+                <div style="font-size:11px;color:var(--light);">${s.id || '—'}</div>
+              </td>
+              <td style="${tdS};font-weight:700;color:var(--mid);">${s.subject || '—'}</td>
+              <td style="${tdS}">
+                <span style="background:${creditBg};color:${creditColor};font-family:'Fredoka One',cursive;font-size:20px;padding:4px 14px;border-radius:10px;">${credits}</span>
+              </td>
+              <td style="${tdS}">
+                <div style="font-size:12px;font-weight:700;color:var(--mid);">📧 ${s.email || '—'}</div>
+                <div style="font-size:12px;font-weight:700;color:var(--mid);">📱 ${s.phone || s.whatsapp || '—'}</div>
+              </td>
+              <td style="${tdS}">
+                <div style="display:flex;flex-direction:column;gap:6px;">
+                  <input type="url" id="topupLink_${s.id}" placeholder="Paste payment link here..."
+                    value="${existingLink && existingLink.url ? existingLink.url : ''}"
+                    style="padding:8px 12px;border:2px solid #e8eaf0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:12px;outline:none;width:220px;">
+                  <button onclick="saveTopUpLink('${s.id}','${s.email}','${s.name || s.studentName || ''}','${s.subject || ''}')"
+                    style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;">
+                    💾 Save & Send
+                  </button>
+                </div>
+              </td>
+              <td style="${tdS}">${linkStatus}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function saveTopUpLink(studentId, email, name, subject) {
+  const input = document.getElementById('topupLink_' + studentId);
+  const url   = input ? input.value.trim() : '';
+  if (!url) { showToast('Please paste a payment link first.', 'error'); return; }
+
+  // Save to sn_payment_links
+  const all = JSON.parse(localStorage.getItem('sn_payment_links') || '[]');
+
+  // Update existing or add new
+  const existing = all.findIndex(l => (l.email === email || l.student === name) && l.status === 'pending');
+  const record = {
+    id:        existing !== -1 ? all[existing].id : 'PL-' + Date.now().toString(36).toUpperCase(),
+    student:   name,
+    email,
+    subject,
+    url,
+    amount:    '',
+    currency:  'GBP',
+    credits:   '',
+    status:    'pending',
+    type:      'topup',
+    createdAt: existing !== -1 ? all[existing].createdAt : new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (existing !== -1) {
+    all[existing] = record;
+  } else {
+    all.unshift(record);
+  }
+
+  localStorage.setItem('sn_payment_links', JSON.stringify(all));
+  updatePOSStats();
+  renderTopUpStudents();
+  showToast('✅ Payment link saved! Student will see it on their dashboard.');
+}

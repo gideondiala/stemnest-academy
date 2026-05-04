@@ -205,7 +205,7 @@ function setGreeting() {
 }
 
 /* ── TAB SWITCHING ── */
-const ALL_TABS = ['overview','lessons','projects','quizzes','certificates'];
+const ALL_TABS = ['overview','lessons','projects','quizzes','certificates','payments'];
 function showTab(tab) {
   ALL_TABS.forEach(t => {
     const el = document.getElementById('tab-' + t);

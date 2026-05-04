@@ -181,8 +181,7 @@ function showClassReminderPopup(booking) {
   `;
   document.body.appendChild(popup);
 
-  // Auto-dismiss after 2 minutes
-  setTimeout(() => popup.remove(), 2 * 60 * 1000);
+  // Do NOT auto-dismiss — teacher must click ✕ to close
 }
 
 /* ══════════════════════════════════════════════════════
