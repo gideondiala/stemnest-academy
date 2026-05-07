@@ -5,7 +5,7 @@
 
 /* ── STUDENT DATA ── */
 const STUDENT = {
-  name: 'James Okafor', initials: 'JO', id: 'SN-2024-0047', year: 'Year 9',
+  name: 'James Okafor', initials: 'JO', id: 'S-0047', year: 'Year 9',
 };
 
 /* ── COURSES & PROGRESS ── */
@@ -125,6 +125,8 @@ let pendingProjects = [
 
 let submittedProjects = [];
 
+let reviewedProjects = [];
+
 /* ── QUIZZES DATA ── */
 const QUIZ_QUESTIONS = {
   q1: [
@@ -178,11 +180,11 @@ const CERTIFICATES = [
 ══════════════════════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', () => {
   setGreeting();
+  loadStudentFromStorage();
   renderProgressBars();
   renderUpcomingPreview();
   renderLessons();
-  renderPendingProjects();
-  renderSubmittedProjects();
+  renderProjectSection('pending');
   renderPendingQuizzes();
   renderCompletedQuizzes();
   renderCertificates();
@@ -192,6 +194,44 @@ document.addEventListener('DOMContentLoaded', () => {
   bindModalCloseOnOverlay('profileModalOverlay', closeProfileModal);
   showTab('overview');
 });
+
+/* ── Load student from localStorage (if onboarded) ── */
+function loadStudentFromStorage() {
+  try {
+    const email = localStorage.getItem('sn_logged_in_student');
+    if (!email) { updateCreditsDisplay(null); return; }
+    const students = JSON.parse(localStorage.getItem('sn_students') || '[]');
+    const s = students.find(st => st.email === email);
+    if (!s) { updateCreditsDisplay(null); return; }
+
+    // Format ID as S-0001
+    const rawId = s.id || '';
+    const numMatch = rawId.match(/(\d+)$/);
+    const formattedId = numMatch ? 'S-' + numMatch[1].padStart(4, '0') : rawId;
+
+    // Update sidebar
+    const nameEl = document.getElementById('sidebarName');
+    if (nameEl) nameEl.textContent = s.name || STUDENT.name;
+    const idEl = document.querySelector('.student-id-badge');
+    if (idEl) idEl.textContent = 'ID: ' + formattedId;
+
+    updateCreditsDisplay(parseInt(s.credits) || 0);
+  } catch(e) { updateCreditsDisplay(null); }
+}
+
+function updateCreditsDisplay(credits) {
+  const statEl  = document.getElementById('statCreditsRemaining');
+  const noteEl  = document.getElementById('statCreditsNote');
+  if (statEl) statEl.textContent = credits !== null ? credits : '—';
+  if (noteEl) {
+    if (credits === null) { noteEl.textContent = 'Class credits'; return; }
+    if (credits <= 2) {
+      noteEl.innerHTML = '<span style="color:#ffd700;font-weight:900;">⚠️ Low — Top up soon</span>';
+    } else {
+      noteEl.textContent = credits + ' class' + (credits !== 1 ? 'es' : '') + ' remaining';
+    }
+  }
+}
 
 /* ── GREETING ── */
 function setGreeting() {
@@ -335,16 +375,57 @@ function showModules(idx) {
 }
 
 /* ══════════════════════════════════════════════════════
-   PROJECTS TAB
+   PROJECTS TAB — Toggle sections with pagination
 ══════════════════════════════════════════════════════ */
+const PROJ_PAGE_SIZE = 10;
+const _projPage = { pending: 0, submitted: 0, reviewed: 0 };
+
+function showProjectSection(section) {
+  ['pending','submitted','reviewed'].forEach(s => {
+    const sec = document.getElementById('projSection-' + s);
+    const btn = document.getElementById('projToggle-' + s);
+    if (sec) sec.style.display = s === section ? 'block' : 'none';
+    if (btn) {
+      btn.classList.toggle('proj-toggle-active', s === section);
+      // Fix count badge color
+      const span = btn.querySelector('span');
+      if (span) span.style.background = s === section ? 'rgba(255,255,255,.3)' : 'rgba(0,0,0,.08)';
+    }
+  });
+  _projPage[section] = 0;
+  renderProjectSection(section);
+}
+
+function renderProjectSection(section) {
+  if (section === 'pending')   renderPendingProjects();
+  if (section === 'submitted') renderSubmittedProjects();
+  if (section === 'reviewed')  renderReviewedProjects();
+}
+
+function loadMoreProjects(section) {
+  _projPage[section]++;
+  renderProjectSection(section);
+}
+
 function renderPendingProjects() {
   const el = document.getElementById('pendingProjects');
+  const moreEl = document.getElementById('pendingLoadMore');
+  const countEl = document.getElementById('projPendingCount');
   if (!el) return;
+
+  if (countEl) countEl.textContent = pendingProjects.length;
+  const badge = document.getElementById('projBadge');
+  if (badge) badge.textContent = pendingProjects.length;
+
   if (pendingProjects.length === 0) {
     el.innerHTML = '<div class="empty-state">🎉 All projects submitted! Great work.</div>';
+    if (moreEl) moreEl.style.display = 'none';
     return;
   }
-  el.innerHTML = pendingProjects.map(p => `
+
+  const page  = _projPage.pending || 0;
+  const slice = pendingProjects.slice(0, (page + 1) * PROJ_PAGE_SIZE);
+  el.innerHTML = slice.map(p => `
     <div class="student-proj-card" onclick="openProjectModal(${p.id})">
       <div class="spc-emoji">${p.emoji}</div>
       <div class="spc-info">
@@ -354,19 +435,27 @@ function renderPendingProjects() {
       <div class="spc-arrow">›</div>
     </div>
   `).join('');
-  // update badge
-  const badge = document.getElementById('projBadge');
-  if (badge) badge.textContent = pendingProjects.length;
+
+  if (moreEl) moreEl.style.display = slice.length < pendingProjects.length ? 'block' : 'none';
 }
 
 function renderSubmittedProjects() {
   const el = document.getElementById('submittedProjects');
+  const moreEl = document.getElementById('submittedLoadMore');
+  const countEl = document.getElementById('projSubmittedCount');
   if (!el) return;
+
+  if (countEl) countEl.textContent = submittedProjects.length;
+
   if (submittedProjects.length === 0) {
     el.innerHTML = '<div class="empty-state" style="color:var(--light);">No submissions yet.</div>';
+    if (moreEl) moreEl.style.display = 'none';
     return;
   }
-  el.innerHTML = submittedProjects.map(p => `
+
+  const page  = _projPage.submitted || 0;
+  const slice = submittedProjects.slice(0, (page + 1) * PROJ_PAGE_SIZE);
+  el.innerHTML = slice.map(p => `
     <div class="student-proj-card submitted-card">
       <div class="spc-emoji">${p.emoji}</div>
       <div class="spc-info">
@@ -376,6 +465,40 @@ function renderSubmittedProjects() {
       <span class="proj-badge pb-reviewed">Submitted ✓</span>
     </div>
   `).join('');
+
+  if (moreEl) moreEl.style.display = slice.length < submittedProjects.length ? 'block' : 'none';
+}
+
+function renderReviewedProjects() {
+  const el = document.getElementById('reviewedProjects');
+  const moreEl = document.getElementById('reviewedLoadMore');
+  const countEl = document.getElementById('projReviewedCount');
+  if (!el) return;
+
+  if (countEl) countEl.textContent = reviewedProjects.length;
+
+  if (reviewedProjects.length === 0) {
+    el.innerHTML = '<div class="empty-state" style="color:var(--light);">No reviewed projects yet.</div>';
+    if (moreEl) moreEl.style.display = 'none';
+    return;
+  }
+
+  const page  = _projPage.reviewed || 0;
+  const slice = reviewedProjects.slice(0, (page + 1) * PROJ_PAGE_SIZE);
+  el.innerHTML = slice.map(p => `
+    <div class="student-proj-card reviewed-card" style="border-left:4px solid var(--green);">
+      <div class="spc-emoji">${p.emoji}</div>
+      <div class="spc-info">
+        <div class="spc-title">${p.title}</div>
+        <div class="spc-meta">${p.course} &nbsp;·&nbsp; Reviewed by ${p.reviewedBy || 'Tutor'}</div>
+        ${p.remarks ? `<div style="font-size:12px;color:var(--mid);margin-top:4px;font-style:italic;">"${p.remarks}"</div>` : ''}
+        ${p.score !== undefined ? `<div style="font-size:12px;font-weight:900;color:var(--green);margin-top:4px;">Score: ${p.score}/100 &nbsp;·&nbsp; +${p.score} pts</div>` : ''}
+      </div>
+      <span class="proj-badge" style="background:var(--green-light);color:var(--green-dark);">⭐ Reviewed</span>
+    </div>
+  `).join('');
+
+  if (moreEl) moreEl.style.display = slice.length < reviewedProjects.length ? 'block' : 'none';
 }
 
 /* ── PROJECT MODAL ── */
@@ -413,7 +536,16 @@ function submitProject() {
   if (idx === -1) return;
 
   const project = pendingProjects.splice(idx, 1)[0];
-  submittedProjects.push({ ...project, submission: text });
+  submittedProjects.push({ ...project, submission: text, submittedAt: new Date().toISOString() });
+
+  // Save to localStorage so teacher can see it
+  try {
+    const email = localStorage.getItem('sn_logged_in_student') || STUDENT.id;
+    const key = 'sn_submitted_projects_' + email;
+    const saved = JSON.parse(localStorage.getItem(key) || '[]');
+    saved.unshift({ ...project, submission: text, submittedAt: new Date().toISOString(), status: 'submitted' });
+    localStorage.setItem(key, JSON.stringify(saved));
+  } catch(e) {}
 
   closeProjectModal();
   renderPendingProjects();

@@ -4,7 +4,7 @@
    assigns teachers, writes directly to teacher calendar.
 ═══════════════════════════════════════════════════════ */
 
-const PS_TABS = ['incoming', 'scheduled', 'completed', 'incomplete', 'cancelled', 'reschedule', 'notes'];
+const PS_TABS = ['incoming', 'scheduled', 'completed', 'incomplete', 'cancelled', 'reschedule', 'notes', 'enrolments'];
 let psScheduleBookingId = null; // booking being scheduled in modal
 
 /* ── INIT ── */
@@ -77,6 +77,7 @@ function showPSTab(tab) {
   if (tab === 'cancelled')  renderCancelled();
   if (tab === 'reschedule') renderReschedule();
   if (tab === 'notes')      renderParentNotes();
+  if (tab === 'enrolments') renderEnrolments();
 }
 
 /* ── STATS ── */
@@ -95,6 +96,8 @@ function updatePSStats() {
   setText('incompleteBadge', incomplete.filter(i => !i.rebooked).length);
   setText('cancelledBadge',  cancelled.length);
   setText('rescheduleBadge', reschedules.filter(r => r.status === 'pending').length);
+  const enrolments = JSON.parse(localStorage.getItem('sn_enrolments') || '[]');
+  setText('enrolmentsBadge', enrolments.filter(e => e.status === 'active').length);
 }
 
 /* ══════════════════════════════════════════════════════
@@ -686,10 +689,14 @@ function renderCompletedDemos() {
             <th style="${thS}">Interest</th>
             <th style="${thS}">Notes</th>
             <th style="${thS}">Completed</th>
+            <th style="${thS}">Enrol</th>
           </tr>
         </thead>
         <tbody>
-          ${list.map((item, i) => `
+          ${list.map((item, i) => {
+            const alreadyEnrolled = (JSON.parse(localStorage.getItem('sn_enrolments') || '[]'))
+              .some(e => e.studentEmail === item.email && e.status === 'active');
+            return `
             <tr style="border-bottom:1px solid #f0f2f8;${i%2===0?'':'background:#fafbff;'}">
               <td style="${tdS}">
                 <div style="font-weight:800;color:var(--dark);">${item.studentName||'—'}</div>
@@ -708,7 +715,98 @@ function renderCompletedDemos() {
               <td style="${tdS};font-size:12px;color:var(--light);font-weight:700;white-space:nowrap;">
                 ${new Date(item.completedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}
               </td>
-            </tr>`).join('')}
+              <td style="${tdS};text-align:center;">
+                ${alreadyEnrolled
+                  ? '<span style="background:var(--green-light);color:var(--green-dark);font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">✅ Enrolled</span>'
+                  : `<button onclick="openEnrolmentModal('${item.bookingId||item.id}')"
+                      style="background:var(--blue);color:#fff;border:none;border-radius:10px;padding:8px 14px;font-family:'Nunito',sans-serif;font-weight:900;font-size:12px;cursor:pointer;white-space:nowrap;">
+                      🎓 Enrol
+                    </button>`
+                }
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+/* ══════════════════════════════════════════════════════
+   ENROLMENTS TAB
+══════════════════════════════════════════════════════ */
+function renderEnrolments() {
+  const el = document.getElementById('enrolmentsList');
+  if (!el) return;
+  const list = JSON.parse(localStorage.getItem('sn_enrolments') || '[]')
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  if (!list.length) {
+    el.innerHTML = `<div style="text-align:center;padding:60px 20px;">
+      <div style="font-size:48px;margin-bottom:12px;">🎓</div>
+      <div style="font-family:'Fredoka One',cursive;font-size:20px;color:var(--dark);">No enrolments yet</div>
+      <div style="font-size:14px;color:var(--light);margin-top:6px;">Once a demo converts to a paid course, click "Enrol" on the Completed Demos tab.</div>
+    </div>`;
+    return;
+  }
+
+  const thS = 'padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;letter-spacing:.5px;';
+  const tdS = 'padding:14px 16px;vertical-align:middle;';
+
+  el.innerHTML = `
+    <div style="overflow-x:auto;border-radius:16px;border:1.5px solid #e8eaf0;background:var(--white);">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">
+            <th style="${thS}">Enrolment ID</th>
+            <th style="${thS}">Student</th>
+            <th style="${thS}">Course</th>
+            <th style="${thS}">Teacher</th>
+            <th style="${thS}">Schedule</th>
+            <th style="${thS}">Start Date</th>
+            <th style="${thS}">Lessons</th>
+            <th style="${thS}">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${list.map((enr, i) => {
+            const scheduleStr = (enr.schedule || []).map(s => {
+              const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+              return (days[s.weekday] || '?') + ' ' + s.time;
+            }).join(', ');
+            // Count completed lessons
+            const allBk = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+            const enrBk = allBk.filter(b => b.enrolmentId === enr.id);
+            const done  = enrBk.filter(b => b.status === 'completed').length;
+            const total = enr.totalLessons || enrBk.length;
+            return `
+            <tr style="border-bottom:1px solid #f0f2f8;${i%2===0?'':'background:#fafbff;'}">
+              <td style="${tdS}">
+                <span style="font-family:'Fredoka One',cursive;font-size:12px;color:var(--blue);">${enr.id}</span>
+              </td>
+              <td style="${tdS}">
+                <div style="font-weight:800;color:var(--dark);">${enr.studentName||'—'}</div>
+                <div style="font-size:11px;color:var(--light);">${enr.studentEmail||'—'}</div>
+              </td>
+              <td style="${tdS}">
+                <div style="font-weight:800;color:var(--dark);">${enr.courseName||'—'}</div>
+                <div style="font-size:11px;color:var(--light);">${enr.courseId||'—'}</div>
+              </td>
+              <td style="${tdS};font-weight:700;color:var(--mid);">${enr.teacherName||'—'}</td>
+              <td style="${tdS};font-size:12px;color:var(--mid);">${scheduleStr||'—'}</td>
+              <td style="${tdS};font-size:12px;color:var(--mid);">${enr.startDate||'—'}</td>
+              <td style="${tdS}">
+                <div style="font-weight:800;color:var(--dark);">${done} / ${total}</div>
+                <div style="background:#e8eaf0;border-radius:50px;height:6px;margin-top:4px;overflow:hidden;">
+                  <div style="background:var(--green);height:100%;width:${total>0?Math.round(done/total*100):0}%;border-radius:50px;"></div>
+                </div>
+              </td>
+              <td style="${tdS}">
+                <span style="background:${enr.status==='active'?'var(--green-light)':'#f0f2f8'};color:${enr.status==='active'?'var(--green-dark)':'var(--light)'};font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">
+                  ${enr.status==='active'?'✅ Active':'⏸ Inactive'}
+                </span>
+              </td>
+            </tr>`;
+          }).join('')}
         </tbody>
       </table>
     </div>`;

@@ -576,9 +576,10 @@ function confirmOnboard() {
     return;
   }
 
-  // Generate student ID
+  // Generate student ID in S-0001 format
   const existing = JSON.parse(localStorage.getItem('sn_students') || '[]');
-  const studentId = 'SN-' + new Date().getFullYear() + '-' + String(existing.length + 1).padStart(4, '0');
+  const seqNum   = existing.length + 1;
+  const studentId = 'S-' + String(seqNum).padStart(4, '0');
   const initials  = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
   const student = {
@@ -833,22 +834,53 @@ function confirmManualOnboard() {
     return;
   }
 
-  // Generate student ID
+  // Generate student ID in S-0001 format
   const existing  = JSON.parse(localStorage.getItem('sn_students') || '[]');
-  const studentId = 'SN-' + new Date().getFullYear() + '-' + String(existing.length + 1).padStart(4, '0');
+  const seqNum    = existing.length + 1;
+  const studentId = 'S-' + String(seqNum).padStart(4, '0');
   const initials  = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
   const student = {
     id: studentId, name, initials, email, phone, age, grade,
     subject, course, password, credits, paymentAmount: amount,
     enrolledAt: new Date().toISOString(),
-    bookingId: null,
     status: 'active',
     isManualOnboard: true,
   };
 
   existing.push(student);
   localStorage.setItem('sn_students', JSON.stringify(existing));
+
+  // Create a booking record so it appears on teacher dashboard
+  // (Pre-Sales style — status 'converted', salesStatus 'converted')
+  const bookingId = 'MOB-' + Date.now().toString(36).toUpperCase();
+  const booking = {
+    id:               bookingId,
+    studentName:      name,
+    studentId:        studentId,
+    email,
+    whatsapp:         phone,
+    age,
+    grade,
+    subject,
+    course,
+    paymentAmount:    amount,
+    studentCredits:   credits,
+    status:           'scheduled',
+    salesStatus:      'converted',
+    studentOnboarded: true,
+    isManualOnboard:  true,
+    isDemoClass:      false,
+    bookedAt:         new Date().toISOString(),
+    scheduledAt:      new Date().toISOString(),
+  };
+  const allBookings = getBookings();
+  allBookings.unshift(booking);
+  saveBookings(allBookings);
+
+  // Update student record with bookingId
+  const sIdx = existing.findIndex(s => s.id === studentId);
+  if (sIdx !== -1) { existing[sIdx].bookingId = bookingId; localStorage.setItem('sn_students', JSON.stringify(existing)); }
 
   // Update password registry
   if (typeof updatePasswordRegistry === 'function') {
@@ -860,14 +892,14 @@ function confirmManualOnboard() {
     const text = generateCredentialText(student);
     downloadCredentialFile(student, text);
     if (typeof logEmail === 'function') {
-      logEmail(email, 'Welcome to StemNest Academy — Your Login Details', text, 'onboarding');
+      logEmail(email, 'Welcome to StemNest Academy — Your Login Details', text);
     }
   }
 
   closeManualOnboardModal();
   updatePOSStats();
   renderPaidStudents();
-  showToast('✅ ' + name + ' onboarded! ID: ' + studentId + '. Credentials downloaded.');
+  showToast('✅ ' + name + ' onboarded! ID: ' + studentId + '. Booking created & credentials downloaded.');
 }
 
 // Bind manual onboard modal overlay close

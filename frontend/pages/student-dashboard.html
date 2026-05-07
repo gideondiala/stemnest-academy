@@ -53,12 +53,6 @@
       <a class="sidebar-link"        data-tab="nest"          onclick="showTab('nest')">          <span class="sl-icon">🪺</span> Learning Nest</a>
       <a class="sidebar-link"        data-tab="payments"      onclick="showTab('payments')">     <span class="sl-icon">💳</span> Payment Records</a>
       <a class="sidebar-link"        data-tab="chat"          onclick="showTab('chat')">          <span class="sl-icon">💬</span> Chat with Tutor</a>
-      <!-- Credits badge — always visible -->
-      <div id="sidebarCreditsBox" style="margin:12px 12px 4px;background:linear-gradient(135deg,var(--blue),var(--green));border-radius:14px;padding:12px 16px;text-align:center;">
-        <div style="font-size:11px;font-weight:900;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Class Credits</div>
-        <div id="sidebarCreditsVal" style="font-family:'Fredoka One',cursive;font-size:28px;color:#fff;line-height:1;">—</div>
-        <div id="sidebarCreditsLabel" style="font-size:11px;font-weight:700;color:rgba(255,255,255,.7);margin-top:2px;">remaining</div>
-      </div>
       <div class="sidebar-section-label">Account</div>
       <a class="sidebar-link" onclick="openProfileModal()"><span class="sl-icon">👤</span> My Profile</a>
       <a class="sidebar-link" href="../index.html"><span class="sl-icon">🌐</span> Back to Website</a>
@@ -84,30 +78,36 @@
     </div>
 
     <!-- Stat cards -->
-    <div class="dash-stats">
+    <div class="dash-stats" id="studentStatCards">
       <div class="dstat ds-green">
         <div class="dstat-icon di-green">📡</div>
-        <div class="dstat-val">12</div>
+        <div class="dstat-val" id="statClassesDone">12</div>
         <div class="dstat-label">Classes Done</div>
         <div class="dstat-trend trend-up">↑ 2 this week</div>
       </div>
       <div class="dstat ds-blue">
         <div class="dstat-icon di-blue">📚</div>
-        <div class="dstat-val">3</div>
+        <div class="dstat-val" id="statCoursesEnrolled">3</div>
         <div class="dstat-label">Courses Enrolled</div>
         <div class="dstat-trend trend-up">Active learner</div>
       </div>
       <div class="dstat ds-orange">
         <div class="dstat-icon di-orange">📁</div>
-        <div class="dstat-val">3</div>
+        <div class="dstat-val" id="statProjectsPending">3</div>
         <div class="dstat-label">Projects Pending</div>
         <div class="dstat-trend trend-neutral">Due this week</div>
       </div>
       <div class="dstat ds-purple">
         <div class="dstat-icon di-purple">🏆</div>
-        <div class="dstat-val">2</div>
+        <div class="dstat-val" id="statCertificates">2</div>
         <div class="dstat-label">Certificates</div>
         <div class="dstat-trend trend-up">Keep going!</div>
+      </div>
+      <div class="dstat" style="background:linear-gradient(135deg,#1a56db,#0e9f6e);border:none;">
+        <div class="dstat-icon" style="background:rgba(255,255,255,.2);">🎟️</div>
+        <div class="dstat-val" id="statCreditsRemaining" style="color:#fff;">—</div>
+        <div class="dstat-label" style="color:rgba(255,255,255,.85);">Credits Remaining</div>
+        <div class="dstat-trend" id="statCreditsNote" style="color:rgba(255,255,255,.7);">Class credits</div>
       </div>
     </div>
 
@@ -203,13 +203,36 @@
         <div class="dash-section-title">📁 My Projects</div>
       </div>
 
-      <!-- Pending -->
-      <div class="proj-section-label">🔲 Pending Projects</div>
-      <div class="student-project-grid" id="pendingProjects"></div>
+      <!-- Toggle buttons -->
+      <div style="display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap;">
+        <button id="projToggle-pending"   class="proj-toggle-btn proj-toggle-active" onclick="showProjectSection('pending')">🔲 Pending Projects <span id="projPendingCount" style="background:rgba(255,255,255,.3);border-radius:50px;padding:1px 8px;font-size:11px;margin-left:4px;">0</span></button>
+        <button id="projToggle-submitted" class="proj-toggle-btn"                    onclick="showProjectSection('submitted')">✅ Submitted Projects <span id="projSubmittedCount" style="background:rgba(0,0,0,.08);border-radius:50px;padding:1px 8px;font-size:11px;margin-left:4px;">0</span></button>
+        <button id="projToggle-reviewed"  class="proj-toggle-btn"                    onclick="showProjectSection('reviewed')">⭐ Reviewed Projects <span id="projReviewedCount" style="background:rgba(0,0,0,.08);border-radius:50px;padding:1px 8px;font-size:11px;margin-left:4px;">0</span></button>
+      </div>
 
-      <!-- Submitted -->
-      <div class="proj-section-label" style="margin-top:36px;">✅ Submitted Projects</div>
-      <div class="student-project-grid" id="submittedProjects"></div>
+      <!-- Pending section -->
+      <div id="projSection-pending">
+        <div class="student-project-grid" id="pendingProjects"></div>
+        <div id="pendingLoadMore" style="display:none;text-align:center;margin-top:16px;">
+          <button class="btn btn-outline" onclick="loadMoreProjects('pending')">Load More →</button>
+        </div>
+      </div>
+
+      <!-- Submitted section -->
+      <div id="projSection-submitted" style="display:none;">
+        <div class="student-project-grid" id="submittedProjects"></div>
+        <div id="submittedLoadMore" style="display:none;text-align:center;margin-top:16px;">
+          <button class="btn btn-outline" onclick="loadMoreProjects('submitted')">Load More →</button>
+        </div>
+      </div>
+
+      <!-- Reviewed section -->
+      <div id="projSection-reviewed" style="display:none;">
+        <div class="student-project-grid" id="reviewedProjects"></div>
+        <div id="reviewedLoadMore" style="display:none;text-align:center;margin-top:16px;">
+          <button class="btn btn-outline" onclick="loadMoreProjects('reviewed')">Load More →</button>
+        </div>
+      </div>
     </div><!-- end tab-projects -->
 
     <!-- ══════════════════════════════════════
@@ -407,5 +430,26 @@
 <script src="../js/utils.js"></script>
 <script src="../js/student-dashboard.js"></script>
 <script src="../js/student-upgrades.js"></script>
+<style>
+.proj-toggle-btn {
+  padding: 10px 20px;
+  border-radius: 50px;
+  border: 2px solid #e8eaf0;
+  background: #fff;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 800;
+  font-size: 13px;
+  color: #718096;
+  cursor: pointer;
+  transition: .15s;
+}
+.proj-toggle-btn:hover { border-color: var(--blue); color: var(--blue); background: #eff6ff; }
+.proj-toggle-active { background: var(--blue); color: #fff; border-color: var(--blue); box-shadow: 0 4px 12px rgba(26,86,219,.25); }
+.proj-toggle-active span { background: rgba(255,255,255,.3) !important; color: #fff; }
+/* Make stat cards smaller when 5 are shown */
+#studentStatCards { grid-template-columns: repeat(5, 1fr); }
+@media (max-width: 1100px) { #studentStatCards { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 700px)  { #studentStatCards { grid-template-columns: repeat(2, 1fr); } }
+</style>
 </body>
 </html>

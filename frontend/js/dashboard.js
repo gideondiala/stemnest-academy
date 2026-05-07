@@ -368,20 +368,26 @@ function renderWeeklyCalendar() {
         const isDemo  = b.status === 'demo' || !b.paymentAmount || b.isDemoStudent;
         const isFirst = slot.mins === bookedEntry.timeMins;
         const cls     = isDemo ? 'wcal-slot wcal-demo-booked' : 'wcal-slot wcal-paid-booked';
+        const isRecurring = b.isRecurring;
 
         if (isFirst) {
+          const rescheduleBtn = isRecurring
+            ? `<button onclick="event.stopPropagation();openRescheduleModal('${b.id}')" style="margin-top:4px;background:rgba(255,255,255,.25);color:#fff;border:none;border-radius:6px;padding:2px 7px;font-size:10px;font-weight:900;cursor:pointer;font-family:'Nunito',sans-serif;">🔄 Reschedule</button>`
+            : '';
           if (isDemo) {
             html += `<td class="${cls}" onclick="showBookingPopup('${b.id}')" title="Demo: ${b.studentName}">
               <div class="wcal-booked-inner wcal-booked-demo">
                 <div class="wcal-booked-label">🎓 ${b.studentName}</div>
                 <div class="wcal-booked-sub">${b.grade || ''}</div>
+                ${rescheduleBtn}
               </div>
             </td>`;
           } else {
             html += `<td class="${cls}" onclick="showBookingPopup('${b.id}')" title="Paid: ${b.studentName}">
               <div class="wcal-booked-inner wcal-booked-paid">
                 <div class="wcal-booked-label">📚 ${b.studentName}</div>
-                <div class="wcal-booked-sub">${b.subject || ''}</div>
+                <div class="wcal-booked-sub">${b.subject || ''} ${b.lessonNumber ? '· L' + b.lessonNumber : ''}</div>
+                ${rescheduleBtn}
               </div>
             </td>`;
           }

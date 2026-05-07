@@ -134,7 +134,7 @@ function openNotInterestedFlow() {
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(10,20,50,.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
   modal.innerHTML =
     '<div style="background:#fff;border-radius:24px;padding:36px 32px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25);">' +
-      '<div style="font-family:\'Fredoka One\',cursive;font-size:20px;color:#1a202c;margin-bottom:8px;">📝 Tell us why</div>' +
+      '<div style="font-family:\'Fredoka One\',cursive;font-size:20px;color:#1a202c;margin-bottom:8px;">📝 Please Tell us why</div>' +
       '<div style="font-size:14px;color:#718096;margin-bottom:16px;line-height:1.6;">We\'re sorry to hear that. Please let us know why you\'re cancelling — this helps us improve.</div>' +
       '<textarea id="jcCancelReason" placeholder="e.g. My schedule changed, I found another provider, I need more time to decide..." style="width:100%;min-height:100px;padding:12px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:\'Nunito\',sans-serif;font-size:14px;outline:none;resize:vertical;margin-bottom:16px;"></textarea>' +
       '<div style="display:flex;gap:10px;">' +

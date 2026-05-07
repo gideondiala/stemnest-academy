@@ -456,10 +456,33 @@
   </div>
 </div>
 
+<!-- ═══ RESCHEDULE LESSON MODAL ═══ -->
+<div class="modal-overlay" id="rescheduleModalOverlay">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <div class="modal-title">🔄 Reschedule Lesson</div>
+      <button class="modal-close" onclick="closeRescheduleModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--bg);border-radius:12px;padding:14px 16px;margin-bottom:20px;font-size:13px;font-weight:700;color:var(--dark);line-height:1.8;" id="reschedule-lesson-info">—</div>
+      <div class="field">
+        <label>📝 Reason for Reschedule <span style="color:var(--orange);">*</span></label>
+        <textarea id="reschedule-reason" placeholder="e.g. Student unavailable — family event" rows="3"
+          style="min-height:80px;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;width:100%;outline:none;resize:vertical;"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeRescheduleModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="confirmReschedule()">🔄 Reschedule & Shift All Future Lessons</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="../js/utils.js"></script>
 <script src="../js/dashboard.js"></script>
 <script src="../js/tutor-companion.js"></script>
 <script src="../js/tutor-sessions.js"></script>
 <script src="../js/tutor-sessions-v2.js"></script>
+<script src="../js/course-scheduler.js"></script>
 </body>
 </html>

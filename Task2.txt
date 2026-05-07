@@ -1,0 +1,11 @@
+I Want us to achieve something, For example, we schedule a scratch Course or Python COurse for a student,
+i want that each slot booked carres a name of the student and the title of the lesson visible on the availabilty calendar and also on the card in the Overview section
+when we click on the slot for Paid there should be Class details Join class, end class, and close. these activity link and lesson titles should be manually entered by admin when creating each course
+This class details should contain the activity links for students, the slides link for that class explanantion etc.
+please implement the above
+
+Also in the future we want to be able to have group classes to cut cost for a students that cant pay for premium 1:1 classes
+we will want to create a batch where we join 2,3 or 4 students in one session(This is something we will do in the future Just asking about the Possibility.)
+
+Also I want to Know if it is Possible to embed paywise auto generate payment link instantly for parents to pay. if possible how do i navigate this
+Also after this we have to start Implementing the backend for possible deployement

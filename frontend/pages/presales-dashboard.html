@@ -38,6 +38,7 @@
       <a class="sidebar-link"        data-tab="cancelled"   onclick="showPSTab('cancelled')">  <span class="sl-icon">🚫</span> Cancelled <span class="sl-badge" id="cancelledBadge">0</span></a>
       <a class="sidebar-link"        data-tab="reschedule"  onclick="showPSTab('reschedule')"> <span class="sl-icon">🔄</span> Reschedule Requests <span class="sl-badge" id="rescheduleBadge">0</span></a>
       <a class="sidebar-link"        data-tab="notes"       onclick="showPSTab('notes')">      <span class="sl-icon">📝</span> Parent Notes</a>
+      <a class="sidebar-link"        data-tab="enrolments"  onclick="showPSTab('enrolments')"> <span class="sl-icon">🎓</span> Enrolments <span class="sl-badge" id="enrolmentsBadge">0</span></a>
     </div>
     <div class="sidebar-bottom">
       <button class="logout-btn" onclick="window.location.href='login.html'">🚪 Log Out</button>
@@ -121,6 +122,15 @@
       <div id="rescheduleRequestsList"></div>
     </div>
 
+    <!-- ENROLMENTS -->
+    <div id="tab-enrolments" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🎓 Course Enrolments</div>
+        <span style="font-size:13px;font-weight:700;color:var(--light);">Students enrolled in recurring courses — all lessons auto-scheduled</span>
+      </div>
+      <div id="enrolmentsList"></div>
+    </div>
+
   </div><!-- end dash-main -->
 </div><!-- end dash-wrap -->
 
@@ -186,8 +196,92 @@
   </div>
 </div>
 
+<!-- ═══ ENROLMENT MODAL ═══ -->
+<div class="modal-overlay" id="enrolmentModalOverlay">
+  <div class="modal" style="max-width:580px;max-height:90vh;overflow-y:auto;">
+    <div class="modal-header">
+      <div class="modal-title">🎓 Enrol Student in Course</div>
+      <button class="modal-close" onclick="closeEnrolmentModal()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Student info banner -->
+      <div style="background:var(--blue-light);border-radius:12px;padding:14px 16px;margin-bottom:20px;font-size:13px;font-weight:700;color:var(--dark);line-height:1.7;" id="enrol-student-info">—</div>
+
+      <!-- Course dropdown -->
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">📚 Select Course <span style="color:#e53e3e;">*</span></label>
+        <select id="enrol-course" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;background:var(--white);">
+          <option value="">— Select a course —</option>
+        </select>
+      </div>
+
+      <!-- Teacher dropdown -->
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">👩‍🏫 Assign Teacher <span style="color:#e53e3e;">*</span></label>
+        <select id="enrol-teacher" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;background:var(--white);">
+          <option value="">— Select a teacher —</option>
+        </select>
+      </div>
+
+      <!-- Start date -->
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">📅 Course Start Date <span style="color:#e53e3e;">*</span></label>
+        <input type="date" id="enrol-start-date" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;">
+      </div>
+
+      <!-- Weekly schedule -->
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">🗓️ Weekly Schedule <span style="color:#e53e3e;">*</span></label>
+        <div style="font-size:12px;color:var(--light);font-weight:700;margin-bottom:10px;">Set the recurring days and times for this student's classes each week.</div>
+        <div id="enrol-schedule-rows"></div>
+        <button type="button" onclick="addScheduleRow()" style="background:var(--bg);color:var(--blue);border:2px dashed var(--blue);border-radius:12px;padding:9px 18px;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;width:100%;margin-top:4px;">+ Add Another Day</button>
+      </div>
+
+      <!-- Class link -->
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">🔗 Class Link (Meet / Zoom) <span style="color:#e53e3e;">*</span></label>
+        <input type="url" id="enrol-class-link" placeholder="https://meet.google.com/xxx-xxxx-xxx"
+          style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;">
+      </div>
+
+      <div style="background:#fff8e1;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13px;font-weight:700;color:#e65100;">
+        ⚠️ This will auto-generate ALL lesson bookings for the full course and add them to the teacher's calendar.
+      </div>
+
+      <div style="display:flex;gap:12px;margin-top:4px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="closeEnrolmentModal()">Cancel</button>
+        <button class="btn btn-primary" style="flex:2;" onclick="confirmEnrolment()">🎓 Create Enrolment & Schedule All Lessons</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ RESCHEDULE LESSON MODAL ═══ -->
+<div class="modal-overlay" id="rescheduleModalOverlay">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <div class="modal-title">🔄 Reschedule Lesson</div>
+      <button class="modal-close" onclick="closeRescheduleModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--bg);border-radius:12px;padding:14px 16px;margin-bottom:20px;font-size:13px;font-weight:700;color:var(--dark);line-height:1.8;" id="reschedule-lesson-info">—</div>
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">📝 Reason for Reschedule <span style="color:#e53e3e;">*</span></label>
+        <textarea id="reschedule-reason" placeholder="e.g. Student unavailable — family event" rows="3"
+          style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;resize:vertical;"></textarea>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:4px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="closeRescheduleModal()">Cancel</button>
+        <button class="btn btn-primary" style="flex:2;" onclick="confirmReschedule()">🔄 Reschedule & Shift All Future Lessons</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="../js/utils.js"></script>
 <script src="../js/presales-dashboard.js"></script>
 <script src="../js/mail-system.js"></script>
+<script src="../js/course-scheduler.js"></script>
 </body>
 </html>

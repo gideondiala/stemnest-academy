@@ -136,3 +136,43 @@ so each demo is assigned to specific sales person and that helps the follow up t
 
 the sales person should also have a section for each completed sales pitch. and a recording uploaded and saved just as teacher dashboardhas a record of each session with the recording link.
 the helps the sales team lead to watch  videos of how the sales person pitched the course. and also be sure the job was done
+
+________________________________________________________________________________________________________________________________
+
+There is a very Important feature i want us to add in this platform
+we have different courses. these courses have different number of lessons with lesson names, lesson number etc.
+this is what we want. when a course is booked for a student e.g python for beginners and it has 48 lessons 
+when that class is booked for a teacher. the number of classes per week has to be selected with days and time. this has to be reocurring same schedule every week.
+so when its scheduled all the classes should be visible on the calendar each week. 
+e.g week 1 monday 6pm intro to dev tools setup
+    week 1 Wednesday 4pm python print and input Statement
+
+    week 2 Monday 6pm conditional Statement
+    week 2 wednesday 4pm nested conditional Statement
+
+    The above is just an example
+Also there should be a reschedule feature where if a student tells the teacher earlier that they cannot join class today. in this case the teacher can click on that lesson on the availabilitycalendar and selects reschedule cllass. 
+
+
+________________________________________________________________________________________________________________________________
+
+In the cancel demo class by student, Where it shows "Tell Us Why", Lets change that text to "Please Tell us why"
+
+In the paid student Dashboard The creditremaining should not be at the  left down side panel under the chat with Tutor. It should be very visible at the top.
+we have 4 cards at the top classes Done, courses enrolled, projects pending, certificates. Please add one more card to this 4 resize them smaller to fit. the card should display the remaining credit. Its a very Important feature and shouldnt be hidden
+
+Also Our Paid student ID should be readable e.g S-0001, s-0002 etc
+
+On the student Dashboard, Pending projects, submitted Projects and Reviewed project.
+The display for this there on "My Project section" should be better. just by each other Pending Projects(Pulls down 10 pending project if Up to 10), when Submitted Projects is clicked the pending projects disappearand 10 submitted projects appear if any. when Reviewed project is clicked only the Reviewedprojects drops down in that order
+if student want to see more than 10 if there is when they scroll down they should see more and continue that way
+the Idea is after class A project is automatically assigned. this shows in the pending projects in the student dashboard. whenthe student have completed  to the Project and submitted it should show on submitted. this also reflects on the teachers dashboard as projects pending review. Then when teacher reviews with remarks it appears on the student dasboardas reviewd project with the teachers remarks and score for that project. each project should Give 100 points
+
+
+The upcoming Demo section on the overview of the academic counsellor/sales dashboard should be populated properly, row wise with top like Name, subject, date time, teacher, gmail, number, join class,log pitch(select only important details from what i have listed)
+this makes it well arranged when other details starts coming in under each other. It should just have about 5 details under upcoming and recent Pipeline activity. then when see all or full pipelineis clicked it leads to those sections seperately and starts bringing up records 10 at a time, when more is clicked it brings up 10 more and so on till the end of the record
+
+when filling the sales Pitch the part written course Pitched should be selectable based on courses created by admin.
+
+The Manual Onboarding on the Post sales dashboardshould just be like the onboarding from the presales. and should directly appear on teachers dashboard
+
