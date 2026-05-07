@@ -383,10 +383,12 @@ function renderWeeklyCalendar() {
               </div>
             </td>`;
           } else {
-            html += `<td class="${cls}" onclick="showBookingPopup('${b.id}')" title="Paid: ${b.studentName}">
+            const lessonTitle = b.lessonName || b.topic || '';
+            const lessonShort = lessonTitle ? lessonTitle.slice(0, 20) + (lessonTitle.length > 20 ? '…' : '') : (b.subject || '');
+            html += `<td class="${cls}" onclick="showBookingPopup('${b.id}')" title="${b.studentName}${lessonTitle ? ' — ' + lessonTitle : ''}">
               <div class="wcal-booked-inner wcal-booked-paid">
                 <div class="wcal-booked-label">📚 ${b.studentName}</div>
-                <div class="wcal-booked-sub">${b.subject || ''} ${b.lessonNumber ? '· L' + b.lessonNumber : ''}</div>
+                <div class="wcal-booked-sub">${lessonShort}${b.lessonNumber ? ' · L' + b.lessonNumber : ''}</div>
                 ${rescheduleBtn}
               </div>
             </td>`;
@@ -477,22 +479,30 @@ function showBookingPopup(bookingId) {
       </div>`;
   } else {
     popup.innerHTML = `
-      <div style="background:var(--white);border-radius:20px;padding:28px 32px;max-width:400px;width:100%;box-shadow:0 16px 60px rgba(0,0,0,.25);">
+      <div style="background:var(--white);border-radius:20px;padding:28px 32px;max-width:440px;width:100%;box-shadow:0 16px 60px rgba(0,0,0,.25);">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
           <div style="font-family:'Fredoka One',cursive;font-size:20px;color:var(--blue);">📚 Paid Class</div>
           <button onclick="document.getElementById('calBookingPopup').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--light);">✕</button>
         </div>
         <div style="background:var(--blue-light);border-radius:12px;padding:16px;margin-bottom:16px;">
           <div style="font-weight:900;font-size:16px;color:var(--dark);margin-bottom:8px;">${b.studentName}</div>
-          <div style="font-size:13px;color:var(--mid);font-weight:700;line-height:1.8;">
-            📚 Topic: <strong>${b.topic || b.subject || '—'}</strong><br>
-            🎓 Grade: <strong>${b.grade || '—'}</strong><br>
-            📅 ${b.date || '—'} at ${b.time || '—'}<br>
-            ⏱ Duration: <strong>${b.duration || '60 mins'}</strong>
+          <div style="font-size:13px;color:var(--mid);font-weight:700;line-height:1.9;">
+            ${b.lessonNumber ? `<div>📖 <strong>Lesson ${b.lessonNumber}${b.totalLessons ? ' of ' + b.totalLessons : ''}</strong></div>` : ''}
+            <div>📝 <strong>${b.lessonName || b.topic || b.subject || '—'}</strong></div>
+            <div>🎓 Grade: <strong>${b.grade || '—'}</strong></div>
+            <div>📅 ${b.date || '—'} at ${b.time || '—'}</div>
+            <div>⏱ Duration: <strong>${b.duration || '60 mins'}</strong></div>
+            ${b.courseName ? `<div>📚 Course: <strong>${b.courseName}</strong></div>` : ''}
           </div>
         </div>
+        ${(b.activityLink || b.slidesLink) ? `
+        <div style="background:var(--bg);border-radius:12px;padding:14px;margin-bottom:14px;">
+          <div style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:var(--light);margin-bottom:10px;">📎 Class Resources</div>
+          ${b.activityLink ? `<a href="${b.activityLink}" target="_blank" style="display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid #e8eaf0;border-radius:10px;padding:10px 14px;text-decoration:none;color:var(--dark);font-weight:800;font-size:13px;margin-bottom:8px;">🔗 Activity Link <span style="margin-left:auto;color:var(--blue);font-size:11px;">Open ↗</span></a>` : ''}
+          ${b.slidesLink ? `<a href="${b.slidesLink}" target="_blank" style="display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid #e8eaf0;border-radius:10px;padding:10px 14px;text-decoration:none;color:var(--dark);font-weight:800;font-size:13px;">📊 Slides / Explanation <span style="margin-left:auto;color:var(--blue);font-size:11px;">Open ↗</span></a>` : ''}
+        </div>` : ''}
         ${b.classLink ? `<a href="${b.classLink}" target="_blank" style="display:block;background:var(--blue);color:#fff;text-align:center;padding:12px;border-radius:12px;font-weight:900;font-size:14px;text-decoration:none;margin-bottom:10px;">🚀 Join Class</a>` : ''}
-        <button onclick="openEndClassModal('${b.id}')" style="width:100%;background:var(--green);color:#fff;border:none;border-radius:12px;padding:12px;font-family:'Nunito',sans-serif;font-weight:900;font-size:14px;cursor:pointer;margin-bottom:10px;">✅ End Class</button>
+        <button onclick="openEndClassDialogV2 ? openEndClassDialogV2('${b.id}') : openEndClassModal('${b.id}')" style="width:100%;background:var(--green);color:#fff;border:none;border-radius:12px;padding:12px;font-family:'Nunito',sans-serif;font-weight:900;font-size:14px;cursor:pointer;margin-bottom:10px;">✅ End Class</button>
         <button onclick="document.getElementById('calBookingPopup').remove()" style="width:100%;background:var(--bg);border:1.5px solid #e8eaf0;border-radius:12px;padding:10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;cursor:pointer;color:var(--mid);">Close</button>
       </div>`;
   }

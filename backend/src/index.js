@@ -1,58 +1,127 @@
 /**
  * StemNest Academy — Backend Entry Point
- * Express server with CORS, JSON parsing, and route mounting.
+ * Production-grade Express server with security middleware,
+ * structured logging, and all API routes mounted.
  */
 
 require('dotenv').config();
-const express    = require('express');
-const cors       = require('cors');
-const rateLimit  = require('express-rate-limit');
+
+const express   = require('express');
+const cors      = require('cors');
+const helmet    = require('helmet');
+const morgan    = require('morgan');
+const rateLimit = require('express-rate-limit');
 
 const authRoutes     = require('./routes/auth');
+const userRoutes     = require('./routes/users');
 const courseRoutes   = require('./routes/courses');
 const sessionRoutes  = require('./routes/sessions');
-const userRoutes     = require('./routes/users');
+const bookingRoutes  = require('./routes/bookings');
 const projectRoutes  = require('./routes/projects');
+const paymentRoutes  = require('./routes/payments');
 const errorHandler   = require('./middleware/errorHandler');
+const logger         = require('./utils/logger');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-// ── Middleware ──
-app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5500' }));
-app.use(express.json());
+/* ══════════════════════════════════════════════
+   SECURITY MIDDLEWARE
+══════════════════════════════════════════════ */
 
-// Global rate limiter (100 req / 15 min per IP)
-app.use(rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  standardHeaders: true,
-  legacyHeaders: false,
+/* Helmet sets secure HTTP headers */
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 
-// ── Health check ──
+/* CORS — only allow the frontend origin */
+const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5500')
+  .split(',').map(o => o.trim());
+
+app.use(cors({
+  origin: (origin, callback) => {
+    /* Allow requests with no origin (mobile apps, Postman, server-to-server) */
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
+  credentials: true,
+  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization'],
+}));
+
+/* Global rate limiter — 200 req / 15 min per IP */
+app.use(rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many requests — please slow down' },
+}));
+
+/* ══════════════════════════════════════════════
+   BODY PARSING
+   Note: /api/payments/webhook needs raw body for
+   Stripe signature verification — mount BEFORE json()
+══════════════════════════════════════════════ */
+app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+
+/* ══════════════════════════════════════════════
+   LOGGING
+══════════════════════════════════════════════ */
+app.use(morgan(
+  process.env.NODE_ENV === 'production' ? 'combined' : 'dev',
+  { stream: { write: msg => logger.info(msg.trim()) } }
+));
+
+/* ══════════════════════════════════════════════
+   HEALTH CHECK
+══════════════════════════════════════════════ */
 app.get('/api/health', (_req, res) => {
-  res.json({ success: true, message: 'StemNest API is running 🚀' });
+  res.json({
+    success: true,
+    message: 'StemNest API is running 🚀',
+    env:     process.env.NODE_ENV,
+    time:    new Date().toISOString(),
+  });
 });
 
-// ── Routes ──
+/* ══════════════════════════════════════════════
+   ROUTES
+══════════════════════════════════════════════ */
 app.use('/api/auth',     authRoutes);
+app.use('/api/users',    userRoutes);
 app.use('/api/courses',  courseRoutes);
 app.use('/api/sessions', sessionRoutes);
-app.use('/api/users',    userRoutes);
+app.use('/api/bookings', bookingRoutes);
 app.use('/api/projects', projectRoutes);
+app.use('/api/payments', paymentRoutes);
 
-// ── 404 ──
+/* ══════════════════════════════════════════════
+   404 + GLOBAL ERROR HANDLER
+══════════════════════════════════════════════ */
 app.use((_req, res) => {
   res.status(404).json({ success: false, error: 'Route not found' });
 });
 
-// ── Global error handler ──
 app.use(errorHandler);
 
-// ── Start ──
-app.listen(PORT, () => {
-  console.log(`✅ StemNest API running on http://localhost:${PORT}`);
+/* ══════════════════════════════════════════════
+   START SERVER
+══════════════════════════════════════════════ */
+const server = app.listen(PORT, () => {
+  logger.info(`✅ StemNest API running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
 });
 
-module.exports = app; // for testing
+/* Graceful shutdown */
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM received — shutting down gracefully');
+  server.close(() => {
+    logger.info('Server closed');
+    process.exit(0);
+  });
+});
+
+module.exports = app;

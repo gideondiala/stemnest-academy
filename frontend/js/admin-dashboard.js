@@ -732,6 +732,8 @@ function buildCourseForm() {
     const idEl = document.getElementById('ac-id');
     if (idEl) idEl.value = nextCourseId();
   }
+  // Build lesson rows
+  renderLessonRows();
 }
 
 function selectCourseEmoji(btn, emoji) {
@@ -743,6 +745,58 @@ function selectCourseColor(swatch, colorId) {
   acSelectedColor = colorId;
   document.querySelectorAll('.ac-color-swatch').forEach(s => s.classList.remove('selected'));
   swatch.classList.add('selected');
+}
+
+/* ── Lesson rows state ── */
+let _lessonRows = []; // [{number, name, activityLink, slidesLink}]
+
+function renderLessonRows() {
+  const container = document.getElementById('lessonLinksContainer');
+  if (!container) return;
+  if (_lessonRows.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--light);font-size:13px;font-weight:700;">No lessons added yet. Click "+ Add Lesson" to start.</div>';
+    return;
+  }
+  container.innerHTML = _lessonRows.map((row, idx) => `
+    <div style="background:var(--bg);border-radius:14px;padding:16px;margin-bottom:12px;border:1.5px solid #e8eaf0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div style="font-family:'Fredoka One',cursive;font-size:15px;color:var(--blue);">Lesson ${row.number}</div>
+        <button type="button" onclick="removeLessonRow(${idx})" style="background:#fde8e8;color:#c53030;border:none;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:900;cursor:pointer;">✕ Remove</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px;">Lesson Title</label>
+          <input type="text" value="${row.name || ''}" placeholder="e.g. Variables & Data Types"
+            oninput="_lessonRows[${idx}].name = this.value"
+            style="width:100%;padding:9px 12px;border:2px solid #e8eaf0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:13px;outline:none;">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px;">🔗 Activity Link</label>
+          <input type="url" value="${row.activityLink || ''}" placeholder="https://replit.com/... or Google Classroom"
+            oninput="_lessonRows[${idx}].activityLink = this.value"
+            style="width:100%;padding:9px 12px;border:2px solid #e8eaf0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:13px;outline:none;">
+        </div>
+        <div style="grid-column:1/-1;">
+          <label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px;">📊 Slides / Explanation Link</label>
+          <input type="url" value="${row.slidesLink || ''}" placeholder="https://docs.google.com/presentation/... or Canva link"
+            oninput="_lessonRows[${idx}].slidesLink = this.value"
+            style="width:100%;padding:9px 12px;border:2px solid #e8eaf0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:13px;outline:none;">
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function addLessonRow() {
+  const nextNum = _lessonRows.length > 0 ? Math.max(..._lessonRows.map(r => r.number)) + 1 : 1;
+  _lessonRows.push({ number: nextNum, name: '', activityLink: '', slidesLink: '' });
+  renderLessonRows();
+}
+
+function removeLessonRow(idx) {
+  _lessonRows.splice(idx, 1);
+  // Re-number
+  _lessonRows.forEach((r, i) => { r.number = i + 1; });
+  renderLessonRows();
 }
 
 /* ── Edit existing course ── */
@@ -776,6 +830,15 @@ function editCourse(id) {
 
   acSelectedEmoji = c.emoji || '💻';
   acSelectedColor = c.color || 'blue';
+
+  // Load lesson rows from saved lessons array
+  _lessonRows = (c.lessons || []).map(l => ({
+    number:       l.number || 1,
+    name:         l.name || '',
+    activityLink: l.activityLink || '',
+    slidesLink:   l.slidesLink || '',
+  }));
+
   buildCourseForm();
 }
 
@@ -823,6 +886,12 @@ function saveCourse() {
     badge:    document.getElementById('ac-badge')?.value || '',
     emoji:    acSelectedEmoji,
     color:    acSelectedColor,
+    lessons:  _lessonRows.filter(r => r.name).map(r => ({
+      number:       r.number,
+      name:         r.name.trim(),
+      activityLink: r.activityLink.trim(),
+      slidesLink:   r.slidesLink.trim(),
+    })),
   };
 
   const all = getAdminCourses();
@@ -843,6 +912,7 @@ function saveCourse() {
 /* ── Reset course form ── */
 function resetCourseForm() {
   editingCourseId = null;
+  _lessonRows = [];
   const titleEl = document.getElementById('addCourseTabTitle');
   if (titleEl) titleEl.textContent = '➕ Add New Course';
   const btnEl = document.getElementById('saveCourseBtn');

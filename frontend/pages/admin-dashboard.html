@@ -366,6 +366,14 @@
           </div>
 
           <div class="atf-divider"></div>
+          <div class="atf-section-title">📋 Lesson Details & Activity Links</div>
+          <div style="background:var(--blue-light);border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13px;font-weight:700;color:var(--blue);">
+            💡 Add activity links and slides for each lesson. Teachers and students will see these when they click on a booked class slot. You can add as many lessons as the course has.
+          </div>
+          <div id="lessonLinksContainer"></div>
+          <button type="button" onclick="addLessonRow()" style="background:var(--bg);color:var(--blue);border:2px dashed var(--blue);border-radius:12px;padding:10px 20px;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;width:100%;margin-bottom:16px;">+ Add Lesson</button>
+
+          <div class="atf-divider"></div>
           <div class="atf-actions">
             <button type="button" class="btn btn-outline" onclick="resetCourseForm()">Clear Form</button>
             <button type="button" class="btn btn-primary" id="saveCourseBtn" onclick="saveCourse()">✦ Save Course</button>

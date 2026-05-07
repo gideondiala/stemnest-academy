@@ -193,6 +193,8 @@ function createEnrolment(opts) {
       lessonNumber:    lesson.number || idx + 1,
       lessonName:      lesson.name   || 'Lesson ' + (idx + 1),
       totalLessons:    total,
+      activityLink:    lesson.activityLink || '',
+      slidesLink:      lesson.slidesLink   || '',
       studentName:     opts.studentName,
       studentId:       opts.studentId || '',
       email:           opts.studentEmail,
