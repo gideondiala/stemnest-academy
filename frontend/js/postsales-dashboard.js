@@ -382,7 +382,7 @@ function loadCourseDropdown() {
     courses.map(c => `<option value="${c.name}">£${c.price || '—'} — ${c.name}</option>`).join('');
 }
 
-function generatePaymentLink() {
+async function generatePaymentLink() {
   const student  = document.getElementById('pl-student')?.value.trim();
   const email    = document.getElementById('pl-email')?.value.trim();
   const course   = document.getElementById('pl-course')?.value;
@@ -392,6 +392,32 @@ function generatePaymentLink() {
   const notes    = document.getElementById('pl-notes')?.value.trim();
   if (!student || !email || !course || !amount) { showToast('Please fill in all required fields.', 'error'); return; }
 
+  /* Try real API first */
+  const online = typeof isApiAvailable === 'function' && await isApiAvailable();
+  if (online && typeof Payments !== 'undefined') {
+    try {
+      const data = await Payments.createLink({
+        studentName: student,
+        studentEmail: email,
+        courseId: null,
+        amount: parseFloat(amount),
+        currency,
+        credits: parseInt(credits),
+        notes,
+      });
+      generatedLink = data.paymentUrl;
+      const box = document.getElementById('generatedLinkBox');
+      const txt = document.getElementById('generatedLinkText');
+      if (box) box.style.display = 'block';
+      if (txt) txt.textContent = generatedLink;
+      showToast('✅ Real payment link generated via Stripe!');
+      return;
+    } catch (e) {
+      console.warn('[API] Payment link failed, using local fallback:', e.message);
+    }
+  }
+
+  /* Fallback: local simulated link */
   const record = {
     id: 'PL-' + Date.now().toString(36).toUpperCase(),
     student, email,
@@ -404,7 +430,7 @@ function generatePaymentLink() {
   all.unshift(record);
   localStorage.setItem('sn_payment_links', JSON.stringify(all));
 
-  generatedLink = `https://pay.stemnest.co.uk/checkout?ref=${record.id}&student=${encodeURIComponent(student)}&course=${encodeURIComponent(course)}&amount=${amount}&currency=${currency}`;
+  generatedLink = `https://pay.stemnestacademy.co.uk/checkout?ref=${record.id}&student=${encodeURIComponent(student)}&course=${encodeURIComponent(course)}&amount=${amount}&currency=${currency}`;
 
   const box = document.getElementById('generatedLinkBox');
   const txt = document.getElementById('generatedLinkText');
@@ -560,7 +586,7 @@ function closeOnboardModal() {
   onboardingStudentId = null;
 }
 
-function confirmOnboard() {
+async function confirmOnboard() {
   const name     = document.getElementById('ob-name')?.value.trim();
   const email    = document.getElementById('ob-email')?.value.trim();
   const phone    = document.getElementById('ob-phone')?.value.trim();
@@ -576,34 +602,52 @@ function confirmOnboard() {
     return;
   }
 
-  // Generate student ID in S-0001 format
-  const existing = JSON.parse(localStorage.getItem('sn_students') || '[]');
-  const seqNum   = existing.length + 1;
-  const studentId = 'S-' + String(seqNum).padStart(4, '0');
-  const initials  = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  /* Try real API first — creates user in PostgreSQL */
+  const online = typeof isApiAvailable === 'function' && await isApiAvailable();
+  let studentId = null;
+
+  if (online && typeof Users !== 'undefined') {
+    try {
+      const data = await apiCall('/api/users', {
+        method: 'POST',
+        body: {
+          name, email, password, role: 'student',
+          phone, whatsapp: phone,
+        },
+      });
+      studentId = data.user?.staff_id || data.user?.id;
+      showToast(`✅ ${name} created in database! ID: ${studentId}`);
+    } catch (e) {
+      console.warn('[API] Create student failed:', e.message);
+      /* Fall through to localStorage */
+    }
+  }
+
+  /* Generate student ID in S-0001 format if not from API */
+  if (!studentId) {
+    const existing = JSON.parse(localStorage.getItem('sn_students') || '[]');
+    const seqNum   = existing.length + 1;
+    studentId = 'S-' + String(seqNum).padStart(4, '0');
+  }
+
+  const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
   const student = {
-    id:          studentId,
-    name,
-    initials,
-    email,
-    phone,
-    age,
-    grade,
-    subject,
-    course,
-    password,
-    credits,
+    id: studentId, name, initials, email, phone, age, grade,
+    subject, course, password, credits,
     enrolledAt:  new Date().toISOString(),
     bookingId:   onboardingStudentId,
     status:      'active',
   };
 
-  // Save to students registry
-  existing.push(student);
+  /* Save to localStorage students registry */
+  const existing = JSON.parse(localStorage.getItem('sn_students') || '[]');
+  const existIdx = existing.findIndex(s => s.email === email);
+  if (existIdx !== -1) existing[existIdx] = { ...existing[existIdx], ...student };
+  else existing.push(student);
   localStorage.setItem('sn_students', JSON.stringify(existing));
 
-  // Mark booking as onboarded
+  /* Mark booking as onboarded */
   const all = getBookings();
   const idx = all.findIndex(b => b.id === onboardingStudentId);
   if (idx !== -1) {
@@ -613,20 +657,17 @@ function confirmOnboard() {
     saveBookings(all);
   }
 
-  // Update password registry (for Super Admin chart)
-  updatePasswordRegistry({ id: studentId, name, email, role: 'student', password });
+  if (typeof updatePasswordRegistry === 'function') {
+    updatePasswordRegistry({ id: studentId, name, email, role: 'student', password });
+  }
 
-  // Generate credential text content
-  const credText = generateCredentialText(student);
-
-  // Simulate email to parent
-  logEmail(email,
-    'Welcome to StemNest Academy — Your Child\'s Login Details',
-    credText
-  );
-
-  // Trigger download of credential file
-  downloadCredentialFile(student, credText);
+  const credText = typeof generateCredentialText === 'function' ? generateCredentialText(student) : '';
+  if (credText && typeof downloadCredentialFile === 'function') {
+    downloadCredentialFile(student, credText);
+  }
+  if (credText && typeof logEmail === 'function') {
+    logEmail(email, 'Welcome to StemNest Academy — Your Child\'s Login Details', credText);
+  }
 
   closeOnboardModal();
   updatePOSStats();

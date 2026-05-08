@@ -235,7 +235,7 @@ function populateSalesDropdown() {
     salesPersons.map(s => `<option value="${s.id}">${s.name} (${s.id})</option>`).join('');
 }
 
-function confirmScheduleDemo() {
+async function confirmScheduleDemo() {
   const teacherId  = document.getElementById('sm-teacher')?.value;
   const salesId    = document.getElementById('sm-sales')?.value;
   const date       = document.getElementById('sm-date')?.value;
@@ -254,6 +254,7 @@ function confirmScheduleDemo() {
   const salesPerson  = salesPersons.find(s => s.id === salesId);
   const timeKey      = time;
 
+  /* Update localStorage */
   const all = getBookings();
   const idx = all.findIndex(b => b.id === psScheduleBookingId);
   if (idx !== -1) {
@@ -276,6 +277,20 @@ function confirmScheduleDemo() {
   }
 
   writeTeacherCalendarSlot(teacherId, date, timeKey, psScheduleBookingId);
+
+  /* Also call real API (fire and forget) */
+  if (typeof isApiAvailable === 'function') {
+    isApiAvailable().then(online => {
+      if (online && typeof Bookings !== 'undefined') {
+        Bookings.assign(psScheduleBookingId, {
+          tutorId:   teacherId,
+          salesId:   salesId || undefined,
+          classLink: link,
+          notes:     notes || undefined,
+        }).catch(e => console.warn('[API] Assign booking failed:', e.message));
+      }
+    });
+  }
 
   if (typeof emailDemoBookedToTeacher === 'function') {
     const updatedBooking = getBookings().find(b => b.id === psScheduleBookingId) || {};
