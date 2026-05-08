@@ -1,0 +1,31 @@
+{
+  "Changes": [
+    {
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "3y6zfo367gxyvqochetpss3gp4d2yws2._domainkey.stemnestacademy.co.uk",
+        "Type": "CNAME",
+        "TTL": 300,
+        "ResourceRecords": [{ "Value": "3y6zfo367gxyvqochetpss3gp4d2yws2.dkim.amazonses.com" }]
+      }
+    },
+    {
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "l4urqhvq43ue6tjux3jlv62mdlmuw7xt._domainkey.stemnestacademy.co.uk",
+        "Type": "CNAME",
+        "TTL": 300,
+        "ResourceRecords": [{ "Value": "l4urqhvq43ue6tjux3jlv62mdlmuw7xt.dkim.amazonses.com" }]
+      }
+    },
+    {
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "cnbarlang3hooei5lxzzis6kgjk3kkxq._domainkey.stemnestacademy.co.uk",
+        "Type": "CNAME",
+        "TTL": 300,
+        "ResourceRecords": [{ "Value": "cnbarlang3hooei5lxzzis6kgjk3kkxq.dkim.amazonses.com" }]
+      }
+    }
+  ]
+}

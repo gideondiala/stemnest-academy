@@ -1,66 +1,75 @@
 /**
  * StemNest Academy — Email Service
- * Uses AWS SES in production, Nodemailer SMTP in development.
- * All outbound emails go through sendEmail() — never call the
- * provider SDK directly from routes.
+ * Production: AWS SES SDK v3 (uses IAM credentials — no SMTP needed)
+ * Development: Nodemailer SMTP or console log
  */
 
-const nodemailer = require('nodemailer');
-const logger     = require('../utils/logger');
-const pool       = require('../config/db');
+const logger = require('../utils/logger');
+const pool   = require('../config/db');
 
 /* ─────────────────────────────────────────────
-   TRANSPORTER
-───────────────────────────────────────────── */
-function createTransporter() {
-  if (process.env.NODE_ENV === 'production') {
-    // AWS SES via SMTP (simpler than SDK, same deliverability)
-    return nodemailer.createTransport({
-      host:   'email-smtp.' + (process.env.AWS_REGION || 'eu-west-2') + '.amazonaws.com',
-      port:   587,
-      secure: false,
-      auth: {
-        user: process.env.AWS_SES_SMTP_USER,   // from AWS SES SMTP credentials
-        pass: process.env.AWS_SES_SMTP_PASS,
-      },
-    });
-  }
-  // Development: log to console (no real sending)
-  return nodemailer.createTransport({
-    host:   process.env.SMTP_HOST || 'smtp.gmail.com',
-    port:   parseInt(process.env.SMTP_PORT || '587'),
-    secure: false,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
-}
-
-/* ─────────────────────────────────────────────
-   CORE SEND FUNCTION
+   SEND FUNCTION
 ───────────────────────────────────────────── */
 async function sendEmail({ to, subject, html, text, template }) {
-  const from = `"${process.env.EMAIL_FROM_NAME || 'StemNest Academy'}" <${process.env.EMAIL_FROM || 'no-reply@stemnestacademy.co.uk'}>`;
+  const fromName    = process.env.EMAIL_FROM_NAME || 'StemNest Academy';
+  const fromAddress = process.env.EMAIL_FROM      || 'no-reply@stemnestacademy.co.uk';
+  const from        = `"${fromName}" <${fromAddress}>`;
 
-  // In dev with no SMTP configured, just log
-  if (process.env.NODE_ENV !== 'production' && !process.env.SMTP_USER) {
-    logger.info(`[EMAIL SIMULATED] To: ${to} | Subject: ${subject}`);
-    await _logEmail(to, subject, template, 'simulated', null, null);
-    return { simulated: true };
+  /* ── Production: AWS SES SDK v3 ── */
+  if (process.env.NODE_ENV === 'production' && process.env.AWS_ACCESS_KEY_ID) {
+    try {
+      const { SESClient, SendEmailCommand } = require('@aws-sdk/client-ses');
+      const client = new SESClient({ region: process.env.AWS_REGION || 'eu-west-2' });
+
+      const command = new SendEmailCommand({
+        Source: from,
+        Destination: { ToAddresses: [to] },
+        Message: {
+          Subject: { Data: subject, Charset: 'UTF-8' },
+          Body: {
+            Html: { Data: html || text || '', Charset: 'UTF-8' },
+            ...(text ? { Text: { Data: text, Charset: 'UTF-8' } } : {}),
+          },
+        },
+      });
+
+      const result = await client.send(command);
+      const msgId  = result.MessageId;
+      logger.info(`[EMAIL SENT] To: ${to} | Subject: ${subject} | ID: ${msgId}`);
+      await _logEmail(to, subject, template, 'sent', msgId, null);
+      return { messageId: msgId };
+    } catch (err) {
+      logger.error(`[EMAIL FAILED] To: ${to} | ${err.message}`);
+      await _logEmail(to, subject, template, 'failed', null, err.message);
+      throw err;
+    }
   }
 
-  try {
-    const transporter = createTransporter();
-    const info = await transporter.sendMail({ from, to, subject, html, text });
-    logger.info(`[EMAIL SENT] To: ${to} | Subject: ${subject} | ID: ${info.messageId}`);
-    await _logEmail(to, subject, template, 'sent', info.messageId, null);
-    return info;
-  } catch (err) {
-    logger.error(`[EMAIL FAILED] To: ${to} | Error: ${err.message}`);
-    await _logEmail(to, subject, template, 'failed', null, err.message);
-    throw err;
+  /* ── Development: Nodemailer SMTP ── */
+  if (process.env.SMTP_HOST && process.env.SMTP_USER) {
+    try {
+      const nodemailer = require('nodemailer');
+      const transporter = nodemailer.createTransport({
+        host:   process.env.SMTP_HOST,
+        port:   parseInt(process.env.SMTP_PORT || '587'),
+        secure: false,
+        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+      });
+      const info = await transporter.sendMail({ from, to, subject, html, text });
+      logger.info(`[EMAIL SENT via SMTP] To: ${to} | ID: ${info.messageId}`);
+      await _logEmail(to, subject, template, 'sent', info.messageId, null);
+      return info;
+    } catch (err) {
+      logger.error(`[EMAIL FAILED via SMTP] To: ${to} | ${err.message}`);
+      await _logEmail(to, subject, template, 'failed', null, err.message);
+      throw err;
+    }
   }
+
+  /* ── Fallback: console log only ── */
+  logger.info(`[EMAIL SIMULATED] To: ${to} | Subject: ${subject}`);
+  await _logEmail(to, subject, template, 'simulated', null, null);
+  return { simulated: true };
 }
 
 async function _logEmail(to, subject, template, status, messageId, error) {
@@ -78,8 +87,6 @@ async function _logEmail(to, subject, template, status, messageId, error) {
 /* ─────────────────────────────────────────────
    EMAIL TEMPLATES
 ───────────────────────────────────────────── */
-
-// Shared header/footer wrapper
 function _wrap(content) {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -90,7 +97,7 @@ function _wrap(content) {
     body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #f4f6fb; margin: 0; padding: 0; }
     .container { max-width: 600px; margin: 32px auto; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,.08); }
     .header { background: linear-gradient(135deg, #1a56db, #0e9f6e); padding: 32px 40px; text-align: center; }
-    .header h1 { color: #fff; font-size: 26px; margin: 0; font-weight: 900; letter-spacing: -0.5px; }
+    .header h1 { color: #fff; font-size: 26px; margin: 0; font-weight: 900; }
     .header p  { color: rgba(255,255,255,.8); margin: 6px 0 0; font-size: 14px; }
     .body { padding: 36px 40px; color: #1a202c; font-size: 15px; line-height: 1.7; }
     .body h2 { font-size: 20px; color: #1a202c; margin-top: 0; }
@@ -110,14 +117,13 @@ function _wrap(content) {
     <div class="body">${content}</div>
     <div class="footer">
       <p>© ${new Date().getFullYear()} StemNest Academy Ltd · Registered in England & Wales</p>
-      <p><a href="${process.env.APP_URL}">stemnestacademy.co.uk</a> · <a href="mailto:support@stemnestacademy.co.uk">support@stemnestacademy.co.uk</a></p>
+      <p><a href="${process.env.APP_URL || 'https://stemnestacademy.co.uk'}">stemnestacademy.co.uk</a> · <a href="mailto:support@stemnestacademy.co.uk">support@stemnestacademy.co.uk</a></p>
     </div>
   </div>
 </body>
 </html>`;
 }
 
-/* ── 1. Welcome / Onboarding ── */
 async function sendWelcomeEmail({ to, name, role, loginUrl, password }) {
   const html = _wrap(`
     <h2>Welcome to StemNest Academy, ${name}! 🎉</h2>
@@ -128,29 +134,26 @@ async function sendWelcomeEmail({ to, name, role, loginUrl, password }) {
       <strong>Role:</strong> ${role}
     </div>
     <p>Please log in and change your password on first login.</p>
-    <a href="${loginUrl || process.env.APP_URL + '/pages/login.html'}" class="btn">Log In Now →</a>
+    <a href="${loginUrl || (process.env.APP_URL + '/pages/login.html')}" class="btn">Log In Now →</a>
     <p style="font-size:13px;color:#718096;">If you did not expect this email, please contact us immediately.</p>
   `);
   return sendEmail({ to, subject: 'Welcome to StemNest Academy — Your Account is Ready', html, template: 'welcome' });
 }
 
-/* ── 2. Forgot Password ── */
 async function sendPasswordResetEmail({ to, name, resetUrl }) {
   const html = _wrap(`
     <h2>Reset Your Password 🔐</h2>
     <p>Hi ${name},</p>
-    <p>We received a request to reset your StemNest Academy password. Click the button below to set a new password:</p>
+    <p>We received a request to reset your StemNest Academy password. Click the button below:</p>
     <a href="${resetUrl}" class="btn">Reset My Password →</a>
     <div class="info-box">
       ⏰ This link expires in <strong>30 minutes</strong>.<br>
-      If you did not request a password reset, you can safely ignore this email.
+      If you did not request this, you can safely ignore this email.
     </div>
-    <p style="font-size:13px;color:#718096;">For security, this link can only be used once.</p>
   `);
   return sendEmail({ to, subject: 'Reset Your StemNest Academy Password', html, template: 'password_reset' });
 }
 
-/* ── 3. Demo Class Confirmed (to parent) ── */
 async function sendDemoConfirmationEmail({ to, parentName, studentName, subject, date, time, bookingId, joinUrl }) {
   const html = _wrap(`
     <h2>Demo Class Confirmed ✅</h2>
@@ -170,12 +173,10 @@ async function sendDemoConfirmationEmail({ to, parentName, studentName, subject,
       <li>Test your camera and microphone beforehand</li>
       <li>Join 2–3 minutes early</li>
     </ul>
-    <p>You will receive reminder calls 30 and 10 minutes before class.</p>
   `);
   return sendEmail({ to, subject: `Demo Class Confirmed — ${studentName} · ${date}`, html, template: 'demo_confirmed' });
 }
 
-/* ── 4. Class Assigned (to teacher) ── */
 async function sendClassAssignedEmail({ to, tutorName, studentName, subject, date, time, classLink }) {
   const html = _wrap(`
     <h2>New Class Assigned 📅</h2>
@@ -188,13 +189,11 @@ async function sendClassAssignedEmail({ to, tutorName, studentName, subject, dat
       <strong>Time:</strong> ${time}
     </div>
     ${classLink ? `<a href="${classLink}" class="btn">Join Class →</a>` : ''}
-    <p>Please log in to your dashboard to view full details.</p>
     <a href="${process.env.APP_URL}/pages/tutor-dashboard.html" class="btn" style="background:#0e9f6e;">View Dashboard →</a>
   `);
   return sendEmail({ to, subject: `New Class Assigned — ${subject} with ${studentName}`, html, template: 'class_assigned' });
 }
 
-/* ── 5. Class Reminder (15 mins before) ── */
 async function sendClassReminderEmail({ to, name, studentName, subject, time, classLink }) {
   const html = _wrap(`
     <h2>⏰ Class in 15 Minutes!</h2>
@@ -210,11 +209,9 @@ async function sendClassReminderEmail({ to, name, studentName, subject, time, cl
   return sendEmail({ to, subject: `⏰ Class Reminder — ${subject} starts in 15 minutes`, html, template: 'class_reminder' });
 }
 
-/* ── 6. Payment Link ── */
 async function sendPaymentLinkEmail({ to, studentName, course, amount, currency, paymentUrl }) {
   const html = _wrap(`
     <h2>Your Payment Link 💳</h2>
-    <p>Hi,</p>
     <p>Here is the payment link for <strong>${studentName}</strong>'s enrolment:</p>
     <div class="info-box">
       <strong>Course:</strong> ${course}<br>
@@ -226,11 +223,9 @@ async function sendPaymentLinkEmail({ to, studentName, course, amount, currency,
   return sendEmail({ to, subject: `StemNest Academy — Payment Link for ${course}`, html, template: 'payment_link' });
 }
 
-/* ── 7. Credits Low Warning ── */
 async function sendLowCreditsEmail({ to, studentName, creditsRemaining }) {
   const html = _wrap(`
     <h2>⚠️ Credits Running Low</h2>
-    <p>Hi,</p>
     <p><strong>${studentName}</strong> has only <strong>${creditsRemaining} class credit${creditsRemaining !== 1 ? 's' : ''}</strong> remaining.</p>
     <p>Top up now to ensure uninterrupted learning.</p>
     <a href="${process.env.APP_URL}/pages/student-dashboard.html" class="btn">Top Up Credits →</a>
@@ -238,23 +233,19 @@ async function sendLowCreditsEmail({ to, studentName, creditsRemaining }) {
   return sendEmail({ to, subject: `⚠️ ${studentName} has ${creditsRemaining} credit${creditsRemaining !== 1 ? 's' : ''} remaining`, html, template: 'low_credits' });
 }
 
-/* ── 8. Birthday Greeting ── */
 async function sendBirthdayEmail({ to, name, message }) {
   const html = _wrap(`
     <h2>🎂 Happy Birthday, ${name}!</h2>
-    <p>${message || `Wishing you a wonderful birthday from all of us at StemNest Academy! 🎉`}</p>
-    <p>Keep up the amazing work — you're doing brilliantly!</p>
+    <p>${message || 'Wishing you a wonderful birthday from all of us at StemNest Academy! 🎉'}</p>
     <a href="${process.env.APP_URL}" class="btn">Visit Your Dashboard →</a>
   `);
   return sendEmail({ to, subject: `🎂 Happy Birthday from StemNest Academy, ${name}!`, html, template: 'birthday' });
 }
 
-/* ── 9. Sales Notification ── */
 async function sendSalesNotificationEmail({ to, salesName, studentName, subject, date, time }) {
   const html = _wrap(`
     <h2>💼 New Demo Class — Pitch Opportunity</h2>
     <p>Hi ${salesName},</p>
-    <p>A demo class has been assigned to you for counseling:</p>
     <div class="info-box">
       <strong>Student:</strong> ${studentName}<br>
       <strong>Subject:</strong> ${subject}<br>
