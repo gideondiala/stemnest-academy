@@ -232,6 +232,38 @@ function getTutorBookings() {
   } catch { return []; }
 }
 
+/* Get bookings from API — called by renderWeeklyCalendar if API is available */
+async function getTutorBookingsFromAPI() {
+  try {
+    if (typeof isApiAvailable === 'function' && await isApiAvailable()) {
+      const data = await Sessions.upcoming();
+      return (data.sessions || []).map(s => ({
+        id:              s.id,
+        studentName:     s.student_name || '—',
+        grade:           s.grade        || '—',
+        subject:         s.subject      || '—',
+        topic:           s.lesson_name_full || s.lesson_name || s.subject || '—',
+        lessonName:      s.lesson_name_full || s.lesson_name || '',
+        lessonNumber:    s.lesson_number,
+        totalLessons:    s.total_lessons,
+        activityLink:    s.lesson_activity || s.activity_link || '',
+        slidesLink:      s.lesson_slides   || s.slides_link  || '',
+        date:            s.date,
+        time:            s.time,
+        classLink:       s.class_link || '',
+        status:          s.status,
+        isDemoClass:     s.is_demo,
+        isRecurring:     s.is_recurring,
+        paymentAmount:   s.payment_amount,
+        assignedTutorId: TUTOR.id,
+        courseName:      s.course_name || '',
+        _fromApi:        true,
+      }));
+    }
+  } catch (e) { /* fall through */ }
+  return null;
+}
+
 /* Parse a booking's time string to 24h "HH:MM" */
 function parseBookingTime(timeStr) {
   if (!timeStr) return null;

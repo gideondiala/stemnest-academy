@@ -158,6 +158,36 @@ function submitBooking() {
   // ── Save to localStorage (admin reads from here) ──
   saveBooking(booking);
 
+  // ── Also save to real API (fire and forget — don't block the UX) ──
+  isApiAvailable().then(online => {
+    if (online) {
+      fetch('https://api.stemnestacademy.co.uk/api/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentName: booking.studentName,
+          age:         booking.age,
+          grade:       booking.grade,
+          email:       booking.email,
+          whatsapp:    booking.whatsapp,
+          parentName:  booking.parentName,
+          subject:     booking.subject,
+          device:      booking.device,
+          timezone:    booking.timezone,
+          date:        booking.date,
+          time:        booking.time,
+        }),
+      }).then(r => r.json()).then(data => {
+        if (data.success && data.bookingId) {
+          // Update localStorage booking with the real DB ID
+          const all = getBookings();
+          const idx = all.findIndex(b => b.id === booking.id);
+          if (idx !== -1) { all[idx].dbId = data.bookingId; localStorage.setItem('sn_bookings', JSON.stringify(all)); }
+        }
+      }).catch(() => { /* silent — localStorage is the fallback */ });
+    }
+  });
+
   // ── Simulate email + WhatsApp confirmation ──
   simulateConfirmations(booking);
 

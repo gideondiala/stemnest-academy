@@ -98,7 +98,58 @@ document.addEventListener('DOMContentLoaded', () => {
   // Seed courses if needed
   getAdminCourses();
   showAdminTab('bookings');
+  // Sync bookings from API in background
+  _syncBookingsFromAPI();
 });
+
+/* ── Sync bookings from real API into localStorage ── */
+async function _syncBookingsFromAPI() {
+  try {
+    const online = await isApiAvailable();
+    if (!online) return;
+    const token = localStorage.getItem('sn_access_token');
+    if (!token) return;
+    const data = await Bookings.list({ limit: 200 });
+    if (!data.success || !data.bookings) return;
+
+    // Merge API bookings into localStorage
+    const local = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+    const localIds = new Set(local.map(b => b.id));
+
+    data.bookings.forEach(b => {
+      // Normalise API booking to match localStorage shape
+      const normalised = {
+        id:              b.id,
+        studentName:     b.student_name || b.notes?.studentName || '—',
+        age:             b.notes?.age || '—',
+        grade:           b.grade || b.notes?.grade || '—',
+        email:           b.student_email || b.notes?.email || '—',
+        whatsapp:        b.student_phone || b.notes?.whatsapp || '—',
+        subject:         b.subject,
+        status:          b.status,
+        date:            b.date,
+        time:            b.time,
+        assignedTutor:   b.tutor_name || '',
+        assignedTutorId: b.tutor_id || '',
+        classLink:       b.class_link || '',
+        bookedAt:        b.booked_at || b.scheduled_at,
+        scheduledAt:     b.scheduled_at,
+        _fromAPI:        true,
+      };
+
+      if (!localIds.has(b.id)) {
+        local.unshift(normalised);
+      } else {
+        // Update existing
+        const idx = local.findIndex(x => x.id === b.id);
+        if (idx !== -1) local[idx] = { ...local[idx], ...normalised };
+      }
+    });
+
+    localStorage.setItem('sn_bookings', JSON.stringify(local));
+    loadBookings(); // refresh the table
+  } catch (e) { /* silent */ }
+}
 function setAdminDate() {
   const el = document.getElementById('adminDate');
   if (el) el.textContent = new Date().toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
@@ -124,9 +175,41 @@ function showAdminTab(tab) {
 /* ══════════════════════════════════════════════════════
    BOOKINGS
 ══════════════════════════════════════════════════════ */
-function loadBookings() {
-  try { allBookings = JSON.parse(localStorage.getItem('sn_bookings') || '[]'); }
-  catch { allBookings = []; }
+async function loadBookings() {
+  try {
+    /* Try real API first */
+    if (typeof isApiAvailable === 'function' && await isApiAvailable()) {
+      const data = await Bookings.list({ limit: 500 });
+      /* Merge API bookings with localStorage (keep both in sync) */
+      const apiBookings = (data.bookings || []).map(b => ({
+        id:              b.id,
+        studentName:     b.student_name || b.notes?.studentName || '—',
+        age:             b.notes?.age   || b.grade || '—',
+        grade:           b.grade        || b.notes?.grade || '—',
+        email:           b.student_email || b.notes?.email || '—',
+        whatsapp:        b.notes?.whatsapp || '—',
+        subject:         b.subject,
+        date:            b.date,
+        time:            b.time,
+        status:          b.status,
+        assignedTutor:   b.tutor_name   || '—',
+        assignedTutorId: b.tutor_id,
+        classLink:       b.class_link   || '',
+        bookedAt:        b.booked_at    || b.created_at,
+        isDemoClass:     b.is_demo,
+        _fromApi:        true,
+      }));
+      /* Also keep any localStorage-only bookings not yet in DB */
+      const localBookings = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+      const apiIds = new Set(apiBookings.map(b => b.id));
+      const localOnly = localBookings.filter(b => !apiIds.has(b.id) && !b._fromApi);
+      allBookings = [...apiBookings, ...localOnly];
+    } else {
+      allBookings = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+    }
+  } catch {
+    allBookings = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+  }
   filteredBookings = [...allBookings];
   updateStats();
   renderBookingsTable(filteredBookings);
