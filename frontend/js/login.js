@@ -165,7 +165,7 @@ function togglePw() {
 }
 
 /* ── HANDLE LOGIN ── */
-function handleLogin() {
+async function handleLogin() {
   const email = document.getElementById('emailInput')?.value.trim();
   const pw    = document.getElementById('passwordInput')?.value;
   const btn   = document.getElementById('loginBtn');
@@ -182,50 +182,92 @@ function handleLogin() {
   document.getElementById('btnText').textContent = 'Logging in…';
   document.getElementById('btnIcon').textContent = '⏳';
 
+  /* ── Try real API first ── */
+  const apiOnline = await isApiAvailable();
+
+  if (apiOnline) {
+    try {
+      const user = await Auth.login(email, pw);
+
+      document.getElementById('btnIcon').textContent = '✅';
+      document.getElementById('btnText').textContent = `Welcome, ${user.name.split(' ')[0]}! Redirecting…`;
+
+      /* Route by role */
+      const roleRoutes = {
+        tutor:       'tutor-dashboard',
+        student:     'student-dashboard',
+        sales:       'sales-dashboard',
+        presales:    'presales-dashboard',
+        postsales:   'postsales-dashboard',
+        operations:  'operations-dashboard',
+        hr:          'hr-dashboard',
+        admin:       'admin-dashboard',
+        super_admin: 'super-admin',
+      };
+
+      const dest = roleRoutes[user.role];
+      if (dest) {
+        /* Store role-specific IDs for dashboard JS compatibility */
+        if (user.role === 'tutor')   localStorage.setItem('sn_logged_in_teacher', user.staffId || user.id);
+        if (user.role === 'sales')   localStorage.setItem('sn_logged_in_sales',   user.staffId || user.id);
+        if (user.role === 'student') localStorage.setItem('sn_logged_in_student', user.email);
+        setTimeout(() => navigate(dest), 700);
+      } else {
+        throw new Error('Unknown role: ' + user.role);
+      }
+      return;
+    } catch (err) {
+      /* API login failed — show error */
+      btn.style.opacity       = '1';
+      btn.style.pointerEvents = '';
+      document.getElementById('btnIcon').textContent = '❌';
+      document.getElementById('btnText').textContent = err.message === 'Invalid email or password'
+        ? 'Invalid credentials' : 'Login failed — try again';
+      btn.style.animation = 'none';
+      btn.offsetHeight;
+      btn.style.animation = 'shake .4s ease';
+      setTimeout(() => {
+        document.getElementById('btnIcon').textContent = loginConfig[currentRole].btnIcon;
+        document.getElementById('btnText').textContent = loginConfig[currentRole].btnText;
+      }, 2000);
+      return;
+    }
+  }
+
+  /* ── Fallback: localStorage (offline / demo mode) ── */
   setTimeout(() => {
     btn.style.opacity       = '1';
     btn.style.pointerEvents = '';
 
     if (currentRole === 'tutor') {
-      // Check teacher registry
       const teachers = JSON.parse(localStorage.getItem('sn_teachers') || '[]');
-      const teacher  = teachers.find(t =>
-        t.email.toLowerCase() === email.toLowerCase() && t.password === pw
-      );
-
-      // Check sales persons registry
+      const teacher  = teachers.find(t => t.email.toLowerCase() === email.toLowerCase() && t.password === pw);
       const salesPersons = JSON.parse(localStorage.getItem('sn_sales_persons') || '[]');
-      const salesPerson  = salesPersons.find(s =>
-        s.email.toLowerCase() === email.toLowerCase() && s.password === pw
-      );
-
-      // Check staff registry (ops, presales, postsales, hr)
+      const salesPerson  = salesPersons.find(s => s.email.toLowerCase() === email.toLowerCase() && s.password === pw);
       const staff = JSON.parse(localStorage.getItem('sn_staff') || '[]');
-      const staffMember = staff.find(s =>
-        s.email.toLowerCase() === email.toLowerCase() && s.password === pw
-      );
+      const staffMember = staff.find(s => s.email.toLowerCase() === email.toLowerCase() && s.password === pw);
 
       if (teacher) {
         localStorage.setItem('sn_logged_in_teacher', teacher.id);
         document.getElementById('btnIcon').textContent = '✅';
-        document.getElementById('btnText').textContent = `Welcome back, ${teacher.name.split(' ')[0]}! Redirecting…`;
+        document.getElementById('btnText').textContent = `Welcome back, ${teacher.name.split(' ')[0]}!`;
         setTimeout(() => navigate('tutor-dashboard'), 700);
       } else if (salesPerson) {
         localStorage.setItem('sn_logged_in_sales', salesPerson.id);
         document.getElementById('btnIcon').textContent = '✅';
-        document.getElementById('btnText').textContent = `Welcome, ${salesPerson.name.split(' ')[0]}! Redirecting…`;
+        document.getElementById('btnText').textContent = `Welcome, ${salesPerson.name.split(' ')[0]}!`;
         setTimeout(() => navigate('sales-dashboard'), 700);
       } else if (staffMember) {
         document.getElementById('btnIcon').textContent = '✅';
-        document.getElementById('btnText').textContent = `Welcome! Redirecting…`;
+        document.getElementById('btnText').textContent = 'Welcome! Redirecting…';
         setTimeout(() => navigate(staffMember.role), 700);
       } else if (email === 'admin@stemnest.co.uk' && pw === 'admin123') {
         document.getElementById('btnIcon').textContent = '✅';
-        document.getElementById('btnText').textContent = 'Welcome, Admin! Redirecting…';
+        document.getElementById('btnText').textContent = 'Welcome, Admin!';
         setTimeout(() => navigate('admin-dashboard'), 700);
       } else if (email === 'founder@stemnest.co.uk' && pw === 'Founder2024!') {
         document.getElementById('btnIcon').textContent = '✅';
-        document.getElementById('btnText').textContent = 'Welcome, Founder! Redirecting…';
+        document.getElementById('btnText').textContent = 'Welcome, Founder!';
         setTimeout(() => navigate('super-admin'), 700);
       } else {
         document.getElementById('btnIcon').textContent = '❌';
@@ -262,86 +304,71 @@ function closeForgotPassword() {
   document.getElementById('forgotPwOverlay').classList.remove('open');
 }
 
-function submitForgotPassword() {
+async function submitForgotPassword() {
   const email = document.getElementById('forgotEmail')?.value.trim().toLowerCase();
   if (!email) { showToast('Please enter your email address.', 'error'); return; }
 
-  // Search all user registries
-  let found = null;
-  let registry = null;
-  let registryKey = null;
+  const btn = document.querySelector('#forgotStep1 button.btn-primary') ||
+              document.querySelector('#forgotStep1 .btn');
 
-  // Teachers
+  if (btn) { btn.textContent = 'Sending…'; btn.disabled = true; }
+
+  /* Try real API first */
+  const apiOnline = await isApiAvailable();
+  if (apiOnline) {
+    try {
+      await Auth.forgotPassword(email);
+      document.getElementById('forgotStep1').style.display = 'none';
+      document.getElementById('forgotStep2').style.display = 'block';
+      document.getElementById('forgotSuccessMsg').textContent =
+        `If ${email} is registered, a reset link has been sent to that address. Check your email and WhatsApp.`;
+      const tempBox = document.getElementById('forgotTempPwBox');
+      if (tempBox) tempBox.style.display = 'none';
+      if (btn) { btn.textContent = 'Send Reset Link'; btn.disabled = false; }
+      return;
+    } catch (err) {
+      /* Fall through to localStorage */
+    }
+  }
+
+  /* Fallback: localStorage demo mode */
+  if (btn) { btn.textContent = 'Send Reset Link'; btn.disabled = false; }
+
+  let found = null, registry = null, registryKey = null;
   const teachers = JSON.parse(localStorage.getItem('sn_teachers') || '[]');
   const teacher  = teachers.find(t => t.email.toLowerCase() === email);
   if (teacher) { found = teacher; registry = teachers; registryKey = 'sn_teachers'; }
 
-  // Sales persons
   if (!found) {
     const sales = JSON.parse(localStorage.getItem('sn_sales_persons') || '[]');
     const sp    = sales.find(s => s.email.toLowerCase() === email);
     if (sp) { found = sp; registry = sales; registryKey = 'sn_sales_persons'; }
   }
-
-  // Staff
   if (!found) {
     const staff = JSON.parse(localStorage.getItem('sn_staff') || '[]');
     const sm    = staff.find(s => s.email.toLowerCase() === email);
     if (sm) { found = sm; registry = staff; registryKey = 'sn_staff'; }
   }
-
-  // Students
   if (!found) {
     const students = JSON.parse(localStorage.getItem('sn_students') || '[]');
     const st       = students.find(s => s.email.toLowerCase() === email);
     if (st) { found = st; registry = students; registryKey = 'sn_students'; }
   }
+  if (!found && email === 'admin@stemnest.co.uk')   found = { name:'Admin',   email, password:'admin123',   _isAdmin:true };
+  if (!found && email === 'founder@stemnest.co.uk') found = { name:'Founder', email, password:'Founder2024!', _isFounder:true };
 
-  // Admin / Founder (hardcoded — update via settings)
-  if (!found) {
-    if (email === 'admin@stemnest.co.uk') {
-      found = { name: 'Admin', email, password: 'admin123', _isAdmin: true };
-    } else if (email === 'founder@stemnest.co.uk') {
-      found = { name: 'Founder', email, password: 'Founder2024!', _isFounder: true };
-    }
-  }
+  if (!found) { showToast('No account found with that email address.', 'error'); return; }
 
-  if (!found) {
-    showToast('No account found with that email address.', 'error');
-    return;
-  }
-
-  // Generate temp password
   const tempPw = 'SN' + Math.random().toString(36).slice(2, 8).toUpperCase() + '!';
-
-  // Update password in registry
   if (registry && registryKey) {
     const idx = registry.findIndex(u => u.email.toLowerCase() === email);
-    if (idx !== -1) {
-      registry[idx].password = tempPw;
-      localStorage.setItem(registryKey, JSON.stringify(registry));
-    }
+    if (idx !== -1) { registry[idx].password = tempPw; localStorage.setItem(registryKey, JSON.stringify(registry)); }
   }
 
-  // Update password registry for Super Admin chart
-  updatePasswordRegistry({ id: found.id || email, name: found.name, email, role: found.role || (found._isAdmin ? 'admin' : found._isFounder ? 'founder' : 'user'), password: tempPw });
-
-  // Log simulated email
-  const emailLog = JSON.parse(localStorage.getItem('sn_email_log') || '[]');
-  emailLog.unshift({
-    to:      email,
-    subject: 'StemNest Academy — Your Temporary Password',
-    body:    `Hi ${found.name},\n\nYour temporary password is: ${tempPw}\n\nPlease log in and change your password immediately.\n\nLogin: https://stemnest.co.uk/pages/login.html\n\nStemNest Academy`,
-    sentAt:  new Date().toISOString(),
-    status:  'simulated',
-  });
-  localStorage.setItem('sn_email_log', JSON.stringify(emailLog));
-
-  // Show success step
   document.getElementById('forgotStep1').style.display = 'none';
   document.getElementById('forgotStep2').style.display = 'block';
   document.getElementById('forgotSuccessMsg').textContent =
-    `A temporary password has been sent to ${email}. Use it to log in, then change your password from your profile settings.`;
+    `A temporary password has been sent to ${email}. Use it to log in, then change your password.`;
   const tempBox = document.getElementById('forgotTempPwBox');
   if (tempBox) {
     tempBox.style.display = 'block';
