@@ -251,7 +251,14 @@ function renderBookingsTable(bookings) {
       <td><span class="ab-subject ab-${(b.subject||'').toLowerCase()}">${b.subject}</span></td>
       <td>${formatDate(b.date)}<br><span style="color:var(--light);font-size:12px;">${b.time}</span></td>
       <td style="font-size:12px;">${b.email}</td>
-      <td style="font-size:12px;">${b.whatsapp}</td>
+      <td style="font-size:12px;">
+        ${b.whatsapp && b.whatsapp !== '—'
+          ? `<a href="https://wa.me/${b.whatsapp.replace(/[\s\-\(\)\+]/g,'')}" target="_blank"
+              style="color:#25D366;font-weight:800;font-size:12px;text-decoration:none;">
+              📱 ${b.whatsapp}
+            </a>`
+          : b.whatsapp || '—'}
+      </td>
       <td>${b.device||'—'}</td>
       <td style="font-size:12px;">${formatDateTime(b.bookedAt)}</td>
       <td><span class="ab-status ab-${b.status}">${capitalise(b.status)}</span></td>

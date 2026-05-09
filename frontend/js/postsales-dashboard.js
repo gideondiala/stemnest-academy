@@ -457,9 +457,16 @@ function sendPayLinkEmail() {
 function sendPayLinkWhatsApp() {
   const wa      = document.getElementById('pl-whatsapp')?.value.trim();
   const student = document.getElementById('pl-student')?.value.trim();
+  const course  = document.getElementById('pl-course')?.value || 'Course';
+  const amount  = document.getElementById('pl-amount')?.value || '';
+  const currency = document.getElementById('pl-currency')?.value || 'GBP';
   if (!wa || !generatedLink) { showToast('Please enter a WhatsApp number.', 'error'); return; }
-  console.log(`💬 WHATSAPP TO: ${wa}\nHi ${student}! Here is your StemNest payment link:\n${generatedLink}`);
-  showToast('💬 WhatsApp sent (simulated)!', 'info');
+  if (typeof waPaymentLink === 'function') {
+    waPaymentLink(wa, student, course, amount, currency, generatedLink);
+  } else {
+    window.open('https://wa.me/' + wa.replace(/[\s\-\(\)\+]/g,'') + '?text=' + encodeURIComponent('Hi ' + student + '! Here is your StemNest payment link:\n' + generatedLink), '_blank');
+  }
+  showToast('💬 WhatsApp opened with payment link!', 'info');
 }
 
 function clearPayLink() {

@@ -148,16 +148,27 @@ function renderIncoming() {
               <td style="padding:14px 16px;font-weight:700;color:var(--mid);">${b.grade || '—'} · Age ${b.age || '—'}</td>
               <td style="padding:14px 16px;">
                 <div style="font-size:12px;font-weight:700;color:var(--mid);">📧 ${b.email}</div>
-                <div style="font-size:12px;font-weight:700;color:var(--mid);margin-top:2px;">📱 ${b.whatsapp || '—'}</div>
+                <div style="font-size:12px;font-weight:700;color:var(--mid);margin-top:2px;">
+                  ${b.whatsapp && b.whatsapp !== '—'
+                    ? `<a href="https://wa.me/${b.whatsapp.replace(/[\s\-\(\)\+]/g,'')}" target="_blank" style="color:#25D366;font-weight:800;text-decoration:none;">📱 ${b.whatsapp}</a>`
+                    : `📱 ${b.whatsapp || '—'}`}
+                </div>
               </td>
               <td style="padding:14px 16px;font-weight:700;color:var(--mid);">${b.date || '—'}<br><span style="font-size:11px;">${b.time || '—'}</span></td>
               <td style="padding:14px 16px;font-size:12px;color:var(--light);font-weight:700;">${b.bookedAt ? new Date(b.bookedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '—'}</td>
               <td style="padding:14px 16px;text-align:center;">
-                <button onclick="openScheduleModal('${b.id}')"
-                  style="background:var(--blue);color:#fff;border:none;border-radius:10px;padding:8px 16px;font-family:'Nunito',sans-serif;font-weight:900;font-size:13px;cursor:pointer;white-space:nowrap;transition:.15s;"
-                  onmouseover="this.style.background='#1140b0'" onmouseout="this.style.background='var(--blue)'">
-                  📅 Schedule Class
-                </button>
+                <div style="display:flex;flex-direction:column;gap:6px;align-items:center;">
+                  <button onclick="openScheduleModal('${b.id}')"
+                    style="background:var(--blue);color:#fff;border:none;border-radius:10px;padding:8px 16px;font-family:'Nunito',sans-serif;font-weight:900;font-size:13px;cursor:pointer;white-space:nowrap;transition:.15s;"
+                    onmouseover="this.style.background='#1140b0'" onmouseout="this.style.background='var(--blue)'">
+                    📅 Schedule Class
+                  </button>
+                  ${b.whatsapp && b.whatsapp !== '—' ? `
+                  <button onclick="waDemoConfirmed(${JSON.stringify({id:b.id,studentName:b.studentName,subject:b.subject,date:b.date,time:b.time,email:b.email,whatsapp:b.whatsapp,parentName:b.parentName||''}).replace(/"/g,'&quot;')})"
+                    style="background:#25D366;color:#fff;border:none;border-radius:10px;padding:6px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap;">
+                    💬 WhatsApp Parent
+                  </button>` : ''}
+                </div>
               </td>
             </tr>`).join('')}
         </tbody>
