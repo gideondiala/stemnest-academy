@@ -263,7 +263,7 @@
       </div>
       <div class="tw-apply-contact">
         <div style="font-size:13px;color:rgba(255,255,255,.6);font-weight:700;margin-top:32px;">Questions? Email us at</div>
-        <div style="font-size:15px;color:#fff;font-weight:800;margin-top:4px;">tutors@stemnest.co.uk</div>
+        <div style="font-size:15px;color:#fff;font-weight:800;margin-top:4px;">tutors@stemnestacademy.co.uk</div>
       </div>
     </div>
 
@@ -426,7 +426,8 @@
             <div class="tw-field tw-full">
               <label class="tw-check-label tw-terms-check">
                 <input type="checkbox" id="ap-terms" required>
-                I agree to StemNest's <a href="#" style="color:var(--blue);">Terms of Service</a> and consent to a DBS check if selected. <span class="req">*</span>
+                I agree to StemNest's <a href="legal/terms-of-use.html" target="_blank" style="color:var(--blue);font-weight:800;">Terms of Service</a>
+                and consent to a <a href="#" onclick="showDBSInfo();return false;" style="color:var(--blue);font-weight:800;text-decoration:underline dotted;">DBS check</a> if selected. <span class="req">*</span>
               </label>
             </div>
           </div>
@@ -469,6 +470,27 @@
     <div class="tw-success-msg">Thank you for applying to StemNest Academy. We'll review your application and get back to you within <strong>48 hours</strong>.</div>
     <div class="tw-success-note">📧 A confirmation has been sent to your email address.</div>
     <a href="../index.html" class="btn btn-primary" style="margin-top:24px;">← Back to StemNest</a>
+  </div>
+</div>
+
+<!-- ═══ DBS INFO MODAL ═══ -->
+<div id="dbsInfoOverlay" style="display:none;position:fixed;inset:0;background:rgba(10,20,50,.7);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:20px;padding:36px 40px;max-width:520px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25);position:relative;">
+    <button onclick="document.getElementById('dbsInfoOverlay').style.display='none'" style="position:absolute;top:16px;right:16px;background:none;border:none;font-size:22px;cursor:pointer;color:#718096;">✕</button>
+    <div style="font-family:'Fredoka One',cursive;font-size:24px;color:#1a202c;margin-bottom:16px;">🔍 What is a DBS Check?</div>
+    <div style="font-size:15px;color:#4a5568;line-height:1.8;">
+      <p><strong>DBS</strong> stands for the <strong>Disclosure and Barring Service</strong> — a UK government body that helps employers make safer recruitment decisions.</p>
+      <p>A DBS check reveals any criminal convictions, cautions, warnings, or reprimands on a person's record. For roles working with children and young people, this is a legal safeguarding requirement in the United Kingdom.</p>
+      <p><strong>At StemNest Academy:</strong></p>
+      <ul style="margin:8px 0 12px 20px;">
+        <li>All UK-based tutors working with under-18s are required to hold a valid Enhanced DBS certificate.</li>
+        <li>We guide you through the application process — it is straightforward and typically takes 2–4 weeks.</li>
+        <li>StemNest Academy covers the cost of the DBS check once you are accepted onto the platform.</li>
+        <li>Tutors based outside the UK will be required to provide an equivalent background check from their country.</li>
+      </ul>
+      <p style="font-size:13px;color:#718096;">For more information, visit the official DBS website: <a href="https://www.gov.uk/government/organisations/disclosure-and-barring-service" target="_blank" style="color:#1a56db;font-weight:700;">gov.uk/dbs</a></p>
+    </div>
+    <button onclick="document.getElementById('dbsInfoOverlay').style.display='none'" style="margin-top:20px;background:#1a56db;color:#fff;border:none;border-radius:50px;padding:12px 32px;font-family:'Nunito',sans-serif;font-weight:900;font-size:15px;cursor:pointer;width:100%;">Got it ✓</button>
   </div>
 </div>
 

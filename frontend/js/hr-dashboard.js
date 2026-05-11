@@ -36,34 +36,137 @@ function setText(id, val) { const el = document.getElementById(id); if (el) el.t
 function renderApplications() {
   const el = document.getElementById('applicationsList');
   if (!el) return;
-  const filter = document.getElementById('appStatusFilter')?.value || 'all';
-  let apps = getApplications();
-  if (filter !== 'all') apps = apps.filter(a => a.status === filter);
-  if (!apps.length) { el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--light);font-weight:700;">No applications yet. Share the Teach With Us page to receive applications.</div>'; return; }
 
-  const statusClass = { pending:'ab-pending', shortlisted:'ab-scheduled', interview:'ab-completed', rejected:'ab-pending' };
-  el.innerHTML = apps.map((a, i) => `
-    <div class="demo-item" style="margin-bottom:12px;">
-      <div class="demo-item-info">
-        <div class="demo-item-name">${a.name} <span style="font-size:11px;color:var(--light);">${a.id}</span></div>
-        <div class="demo-item-meta">
-          📧 ${a.email} · 📱 ${a.phone || '—'} · 🌍 ${a.country || '—'}<br>
-          📚 ${(a.subjects || []).join(', ')} · 🎓 ${a.qual || '—'} · ⏱ ${a.exp || '0'} yrs exp<br>
-          Applied: ${new Date(a.appliedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}
-        </div>
-        ${a.bio ? `<div style="font-size:12px;color:var(--mid);background:var(--bg);border-radius:8px;padding:6px 10px;margin-top:6px;font-style:italic;">"${a.bio.slice(0,120)}${a.bio.length > 120 ? '…' : ''}"</div>` : ''}
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0;">
-        <span class="ab-status ${statusClass[a.status] || 'ab-pending'}">${capitalise(a.status || 'pending')}</span>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
-          <button class="ab-btn ab-btn-view"   onclick="viewApplication(${i})">👁 View</button>
-          <button class="ab-btn ab-btn-assign" onclick="updateAppStatus(${i},'shortlisted')">⭐ Shortlist</button>
-          <button class="ab-btn ab-btn-complete" onclick="scheduleInterview(${i})">📅 Interview</button>
-          <button class="ab-btn" style="background:var(--orange-light);color:var(--orange-dark);" onclick="updateAppStatus(${i},'rejected')">❌ Reject</button>
-          <button class="ab-btn" style="background:#fde8e8;color:#c53030;" onclick="deleteApplication(${i})">🗑 Delete</button>
-        </div>
-      </div>
-    </div>`).join('');
+  const filter     = document.getElementById('appStatusFilter')?.value || 'all';
+  const dateFilter = document.getElementById('appDateFilter')?.value   || 'all';
+  let apps = getApplications();
+
+  /* Status filter */
+  if (filter !== 'all') apps = apps.filter(a => a.status === filter);
+
+  /* Date filter */
+  const now = new Date();
+  if (dateFilter === 'today') {
+    apps = apps.filter(a => new Date(a.appliedAt).toDateString() === now.toDateString());
+  } else if (dateFilter === 'week') {
+    const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7);
+    apps = apps.filter(a => new Date(a.appliedAt) >= weekAgo);
+  } else if (dateFilter === 'month') {
+    const monthAgo = new Date(now); monthAgo.setMonth(now.getMonth() - 1);
+    apps = apps.filter(a => new Date(a.appliedAt) >= monthAgo);
+  } else if (dateFilter === 'last_month') {
+    const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const end   = new Date(now.getFullYear(), now.getMonth(), 0);
+    apps = apps.filter(a => { const d = new Date(a.appliedAt); return d >= start && d <= end; });
+  }
+
+  /* Update count badge */
+  const countEl = document.getElementById('appCount');
+  if (countEl) countEl.textContent = apps.length + ' application' + (apps.length !== 1 ? 's' : '');
+
+  if (!apps.length) {
+    el.innerHTML = `<div style="text-align:center;padding:60px 20px;">
+      <div style="font-size:48px;margin-bottom:12px;">📭</div>
+      <div style="font-family:'Fredoka One',cursive;font-size:20px;color:var(--dark);">No applications found</div>
+      <div style="font-size:14px;color:var(--light);margin-top:6px;">Share the <a href="../pages/teach-with-us.html" target="_blank" style="color:var(--blue);">Teach With Us</a> page to receive applications.</div>
+    </div>`;
+    return;
+  }
+
+  const statusBadge = {
+    pending:     '<span style="background:#fff3e0;color:#e65100;font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">⏳ Pending</span>',
+    shortlisted: '<span style="background:var(--blue-light);color:var(--blue);font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">⭐ Shortlisted</span>',
+    interview:   '<span style="background:var(--green-light);color:var(--green-dark);font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">📅 Interview</span>',
+    rejected:    '<span style="background:#fde8e8;color:#c53030;font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">❌ Rejected</span>',
+    hired:       '<span style="background:var(--green-light);color:var(--green-dark);font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">✅ Hired</span>',
+  };
+
+  const thS = 'padding:11px 14px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;letter-spacing:.5px;';
+  const tdS = 'padding:12px 14px;vertical-align:middle;font-size:13px;';
+
+  el.innerHTML = `
+    <div style="overflow-x:auto;border-radius:16px;border:1.5px solid #e8eaf0;background:var(--white);">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">
+            <th style="${thS}">Applicant</th>
+            <th style="${thS}">Contact</th>
+            <th style="${thS}">Subjects</th>
+            <th style="${thS}">Qualification</th>
+            <th style="${thS}">Experience</th>
+            <th style="${thS}">Location</th>
+            <th style="${thS}">Applied</th>
+            <th style="${thS}">Status</th>
+            <th style="${thS};text-align:center;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${apps.map((a, i) => `
+            <tr style="border-bottom:1px solid #f0f2f8;${i%2===0?'':'background:#fafbff;'}">
+              <td style="${tdS}">
+                <div style="font-weight:800;color:var(--dark);">${a.name}</div>
+                <div style="font-size:11px;color:var(--light);">${a.id}</div>
+                ${a.linkedin ? `<a href="${a.linkedin}" target="_blank" style="font-size:11px;color:var(--blue);font-weight:700;">LinkedIn ↗</a>` : ''}
+              </td>
+              <td style="${tdS}">
+                <div style="font-weight:700;color:var(--mid);">📧 ${a.email}</div>
+                <div style="font-weight:700;color:var(--mid);margin-top:2px;">
+                  ${a.phone ? `<a href="https://wa.me/${a.phone.replace(/[\s\-\(\)\+]/g,'')}" target="_blank" style="color:#25D366;font-weight:800;text-decoration:none;">📱 ${a.phone}</a>` : '—'}
+                </div>
+              </td>
+              <td style="${tdS}">
+                <div style="font-weight:700;color:var(--mid);">${(a.subjects||[]).join(', ') || '—'}</div>
+                <div style="font-size:11px;color:var(--light);">${a.topics || '—'}</div>
+              </td>
+              <td style="${tdS};font-weight:700;color:var(--mid);">${a.qual || '—'}</td>
+              <td style="${tdS};font-weight:700;color:var(--mid);">${a.exp || '0'} yrs</td>
+              <td style="${tdS};font-weight:700;color:var(--mid);">${a.country || '—'}</td>
+              <td style="${tdS};font-size:12px;color:var(--light);font-weight:700;white-space:nowrap;">
+                ${new Date(a.appliedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}
+              </td>
+              <td style="${tdS}">${statusBadge[a.status] || statusBadge.pending}</td>
+              <td style="${tdS};text-align:center;">
+                <div style="display:flex;gap:5px;justify-content:center;flex-wrap:wrap;">
+                  <button class="ab-btn ab-btn-view"   onclick="viewApplication(${getApplications().indexOf(a)})">👁 View</button>
+                  <button class="ab-btn ab-btn-assign" onclick="updateAppStatus(${getApplications().indexOf(a)},'shortlisted')" title="Shortlist">⭐</button>
+                  <button class="ab-btn ab-btn-complete" onclick="scheduleInterview(${getApplications().indexOf(a)})" title="Schedule Interview">📅</button>
+                  <button class="ab-btn" style="background:var(--green-light);color:var(--green-dark);" onclick="updateAppStatus(${getApplications().indexOf(a)},'hired')" title="Mark Hired">✅</button>
+                  <button class="ab-btn" style="background:#fde8e8;color:#c53030;" onclick="updateAppStatus(${getApplications().indexOf(a)},'rejected')" title="Reject">❌</button>
+                </div>
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function exportApplicationsCSV() {
+  const apps = getApplications();
+  if (!apps.length) { showToast('No applications to export.', 'error'); return; }
+
+  const headers = ['ID','Name','Email','Phone','Country','Qualification','Experience (yrs)',
+                   'Subjects','Topics','Age Groups','Hours/Week','Preferred Times','Device',
+                   'LinkedIn','Source','Status','Applied At','Bio'];
+
+  const rows = apps.map(a => [
+    a.id, a.name, a.email, a.phone || '', a.country || '',
+    a.qual || '', a.exp || '0',
+    (a.subjects || []).join('; '), a.topics || '',
+    (a.ageGroups || []).join('; '), a.hours || '', a.times || '', a.device || '',
+    a.linkedin || '', a.source || '', a.status || 'pending',
+    new Date(a.appliedAt).toLocaleDateString('en-GB'),
+    (a.bio || '').replace(/"/g, '""'),
+  ].map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(','));
+
+  const csv  = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `stemnest-applications-${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('✅ Applications exported to CSV!');
 }
 
 function viewApplication(idx) {

@@ -60,15 +60,24 @@
     <!-- APPLICATIONS -->
     <div id="tab-applications">
       <div class="dash-section-header">
-        <div class="dash-section-title">📋 Tutor Applications</div>
-        <div class="admin-filters">
+        <div class="dash-section-title">📋 Tutor Applications <span id="appCount" style="font-size:13px;font-weight:700;color:var(--light);margin-left:8px;"></span></div>
+        <div class="admin-filters" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
           <select id="appStatusFilter" class="admin-filter-sel" onchange="renderApplications()">
             <option value="all">All Status</option>
-            <option value="pending">Pending</option>
-            <option value="shortlisted">Shortlisted</option>
-            <option value="interview">Interview</option>
-            <option value="rejected">Rejected</option>
+            <option value="pending">⏳ Pending</option>
+            <option value="shortlisted">⭐ Shortlisted</option>
+            <option value="interview">📅 Interview</option>
+            <option value="hired">✅ Hired</option>
+            <option value="rejected">❌ Rejected</option>
           </select>
+          <select id="appDateFilter" class="admin-filter-sel" onchange="renderApplications()">
+            <option value="all">All Time</option>
+            <option value="today">Today</option>
+            <option value="week">This Week</option>
+            <option value="month">This Month</option>
+            <option value="last_month">Last Month</option>
+          </select>
+          <button class="btn btn-outline" style="font-size:13px;padding:8px 16px;" onclick="exportApplicationsCSV()">⬇ Export CSV</button>
         </div>
       </div>
       <div id="applicationsList"></div>

@@ -205,3 +205,19 @@ function initScrollReveal() {
   }, { threshold: 0.1 });
   document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
 }
+
+/* ── DBS INFO MODAL ── */
+function showDBSInfo() {
+  const overlay = document.getElementById('dbsInfoOverlay');
+  if (overlay) { overlay.style.display = 'flex'; }
+}
+
+/* Close DBS modal on overlay click */
+document.addEventListener('DOMContentLoaded', () => {
+  const overlay = document.getElementById('dbsInfoOverlay');
+  if (overlay) {
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay) overlay.style.display = 'none';
+    });
+  }
+});
