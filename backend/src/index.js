@@ -12,14 +12,15 @@ const helmet    = require('helmet');
 const morgan    = require('morgan');
 const rateLimit = require('express-rate-limit');
 
-const authRoutes     = require('./routes/auth');
-const userRoutes     = require('./routes/users');
-const courseRoutes   = require('./routes/courses');
-const sessionRoutes  = require('./routes/sessions');
-const bookingRoutes  = require('./routes/bookings');
-const projectRoutes  = require('./routes/projects');
-const paymentRoutes  = require('./routes/payments');
-const errorHandler   = require('./middleware/errorHandler');
+const authRoutes         = require('./routes/auth');
+const userRoutes         = require('./routes/users');
+const courseRoutes       = require('./routes/courses');
+const sessionRoutes      = require('./routes/sessions');
+const bookingRoutes      = require('./routes/bookings');
+const projectRoutes      = require('./routes/projects');
+const paymentRoutes      = require('./routes/payments');
+const applicationRoutes  = require('./routes/applications');
+const errorHandler       = require('./middleware/errorHandler');
 const logger         = require('./utils/logger');
 
 const app  = express();
@@ -91,13 +92,14 @@ app.get('/api/health', (_req, res) => {
 /* ══════════════════════════════════════════════
    ROUTES
 ══════════════════════════════════════════════ */
-app.use('/api/auth',     authRoutes);
-app.use('/api/users',    userRoutes);
-app.use('/api/courses',  courseRoutes);
-app.use('/api/sessions', sessionRoutes);
-app.use('/api/bookings', bookingRoutes);
-app.use('/api/projects', projectRoutes);
-app.use('/api/payments', paymentRoutes);
+app.use('/api/auth',         authRoutes);
+app.use('/api/users',        userRoutes);
+app.use('/api/courses',      courseRoutes);
+app.use('/api/sessions',     sessionRoutes);
+app.use('/api/bookings',     bookingRoutes);
+app.use('/api/projects',     projectRoutes);
+app.use('/api/payments',     paymentRoutes);
+app.use('/api/applications', applicationRoutes);
 
 /* ══════════════════════════════════════════════
    404 + GLOBAL ERROR HANDLER

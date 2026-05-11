@@ -128,7 +128,7 @@ function validateStep(step) {
   return true;
 }
 
-function submitApplication() {
+async function submitApplication() {
   const bio   = document.getElementById('ap-bio')?.value.trim();
   const terms = document.getElementById('ap-terms')?.checked;
   if (!bio)   { showToast('Please tell us about yourself.', 'error'); return; }
@@ -160,12 +160,38 @@ function submitApplication() {
     status:    'pending',
   };
 
-  // Persist so admin can review
+  /* ── Try real API first ── */
+  try {
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/applications', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(application),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || 'Submission failed');
+    }
+
+    /* Also save to localStorage as backup */
+    const all = JSON.parse(localStorage.getItem('sn_applications') || '[]');
+    all.unshift({ ...application, dbId: data.applicationId });
+    localStorage.setItem('sn_applications', JSON.stringify(all));
+
+    if (btn) btn.disabled = false;
+    if (txt) txt.textContent = '✦ Submit Application';
+    document.getElementById('applySuccess').classList.add('show');
+    return;
+
+  } catch (err) {
+    console.warn('[API] Application submit failed, saving locally:', err.message);
+  }
+
+  /* ── Fallback: localStorage only ── */
   const all = JSON.parse(localStorage.getItem('sn_applications') || '[]');
   all.unshift(application);
   localStorage.setItem('sn_applications', JSON.stringify(all));
 
-  // Simulate confirmation email
   console.log('📧 CONFIRMATION EMAIL TO:', application.email,
     '\nApplication ID:', application.id,
     '\nSubjects:', application.subjects.join(', '));
@@ -174,7 +200,7 @@ function submitApplication() {
     if (btn) btn.disabled = false;
     if (txt) txt.textContent = '✦ Submit Application';
     document.getElementById('applySuccess').classList.add('show');
-  }, 1200);
+  }, 800);
 }
 
 /* ── FAQ ACCORDION ── */
