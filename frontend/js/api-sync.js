@@ -1,11 +1,36 @@
 /* ═══════════════════════════════════════════════════════
    STEMNEST ACADEMY — API SYNC (api-sync.js)
-   Syncs real API data into localStorage so all existing
-   dashboard JS continues to work without changes.
+   Bidirectional sync between localStorage and real API.
+   - On page load: pulls real data from API into localStorage
+   - On data write: pushes to API in background
    Load this after api.js and before dashboard JS files.
 ═══════════════════════════════════════════════════════ */
 
-/* ── Sync bookings from API into localStorage ── */
+const API_BASE = 'https://api.stemnestacademy.co.uk';
+
+/* ── Auth token helper ── */
+function _authHeader() {
+  const token = localStorage.getItem('sn_access_token');
+  return token ? { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
+}
+
+/* ── Fire-and-forget API push ── */
+async function _push(endpoint, data) {
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    if (!token) return;
+    await fetch(API_BASE + endpoint, {
+      method:  'POST',
+      headers: _authHeader(),
+      body:    JSON.stringify(data),
+    });
+  } catch (e) { /* silent — localStorage is the fallback */ }
+}
+
+/* ─────────────────────────────────────────────
+   PULL: Sync from API into localStorage
+───────────────────────────────────────────── */
+
 async function syncBookingsFromAPI() {
   try {
     if (!Auth.isLoggedIn()) return;
@@ -13,10 +38,8 @@ async function syncBookingsFromAPI() {
     if (!data.bookings || !data.bookings.length) return;
 
     const apiBookings = data.bookings.map(b => {
-      /* Parse notes JSON if stored there (demo bookings) */
       let notes = {};
       try { notes = typeof b.notes === 'string' ? JSON.parse(b.notes) : (b.notes || {}); } catch {}
-
       return {
         id:              b.id,
         studentName:     b.student_name || notes.studentName || '—',
@@ -52,188 +75,191 @@ async function syncBookingsFromAPI() {
       };
     });
 
-    /* Merge: API bookings take priority, keep localStorage-only ones */
     const local = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
     const apiIds = new Set(apiBookings.map(b => b.id));
     const localOnly = local.filter(b => !apiIds.has(b.id) && !b._fromApi);
-    const merged = [...apiBookings, ...localOnly];
-    localStorage.setItem('sn_bookings', JSON.stringify(merged));
-  } catch (e) {
-    console.warn('[API Sync] Bookings sync failed:', e.message);
-  }
+    localStorage.setItem('sn_bookings', JSON.stringify([...apiBookings, ...localOnly]));
+  } catch (e) { console.warn('[API Sync] Bookings sync failed:', e.message); }
 }
 
-/* ── Sync courses from API into localStorage ── */
 async function syncCoursesFromAPI() {
   try {
     const data = await Courses.list();
     if (!data.courses || !data.courses.length) return;
-
     const apiCourses = data.courses.map(c => ({
-      id:       c.id,
-      name:     c.name,
-      desc:     c.description,
-      subject:  c.subject,
-      level:    c.level,
-      age:      c.age_range,
-      price:    c.price,
-      classes:  c.num_classes,
-      duration: c.duration,
-      rating:   c.rating,
-      students: c.students,
-      emoji:    c.emoji || '📚',
-      color:    c.color || 'blue',
-      badge:    c.badge || '',
+      id: c.id, name: c.name, desc: c.description, subject: c.subject,
+      level: c.level, age: c.age_range, price: c.price, classes: c.num_classes,
+      duration: c.duration, rating: c.rating, students: c.students,
+      emoji: c.emoji || '📚', color: c.color || 'blue', badge: c.badge || '',
       _fromApi: true,
     }));
-
-    /* Only replace if API has data */
-    if (apiCourses.length > 0) {
-      localStorage.setItem('sn_courses', JSON.stringify(apiCourses));
-    }
-  } catch (e) {
-    console.warn('[API Sync] Courses sync failed:', e.message);
-  }
+    if (apiCourses.length > 0) localStorage.setItem('sn_courses', JSON.stringify(apiCourses));
+  } catch (e) { console.warn('[API Sync] Courses sync failed:', e.message); }
 }
 
-/* ── Sync teachers from API into localStorage ── */
 async function syncTeachersFromAPI() {
   try {
     if (!Auth.isLoggedIn()) return;
     const data = await apiCall('/api/users?role=tutor');
     if (!data.users || !data.users.length) return;
-
     const apiTeachers = data.users.map(u => ({
-      id:           u.staff_id || u.id,
-      name:         u.name,
-      initials:     u.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase(),
-      email:        u.email,
-      subject:      u.subject || 'Coding',
-      courses:      u.courses || [],
-      gradeGroups:  u.grade_groups || [],
+      id: u.staff_id || u.id, name: u.name,
+      initials: u.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase(),
+      email: u.email, subject: u.subject || 'Coding',
+      courses: u.courses || [], gradeGroups: u.grade_groups || [],
       availability: u.availability || 'Mon–Fri, 9am–6pm',
-      dbs:          u.dbs_checked || 'yes',
-      photo:        u.photo_url || null,
-      color:        u.color || 'linear-gradient(135deg,#1a56db,#4f87f5)',
-      _fromApi:     true,
+      dbs: u.dbs_checked || 'yes', photo: u.photo_url || null,
+      color: u.color || 'linear-gradient(135deg,#1a56db,#4f87f5)', _fromApi: true,
     }));
-
     if (apiTeachers.length > 0) {
-      /* Merge with local (keep local photo uploads etc.) */
       const local = JSON.parse(localStorage.getItem('sn_teachers') || '[]');
       const apiIds = new Set(apiTeachers.map(t => t.id));
       const localOnly = local.filter(t => !apiIds.has(t.id) && !t._fromApi);
       localStorage.setItem('sn_teachers', JSON.stringify([...apiTeachers, ...localOnly]));
     }
-  } catch (e) {
-    console.warn('[API Sync] Teachers sync failed:', e.message);
-  }
+  } catch (e) { console.warn('[API Sync] Teachers sync failed:', e.message); }
 }
 
-/* ── Sync sales persons from API into localStorage ── */
 async function syncSalesFromAPI() {
   try {
     if (!Auth.isLoggedIn()) return;
     const data = await apiCall('/api/users?role=sales');
     if (!data.users || !data.users.length) return;
-
     const apiSales = data.users.map(u => ({
-      id:       u.staff_id || u.id,
-      name:     u.name,
+      id: u.staff_id || u.id, name: u.name,
       initials: u.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase(),
-      email:    u.email,
-      phone:    u.phone || '',
-      region:   'Global',
-      color:    'linear-gradient(135deg,#ff6b35,#fbbf24)',
-      photo:    u.photo_url || null,
-      _fromApi: true,
+      email: u.email, phone: u.phone || '', region: 'Global',
+      color: 'linear-gradient(135deg,#ff6b35,#fbbf24)', photo: u.photo_url || null, _fromApi: true,
     }));
-
-    if (apiSales.length > 0) {
-      localStorage.setItem('sn_sales_persons', JSON.stringify(apiSales));
-    }
-  } catch (e) {
-    console.warn('[API Sync] Sales sync failed:', e.message);
-  }
+    if (apiSales.length > 0) localStorage.setItem('sn_sales_persons', JSON.stringify(apiSales));
+  } catch (e) { console.warn('[API Sync] Sales sync failed:', e.message); }
 }
 
-/* ── Sync payments from API into localStorage ── */
-async function syncPaymentsFromAPI() {
+async function syncDashboardData() {
   try {
     if (!Auth.isLoggedIn()) return;
     const user = Auth.getStoredUser();
     if (!user) return;
 
-    let data;
-    if (['admin','super_admin','postsales'].includes(user.role)) {
-      data = await Payments.list();
-    } else if (user.role === 'student') {
-      data = await Payments.studentHistory(user.id);
-    } else {
-      return;
+    const role = user.role;
+    if (!['operations','sales','presales','postsales'].includes(role)) return;
+
+    const token = localStorage.getItem('sn_access_token');
+    const res = await fetch(API_BASE + '/api/sync/dashboard/' + role, {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+
+    /* Operations */
+    if (data.lateJoins) {
+      const mapped = data.lateJoins.map(l => ({
+        tutorId:   l.tutor_id, tutorName: l.tutor_name || '—',
+        sessionId: l.booking_id, joinTime: l.join_time,
+        month:     l.created_at ? new Date(l.created_at).getFullYear() + '-' + (new Date(l.created_at).getMonth() + 1) : '',
+        date:      l.created_at, penalty: l.penalty || 0, pardoned: l.pardoned,
+        _fromApi:  true,
+      }));
+      localStorage.setItem('sn_late_joins', JSON.stringify(mapped));
+    }
+    if (data.classReports) {
+      const mapped = data.classReports.map(r => ({
+        bookingId: r.booking_id, tutorName: r.tutor_name || '—',
+        outcome: r.outcome, classQuality: r.class_quality,
+        studentInterest: r.student_interest, incompleteReason: r.incomplete_reason,
+        notes: r.notes, recordingLink: r.recording_link,
+        date: r.date, time: r.time, subject: r.subject, _fromApi: true,
+      }));
+      localStorage.setItem('sn_class_reports', JSON.stringify(mapped));
+    }
+    if (data.absentTeachers) {
+      localStorage.setItem('sn_absent_teachers', JSON.stringify(data.absentTeachers));
     }
 
-    if (data.payments && data.payments.length) {
-      localStorage.setItem('sn_payment_links', JSON.stringify(
-        data.payments.map(p => ({
-          id:        p.id,
-          student:   p.student_name || '—',
-          email:     p.student_email || '—',
-          course:    p.course_name || '—',
-          amount:    p.amount,
-          currency:  p.currency,
-          credits:   p.credits_purchased,
-          status:    p.status,
-          createdAt: p.created_at,
-          _fromApi:  true,
-        }))
-      ));
+    /* Sales pipeline */
+    if (data.pipeline) {
+      const salesId = user.staffId || user.id;
+      const mapped = data.pipeline.map(p => ({
+        bookingId: p.booking_id, studentName: p.student_name || '—',
+        subject: p.subject, date: p.date, email: p.student_email || '—',
+        course: p.course_pitched, status: p.status,
+        interest: p.interest_level, purchasingPower: p.purchasing_power,
+        paymentAmount: p.payment_amount, notes: p.notes, _fromApi: true,
+      }));
+      localStorage.setItem('sn_pipeline_' + salesId, JSON.stringify(mapped));
     }
-  } catch (e) {
-    console.warn('[API Sync] Payments sync failed:', e.message);
-  }
+
+    /* Postsales students */
+    if (data.students) {
+      const existing = JSON.parse(localStorage.getItem('sn_students') || '[]');
+      const apiEmails = new Set(data.students.map(s => s.email));
+      const localOnly = existing.filter(s => !apiEmails.has(s.email) && !s._fromApi);
+      const apiStudents = data.students.map(s => ({
+        id: s.id, name: s.name, email: s.email, phone: s.phone || '',
+        grade: s.grade || '', credits: s.credits || 0, _fromApi: true,
+      }));
+      localStorage.setItem('sn_students', JSON.stringify([...apiStudents, ...localOnly]));
+    }
+
+  } catch (e) { console.warn('[API Sync] Dashboard sync failed:', e.message); }
 }
 
-/* ── Sync notifications from API ── */
 async function syncNotificationsFromAPI() {
   try {
     if (!Auth.isLoggedIn()) return;
     const data = await Users.getNotifications();
     if (data.notifications) {
       const unread = data.notifications.filter(n => !n.is_read).length;
-      /* Update any notification badge in the UI */
       const badge = document.getElementById('notifBadge');
-      if (badge) {
-        badge.textContent = unread;
-        badge.style.display = unread > 0 ? 'inline-block' : 'none';
-      }
+      if (badge) { badge.textContent = unread; badge.style.display = unread > 0 ? 'inline-block' : 'none'; }
       localStorage.setItem('sn_notifications', JSON.stringify(data.notifications));
     }
   } catch (e) { /* silent */ }
 }
 
-/* ── Master sync — runs on page load ── */
+/* ─────────────────────────────────────────────
+   PUSH: Send data to API when written locally
+───────────────────────────────────────────── */
+
+/** Call after a class report is saved locally */
+function pushClassReport(bookingId, reportData) {
+  _push('/api/sync/class-reports', { bookingId, ...reportData });
+}
+
+/** Call after a pitch record is saved locally */
+function pushPipelineRecord(record) {
+  _push('/api/sync/pipeline', record);
+}
+
+/** Call after a late join is logged locally */
+function pushLateJoin(data) {
+  _push('/api/sync/late-joins', data);
+}
+
+/** Call after student credits change */
+function pushCreditsUpdate(studentEmail, credits, type, description, bookingId) {
+  _push('/api/sync/credits', { studentEmail, credits, type, description, bookingId });
+}
+
+/* ─────────────────────────────────────────────
+   MASTER SYNC — runs on page load
+───────────────────────────────────────────── */
 async function runApiSync() {
   const online = await isApiAvailable();
-  if (!online) {
-    console.log('[API Sync] API offline — using localStorage');
-    return;
-  }
+  if (!online) { console.log('[API Sync] API offline — using localStorage'); return; }
 
   console.log('[API Sync] Syncing from API...');
 
-  /* Run syncs in parallel where possible */
   await Promise.allSettled([
     syncCoursesFromAPI(),
     syncTeachersFromAPI(),
     syncSalesFromAPI(),
   ]);
 
-  /* Bookings and payments need auth */
   if (Auth.isLoggedIn()) {
     await Promise.allSettled([
       syncBookingsFromAPI(),
-      syncPaymentsFromAPI(),
+      syncDashboardData(),
       syncNotificationsFromAPI(),
     ]);
   }
@@ -241,11 +267,8 @@ async function runApiSync() {
   console.log('[API Sync] Sync complete');
 }
 
-/* ── Auto-run on page load ── */
 document.addEventListener('DOMContentLoaded', () => {
-  /* Small delay to let dashboard JS initialise first */
   setTimeout(runApiSync, 500);
 });
 
-/* ── Also sync when user logs in ── */
 window.addEventListener('sn:login', runApiSync);

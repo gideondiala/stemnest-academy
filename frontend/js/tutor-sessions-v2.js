@@ -521,6 +521,15 @@ function _handlePaidOutcome(bookingId, booking, outcome, rates) {
     _deductStudentCredit(booking);
     _updateBookingStatus(bookingId, 'completed', { completedAt: new Date().toISOString() });
     recordClassSession(booking, 'completed', '', rates.paid, true);
+    /* Push to real API */
+    if (typeof pushClassReport === 'function') {
+      pushClassReport(bookingId, { outcome: 'completed', payAmount: rates.paid, creditDeducted: true });
+    }
+    if (typeof pushCreditsUpdate === 'function' && booking.email) {
+      var students = JSON.parse(localStorage.getItem('sn_students') || '[]');
+      var s = students.find(function(st) { return st.email === booking.email || st.id === booking.studentId; });
+      if (s) pushCreditsUpdate(booking.email, s.credits, 'class_deduction', 'Class completed', bookingId);
+    }
     _refreshOverviewCards();
     showToast('\u2705 Class completed! \u00a3' + rates.paid.toFixed(2) + ' added to earnings.', 'success');
     renderUpcomingCards();

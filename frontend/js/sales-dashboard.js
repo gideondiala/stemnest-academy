@@ -412,6 +412,11 @@ function savePitch() {
   else pipeline.unshift(record);
   saveMyPipeline(pipeline);
 
+  /* Push to real API */
+  if (typeof pushPipelineRecord === 'function') {
+    pushPipelineRecord(record);
+  }
+
   // If converted, update booking status and notify admin
   if (record.status === 'converted') {
     const bookings = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
