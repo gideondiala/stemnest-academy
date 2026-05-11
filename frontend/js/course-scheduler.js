@@ -568,7 +568,28 @@ function confirmReschedule() {
 
   if (success) {
     if (typeof showToast === 'function') showToast('✅ Lesson rescheduled. All future lessons shifted forward.', 'success');
-    // Refresh calendar if visible
+
+    /* Push updated bookings to API */
+    try {
+      const token = localStorage.getItem('sn_access_token');
+      if (token) {
+        const allBookings = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+        const enrolmentId = allBookings.find(b => b.id === bookingId)?.enrolmentId;
+        if (enrolmentId) {
+          const futureLessons = allBookings.filter(b => b.enrolmentId === enrolmentId && b.status === 'scheduled');
+          futureLessons.forEach(b => {
+            if (b.dbId) {
+              fetch('https://api.stemnestacademy.co.uk/api/bookings/' + b.dbId + '/assign', {
+                method:  'PUT',
+                headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ classLink: b.classLink || '' }),
+              }).catch(() => {});
+            }
+          });
+        }
+      }
+    } catch (e) { /* silent */ }
+
     if (typeof renderWeeklyCalendar === 'function') renderWeeklyCalendar();
     if (typeof renderUpcomingCards  === 'function') renderUpcomingCards();
   } else {

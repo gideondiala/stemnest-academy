@@ -953,6 +953,25 @@ function confirmManualOnboard() {
   allBookings.unshift(booking);
   saveBookings(allBookings);
 
+  /* Also create in real DB so it syncs to teacher dashboard */
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    if (token) {
+      const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      await fetch('https://api.stemnestacademy.co.uk/api/bookings', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          studentName: name, age: age || '—', grade: grade || '—',
+          email, whatsapp: phone || '+000000000',
+          subject: subject || 'Coding',
+          device: 'laptop', timezone: 'Europe/London',
+          date: futureDate, time: '10:00 AM',
+        }),
+      });
+    }
+  } catch (e) { /* silent */ }
+
   // Update student record with bookingId
   const sIdx = existing.findIndex(s => s.id === studentId);
   if (sIdx !== -1) { existing[sIdx].bookingId = bookingId; localStorage.setItem('sn_students', JSON.stringify(existing)); }

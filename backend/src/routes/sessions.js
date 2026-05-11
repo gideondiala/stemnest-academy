@@ -35,7 +35,7 @@ router.get('/upcoming', requireAuth, async (req, res, next) => {
               b.class_link, b.activity_link, b.slides_link, b.is_demo,
               b.duration_mins, b.course_id,
               u_s.name AS student_name, u_s.email AS student_email,
-              u_t.name AS tutor_name,
+              u_t.name AS tutor_name,   u_t.staff_id AS tutor_staff_id,
               c.name   AS course_name,
               l.name   AS lesson_name_full, l.activity_link AS lesson_activity, l.slides_link AS lesson_slides
        FROM bookings b

@@ -81,7 +81,7 @@ router.get('/', requireAuth, async (req, res, next) => {
       `SELECT b.*,
               u_s.name  AS student_name,  u_s.email AS student_email,
               u_t.name  AS tutor_name,    u_t.staff_id AS tutor_staff_id,
-              u_sp.name AS sales_name,
+              u_sp.name AS sales_name,    u_sp.staff_id AS sales_staff_id,
               c.name    AS course_name,
               l.name    AS lesson_name_full, l.activity_link, l.slides_link
        FROM bookings b
@@ -161,7 +161,7 @@ router.get('/:id', requireAuth, async (req, res, next) => {
       `SELECT b.*,
               u_s.name  AS student_name,  u_s.email AS student_email, u_s.phone AS student_phone,
               u_t.name  AS tutor_name,    u_t.staff_id AS tutor_staff_id,
-              u_sp.name AS sales_name,
+              u_sp.name AS sales_name,    u_sp.staff_id AS sales_staff_id,
               c.name    AS course_name,
               l.name    AS lesson_name_full, l.activity_link, l.slides_link
        FROM bookings b

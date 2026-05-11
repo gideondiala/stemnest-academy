@@ -14,6 +14,20 @@ function _authHeader() {
   return token ? { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
 }
 
+/* ── Convert API time "HH:MM:SS" to "H:MM AM/PM" display format ── */
+function _formatApiTime(t) {
+  if (!t) return '—';
+  /* Already in 12h format */
+  if (/AM|PM/i.test(t)) return t;
+  /* Convert HH:MM or HH:MM:SS to 12h */
+  const parts = t.split(':');
+  let h = parseInt(parts[0]);
+  const m = parts[1] || '00';
+  const period = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return h + ':' + m + ' ' + period;
+}
+
 /* ── Fire-and-forget API push ── */
 async function _push(endpoint, data) {
   try {
@@ -49,12 +63,13 @@ async function syncBookingsFromAPI() {
         whatsapp:        notes.whatsapp  || '—',
         parentName:      notes.parentName || '—',
         subject:         b.subject,
-        date:            b.date,
-        time:            b.time,
+        date:            typeof b.date === 'string' ? b.date.split('T')[0] : b.date,
+        time:            _formatApiTime(b.time),
         status:          b.status,
         assignedTutor:   b.tutor_name   || '—',
+        /* CRITICAL: use staff_id (CT001) not UUID so tutor dashboard filter works */
         assignedTutorId: b.tutor_staff_id || b.tutor_id || '',
-        assignedSalesId: b.sales_id     || '',
+        assignedSalesId: b.sales_staff_id || b.sales_id || '',
         classLink:       b.class_link   || '',
         lessonName:      b.lesson_name_full || b.lesson_name || '',
         lessonNumber:    b.lesson_number,
@@ -71,7 +86,7 @@ async function syncBookingsFromAPI() {
         salesStatus:     b.status === 'completed' ? 'converted' : undefined,
         device:          notes.device || '—',
         timezone:        notes.timezone || '—',
-        dbId:            b.id,   /* store real DB UUID for API calls */
+        dbId:            b.id,
         _fromApi:        true,
       };
     });
