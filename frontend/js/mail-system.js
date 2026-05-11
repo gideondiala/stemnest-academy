@@ -1,4 +1,4 @@
-/* ═══════════════════════════════════════════════════════
+﻿/* ═══════════════════════════════════════════════════════
    STEMNEST ACADEMY — MAIL SYSTEM (mail-system.js)
    Priority 9: Transactional + Bulk Email
    All emails are simulated (logged to sn_email_log).
@@ -98,7 +98,7 @@ function emailLoginDetailsToParent(student) {
     '',
     `HOW TO LOG IN`,
     `─────────────────────────────`,
-    `1. Go to: https://stemnest.co.uk/pages/login.html`,
+    `1. Go to: https://stemnestacademy.co.uk/pages/login.html`,
     `2. Click "I'm a Student"`,
     `3. Enter the email and password above`,
     `4. Click "Log In & Join Class"`,
@@ -111,7 +111,7 @@ function emailLoginDetailsToParent(student) {
     `If you need help, reply to this email or contact us on WhatsApp.`,
     '',
     `StemNest Academy`,
-    `support@stemnest.co.uk`,
+    `support@stemnestacademy.co.uk`,
   ].join('\n');
   logEmail(student.email, subject, body, 'onboarding');
 }

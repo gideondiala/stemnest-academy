@@ -1,4 +1,4 @@
-/* ═══════════════════════════════════════════════════════
+﻿/* ═══════════════════════════════════════════════════════
    STEMNEST ACADEMY — STUDENT DASHBOARD UPGRADES (Phase 4)
    Learning Nest, Chat, Multi-course, Payment Link,
    Certificate signatures, Late project alerts.
@@ -1222,7 +1222,7 @@ function renderPaymentRecords() {
   }
 
   html += '<div style="margin-top:16px;padding:12px 16px;background:var(--bg);border-radius:10px;font-size:12px;font-weight:700;color:var(--light);">' +
-    '🔒 This record is read-only and managed by the StemNest Finance Team. Contact support@stemnest.co.uk for any queries.' +
+    '🔒 This record is read-only and managed by the StemNest Finance Team. Contact support@stemnestacademy.co.uk for any queries.' +
   '</div>';
 
   el.innerHTML = html;

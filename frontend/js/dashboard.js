@@ -1,4 +1,4 @@
-/* ═══════════════════════════════════════════════════════
+﻿/* ═══════════════════════════════════════════════════════
    STEMNEST ACADEMY — TUTOR DASHBOARD JS
    Loads logged-in teacher from localStorage registry,
    weekly availability calendar, photo upload, notifications.
@@ -16,7 +16,7 @@ function getLoggedInTutor() {
     return found || {
       id: 'CT001', name: 'Sarah Rahman', initials: 'SR',
       role: 'Coding Tutor', subject: 'Coding',
-      email: 'sarah.rahman@stemnest.co.uk',
+      email: 'sarah.rahman@stemnestacademy.co.uk',
       courses: ['Python for Beginners','Scratch & Game Design','Web Dev'],
       gradeGroups: ['Year 7–9','Year 10–11'],
       photo: null,

@@ -1,4 +1,4 @@
-/* ═══════════════════════════════════════════════════════
+﻿/* ═══════════════════════════════════════════════════════
    STEMNEST ACADEMY — SUPER ADMIN / FOUNDER DASHBOARD JS
    Full reporting: sales, classes, revenue, expenses, profit.
 ═══════════════════════════════════════════════════════ */
@@ -702,8 +702,8 @@ function renderCredentialsChart() {
 
   // Admin + Founder (from settings or hardcoded)
   const settings = JSON.parse(localStorage.getItem('sn_sa_settings') || '{}');
-  allUsers.push({ id: 'ADMIN', name: 'Admin', email: 'admin@stemnest.co.uk', role: 'Admin', password: settings.adminPassword || 'admin123' });
-  allUsers.push({ id: 'FOUNDER', name: 'Founder', email: settings.saEmail || 'founder@stemnest.co.uk', role: 'Founder / Super Admin', password: settings.saPassword || 'Founder2024!' });
+  allUsers.push({ id: 'ADMIN', name: 'Admin', email: 'admin@stemnestacademy.co.uk', role: 'Admin', password: settings.adminPassword || 'admin123' });
+  allUsers.push({ id: 'FOUNDER', name: 'Founder', email: settings.saEmail || 'founder@stemnestacademy.co.uk', role: 'Founder / Super Admin', password: settings.saPassword || 'Founder2024!' });
 
   // Also merge from password registry (catches password changes)
   const registry = JSON.parse(localStorage.getItem('sn_password_registry') || '[]');

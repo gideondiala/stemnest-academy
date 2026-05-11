@@ -1,4 +1,4 @@
-
+﻿
 /* ═══════════════════════════════════════════════════════
    STEMNEST ACADEMY — ADMIN DASHBOARD JS
    Teacher registry, smart assign (subject + availability),
@@ -36,10 +36,10 @@ function getTeachers() {
     // Seed default teachers if empty
     if (stored.length === 0) {
       const defaults = [
-        { id:'CT001', name:'Sarah Rahman',  initials:'SR', subject:'Coding',   email:'sarah.rahman@stemnest.co.uk',  phone:'+44 7700 111001', password:'StemNest2024!', courses:['Python for Beginners','Scratch & Game Design','Web Dev: HTML/CSS/JS'], gradeGroups:['Year 7–9','Year 10–11'], bio:'Former software engineer turned educator. 6+ years helping young people fall in love with coding.', availability:'Mon–Fri, 9am–6pm', dbs:'yes', color:TUTOR_COLORS[0], photo:null },
-        { id:'MT001', name:'James Okafor',  initials:'JO', subject:'Maths',    email:'james.okafor@stemnest.co.uk',  phone:'+44 7700 111002', password:'StemNest2024!', courses:['Primary Maths Boost','GCSE Maths Prep','A-Level Maths Mastery'],         gradeGroups:['Year 7–9','Year 10–11','Year 12–13'], bio:'PGCE-qualified Maths specialist. Helped 150+ students achieve their target GCSE and A-Level grades.', availability:'Mon–Sat, 10am–7pm', dbs:'yes', color:TUTOR_COLORS[1], photo:null },
-        { id:'ST001', name:'Lisa Patel',    initials:'LP', subject:'Sciences', email:'lisa.patel@stemnest.co.uk',    phone:'+44 7700 111003', password:'StemNest2024!', courses:['GCSE Biology','GCSE Chemistry','A-Level Physics'],                         gradeGroups:['Year 10–11','Year 12–13'], bio:'Biology & Chemistry graduate from UCL with a talent for making complex science click.', availability:'Tue–Sat, 11am–6pm', dbs:'yes', color:TUTOR_COLORS[2], photo:null },
-        { id:'CT002', name:'Marcus King',   initials:'MK', subject:'Coding',   email:'marcus.king@stemnest.co.uk',   phone:'+44 7700 111004', password:'StemNest2024!', courses:['Python for Beginners','AI Literacy','A-Level Computer Science'],           gradeGroups:['Year 10–11','Year 12–13'], bio:'Tech innovator passionate about preparing the next generation for an AI-first world.', availability:'Mon–Fri, 2pm–9pm', dbs:'yes', color:TUTOR_COLORS[3], photo:null },
+        { id:'CT001', name:'Sarah Rahman',  initials:'SR', subject:'Coding',   email:'sarah.rahman@stemnestacademy.co.uk',  phone:'+44 7700 111001', password:'StemNest2024!', courses:['Python for Beginners','Scratch & Game Design','Web Dev: HTML/CSS/JS'], gradeGroups:['Year 7–9','Year 10–11'], bio:'Former software engineer turned educator. 6+ years helping young people fall in love with coding.', availability:'Mon–Fri, 9am–6pm', dbs:'yes', color:TUTOR_COLORS[0], photo:null },
+        { id:'MT001', name:'James Okafor',  initials:'JO', subject:'Maths',    email:'james.okafor@stemnestacademy.co.uk',  phone:'+44 7700 111002', password:'StemNest2024!', courses:['Primary Maths Boost','GCSE Maths Prep','A-Level Maths Mastery'],         gradeGroups:['Year 7–9','Year 10–11','Year 12–13'], bio:'PGCE-qualified Maths specialist. Helped 150+ students achieve their target GCSE and A-Level grades.', availability:'Mon–Sat, 10am–7pm', dbs:'yes', color:TUTOR_COLORS[1], photo:null },
+        { id:'ST001', name:'Lisa Patel',    initials:'LP', subject:'Sciences', email:'lisa.patel@stemnestacademy.co.uk',    phone:'+44 7700 111003', password:'StemNest2024!', courses:['GCSE Biology','GCSE Chemistry','A-Level Physics'],                         gradeGroups:['Year 10–11','Year 12–13'], bio:'Biology & Chemistry graduate from UCL with a talent for making complex science click.', availability:'Tue–Sat, 11am–6pm', dbs:'yes', color:TUTOR_COLORS[2], photo:null },
+        { id:'CT002', name:'Marcus King',   initials:'MK', subject:'Coding',   email:'marcus.king@stemnestacademy.co.uk',   phone:'+44 7700 111004', password:'StemNest2024!', courses:['Python for Beginners','AI Literacy','A-Level Computer Science'],           gradeGroups:['Year 10–11','Year 12–13'], bio:'Tech innovator passionate about preparing the next generation for an AI-first world.', availability:'Mon–Fri, 2pm–9pm', dbs:'yes', color:TUTOR_COLORS[3], photo:null },
       ];
       localStorage.setItem('sn_teachers', JSON.stringify(defaults));
       return defaults;
@@ -1035,7 +1035,7 @@ function getSalesPersons() {
     const stored = JSON.parse(localStorage.getItem('sn_sales_persons') || '[]');
     if (stored.length === 0) {
       const defaults = [
-        { id:'SP001', name:'Alex Johnson', initials:'AJ', email:'alex.johnson@stemnest.co.uk', phone:'+44 7700 222001', password:'StemNest2024!', region:'UK & Europe', bio:'Senior academic counselor with 3 years experience.', color:SP_COLORS[0], photo:null, createdAt: new Date().toISOString() },
+        { id:'SP001', name:'Alex Johnson', initials:'AJ', email:'alex.johnson@stemnestacademy.co.uk', phone:'+44 7700 222001', password:'StemNest2024!', region:'UK & Europe', bio:'Senior academic counselor with 3 years experience.', color:SP_COLORS[0], photo:null, createdAt: new Date().toISOString() },
       ];
       localStorage.setItem('sn_sales_persons', JSON.stringify(defaults));
       return defaults;

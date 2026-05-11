@@ -298,7 +298,7 @@ function confirmReschedule() {
           'Check your email and WhatsApp for confirmation.' +
         '</div>' +
         '<div style="background:rgba(255,255,255,.15);border-radius:14px;padding:14px;font-size:13px;color:rgba(255,255,255,.8);font-weight:700;">' +
-          '💬 Need help? Contact us on WhatsApp or email support@stemnest.co.uk' +
+          '💬 Need help? Contact us on WhatsApp or email support@stemnestacademy.co.uk' +
         '</div>' +
       '</div>';
   }

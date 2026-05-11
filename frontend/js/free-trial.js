@@ -1,4 +1,4 @@
-/* ═══════════════════════════════════════════════════════
+﻿/* ═══════════════════════════════════════════════════════
    STEMNEST ACADEMY — FREE TRIAL LANDING PAGE JS
    Form validation, booking storage, success flow,
    simulated email/WhatsApp confirmation.
@@ -271,7 +271,7 @@ You will receive an automated reminder call:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Questions? Reply to this email or WhatsApp us.
-Website: https://stemnest.co.uk
+Website: https://stemnestacademy.co.uk
 
 StemNest Academy Ltd · Registered in England & Wales
   `;

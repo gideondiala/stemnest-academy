@@ -1,4 +1,4 @@
-/* ═══════════════════════════════════════════════════════
+﻿/* ═══════════════════════════════════════════════════════
    STEMNEST ACADEMY — POST-SALES DASHBOARD JS
    Receives converted (paid) students, schedules recurring
    paid classes, writes slots to teacher calendar.
@@ -700,7 +700,7 @@ function generateCredentialText(student) {
     '  HOW TO LOG IN',
     '───────────────────────────────────────────────',
     '',
-    '  1. Go to: https://stemnest.co.uk/pages/login.html',
+    '  1. Go to: https://stemnestacademy.co.uk/pages/login.html',
     '  2. Click "I\'m a Student"',
     '  3. Enter the email and password above',
     '  4. Click "Log In & Join Class"',
@@ -712,7 +712,7 @@ function generateCredentialText(student) {
     '  NEED HELP?',
     '───────────────────────────────────────────────',
     '',
-    '  Email:    support@stemnest.co.uk',
+    '  Email:    support@stemnestacademy.co.uk',
     '  WhatsApp: Available on your dashboard',
     '',
     '  We recommend changing your password after',

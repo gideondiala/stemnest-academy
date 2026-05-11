@@ -1,4 +1,4 @@
-/* ═══════════════════════════════════════════════════════
+﻿/* ═══════════════════════════════════════════════════════
    STEMNEST ACADEMY — TUTOR SESSION LIFECYCLE (tutor-sessions.js)
    - 15-min join window enforcement
    - Auto-absent if teacher doesn't join
@@ -452,7 +452,7 @@ function seedTestSession() {
     grade:           'Year 9',
     age:             '14',
     subject:         tutor.subject || 'Coding',
-    email:           'test@stemnest.co.uk',
+    email:           'test@stemnestacademy.co.uk',
     whatsapp:        '+44 7700 000000',
     status:          'scheduled',
     assignedTutor:   tutor.name,
