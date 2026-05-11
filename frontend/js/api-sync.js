@@ -52,15 +52,33 @@ async function syncBookingsFromAPI() {
     if (!data.bookings || !data.bookings.length) return;
 
     const apiBookings = data.bookings.map(b => {
+      /* Parse notes — may be JSON object, JSON string, or plain text */
       let notes = {};
-      try { notes = typeof b.notes === 'string' ? JSON.parse(b.notes) : (b.notes || {}); } catch {}
+      if (b.notes) {
+        if (typeof b.notes === 'object') {
+          notes = b.notes;
+        } else {
+          try { notes = JSON.parse(b.notes); } catch { notes = {}; }
+        }
+      }
+
+      /* Student name: try multiple sources */
+      const studentName = b.student_name ||
+                          notes.studentName ||
+                          b.lesson_name ||   /* we store studentName in lesson_name for demo bookings */
+                          '—';
+
+      /* Phone: try multiple sources */
+      const whatsapp = notes.whatsapp || b.student_phone || '—';
+      const email    = b.student_email || notes.email || '—';
+
       return {
         id:              b.id,
-        studentName:     b.student_name || notes.studentName || '—',
+        studentName:     studentName,
         age:             notes.age      || b.grade || '—',
         grade:           b.grade        || notes.grade || '—',
-        email:           b.student_email || notes.email || '—',
-        whatsapp:        notes.whatsapp  || '—',
+        email:           email,
+        whatsapp:        whatsapp,
         parentName:      notes.parentName || '—',
         subject:         b.subject,
         date:            typeof b.date === 'string' ? b.date.split('T')[0] : b.date,

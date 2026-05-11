@@ -122,12 +122,26 @@ router.post('/', async (req, res, next) => {
        VALUES ($1, $2, $3::date, $4::time, '', 'pending', TRUE, $5, NOW())
        RETURNING id`,
       [data.subject, data.grade, data.date, data.time,
-       JSON.stringify({ studentName: data.studentName, age: data.age, email: data.email,
-                        whatsapp: data.whatsapp, parentName: data.parentName,
-                        device: data.device, timezone: data.timezone })]
+       JSON.stringify({
+         studentName: data.studentName,
+         age:         data.age,
+         email:       data.email,
+         whatsapp:    data.whatsapp,
+         parentName:  data.parentName,
+         device:      data.device,
+         timezone:    data.timezone,
+       })]
     );
 
     const bookingId = result.rows[0].id;
+
+    /* Also update the booking with student info in dedicated columns for easier querying */
+    await pool.query(
+      `UPDATE bookings SET
+         lesson_name = $1
+       WHERE id = $2`,
+      [data.studentName, bookingId]
+    ).catch(() => {});
 
     /* Notify parent */
     await notify.notifyDemoConfirmed({
