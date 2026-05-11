@@ -199,14 +199,27 @@ router.get('/:id', requireAuth, async (req, res, next) => {
 /* ══════════════════════════════════════════════
    PUT /api/bookings/:id/assign
 ══════════════════════════════════════════════ */
-router.put('/:id/assign', requireAuth, requireRole('admin','super_admin','presales'), async (req, res, next) => {
+router.put('/:id/assign', requireAuth, requireRole('admin','super_admin','presales','postsales'), async (req, res, next) => {
   try {
     const { tutorId, salesId, classLink, notes } = assignSchema.parse(req.body);
 
-    /* Get tutor + sales details for notifications */
-    const tutorResult = await pool.query('SELECT * FROM users WHERE id = $1', [tutorId]);
+    /* Support both UUID and staff_id for tutorId */
+    let tutorResult = await pool.query('SELECT * FROM users WHERE id = $1', [tutorId]);
+    if (!tutorResult.rows.length) {
+      /* Try by staff_id */
+      tutorResult = await pool.query('SELECT * FROM users WHERE staff_id = $1', [tutorId]);
+    }
     const tutor = tutorResult.rows[0];
-    if (!tutor) return res.status(404).json({ success: false, error: 'Tutor not found' });
+    if (!tutor) return res.status(404).json({ success: false, error: 'Tutor not found: ' + tutorId });
+
+    /* Support both UUID and staff_id for salesId */
+    let salesDbId = salesId || null;
+    if (salesId) {
+      const salesResult = await pool.query(
+        'SELECT id FROM users WHERE id = $1 OR staff_id = $1', [salesId]
+      );
+      if (salesResult.rows.length) salesDbId = salesResult.rows[0].id;
+    }
 
     /* Get booking */
     const bResult = await pool.query('SELECT * FROM bookings WHERE id = $1', [req.params.id]);
@@ -216,10 +229,10 @@ router.put('/:id/assign', requireAuth, requireRole('admin','super_admin','presal
     /* Update booking */
     await pool.query(
       `UPDATE bookings
-       SET tutor_id = $1, sales_id = $2, class_link = $3, notes = $4,
+       SET tutor_id = $1, sales_id = $2, class_link = $3,
            status = 'scheduled', scheduled_at = NOW()
-       WHERE id = $5`,
-      [tutorId, salesId || null, classLink, notes || null, req.params.id]
+       WHERE id = $4`,
+      [tutor.id, salesDbId, classLink, req.params.id]
     );
 
     /* Notify tutor */

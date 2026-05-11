@@ -266,10 +266,33 @@ async function confirmScheduleDemo() {
   const timeKey      = time;
 
   /* ── Find the real DB booking ID ── */
-  /* The local booking may have a local ID (SN-...) or a real UUID */
-  const localBooking = getBookings().find(b => b.id === psScheduleBookingId);
-  /* dbId is either the real UUID (if booking came from API) or the local ID */
-  const dbBookingId  = localBooking?.dbId || psScheduleBookingId;
+  /* Strategy: look up by email + subject in the DB since local IDs don't match DB UUIDs */
+  let dbBookingId = localBooking?.dbId || null;
+
+  if (!dbBookingId) {
+    try {
+      const token = localStorage.getItem('sn_access_token');
+      if (token && localBooking) {
+        const res = await fetch('https://api.stemnestacademy.co.uk/api/bookings?limit=200', {
+          headers: { 'Authorization': 'Bearer ' + token },
+        });
+        const data = await res.json();
+        /* Find matching booking by email or student name + subject */
+        const match = (data.bookings || []).find(b =>
+          b.status === 'pending' &&
+          b.subject === localBooking.subject &&
+          (
+            (b.notes && b.notes.includes(localBooking.email)) ||
+            (b.lesson_name && b.lesson_name === localBooking.studentName)
+          )
+        );
+        if (match) dbBookingId = match.id;
+      }
+    } catch (e) { /* silent */ }
+  }
+
+  /* Final fallback: use local ID (will fail silently if not a UUID) */
+  if (!dbBookingId) dbBookingId = psScheduleBookingId;
 
   /* ── Get teacher's real user ID from DB ── */
   let teacherDbId = null;
