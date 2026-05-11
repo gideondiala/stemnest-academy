@@ -265,7 +265,41 @@ async function confirmScheduleDemo() {
   const salesPerson  = salesPersons.find(s => s.id === salesId);
   const timeKey      = time;
 
-  /* Update localStorage */
+  /* ── Find the real DB booking ID ── */
+  /* The local booking may have a local ID (SN-...) or a real UUID */
+  const localBooking = getBookings().find(b => b.id === psScheduleBookingId);
+  /* dbId is either the real UUID (if booking came from API) or the local ID */
+  const dbBookingId  = localBooking?.dbId || psScheduleBookingId;
+
+  /* ── Get teacher's real user ID from DB ── */
+  let teacherDbId = null;
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    if (token) {
+      const res = await fetch('https://api.stemnestacademy.co.uk/api/users?role=tutor', {
+        headers: { 'Authorization': 'Bearer ' + token },
+      });
+      const data = await res.json();
+      const dbTeacher = (data.users || []).find(u => u.staff_id === teacherId || u.id === teacherId);
+      teacherDbId = dbTeacher?.id || null;
+    }
+  } catch (e) { /* silent */ }
+
+  /* ── Get sales person's real user ID from DB ── */
+  let salesDbId = null;
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    if (token) {
+      const res = await fetch('https://api.stemnestacademy.co.uk/api/users?role=sales', {
+        headers: { 'Authorization': 'Bearer ' + token },
+      });
+      const data = await res.json();
+      const dbSales = (data.users || []).find(u => u.staff_id === salesId || u.id === salesId);
+      salesDbId = dbSales?.id || null;
+    }
+  } catch (e) { /* silent */ }
+
+  /* ── Update localStorage ── */
   const all = getBookings();
   const idx = all.findIndex(b => b.id === psScheduleBookingId);
   if (idx !== -1) {
@@ -289,18 +323,31 @@ async function confirmScheduleDemo() {
 
   writeTeacherCalendarSlot(teacherId, date, timeKey, psScheduleBookingId);
 
-  /* Also call real API (fire and forget) */
-  if (typeof isApiAvailable === 'function') {
-    isApiAvailable().then(online => {
-      if (online && typeof Bookings !== 'undefined') {
-        Bookings.assign(psScheduleBookingId, {
-          tutorId:   teacherId,
-          salesId:   salesId || undefined,
+  /* ── Call real API to assign in database ── */
+  if (teacherDbId && dbBookingId) {
+    try {
+      const token = localStorage.getItem('sn_access_token');
+      const res = await fetch('https://api.stemnestacademy.co.uk/api/bookings/' + dbBookingId + '/assign', {
+        method:  'PUT',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          tutorId:   teacherDbId,
+          salesId:   salesDbId || undefined,
           classLink: link,
           notes:     notes || undefined,
-        }).catch(e => console.warn('[API] Assign booking failed:', e.message));
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        console.log('[Presales] Booking assigned in DB:', dbBookingId, '→', teacher?.name);
+      } else {
+        console.warn('[Presales] DB assign failed:', data.error);
       }
-    });
+    } catch (e) {
+      console.warn('[Presales] API assign error:', e.message);
+    }
+  } else {
+    console.warn('[Presales] Could not assign in DB — teacherDbId:', teacherDbId, 'dbBookingId:', dbBookingId);
   }
 
   if (typeof emailDemoBookedToTeacher === 'function') {

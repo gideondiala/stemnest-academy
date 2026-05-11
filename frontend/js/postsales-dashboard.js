@@ -256,7 +256,7 @@ function loadCourseDropdownSchedule(subject) {
       .map(c => `<option value="${c.name}">${c.name}${c.price ? ' — £'+c.price : ''}</option>`).join('');
 }
 
-function confirmPOSSchedule() {
+async function confirmPOSSchedule() {
   const teacherId = document.getElementById('pos-sm-teacher')?.value;
   const course    = document.getElementById('pos-sm-course')?.value;
   const startDate = document.getElementById('pos-sm-start')?.value;
@@ -273,24 +273,39 @@ function confirmPOSSchedule() {
 
   const teacher = getTeachers().find(t => t.id === teacherId);
 
+  /* ── Get teacher's real DB user ID ── */
+  let teacherDbId = null;
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    if (token) {
+      const res = await fetch('https://api.stemnestacademy.co.uk/api/users?role=tutor', {
+        headers: { 'Authorization': 'Bearer ' + token },
+      });
+      const data = await res.json();
+      const dbTeacher = (data.users || []).find(u => u.staff_id === teacherId || u.id === teacherId);
+      teacherDbId = dbTeacher?.id || null;
+    }
+  } catch (e) { /* silent */ }
+
+  /* ── Get real DB booking ID ── */
+  const localBooking = getBookings().find(b => b.id === posScheduleStudentId);
+  const dbBookingId  = localBooking?.dbId || posScheduleStudentId;
+
   // Generate all weekly session dates
   const sessionDates = [];
   let current = new Date(startDate + 'T12:00:00');
-  // Advance to the correct day of week
-  while (current.getDay() !== dayOfWeek) {
-    current.setDate(current.getDate() + 1);
-  }
+  while (current.getDay() !== dayOfWeek) { current.setDate(current.getDate() + 1); }
   for (let w = 0; w < weeks; w++) {
     sessionDates.push(current.toISOString().split('T')[0]);
     current.setDate(current.getDate() + 7);
   }
 
-  // Write each session to teacher's calendar
+  // Write each session to teacher's calendar (localStorage)
   sessionDates.forEach(dateKey => {
     writeTeacherCalendarSlot(teacherId, dateKey, time, posScheduleStudentId);
   });
 
-  // Update booking record
+  // Update booking record in localStorage
   const all = getBookings();
   const idx = all.findIndex(b => b.id === posScheduleStudentId);
   if (idx !== -1) {
@@ -309,6 +324,18 @@ function confirmPOSSchedule() {
       tutorNotified:   false,
     };
     saveBookings(all);
+  }
+
+  /* ── Also assign in real DB ── */
+  if (teacherDbId && dbBookingId) {
+    try {
+      const token = localStorage.getItem('sn_access_token');
+      await fetch('https://api.stemnestacademy.co.uk/api/bookings/' + dbBookingId + '/assign', {
+        method:  'PUT',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ tutorId: teacherDbId, classLink: link }),
+      });
+    } catch (e) { console.warn('[PostSales] DB assign error:', e.message); }
   }
 
   closePOSScheduleModal();

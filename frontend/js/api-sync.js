@@ -53,7 +53,7 @@ async function syncBookingsFromAPI() {
         time:            b.time,
         status:          b.status,
         assignedTutor:   b.tutor_name   || '—',
-        assignedTutorId: b.tutor_id     || '',
+        assignedTutorId: b.tutor_staff_id || b.tutor_id || '',
         assignedSalesId: b.sales_id     || '',
         classLink:       b.class_link   || '',
         lessonName:      b.lesson_name_full || b.lesson_name || '',
@@ -71,6 +71,7 @@ async function syncBookingsFromAPI() {
         salesStatus:     b.status === 'completed' ? 'converted' : undefined,
         device:          notes.device || '—',
         timezone:        notes.timezone || '—',
+        dbId:            b.id,   /* store real DB UUID for API calls */
         _fromApi:        true,
       };
     });
