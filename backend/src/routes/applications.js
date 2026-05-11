@@ -38,9 +38,9 @@ router.post('/', async (req, res, next) => {
   try {
     const data = applicationSchema.parse(req.body);
 
-    /* Check for duplicate (same email in last 30 days) */
+    /* Check for duplicate (same email + same name in last 7 days only) */
     const dup = await pool.query(
-      `SELECT id FROM applications WHERE email = $1 AND applied_at > NOW() - INTERVAL '30 days'`,
+      `SELECT id FROM applications WHERE LOWER(email) = LOWER($1) AND applied_at > NOW() - INTERVAL '7 days'`,
       [data.email]
     ).catch(() => ({ rows: [] }));
 
