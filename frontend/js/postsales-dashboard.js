@@ -113,8 +113,8 @@ function tdStyle(align) { return `padding:14px 16px;text-align:${align||'left'};
 ══════════════════════════════════════════════════════ */
 function openPOSScheduleModal(bookingId) {
   posScheduleStudentId = bookingId;
+  _posScheduleRows = [];
 
-  // Find student from bookings or pipeline
   const booking = getBookings().find(b => b.id === bookingId);
   const pipeline = getAllPipeline().find(p => p.bookingId === bookingId);
   const s = booking || pipeline || {};
@@ -124,24 +124,68 @@ function openPOSScheduleModal(bookingId) {
     <strong>${s.studentName || '—'}</strong> · ${s.grade || '—'}<br>
     📚 ${s.subject || s.course || '—'} &nbsp;·&nbsp; 📧 ${s.email || '—'} &nbsp;·&nbsp; 📱 ${s.whatsapp || '—'}`;
 
-  // Pre-fill subject in course dropdown
   loadCourseDropdownSchedule(s.subject);
-
-  // Populate teacher dropdown filtered by subject
   populatePOSTeacherDropdown(s.subject);
 
-  // Set start date min to today
   const dateEl = document.getElementById('pos-sm-start');
   if (dateEl) dateEl.min = new Date().toISOString().split('T')[0];
 
-  // Clear fields
-  ['pos-sm-time','pos-sm-weeks','pos-sm-link'].forEach(id => {
-    const el = document.getElementById(id); if (el) el.value = '';
-  });
-  const dayEl = document.getElementById('pos-sm-day');
-  if (dayEl) dayEl.value = '1'; // Monday default
+  ['pos-sm-weeks','pos-sm-link'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
 
+  _renderPOSScheduleRows();
   document.getElementById('posScheduleModalOverlay').classList.add('open');
+}
+
+/* ── Schedule row helpers ── */
+let _posScheduleRows = [];
+
+function _buildPOSScheduleRow(idx) {
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  return `<div class="enrol-schedule-row" id="pos-row-${idx}" style="display:flex;gap:12px;align-items:center;margin-bottom:12px;">
+    <select id="pos-day-${idx}" style="flex:1;padding:10px 12px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark,#1a202c);outline:none;background:#fff;">
+      <option value="">— Day —</option>
+      ${days.map((d,i) => `<option value="${i}">${d}</option>`).join('')}
+    </select>
+    <input type="time" id="pos-time-${idx}" style="flex:1;padding:10px 12px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark,#1a202c);outline:none;">
+    ${idx > 0 ? `<button type="button" onclick="removePOSScheduleRow(${idx})" style="background:#fde8e8;color:#c53030;border:none;border-radius:10px;padding:8px 12px;font-size:18px;cursor:pointer;font-weight:900;line-height:1;">×</button>` : '<div style="width:40px;"></div>'}
+  </div>`;
+}
+
+function _renderPOSScheduleRows() {
+  const container = document.getElementById('pos-schedule-rows');
+  if (!container) return;
+  container.innerHTML = _buildPOSScheduleRow(0) + _buildPOSScheduleRow(1);
+  _posScheduleRows = [0, 1];
+}
+
+function addPOSScheduleRow() {
+  const container = document.getElementById('pos-schedule-rows');
+  if (!container) return;
+  const existing = container.querySelectorAll('.enrol-schedule-row').length;
+  if (existing >= 5) { showToast('Maximum 5 days per week.', 'error'); return; }
+  const div = document.createElement('div');
+  div.innerHTML = _buildPOSScheduleRow(existing);
+  container.appendChild(div.firstChild);
+  _posScheduleRows.push(existing);
+}
+
+function removePOSScheduleRow(idx) {
+  const row = document.getElementById('pos-row-' + idx);
+  if (row) row.remove();
+}
+
+function _getPOSSchedule() {
+  const schedule = [];
+  const container = document.getElementById('pos-schedule-rows');
+  if (!container) return schedule;
+  container.querySelectorAll('.enrol-schedule-row').forEach(row => {
+    const dayEl  = row.querySelector('select[id^="pos-day-"]');
+    const timeEl = row.querySelector('input[type="time"]');
+    if (dayEl && timeEl && dayEl.value !== '' && timeEl.value) {
+      schedule.push({ weekday: parseInt(dayEl.value), time: timeEl.value });
+    }
+  });
+  return schedule;
 }
 
 function populatePOSTeacherDropdown(subject) {
@@ -171,88 +215,111 @@ async function confirmPOSSchedule() {
   const teacherId = document.getElementById('pos-sm-teacher')?.value;
   const course    = document.getElementById('pos-sm-course')?.value;
   const startDate = document.getElementById('pos-sm-start')?.value;
-  const dayOfWeek = parseInt(document.getElementById('pos-sm-day')?.value || '1');
-  const time      = document.getElementById('pos-sm-time')?.value;
   const weeks     = parseInt(document.getElementById('pos-sm-weeks')?.value || '0');
   const link      = document.getElementById('pos-sm-link')?.value.trim();
+  const schedule  = _getPOSSchedule();
 
-  if (!teacherId) { showToast('Please select a teacher.', 'error'); return; }
-  if (!startDate) { showToast('Please select a start date.', 'error'); return; }
-  if (!time)      { showToast('Please select a class time.', 'error'); return; }
-  if (!weeks || weeks < 1) { showToast('Please enter the number of weeks.', 'error'); return; }
-  if (!link)      { showToast('Please enter a class link.', 'error'); return; }
+  if (!teacherId)         { showToast('Please select a teacher.', 'error'); return; }
+  if (!startDate)         { showToast('Please select a start date.', 'error'); return; }
+  if (!schedule.length)   { showToast('Please set at least one day and time.', 'error'); return; }
+  if (!weeks || weeks < 1){ showToast('Please enter the number of weeks.', 'error'); return; }
+  if (!link)              { showToast('Please enter a class link.', 'error'); return; }
+
+  const btn = document.querySelector('#posScheduleModalOverlay .btn-green');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Scheduling…'; }
 
   const teacher = getTeachers().find(t => t.id === teacherId);
+  const localBooking = getBookings().find(b => b.id === posScheduleStudentId) ||
+                       getAllPipeline().find(p => p.bookingId === posScheduleStudentId) || {};
 
-  /* ── Get teacher's real DB user ID ── */
-  let teacherDbId = null;
-  try {
-    const token = localStorage.getItem('sn_access_token');
-    if (token) {
-      const res = await fetch('https://api.stemnestacademy.co.uk/api/users?role=tutor', {
-        headers: { 'Authorization': 'Bearer ' + token },
-      });
-      const data = await res.json();
-      const dbTeacher = (data.users || []).find(u => u.staff_id === teacherId || u.id === teacherId);
-      teacherDbId = dbTeacher?.id || null;
+  /* Generate all session dates for each day */
+  const allSessions = [];
+  schedule.forEach(slot => {
+    let current = new Date(startDate + 'T12:00:00');
+    while (current.getDay() !== slot.weekday) { current.setDate(current.getDate() + 1); }
+    for (let w = 0; w < weeks; w++) {
+      allSessions.push({ date: current.toISOString().split('T')[0], time: slot.time });
+      current.setDate(current.getDate() + 7);
     }
-  } catch (e) { /* silent */ }
+  });
+  allSessions.sort((a, b) => a.date.localeCompare(b.date));
 
-  /* ── Get real DB booking ID ── */
-  const localBooking = getBookings().find(b => b.id === posScheduleStudentId);
-  const dbBookingId  = localBooking?.dbId || posScheduleStudentId;
+  /* Write to teacher calendar + create booking entries */
+  allSessions.forEach(session => {
+    const bId = 'POS-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2,5);
+    writeTeacherCalendarSlot(teacherId, session.date, session.time, bId);
 
-  // Generate all weekly session dates
-  const sessionDates = [];
-  let current = new Date(startDate + 'T12:00:00');
-  while (current.getDay() !== dayOfWeek) { current.setDate(current.getDate() + 1); }
-  for (let w = 0; w < weeks; w++) {
-    sessionDates.push(current.toISOString().split('T')[0]);
-    current.setDate(current.getDate() + 7);
-  }
-
-  // Write each session to teacher's calendar (localStorage)
-  sessionDates.forEach(dateKey => {
-    writeTeacherCalendarSlot(teacherId, dateKey, time, posScheduleStudentId);
+    const newBooking = {
+      id:              bId,
+      studentName:     localBooking.studentName || '—',
+      studentId:       localBooking.studentId || '',
+      email:           localBooking.email || '',
+      whatsapp:        localBooking.whatsapp || '',
+      grade:           localBooking.grade || '',
+      age:             localBooking.age || '',
+      subject:         localBooking.subject || '',
+      course:          course || localBooking.course || '',
+      assignedTutor:   teacher?.name || '—',
+      assignedTutorId: teacherId,
+      classLink:       link,
+      date:            session.date,
+      time:            to12h(session.time),
+      timeRaw:         session.time,
+      status:          'scheduled',
+      isDemoClass:     false,
+      paymentAmount:   localBooking.paymentAmount || 0,
+      isRecurring:     true,
+      paidScheduled:   true,
+      bookedAt:        new Date().toISOString(),
+      scheduledAt:     new Date().toISOString(),
+    };
+    const allBk = getBookings();
+    allBk.unshift(newBooking);
+    saveBookings(allBk);
   });
 
-  // Update booking record in localStorage
+  /* Mark original booking as scheduled */
   const all = getBookings();
   const idx = all.findIndex(b => b.id === posScheduleStudentId);
   if (idx !== -1) {
-    all[idx] = {
-      ...all[idx],
-      paidScheduled:   true,
-      assignedTutor:   teacher?.name,
-      assignedTutorId: teacherId,
-      course,
-      classLink:       link,
-      classTime:       to12h(time),
-      classDayOfWeek:  dayOfWeek,
-      totalWeeks:      weeks,
-      sessionDates,
-      scheduledAt:     new Date().toISOString(),
-      tutorNotified:   false,
-    };
+    all[idx].paidScheduled   = true;
+    all[idx].assignedTutor   = teacher?.name;
+    all[idx].assignedTutorId = teacherId;
+    all[idx].course          = course;
+    all[idx].classLink       = link;
+    all[idx].schedule        = schedule;
+    all[idx].totalWeeks      = weeks;
+    all[idx].scheduledAt     = new Date().toISOString();
     saveBookings(all);
   }
 
-  /* ── Also assign in real DB ── */
-  if (teacherDbId && dbBookingId) {
-    try {
-      const token = localStorage.getItem('sn_access_token');
-      await fetch('https://api.stemnestacademy.co.uk/api/bookings/' + dbBookingId + '/assign', {
-        method:  'PUT',
-        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ tutorId: teacherDbId, classLink: link }),
+  /* Also assign in real DB */
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    if (token) {
+      const uRes = await fetch('https://api.stemnestacademy.co.uk/api/users?role=tutor', {
+        headers: { 'Authorization': 'Bearer ' + token },
       });
-    } catch (e) { console.warn('[PostSales] DB assign error:', e.message); }
-  }
+      const uData = await uRes.json();
+      const dbTeacher = (uData.users || []).find(u => u.staff_id === teacherId || u.id === teacherId);
+      const dbBookingId = localBooking.dbId || posScheduleStudentId;
+      if (dbTeacher && dbBookingId && dbBookingId.length > 20) {
+        await fetch('https://api.stemnestacademy.co.uk/api/bookings/' + dbBookingId + '/assign', {
+          method:  'PUT',
+          headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ tutorId: dbTeacher.id, classLink: link }),
+        });
+      }
+    }
+  } catch (e) { console.warn('[PostSales] DB assign error:', e.message); }
 
+  if (btn) { btn.disabled = false; btn.textContent = '✅ Schedule All Classes'; }
   closePOSScheduleModal();
   updatePOSStats();
   renderPaidStudents();
-  showToast(`✅ ${weeks} sessions scheduled with ${teacher?.name} every ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dayOfWeek]} at ${to12h(time)}!`);
+
+  const daysText = schedule.map(s => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][s.weekday] + ' ' + to12h(s.time)).join(' + ');
+  showToast(`✅ ${allSessions.length} sessions scheduled with ${teacher?.name} — ${daysText} for ${weeks} weeks!`);
 }
 
 function closePOSScheduleModal() {

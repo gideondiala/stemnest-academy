@@ -145,7 +145,7 @@
 
 <!-- ═══ SCHEDULE PAID CLASSES MODAL ═══ -->
 <div class="modal-overlay" id="posScheduleModalOverlay">
-  <div class="modal" style="max-width:540px;">
+  <div class="modal" style="max-width:580px;max-height:90vh;overflow-y:auto;">
     <div class="modal-header">
       <div class="modal-title">📅 Schedule Paid Classes</div>
       <button class="modal-close" onclick="closePOSScheduleModal()">✕</button>
@@ -171,24 +171,12 @@
         </select>
       </div>
 
-      <!-- Day of week + Time -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
-        <div class="pm-field" style="margin-bottom:0;">
-          <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">📆 Day of Week <span style="color:#e53e3e;">*</span></label>
-          <select id="pos-sm-day" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;background:var(--white);">
-            <option value="1">Monday</option>
-            <option value="2">Tuesday</option>
-            <option value="3">Wednesday</option>
-            <option value="4">Thursday</option>
-            <option value="5">Friday</option>
-            <option value="6">Saturday</option>
-            <option value="0">Sunday</option>
-          </select>
-        </div>
-        <div class="pm-field" style="margin-bottom:0;">
-          <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">🕐 Class Time <span style="color:#e53e3e;">*</span></label>
-          <input type="time" id="pos-sm-time" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;">
-        </div>
+      <!-- Weekly schedule — multiple days -->
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">🗓️ Weekly Schedule <span style="color:#e53e3e;">*</span></label>
+        <div style="font-size:12px;color:var(--light);font-weight:700;margin-bottom:10px;">Add the recurring days and times (e.g. Mon 6pm + Wed 4pm = 2 classes/week)</div>
+        <div id="pos-schedule-rows"></div>
+        <button type="button" onclick="addPOSScheduleRow()" style="background:var(--bg);color:var(--blue);border:2px dashed var(--blue);border-radius:12px;padding:9px 18px;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;width:100%;margin-top:4px;">+ Add Another Day</button>
       </div>
 
       <!-- Start date + Weeks -->
@@ -211,8 +199,8 @@
           style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;">
       </div>
 
-      <div style="background:var(--orange-light);border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:12px;font-weight:700;color:var(--orange-dark);">
-        💡 All weekly sessions will be automatically added to the teacher's calendar for the selected number of weeks.
+      <div style="background:#fff8e1;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:12px;font-weight:700;color:#e65100;">
+        ⚠️ All sessions will be added to the teacher's calendar and visible on their dashboard immediately.
       </div>
 
       <div style="display:flex;gap:12px;">

@@ -39,6 +39,13 @@ const createUserSchema = z.object({
   whatsapp: z.string().optional(),
 });
 
+/* Postsales can only create students */
+function validateCreateRole(req, data) {
+  if (req.user.role === 'postsales' && data.role !== 'student') {
+    throw Object.assign(new Error('Post-Sales can only create student accounts'), { status: 403 });
+  }
+}
+
 /* ── GET /api/users/me/notifications ── */
 router.get('/me/notifications', requireAuth, async (req, res, next) => {
   try {
@@ -87,9 +94,10 @@ router.get('/', requireAuth, requireRole('admin', 'super_admin'), async (req, re
 });
 
 /* ── POST /api/users (admin only) — create any user ── */
-router.post('/', requireAuth, requireRole('admin', 'super_admin'), async (req, res, next) => {
+router.post('/', requireAuth, requireRole('admin', 'super_admin', 'postsales'), async (req, res, next) => {
   try {
     const data = createUserSchema.parse(req.body);
+    validateCreateRole(req, data);
 
     /* Check duplicate email */
     const exists = await pool.query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [data.email]);
