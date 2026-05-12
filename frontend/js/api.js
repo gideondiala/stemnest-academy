@@ -86,8 +86,10 @@ const Auth = {
       body: { email, password },
     });
     setTokens(data.accessToken, data.refreshToken);
-    localStorage.setItem('sn_api_user', JSON.stringify(data.user));
-    return data.user;
+    /* Store user with both id and staffId for dashboard compatibility */
+    const user = { ...data.user, staffId: data.user.staffId || data.user.staff_id };
+    localStorage.setItem('sn_api_user', JSON.stringify(user));
+    return user;
   },
 
   async logout() {

@@ -226,7 +226,7 @@ function getTutorBookings() {
   try {
     const all = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
     return all.filter(b =>
-      b.assignedTutorId === TUTOR.id &&
+      (b.assignedTutorId === TUTOR.id || b.assignedTutorId === TUTOR.staffId || b.tutor_staff_id === TUTOR.id) &&
       (b.status === 'scheduled' || b.status === 'completed')
     );
   } catch { return []; }

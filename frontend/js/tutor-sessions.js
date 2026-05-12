@@ -31,7 +31,7 @@ function getCurrentTutor() {
 function getMyBookings() {
   const tutor = getCurrentTutor();
   return getBookings().filter(b =>
-    b.assignedTutorId === tutor.id &&
+    (b.assignedTutorId === tutor.id || b.assignedTutorId === tutor.staffId || b.tutor_staff_id === tutor.id) &&
     (b.status === 'scheduled' || b.status === 'completed' || b.status === 'incomplete' || b.status === 'teacher_absent')
   );
 }

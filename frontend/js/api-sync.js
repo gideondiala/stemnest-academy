@@ -81,7 +81,7 @@ async function syncBookingsFromAPI() {
         whatsapp:        whatsapp,
         parentName:      notes.parentName || '—',
         subject:         b.subject,
-        date:            typeof b.date === 'string' ? b.date.split('T')[0] : b.date,
+      date:            typeof b.date === 'string' ? b.date.split('T')[0] : (b.date || ''),
         time:            _formatApiTime(b.time),
         status:          b.status,
         assignedTutor:   b.tutor_name   || '—',

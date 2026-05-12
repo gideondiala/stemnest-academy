@@ -21,7 +21,11 @@ function _safeGetMyBookings() {
     var tutor = _safeGetCurrentTutor();
     var all   = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
     return all.filter(function(b) {
-      return b.assignedTutorId === tutor.id &&
+      /* Match by staff_id (CT001) OR by UUID (for API-synced bookings) */
+      var tutorMatch = b.assignedTutorId === tutor.id ||
+                       b.assignedTutorId === tutor.staffId ||
+                       b.tutor_staff_id  === tutor.id;
+      return tutorMatch &&
         (b.status === 'scheduled' || b.status === 'completed' || b.status === 'incomplete');
     });
   } catch(e) { return []; }

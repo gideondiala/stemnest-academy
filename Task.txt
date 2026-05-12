@@ -34,7 +34,7 @@ ALso the Chat with student/teacher feature that is already implemented... the ch
 I also want us to build a robust mailing system in this platform. when a demo class is booked for a teacher the teacher should recieve a mail notification stating the demo booked , Time, student details, and a brief note.If Demo is also cancelled a mail should be sent to the teacher
 
 
-The Admin teacm or operations, founders can send Bulk mails to staff, all Coding teachers, all maths teachers, everyone, students e.g all students, all maths students, all coding students, All students in Nigeria, all students in UK, we should be able to filter it that way
+The Admin team or operations, founders can send Bulk mails to staff, all Coding teachers, all maths teachers, everyone, students e.g all students, all maths students, all coding students, All students in Nigeria, all students in UK, we should be able to filter it that way
 
 
 This whole Stemnest dasboard system we are building should be built with forward compatibilty in mind, we are just a start up company and as operations starts we will definitely see lopholes and want to modify them, The system should allow for that midifcation without loosing data in the database or the system generally.
