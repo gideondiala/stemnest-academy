@@ -618,20 +618,28 @@ async function confirmOnboard() {
   const online = typeof isApiAvailable === 'function' && await isApiAvailable();
   let studentId = null;
 
-  if (online && typeof Users !== 'undefined') {
+  if (online) {
     try {
-      const data = await apiCall('/api/users', {
-        method: 'POST',
-        body: {
+      const token = localStorage.getItem('sn_access_token');
+      if (!token) throw new Error('Not logged in');
+
+      const res = await fetch('https://api.stemnestacademy.co.uk/api/users', {
+        method:  'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
           name, email, password, role: 'student',
           phone, whatsapp: phone,
-        },
+        }),
       });
-      studentId = data.user?.staff_id || data.user?.id;
-      showToast(`✅ ${name} created in database! ID: ${studentId}`);
+      const data = await res.json();
+      if (data.success) {
+        studentId = data.user?.staff_id || data.user?.id;
+        console.log('[Onboard] Student created in DB:', studentId);
+      } else {
+        console.warn('[Onboard] API create failed:', data.error);
+      }
     } catch (e) {
       console.warn('[API] Create student failed:', e.message);
-      /* Fall through to localStorage */
     }
   }
 
@@ -881,10 +889,30 @@ async function confirmManualOnboard() {
     return;
   }
 
+  /* Create student in real DB first */
+  let dbStudentId = null;
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    if (token) {
+      const res = await fetch('https://api.stemnestacademy.co.uk/api/users', {
+        method:  'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ name, email, password, role: 'student', phone, whatsapp: phone }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        dbStudentId = data.user?.id;
+        console.log('[ManualOnboard] Student created in DB:', dbStudentId);
+      } else {
+        console.warn('[ManualOnboard] DB create failed:', data.error);
+      }
+    }
+  } catch (e) { console.warn('[ManualOnboard] API error:', e.message); }
+
   // Generate student ID in S-0001 format
   const existing  = JSON.parse(localStorage.getItem('sn_students') || '[]');
   const seqNum    = existing.length + 1;
-  const studentId = 'S-' + String(seqNum).padStart(4, '0');
+  const studentId = dbStudentId || ('S-' + String(seqNum).padStart(4, '0'));
   const initials  = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
   const student = {
