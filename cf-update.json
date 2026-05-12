@@ -76,7 +76,13 @@
       "Quantity": 0
     },
     "FunctionAssociations": {
-      "Quantity": 0
+      "Quantity": 1,
+      "Items": [
+        {
+          "FunctionARN": "arn:aws:cloudfront::350202660449:function/stemnest-url-rewrite",
+          "EventType": "viewer-request"
+        }
+      ]
     },
     "FieldLevelEncryptionId": "",
     "GrpcConfig": {

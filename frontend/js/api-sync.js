@@ -303,6 +303,46 @@ async function runApiSync() {
 
 document.addEventListener('DOMContentLoaded', () => {
   setTimeout(runApiSync, 500);
+
+  /* ── Auto-refresh every 30 seconds for real-time data ── */
+  setInterval(async () => {
+    if (!Auth.isLoggedIn()) return;
+    const online = await isApiAvailable();
+    if (!online) return;
+
+    /* Silently refresh bookings and dashboard data */
+    await Promise.allSettled([
+      syncBookingsFromAPI(),
+      syncDashboardData(),
+    ]);
+
+    /* Re-render the active tab if a render function exists */
+    const user = Auth.getStoredUser();
+    if (!user) return;
+
+    /* Presales — re-render incoming if visible */
+    if (typeof renderIncoming === 'function' && document.getElementById('tab-incoming')?.style.display !== 'none') {
+      renderIncoming();
+      if (typeof updatePSStats === 'function') updatePSStats();
+    }
+    /* Admin — re-render bookings if visible */
+    if (typeof loadBookings === 'function' && document.getElementById('tab-bookings')?.style.display !== 'none') {
+      loadBookings();
+    }
+    /* Tutor — re-render upcoming cards */
+    if (typeof renderUpcomingCards === 'function') {
+      renderUpcomingCards();
+    }
+    /* Sales — re-render overview */
+    if (typeof renderOverview === 'function' && document.getElementById('tab-overview')?.style.display !== 'none') {
+      renderOverview();
+      if (typeof updateStats === 'function') updateStats();
+    }
+    /* HR — re-render applications */
+    if (typeof renderApplications === 'function' && document.getElementById('tab-applications')?.style.display !== 'none') {
+      renderApplications();
+    }
+  }, 30000); /* 30 seconds */
 });
 
 window.addEventListener('sn:login', runApiSync);
