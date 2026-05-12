@@ -101,98 +101,9 @@ function updatePOSStats() {
 }
 
 /* ══════════════════════════════════════════════════════
-   PAID STUDENTS TABLE
-   Shows all converted students awaiting class scheduling
+/* ══════════════════════════════════════════════════════
+   PAID STUDENTS TABLE — see full implementation below
 ══════════════════════════════════════════════════════ */
-function renderPaidStudents() {
-  const el = document.getElementById('paidStudentsList');
-  if (!el) return;
-
-  // Converted pipeline entries + bookings marked converted
-  const pipeline = getAllPipeline().filter(p => p.status === 'converted');
-  const bookings = getBookings().filter(b => b.salesStatus === 'converted');
-
-  // Merge — prefer booking record if exists
-  const seen = new Set();
-  const students = [];
-  bookings.forEach(b => {
-    seen.add(b.id);
-    students.push({ ...b, _source: 'booking' });
-  });
-  pipeline.forEach(p => {
-    if (!seen.has(p.bookingId)) {
-      students.push({ ...p, id: p.bookingId, studentName: p.studentName, _source: 'pipeline' });
-    }
-  });
-
-  if (!students.length) {
-    el.innerHTML = `<div style="text-align:center;padding:60px 20px;">
-      <div style="font-size:48px;margin-bottom:12px;">💼</div>
-      <div style="font-family:'Fredoka One',cursive;font-size:20px;color:var(--dark);">No paid students yet</div>
-      <div style="font-size:14px;color:var(--light);margin-top:6px;">Converted students from the sales pipeline will appear here.</div>
-    </div>`;
-    return;
-  }
-
-  el.innerHTML = `
-    <div style="overflow-x:auto;border-radius:16px;border:1.5px solid #e8eaf0;background:var(--white);">
-      <table style="width:100%;border-collapse:collapse;font-size:13px;">
-        <thead>
-          <tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">
-            <th style="${thStyle()}">Student</th>
-            <th style="${thStyle()}">Subject / Course</th>
-            <th style="${thStyle()}">Grade</th>
-            <th style="${thStyle()}">Contact</th>
-            <th style="${thStyle()}">Amount Paid</th>
-            <th style="${thStyle()}">Credits</th>
-            <th style="${thStyle()}">Status</th>
-            <th style="${thStyle('center')}">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${students.map((s, i) => `
-            <tr style="border-bottom:1px solid #f0f2f8;${i % 2 === 0 ? '' : 'background:#fafbff;'}">
-              <td style="${tdStyle()}">
-                <div style="font-weight:800;color:var(--dark);">${s.studentName || '—'}</div>
-                <div style="font-size:11px;color:var(--light);font-weight:700;">${s.id || '—'}</div>
-              </td>
-              <td style="${tdStyle()}">
-                <span style="font-weight:700;color:var(--mid);">${s.subject || '—'}</span>
-                ${s.course ? `<div style="font-size:11px;color:var(--light);font-weight:700;">${s.course}</div>` : ''}
-              </td>
-              <td style="${tdStyle()};font-weight:700;color:var(--mid);">${s.grade || '—'}</td>
-              <td style="${tdStyle()}">
-                <div style="font-size:12px;font-weight:700;color:var(--mid);">📧 ${s.email || '—'}</div>
-                <div style="font-size:12px;font-weight:700;color:var(--mid);margin-top:2px;">📱 ${s.whatsapp || '—'}</div>
-              </td>
-              <td style="${tdStyle()};font-weight:800;color:var(--green-dark);">
-                ${s.paymentAmount ? `£${s.paymentAmount}` : '—'}
-              </td>
-              <td style="${tdStyle()};font-weight:800;color:var(--blue);">
-                ${s.studentCredits || s.credits || '—'}
-              </td>
-              <td style="${tdStyle()}">
-                ${s.paidScheduled
-                  ? `<span style="background:var(--green-light);color:var(--green-dark);font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">✅ Scheduled</span>`
-                  : `<span style="background:#fff3e0;color:#e65100;font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">⏳ Pending</span>`}
-              </td>
-              <td style="${tdStyle('center')}">
-                ${!s.paidScheduled ? `
-                  <button onclick="openPOSScheduleModal('${s.id}')"
-                    style="background:var(--green);color:#fff;border:none;border-radius:10px;padding:8px 16px;font-family:'Nunito',sans-serif;font-weight:900;font-size:13px;cursor:pointer;white-space:nowrap;"
-                    onmouseover="this.style.background='#065f46'" onmouseout="this.style.background='var(--green)'">
-                    📅 Schedule Classes
-                  </button>` : `
-                  <button onclick="openPOSScheduleModal('${s.id}')"
-                    style="background:var(--bg);color:var(--mid);border:1.5px solid #e8eaf0;border-radius:10px;padding:7px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;">
-                    ✏️ Edit Schedule
-                  </button>`}
-              </td>
-            </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>`;
-}
 
 function thStyle(align) { return `padding:12px 16px;text-align:${align||'left'};font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;letter-spacing:.5px;`; }
 function tdStyle(align) { return `padding:14px 16px;text-align:${align||'left'};vertical-align:middle;`; }
@@ -768,13 +679,7 @@ function logEmail(to, subject, body) {
   console.log('📧 EMAIL TO:', to, '\nSUBJECT:', subject, '\n\n', body);
 }
 
-/* Update the paid students table to show Onboard button */
-const _origRenderPaidStudents = window.renderPaidStudents;
-window.renderPaidStudents = function() {
-  _origRenderPaidStudents();
-  // Add Onboard button to rows that aren't yet onboarded
-  // (handled inline in the table — we patch the action column)
-};
+/* renderPaidStudents is defined below — the override above is removed */
 
 // Override renderPaidStudents to include onboard button
 function renderPaidStudents() {

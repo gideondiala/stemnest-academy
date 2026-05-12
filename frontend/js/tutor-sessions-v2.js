@@ -149,6 +149,31 @@ function _updateBookingStatus(bookingId, status, extra) {
       localStorage.setItem('sn_bookings', JSON.stringify(all));
     }
   } catch (e) { /* silent */ }
+
+  /* Also push to real DB so the 30s sync doesn't overwrite it */
+  try {
+    var token = localStorage.getItem('sn_access_token');
+    if (token) {
+      /* Find the real DB UUID for this booking */
+      var allBk = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+      var bk = allBk.find(function(b) { return b.id === bookingId; });
+      var dbId = (bk && bk.dbId) ? bk.dbId : bookingId;
+
+      /* Only call if it looks like a UUID (not a local SN-... ID) */
+      if (dbId && dbId.length > 20) {
+        fetch('https://api.stemnestacademy.co.uk/api/sync/class-reports', {
+          method:  'POST',
+          headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            bookingId: dbId,
+            outcome:   status,
+            payAmount: 0,
+            creditDeducted: false,
+          }),
+        }).catch(function() { /* silent */ });
+      }
+    }
+  } catch (e) { /* silent */ }
 }
 
 /** Auto-reschedule a booking by adding 7 days */

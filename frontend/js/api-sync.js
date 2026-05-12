@@ -111,8 +111,24 @@ async function syncBookingsFromAPI() {
 
     const local = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
     const apiIds = new Set(apiBookings.map(b => b.id));
+
+    /* Keep local bookings that are NOT in the API, AND
+       keep local status for bookings the tutor has already ended
+       (so the 30s sync doesn't resurrect completed classes) */
     const localOnly = local.filter(b => !apiIds.has(b.id) && !b._fromApi);
-    localStorage.setItem('sn_bookings', JSON.stringify([...apiBookings, ...localOnly]));
+
+    /* For API bookings, preserve local status if it's a terminal state */
+    const terminalStatuses = new Set(['completed','incomplete','partially_completed','cancelled','teacher_absent']);
+    const merged = apiBookings.map(apiB => {
+      const localB = local.find(l => l.id === apiB.id || l.dbId === apiB.id);
+      if (localB && terminalStatuses.has(localB.status)) {
+        /* Keep the local terminal status — don't let API overwrite it */
+        return { ...apiB, status: localB.status };
+      }
+      return apiB;
+    });
+
+    localStorage.setItem('sn_bookings', JSON.stringify([...merged, ...localOnly]));
   } catch (e) { console.warn('[API Sync] Bookings sync failed:', e.message); }
 }
 
