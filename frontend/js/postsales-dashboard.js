@@ -797,7 +797,7 @@ function closeManualOnboardModal() {
   document.getElementById('manualOnboardOverlay')?.classList.remove('open');
 }
 
-function confirmManualOnboard() {
+async function confirmManualOnboard() {
   const name     = document.getElementById('mob-name')?.value.trim();
   const email    = document.getElementById('mob-email')?.value.trim();
   const phone    = document.getElementById('mob-phone')?.value.trim();
