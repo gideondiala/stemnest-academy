@@ -1,0 +1,15 @@
+{
+  "Changes": [
+    {
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "_acme-challenge.billing.stemnestacademy.co.uk",
+        "Type": "TXT",
+        "TTL": 300,
+        "ResourceRecords": [
+          { "Value": "\"9Afrz1pdIj24DyMQcFjyG8VvEXZ5I4rTmyVwLrOGgFU\"" }
+        ]
+      }
+    }
+  ]
+}
