@@ -27,6 +27,9 @@ const logger         = require('./utils/logger');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
+/* Trust Nginx reverse proxy */
+app.set('trust proxy', 1);
+
 /* ══════════════════════════════════════════════
    SECURITY MIDDLEWARE
 ══════════════════════════════════════════════ */
@@ -40,11 +43,18 @@ app.use(helmet({
 const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5500')
   .split(',').map(o => o.trim());
 
+/* Always allow both www and non-www */
+const extraOrigins = allowedOrigins.flatMap(o => [
+  o,
+  o.replace('https://www.', 'https://'),
+  o.replace('https://', 'https://www.'),
+]);
+const allAllowedOrigins = [...new Set(extraOrigins)];
+
 app.use(cors({
   origin: (origin, callback) => {
-    /* Allow requests with no origin (mobile apps, Postman, server-to-server) */
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (allAllowedOrigins.includes(origin)) return callback(null, true);
     callback(new Error(`CORS: origin ${origin} not allowed`));
   },
   credentials: true,
