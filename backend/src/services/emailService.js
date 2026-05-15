@@ -16,7 +16,8 @@ async function sendEmail({ to, subject, html, text, template }) {
   const from        = `"${fromName}" <${fromAddress}>`;
 
   /* ── Production: AWS SES SDK v3 ── */
-  if (process.env.NODE_ENV === 'production' && process.env.AWS_ACCESS_KEY_ID) {
+  if (process.env.NODE_ENV === 'production' && process.env.AWS_ACCESS_KEY_ID &&
+      !process.env.SMTP_HOST) {
     try {
       const { SESClient, SendEmailCommand } = require('@aws-sdk/client-ses');
       const client = new SESClient({ region: process.env.AWS_REGION || 'eu-west-2' });
