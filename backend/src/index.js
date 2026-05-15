@@ -37,6 +37,11 @@ app.set('trust proxy', 1);
 /* Helmet sets secure HTTP headers */
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
+  hsts: {
+    maxAge: 31536000,        // 1 year
+    includeSubDomains: true,
+    preload: true,
+  },
 }));
 
 /* CORS — only allow the frontend origin */
