@@ -14,9 +14,62 @@ document.addEventListener('DOMContentLoaded', () => {
   if (grEl) grEl.textContent = h < 12 ? 'Good morning ☀️' : h < 17 ? 'Good afternoon 🌤️' : 'Good evening 🌙';
   const dateEl = document.getElementById('psDate');
   if (dateEl) dateEl.textContent = new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  showPSTab('incoming');
+
+  /* Load from API first, then render */
+  _loadPresalesFromAPI().then(() => {
+    showPSTab('incoming');
+  });
   bindScheduleModal();
 });
+
+async function _loadPresalesFromAPI() {
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    if (!token) return;
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/bookings?limit=500', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const data = await res.json();
+    if (!data.bookings) return;
+
+    const apiBookings = data.bookings.map(b => {
+      let notes = {};
+      try { notes = typeof b.notes === 'string' ? JSON.parse(b.notes) : (b.notes || {}); } catch {}
+      return {
+        id:              b.id,
+        dbId:            b.id,
+        studentName:     b.lesson_name || notes.studentName || '—',
+        age:             notes.age || b.grade || '—',
+        grade:           b.grade || notes.grade || '—',
+        email:           b.student_email || notes.email || '—',
+        whatsapp:        notes.whatsapp || '—',
+        parentName:      notes.parentName || '—',
+        subject:         b.subject || '—',
+        date:            b.date ? b.date.split('T')[0] : '—',
+        time:            notes.time || b.time || '—',
+        timezone:        notes.timezone || '—',
+        device:          notes.device || '—',
+        status:          b.status,
+        assignedTutor:   b.tutor_name || '—',
+        assignedTutorId: b.tutor_staff_id || b.tutor_id || '',
+        assignedSalesId: b.sales_staff_id || b.sales_id || '',
+        classLink:       b.class_link || '',
+        bookedAt:        b.booked_at || b.created_at,
+        scheduledAt:     b.scheduled_at,
+        isDemoClass:     b.is_demo,
+        _fromApi:        true,
+      };
+    });
+
+    /* Merge with localStorage — API takes priority */
+    const local = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+    const apiIds = new Set(apiBookings.map(b => b.id));
+    const localOnly = local.filter(b => !apiIds.has(b.id) && !b._fromApi);
+    localStorage.setItem('sn_bookings', JSON.stringify([...apiBookings, ...localOnly]));
+  } catch (e) {
+    console.warn('[Presales] API load failed:', e.message);
+  }
+}
 
 /* ── HELPERS ── */
 function getBookings()  { try { return JSON.parse(localStorage.getItem('sn_bookings') || '[]'); } catch { return []; } }
