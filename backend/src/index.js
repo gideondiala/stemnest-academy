@@ -21,6 +21,7 @@ const projectRoutes      = require('./routes/projects');
 const paymentRoutes      = require('./routes/payments');
 const applicationRoutes  = require('./routes/applications');
 const syncRoutes         = require('./routes/sync');
+const blogRoutes         = require('./routes/blogs');
 const errorHandler       = require('./middleware/errorHandler');
 const logger         = require('./utils/logger');
 
@@ -117,6 +118,7 @@ app.use('/api/projects',     projectRoutes);
 app.use('/api/payments',     paymentRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/sync',         syncRoutes);
+app.use('/api/blogs',        blogRoutes);
 
 /* ══════════════════════════════════════════════
    404 + GLOBAL ERROR HANDLER

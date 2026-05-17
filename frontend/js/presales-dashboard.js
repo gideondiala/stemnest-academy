@@ -7,6 +7,15 @@
 const PS_TABS = ['incoming', 'scheduled', 'completed', 'incomplete', 'cancelled', 'reschedule', 'notes', 'enrolments'];
 let psScheduleBookingId = null; // booking being scheduled in modal
 
+/* ── STATE MANAGEMENT ── */
+window.PS_DATA = {
+  bookings: [],
+  teachers: [],
+  sales: [],
+  reports: [],
+  enrolments: []
+};
+
 /* ── INIT ── */
 document.addEventListener('DOMContentLoaded', () => {
   const h = new Date().getHours();
@@ -26,84 +35,100 @@ async function _loadPresalesFromAPI() {
   try {
     const token = localStorage.getItem('sn_access_token');
     if (!token) return;
-    const res = await fetch('https://api.stemnestacademy.co.uk/api/bookings?limit=500', {
+    
+    // Fetch bookings
+    const bRes = await fetch('https://api.stemnestacademy.co.uk/api/bookings?limit=500', {
       headers: { 'Authorization': 'Bearer ' + token },
     });
-    const data = await res.json();
-    if (!data.bookings) return;
+    const bData = await bRes.json();
+    
+    if (bData.bookings) {
+      window.PS_DATA.bookings = bData.bookings.map(b => {
+        let notes = {};
+        try { notes = typeof b.notes === 'string' ? JSON.parse(b.notes) : (b.notes || {}); } catch {}
+        return {
+          id:              b.id,
+          dbId:            b.id,
+          studentName:     b.lesson_name || notes.studentName || '—',
+          age:             notes.age || b.grade || '—',
+          grade:           b.grade || notes.grade || '—',
+          email:           b.student_email || notes.email || '—',
+          whatsapp:        notes.whatsapp || '—',
+          parentName:      notes.parentName || '—',
+          subject:         b.subject || '—',
+          date:            b.date ? b.date.split('T')[0] : '—',
+          time:            notes.time || b.time || '—',
+          timezone:        notes.timezone || '—',
+          device:          notes.device || '—',
+          status:          b.status,
+          assignedTutor:   b.tutor_name || '—',
+          assignedTutorId: b.tutor_staff_id || b.tutor_id || '',
+          assignedSalesId: b.sales_staff_id || b.sales_id || '',
+          classLink:       b.class_link || '',
+          bookedAt:        b.booked_at || b.created_at,
+          scheduledAt:     b.scheduled_at,
+          completedAt:     b.completed_at,
+          isDemoClass:     b.is_demo,
+          psNote:          notes.psNote || '',
+          psConfirmed:     !!notes.psNote,
+          cancelReason:    notes.cancelReason || '',
+          rescheduleNote:  notes.rescheduleNote || null,
+          incompleteReason: notes.incompleteReason || '',
+        };
+      });
+    }
 
-    const apiBookings = data.bookings.map(b => {
-      let notes = {};
-      try { notes = typeof b.notes === 'string' ? JSON.parse(b.notes) : (b.notes || {}); } catch {}
-      return {
-        id:              b.id,
-        dbId:            b.id,
-        studentName:     b.lesson_name || notes.studentName || '—',
-        age:             notes.age || b.grade || '—',
-        grade:           b.grade || notes.grade || '—',
-        email:           b.student_email || notes.email || '—',
-        whatsapp:        notes.whatsapp || '—',
-        parentName:      notes.parentName || '—',
-        subject:         b.subject || '—',
-        date:            b.date ? b.date.split('T')[0] : '—',
-        time:            notes.time || b.time || '—',
-        timezone:        notes.timezone || '—',
-        device:          notes.device || '—',
-        status:          b.status,
-        assignedTutor:   b.tutor_name || '—',
-        assignedTutorId: b.tutor_staff_id || b.tutor_id || '',
-        assignedSalesId: b.sales_staff_id || b.sales_id || '',
-        classLink:       b.class_link || '',
-        bookedAt:        b.booked_at || b.created_at,
-        scheduledAt:     b.scheduled_at,
-        isDemoClass:     b.is_demo,
-        _fromApi:        true,
-      };
+    // Fetch teachers
+    const tRes = await fetch('https://api.stemnestacademy.co.uk/api/users?role=tutor', {
+      headers: { 'Authorization': 'Bearer ' + token },
     });
+    const tData = await tRes.json();
+    if (tData.users) {
+      window.PS_DATA.teachers = tData.users.map(u => ({
+        id: u.staff_id || u.id, name: u.name, subject: u.subject || 'Coding'
+      }));
+    }
 
-    /* Merge with localStorage — API takes priority */
-    const local = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
-    const apiIds = new Set(apiBookings.map(b => b.id));
-    const localOnly = local.filter(b => !apiIds.has(b.id) && !b._fromApi);
-    localStorage.setItem('sn_bookings', JSON.stringify([...apiBookings, ...localOnly]));
+    // Fetch sales
+    const sRes = await fetch('https://api.stemnestacademy.co.uk/api/users?role=sales', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const sData = await sRes.json();
+    if (sData.users) {
+      window.PS_DATA.sales = sData.users.map(u => ({
+        id: u.staff_id || u.id, name: u.name
+      }));
+    }
+
+    // Fetch class reports (for incomplete reasons)
+    try {
+      const dRes = await fetch('https://api.stemnestacademy.co.uk/api/sync/dashboard/presales', {
+        headers: { 'Authorization': 'Bearer ' + token },
+      });
+      const dData = await dRes.json();
+      if (dData.classReports) window.PS_DATA.reports = dData.classReports;
+    } catch {}
+
   } catch (e) {
     console.warn('[Presales] API load failed:', e.message);
   }
 }
 
 /* ── HELPERS ── */
-function getBookings()  { try { return JSON.parse(localStorage.getItem('sn_bookings') || '[]'); } catch { return []; } }
-function getTeachers()  { try { return JSON.parse(localStorage.getItem('sn_teachers') || '[]'); } catch { return []; } }
-function saveBookings(list) { localStorage.setItem('sn_bookings', JSON.stringify(list)); }
+function getBookings()  { return window.PS_DATA.bookings || []; }
+function getTeachers()  { return window.PS_DATA.teachers || []; }
+function getSales()     { return window.PS_DATA.sales || []; }
 function setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
 
 function getTeacherAvailability(id) {
-  try { return JSON.parse(localStorage.getItem('sn_all_tutor_avail') || '{}')[id]?.slots || {}; }
-  catch { return {}; }
+  // Mock availability for UI until backend scheduling is built
+  return { "2026-05-20|10:00": false, "2026-05-20|11:00": false };
 }
 
 /* Write a slot directly onto a teacher's calendar */
 function writeTeacherCalendarSlot(teacherId, dateKey, timeKey, bookingId) {
-  // Read existing availability
-  const allAvail = JSON.parse(localStorage.getItem('sn_all_tutor_avail') || '{}');
-  const tutorEntry = allAvail[teacherId] || { tutor: getTeachers().find(t => t.id === teacherId) || {}, slots: {} };
-  const slots = tutorEntry.slots || {};
-
-  // Mark the 1-hour block (timeKey + timeKey+30)
-  slots[dateKey + '|' + timeKey] = { booked: true, bookingId };
-  const [h, m] = timeKey.split(':').map(Number);
-  const nextKey = m === 0 ? `${h}:30` : `${h + 1}:00`;
-  slots[dateKey + '|' + nextKey] = { booked: true, bookingId };
-
-  tutorEntry.slots = slots;
-  allAvail[teacherId] = tutorEntry;
-  localStorage.setItem('sn_all_tutor_avail', JSON.stringify(allAvail));
-
-  // Also write to teacher's personal store
-  const personal = JSON.parse(localStorage.getItem('sn_tutor_avail_' + teacherId) || '{}');
-  personal[dateKey + '|' + timeKey] = { booked: true, bookingId };
-  personal[dateKey + '|' + nextKey] = { booked: true, bookingId };
-  localStorage.setItem('sn_tutor_avail_' + teacherId, JSON.stringify(personal));
+  // In a real-time system, this is handled entirely by the backend `assign` endpoint
+  // We no longer rely on localStorage slots
 }
 
 /* Convert "HH:MM" 24h to display label */
@@ -136,21 +161,22 @@ function showPSTab(tab) {
 /* ── STATS ── */
 function updatePSStats() {
   const bookings = getBookings();
-  const incomplete  = JSON.parse(localStorage.getItem('sn_incomplete_demos') || '[]');
-  const cancelled   = JSON.parse(localStorage.getItem('sn_cancelled_classes') || '[]');
-  const reschedules = JSON.parse(localStorage.getItem('sn_reschedule_requests') || '[]');
-  const completed   = JSON.parse(localStorage.getItem('sn_completed_demos') || '[]');
+  const incomplete  = bookings.filter(b => b.status === 'incomplete');
+  const cancelled   = bookings.filter(b => b.status === 'cancelled');
+  const reschedules = bookings.filter(b => b.rescheduleNote && !b.rescheduleNote.actioned);
+  const completed   = bookings.filter(b => b.status === 'completed' && b.isDemoClass);
   setText('psStat1', bookings.filter(b => b.status === 'pending').length);
   setText('psStat2', bookings.filter(b => b.status === 'scheduled').length);
   setText('psStat3', bookings.filter(b => b.psConfirmed).length);
   setText('psStat4', getTeachers().length);
   setText('incomingBadge',   bookings.filter(b => b.status === 'pending').length);
   setText('completedBadge',  completed.length);
-  setText('incompleteBadge', incomplete.filter(i => !i.rebooked).length);
+  setText('incompleteBadge', incomplete.length);
   setText('cancelledBadge',  cancelled.length);
-  setText('rescheduleBadge', reschedules.filter(r => r.status === 'pending').length);
-  const enrolments = JSON.parse(localStorage.getItem('sn_enrolments') || '[]');
-  setText('enrolmentsBadge', enrolments.filter(e => e.status === 'active').length);
+  setText('rescheduleBadge', reschedules.length);
+  
+  // Enrolments (mock for now, should come from API)
+  setText('enrolmentsBadge', 0);
 }
 
 /* ══════════════════════════════════════════════════════
@@ -318,73 +344,26 @@ async function confirmScheduleDemo() {
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Scheduling…'; }
 
   const teacher      = getTeachers().find(t => t.id === teacherId);
-  const salesPersons = JSON.parse(localStorage.getItem('sn_sales_persons') || '[]');
+  const salesPersons = getSales();
   const salesPerson  = salesPersons.find(s => s.id === salesId);
   const timeKey      = time;
 
-  /* ── Update localStorage first (always works) ── */
-  const all = getBookings();
-  const idx = all.findIndex(b => b.id === psScheduleBookingId);
-  if (idx !== -1) {
-    all[idx] = {
-      ...all[idx],
-      status:            'scheduled',
-      assignedTutor:     teacher?.name,
-      assignedTutorId:   teacherId,
-      assignedSalesId:   salesId,
-      assignedSalesName: salesPerson?.name || '',
-      classLink:         link,
-      date,
-      time:              to12h(time),
-      notes,
-      tutorNotified:     false,
-      salesNotified:     false,
-      scheduledAt:       new Date().toISOString(),
-    };
-    saveBookings(all);
-  }
-
-  writeTeacherCalendarSlot(teacherId, date, timeKey, psScheduleBookingId);
-
-  /* ── Try to assign in real DB (non-blocking — don't fail if this errors) ── */
+  /* ── Assign in real DB directly ── */
   try {
     const token = localStorage.getItem('sn_access_token');
     if (token) {
       const localBooking = getBookings().find(b => b.id === psScheduleBookingId);
-
-      /* Find real DB booking ID by searching API */
-      let dbBookingId = localBooking?.dbId || null;
-      if (!dbBookingId) {
-        const bRes = await fetch('https://api.stemnestacademy.co.uk/api/bookings?limit=200', {
-          headers: { 'Authorization': 'Bearer ' + token },
+      if (localBooking && localBooking.dbId) {
+        // We know the dbId because we loaded it from API
+        await fetch('https://api.stemnestacademy.co.uk/api/bookings/' + localBooking.dbId + '/assign', {
+          method:  'PUT',
+          headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ tutorId: teacherId, salesId: salesId, classLink: link, notes: notes || undefined }),
         });
-        const bData = await bRes.json();
-        const match = (bData.bookings || []).find(b =>
-          b.status === 'pending' && b.subject === localBooking?.subject &&
-          b.notes && (b.notes.includes(localBooking?.email) || b.lesson_name === localBooking?.studentName)
-        );
-        if (match) dbBookingId = match.id;
-      }
-
-      if (dbBookingId) {
-        /* Find teacher UUID from staff_id */
-        const uRes = await fetch('https://api.stemnestacademy.co.uk/api/users?role=tutor', {
-          headers: { 'Authorization': 'Bearer ' + token },
-        });
-        const uData = await uRes.json();
-        const dbTeacher = (uData.users || []).find(u => u.staff_id === teacherId || u.id === teacherId);
-
-        if (dbTeacher) {
-          await fetch('https://api.stemnestacademy.co.uk/api/bookings/' + dbBookingId + '/assign', {
-            method:  'PUT',
-            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ tutorId: dbTeacher.id, classLink: link, notes: notes || undefined }),
-          });
-        }
       }
     }
   } catch (e) {
-    console.warn('[Presales] DB assign failed (localStorage updated):', e.message);
+    console.warn('[Presales] DB assign failed:', e.message);
   }
 
   if (typeof emailDemoBookedToTeacher === 'function') {
@@ -396,8 +375,12 @@ async function confirmScheduleDemo() {
   if (btn) { btn.disabled = false; btn.textContent = '✅ Confirm & Schedule'; }
 
   closeScheduleModal();
+  
+  /* Refresh UI directly from API */
+  await _loadPresalesFromAPI();
   updatePSStats();
   renderIncoming();
+  renderScheduled();
   showToast('Demo scheduled with ' + (teacher?.name || 'teacher') + ' on ' + date + ' at ' + to12h(time) + '!');
 }
 
@@ -466,13 +449,8 @@ function renderScheduled() {
 function addParentNote(bookingId) {
   const note = prompt('Add a note about this parent/student:');
   if (!note) return;
-  const all = getBookings();
-  const idx = all.findIndex(b => b.id === bookingId);
-  if (idx !== -1) { all[idx].psNote = note; all[idx].psConfirmed = true; saveBookings(all); }
-  renderIncoming();
-  renderScheduled();
-  updatePSStats();
-  showToast('✅ Note saved!');
+  // TODO: Add actual API endpoint for updating notes
+  showToast('Notes update via API is pending backend implementation.');
 }
 
 function renderParentNotes() {
@@ -528,8 +506,17 @@ document.addEventListener('DOMContentLoaded', () => {
 function renderIncomplete() {
   const el   = document.getElementById('incompleteDemosList');
   if (!el) return;
-  const list = JSON.parse(localStorage.getItem('sn_incomplete_demos') || '[]')
-    .sort((a, b) => new Date(b.loggedAt) - new Date(a.loggedAt));
+  
+  const bookings = getBookings().filter(b => b.status === 'incomplete');
+  
+  const list = bookings.map(b => {
+    return {
+      ...b,
+      tutorName: b.assignedTutor,
+      reason: b.incompleteReason || '—',
+      rebooked: false // This will require a backend status check in the future
+    };
+  }).sort((a, b) => new Date(b.date) - new Date(a.date));
 
   if (!list.length) {
     el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--light);font-weight:700;">No incomplete demos. 🎉</div>';
@@ -577,9 +564,16 @@ function renderIncomplete() {
 }
 
 function rebookIncomplete(incId) {
-  const list = JSON.parse(localStorage.getItem('sn_incomplete_demos') || '[]');
-  const item = list.find(i => i.id === incId);
-  if (!item) return;
+  const bookings = getBookings().filter(b => b.status === 'incomplete');
+  const b = bookings.find(x => x.id === incId);
+  if (!b) return;
+
+  const item = {
+    ...b,
+    bookingId: b.id,
+    tutorName: b.assignedTutor,
+    reason: b.incompleteReason || '—'
+  };
 
   // Pre-fill the schedule modal with this student's details
   psScheduleBookingId = item.bookingId;
@@ -588,7 +582,7 @@ function rebookIncomplete(incId) {
     `<strong>${item.studentName}</strong> · ${item.grade||'—'} · Age ${item.age||'—'}<br>` +
     `📚 ${item.subject} &nbsp;·&nbsp; 📧 ${item.email} &nbsp;·&nbsp; 📱 ${item.whatsapp||'—'}<br>` +
     `<span style="color:#c53030;font-weight:800;">Previous reason: ${item.reason}</span>`;
-
+  
   populateTeacherDropdown(item.subject);
 
   const dateEl = document.getElementById('sm-date');
@@ -596,12 +590,10 @@ function rebookIncomplete(incId) {
 
   ['sm-time','sm-link'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
 
-  // Mark as rebooked after scheduling
+  // Mark as rebooked after scheduling (Requires backend endpoint for proper tracking)
   const _origConfirm = window.confirmScheduleDemo;
-  window.confirmScheduleDemo = function() {
-    _origConfirm();
-    const idx = list.findIndex(i => i.id === incId);
-    if (idx !== -1) { list[idx].rebooked = true; localStorage.setItem('sn_incomplete_demos', JSON.stringify(list)); }
+  window.confirmScheduleDemo = async function() {
+    await _origConfirm();
     window.confirmScheduleDemo = _origConfirm;
   };
 
@@ -614,8 +606,12 @@ function rebookIncomplete(incId) {
 function renderCancelled() {
   const el   = document.getElementById('cancelledClassesList');
   if (!el) return;
-  const list = JSON.parse(localStorage.getItem('sn_cancelled_classes') || '[]')
-    .sort((a, b) => new Date(b.cancelledAt) - new Date(a.cancelledAt));
+  
+  const list = getBookings().filter(b => b.status === 'cancelled').map(b => ({
+      ...b,
+      reason: b.cancelReason || 'Cancelled by student',
+      cancelledAt: b.date // fallback
+  })).sort((a, b) => new Date(b.cancelledAt) - new Date(a.cancelledAt));
 
   if (!list.length) {
     el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--light);font-weight:700;">No cancelled classes.</div>';
@@ -680,8 +676,15 @@ function renderCancelled() {
 function renderReschedule() {
   const el   = document.getElementById('rescheduleRequestsList');
   if (!el) return;
-  const list = JSON.parse(localStorage.getItem('sn_reschedule_requests') || '[]')
-    .sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt));
+  
+  const list = getBookings().filter(b => b.rescheduleNote).map(b => ({
+      ...b,
+      originalDate: b.date,
+      originalTime: b.time,
+      preferredDate: b.rescheduleNote?.date || '—',
+      preferredTime: b.rescheduleNote?.time || '—',
+      status: b.rescheduleNote?.actioned ? 'actioned' : 'pending'
+  }));
 
   if (!list.length) {
     el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--light);font-weight:700;">No reschedule requests.</div>';
@@ -733,7 +736,12 @@ function renderReschedule() {
 }
 
 function actionReschedule(reqId) {
-  const list = JSON.parse(localStorage.getItem('sn_reschedule_requests') || '[]');
+  const list = getBookings().filter(b => b.rescheduleNote).map(b => ({
+      id: b.id, bookingId: b.id, studentName: b.studentName,
+      subject: b.subject, email: b.email, 
+      preferredDate: b.rescheduleNote?.date || '—',
+      preferredTime: b.rescheduleNote?.time || '—'
+  }));
   const item = list.find(r => r.id === reqId);
   if (!item) return;
 
@@ -759,12 +767,10 @@ function actionReschedule(reqId) {
     }
   }
 
-  // Mark as actioned after scheduling
+  // Mark as actioned after scheduling (Requires backend endpoint for proper tracking)
   const _origConfirm = window.confirmScheduleDemo;
-  window.confirmScheduleDemo = function() {
-    _origConfirm();
-    const idx = list.findIndex(r => r.id === reqId);
-    if (idx !== -1) { list[idx].status = 'actioned'; localStorage.setItem('sn_reschedule_requests', JSON.stringify(list)); }
+  window.confirmScheduleDemo = async function() {
+    await _origConfirm();
     window.confirmScheduleDemo = _origConfirm;
     updatePSStats();
   };
@@ -778,8 +784,8 @@ function actionReschedule(reqId) {
 function renderCompletedDemos() {
   const el   = document.getElementById('completedDemosList');
   if (!el) return;
-  const list = JSON.parse(localStorage.getItem('sn_completed_demos') || '[]')
-    .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt));
+  const list = getBookings().filter(b => b.status === 'completed' && b.isDemoClass)
+    .sort((a, b) => new Date(b.completedAt || b.date) - new Date(a.completedAt || a.date));
 
   if (!list.length) {
     el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--light);font-weight:700;">No completed demos yet. Completed demo classes will appear here.</div>';
@@ -807,7 +813,7 @@ function renderCompletedDemos() {
         </thead>
         <tbody>
           ${list.map((item, i) => {
-            const alreadyEnrolled = (JSON.parse(localStorage.getItem('sn_enrolments') || '[]'))
+            const alreadyEnrolled = (window.PS_DATA.enrolments || [])
               .some(e => e.studentEmail === item.email && e.status === 'active');
             return `
             <tr style="border-bottom:1px solid #f0f2f8;${i%2===0?'':'background:#fafbff;'}">
@@ -850,8 +856,8 @@ function renderCompletedDemos() {
 function renderEnrolments() {
   const el = document.getElementById('enrolmentsList');
   if (!el) return;
-  const list = JSON.parse(localStorage.getItem('sn_enrolments') || '[]')
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const list = (window.PS_DATA.enrolments || [])
+    .sort((a, b) => new Date(b.createdAt || b.created_at) - new Date(a.createdAt || a.created_at));
 
   if (!list.length) {
     el.innerHTML = `<div style="text-align:center;padding:60px 20px;">
@@ -887,7 +893,7 @@ function renderEnrolments() {
               return (days[s.weekday] || '?') + ' ' + s.time;
             }).join(', ');
             // Count completed lessons
-            const allBk = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+            const allBk = getBookings();
             const enrBk = allBk.filter(b => b.enrolmentId === enr.id);
             const done  = enrBk.filter(b => b.status === 'completed').length;
             const total = enr.totalLessons || enrBk.length;

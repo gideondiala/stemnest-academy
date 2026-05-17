@@ -4,12 +4,26 @@
    Depends on: utils.js, dashboard.js, tutor-sessions.js
 ═══════════════════════════════════════════════════════ */
 
+function _getGlobalData() { return window.TUTOR_DATA || window.ADMIN_DATA || window.PS_DATA || window.STUDENT_DATA || window; }
+function _getLocalStr(key) {
+  if (key === 'sn_access_token' || key === 'sn_logged_in_teacher') return _getLocalStr(key);
+  let d = _getGlobalData()[key];
+  if (typeof d === 'string') return d;
+  if (d !== undefined && d !== null) return JSON.stringify(d);
+  return null;
+}
+function _setLocalStr(key, val) {
+  if (key === 'sn_logged_in_teacher') { _setLocalStr(key, val); return; }
+  try { _getGlobalData()[key] = JSON.parse(val); } catch(e) { _getGlobalData()[key] = val; }
+}
+
+
 /* ── Safe wrappers: work even if tutor-sessions.js hasn't fully run yet ── */
 function _safeGetCurrentTutor() {
   if (typeof getCurrentTutor === 'function') return getCurrentTutor();
   try {
-    var id  = localStorage.getItem('sn_logged_in_teacher');
-    var reg = JSON.parse(localStorage.getItem('sn_teachers') || '[]');
+    var id  = _getLocalStr('sn_logged_in_teacher');
+    var reg = JSON.parse(_getLocalStr('sn_teachers') || '[]');
     var f   = id ? reg.find(function(t) { return t.id === id; }) : null;
     return f || { id: id || 'CT001', name: 'Teacher', subject: 'Coding' };
   } catch(e) { return { id: 'CT001', name: 'Teacher', subject: 'Coding' }; }
@@ -19,7 +33,7 @@ function _safeGetMyBookings() {
   if (typeof getMyBookings === 'function') return getMyBookings();
   try {
     var tutor = _safeGetCurrentTutor();
-    var all   = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+    var all   = window.TUTOR_DATA?.bookings || JSON.parse(_getLocalStr('sn_bookings') || '[]');
     return all.filter(function(b) {
       /* Match by staff_id (CT001) OR by UUID (for API-synced bookings) */
       var tutorMatch = b.assignedTutorId === tutor.id ||
@@ -56,7 +70,7 @@ function _safeParseClassDateTime(dateStr, timeStr) {
 ───────────────────────────────────────────────────── */
 function getPayRates() {
   try {
-    var settings = JSON.parse(localStorage.getItem('sn_sa_settings') || '{}');
+    var settings = JSON.parse(_getLocalStr('sn_sa_settings') || '{}');
     return {
       demo: (settings.demoPayRate !== undefined) ? Number(settings.demoPayRate) : 5,
       paid: (settings.paidPayRate !== undefined) ? Number(settings.paidPayRate) : 20
@@ -75,17 +89,17 @@ function _addEarnings(amount) {
   if (!amount || amount <= 0) return;
   var tutor = getCurrentTutor();
   var key   = 'sn_earnings_' + tutor.id;
-  var data  = JSON.parse(localStorage.getItem(key) || '{"total":0,"sessions":[]}');
+  var data  = JSON.parse(_getLocalStr(key) || '{"total":0,"sessions":[]}');
   data.total = (data.total || 0) + amount;
-  localStorage.setItem(key, JSON.stringify(data));
+  _setLocalStr(key, JSON.stringify(data));
 
   // Also update the shared teacher record
   try {
-    var teachers = JSON.parse(localStorage.getItem('sn_teachers') || '[]');
+    var teachers = JSON.parse(_getLocalStr('sn_teachers') || '[]');
     var idx = teachers.findIndex(function(t) { return t.id === tutor.id; });
     if (idx !== -1) {
       teachers[idx].earnings = (teachers[idx].earnings || 0) + amount;
-      localStorage.setItem('sn_teachers', JSON.stringify(teachers));
+      _setLocalStr('sn_teachers', JSON.stringify(teachers));
     }
   } catch (e) { /* silent */ }
 
@@ -100,28 +114,29 @@ function _addEarnings(amount) {
 function _deductStudentCredit(booking) {
   try {
     // Update sn_students registry
-    var students = JSON.parse(localStorage.getItem('sn_students') || '[]');
+    var students = JSON.parse(_getLocalStr('sn_students') || '[]');
     var idx = students.findIndex(function(s) {
       return s.email === booking.email || s.id === booking.studentId;
     });
     if (idx !== -1) {
       students[idx].credits = (parseInt(students[idx].credits) || 0) - 1;
-      localStorage.setItem('sn_students', JSON.stringify(students));
+      _setLocalStr('sn_students', JSON.stringify(students));
     }
 
     // Also update booking record
-    var bookings = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+    var bookings = window.TUTOR_DATA?.bookings || JSON.parse(_getLocalStr('sn_bookings') || '[]');
     var bi = bookings.findIndex(function(b) { return b.id === booking.id; });
     if (bi !== -1) {
       bookings[bi].studentCredits = (parseInt(bookings[bi].studentCredits) || 0) - 1;
-      localStorage.setItem('sn_bookings', JSON.stringify(bookings));
+      window.TUTOR_DATA.bookings = bookings;
+      _setLocalStr('sn_bookings', JSON.stringify(bookings));
     }
 
     // Log the deduction in the student's credit log (append-only)
     var studentKey = booking.studentId || booking.email || booking.id;
     var logKey = 'sn_credit_log_' + studentKey;
     var log = [];
-    try { log = JSON.parse(localStorage.getItem(logKey) || '[]'); } catch(e) {}
+    try { log = JSON.parse(_getLocalStr(logKey) || '[]'); } catch(e) {}
     log.push({
       id:          'TXN-' + Date.now().toString(36).toUpperCase(),
       type:        'class_deduction',
@@ -132,30 +147,31 @@ function _deductStudentCredit(booking) {
       bookingId:   booking.id,
       _readonly:   true,
     });
-    localStorage.setItem(logKey, JSON.stringify(log));
+    _setLocalStr(logKey, JSON.stringify(log));
   } catch (e) { /* silent */ }
 }
 
 /** Mark a booking with a given status and save */
 function _updateBookingStatus(bookingId, status, extra) {
   try {
-    var all = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+    var all = window.TUTOR_DATA?.bookings || JSON.parse(_getLocalStr('sn_bookings') || '[]');
     var idx = all.findIndex(function(b) { return b.id === bookingId; });
     if (idx !== -1) {
       all[idx].status = status;
       if (extra) {
         Object.keys(extra).forEach(function(k) { all[idx][k] = extra[k]; });
       }
-      localStorage.setItem('sn_bookings', JSON.stringify(all));
+      if (window.TUTOR_DATA) window.TUTOR_DATA.bookings = all;
+      _setLocalStr('sn_bookings', JSON.stringify(all));
     }
   } catch (e) { /* silent */ }
 
   /* Also push to real DB so the 30s sync doesn't overwrite it */
   try {
-    var token = localStorage.getItem('sn_access_token');
+    var token = _getLocalStr('sn_access_token');
     if (token) {
       /* Find the real DB UUID for this booking */
-      var allBk = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+      var allBk = window.TUTOR_DATA?.bookings || JSON.parse(_getLocalStr('sn_bookings') || '[]');
       var bk = allBk.find(function(b) { return b.id === bookingId; });
       var dbId = (bk && bk.dbId) ? bk.dbId : bookingId;
 
@@ -179,7 +195,7 @@ function _updateBookingStatus(bookingId, status, extra) {
 /** Auto-reschedule a booking by adding 7 days */
 function _rescheduleBooking(bookingId) {
   try {
-    var all = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+    var all = window.TUTOR_DATA?.bookings || JSON.parse(_getLocalStr('sn_bookings') || '[]');
     var idx = all.findIndex(function(b) { return b.id === bookingId; });
     if (idx !== -1) {
       var b = all[idx];
@@ -196,7 +212,8 @@ function _rescheduleBooking(bookingId) {
         all[idx].status        = 'scheduled';
         all[idx].rescheduledAt = new Date().toISOString();
         all[idx].rescheduledFrom = b.date;
-        localStorage.setItem('sn_bookings', JSON.stringify(all));
+        if (window.TUTOR_DATA) window.TUTOR_DATA.bookings = all;
+        _setLocalStr('sn_bookings', JSON.stringify(all));
       }
     }
   } catch (e) { /* silent */ }
@@ -256,10 +273,10 @@ function renderUpcomingCards() {
   /* ── Step 2: get booked slots from the calendar store ── */
   var fromCalendar = [];
   try {
-    var allAvail = JSON.parse(localStorage.getItem('sn_all_tutor_avail') || '{}');
+    var allAvail = JSON.parse(_getLocalStr('sn_all_tutor_avail') || '{}');
     var tutorSlots = (allAvail[tutor.id] && allAvail[tutor.id].slots) || {};
     // Also check personal store
-    var personalSlots = JSON.parse(localStorage.getItem('sn_tutor_avail_' + tutor.id) || '{}');
+    var personalSlots = JSON.parse(_getLocalStr('sn_tutor_avail_' + tutor.id) || '{}');
     var merged = Object.assign({}, tutorSlots, personalSlots);
 
     Object.keys(merged).forEach(function(key) {
@@ -276,7 +293,7 @@ function renderUpcomingCards() {
 
         // Skip slots whose booking is already completed/incomplete
         if (val.bookingId) {
-          var allBk = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+          var allBk = window.TUTOR_DATA?.bookings || JSON.parse(_getLocalStr('sn_bookings') || '[]');
           var bk = allBk.find(function(b) { return b.id === val.bookingId; });
           if (bk && (bk.status === 'completed' || bk.status === 'incomplete' ||
               bk.status === 'partially_completed' || bk.status === 'cancelled' ||
@@ -293,7 +310,7 @@ function renderUpcomingCards() {
         // Find matching booking in sn_bookings if bookingId exists
         var matchedBooking = null;
         if (val.bookingId) {
-          var allBookings = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+          var allBookings = window.TUTOR_DATA?.bookings || JSON.parse(_getLocalStr('sn_bookings') || '[]');
           matchedBooking = allBookings.find(function(b) { return b.id === val.bookingId; });
         }
 
@@ -410,7 +427,7 @@ function renderUpcomingCards() {
 function openEndClassDialogV2(bookingId) {
   _removeModal('endClassV2Overlay');
 
-  var all = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+  var all = window.TUTOR_DATA?.bookings || JSON.parse(_getLocalStr('sn_bookings') || '[]');
   var booking = all.find(function(b) { return b.id === bookingId; });
   if (!booking) { showToast('Booking not found.', 'error'); return; }
 
@@ -555,7 +572,7 @@ function _handlePaidOutcome(bookingId, booking, outcome, rates) {
       pushClassReport(bookingId, { outcome: 'completed', payAmount: rates.paid, creditDeducted: true });
     }
     if (typeof pushCreditsUpdate === 'function' && booking.email) {
-      var students = JSON.parse(localStorage.getItem('sn_students') || '[]');
+      var students = JSON.parse(_getLocalStr('sn_students') || '[]');
       var s = students.find(function(st) { return st.email === booking.email || st.id === booking.studentId; });
       if (s) pushCreditsUpdate(booking.email, s.credits, 'class_deduction', 'Class completed', bookingId);
     }
@@ -735,7 +752,7 @@ function _handleDemoOutcome(bookingId, booking, outcome, rates) {
 
     // Send to sales leads
     try {
-      var leads = JSON.parse(localStorage.getItem('sn_sales_leads') || '[]');
+      var leads = JSON.parse(_getLocalStr('sn_sales_leads') || '[]');
       leads.unshift({
         id:             'LEAD-' + Date.now().toString(36).toUpperCase(),
         bookingId:      bookingId,
@@ -754,10 +771,10 @@ function _handleDemoOutcome(bookingId, booking, outcome, rates) {
         source:         'demo_completed_v2',
         createdAt:      new Date().toISOString()
       });
-      localStorage.setItem('sn_sales_leads', JSON.stringify(leads));
+      _setLocalStr('sn_sales_leads', JSON.stringify(leads));
     // Save to sn_completed_demos for Pre-Sales Completed tab
     try {
-      var completed = JSON.parse(localStorage.getItem('sn_completed_demos') || '[]');
+      var completed = JSON.parse(_getLocalStr('sn_completed_demos') || '[]');
       completed.unshift({
         id:          'COMP-' + Date.now().toString(36).toUpperCase(),
         bookingId:   bookingId,
@@ -773,7 +790,7 @@ function _handleDemoOutcome(bookingId, booking, outcome, rates) {
         tutorId:     tutor.id,
         completedAt: new Date().toISOString()
       });
-      localStorage.setItem('sn_completed_demos', JSON.stringify(completed));
+      _setLocalStr('sn_completed_demos', JSON.stringify(completed));
     } catch (e) { /* silent */ }
 
     } catch (e) { /* silent */ }
@@ -794,29 +811,6 @@ function _finaliseDemoIncomplete(bookingId, booking, reason) {
   _updateBookingStatus(bookingId, 'incomplete', { incompleteAt: new Date().toISOString(), incompleteReason: reason });
   recordClassSession(booking, 'incomplete', reason, 0, false);
 
-  // Send to sn_incomplete_demos for Pre-Sales follow-up
-  try {
-    var incomplete = JSON.parse(localStorage.getItem('sn_incomplete_demos') || '[]');
-    incomplete.unshift({
-      id:          'INC-' + Date.now().toString(36).toUpperCase(),
-      bookingId:   bookingId,
-      studentName: booking.studentName,
-      grade:       booking.grade,
-      age:         booking.age,
-      subject:     booking.subject,
-      email:       booking.email,
-      whatsapp:    booking.whatsapp,
-      date:        booking.date,
-      time:        booking.time,
-      tutorName:   tutor.name,
-      tutorId:     tutor.id,
-      reason:      reason,
-      source:      'demo_incomplete_v2',
-      loggedAt:    new Date().toISOString()
-    });
-    localStorage.setItem('sn_incomplete_demos', JSON.stringify(incomplete));
-  } catch (e) { /* silent */ }
-
   showToast('\u274c Incomplete demo logged. Pre-Sales team notified.', 'info');
   renderUpcomingCards();
 }
@@ -829,7 +823,7 @@ function _refreshOverviewCards() {
   // Update earnings display from stored value
   var tutor = getCurrentTutor();
   try {
-    var data = JSON.parse(localStorage.getItem('sn_earnings_' + tutor.id) || '{"total":0}');
+    var data = JSON.parse(_getLocalStr('sn_earnings_' + tutor.id) || '{"total":0}');
     var total = (data.total || 0).toFixed(2);
     var earningsEl = document.getElementById('overviewEarnings');
     if (earningsEl) earningsEl.textContent = '\u00a3' + total;
@@ -855,13 +849,13 @@ function recordClassSession(booking, outcome, reason, payAmount, creditDeducted)
   var key   = 'sn_class_sessions_' + tutor.id;
 
   var sessions = [];
-  try { sessions = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { sessions = []; }
+  try { sessions = JSON.parse(_getLocalStr(key) || '[]'); } catch (e) { sessions = []; }
 
   var isDemo = booking.isDemoClass || !booking.paymentAmount;
 
   // Get start time from join record
   var startTimes = {};
-  try { startTimes = JSON.parse(localStorage.getItem('sn_session_start_times') || '{}'); } catch(e) {}
+  try { startTimes = JSON.parse(_getLocalStr('sn_session_start_times') || '{}'); } catch(e) {}
   var startedAt = startTimes[booking.id] || null;
 
   // Calculate duration in minutes
@@ -897,7 +891,7 @@ function recordClassSession(booking, outcome, reason, payAmount, creditDeducted)
     sessions.unshift(record);
   }
 
-  localStorage.setItem(key, JSON.stringify(sessions));
+  _setLocalStr(key, JSON.stringify(sessions));
 }
 
 /* ─────────────────────────────────────────────────────
@@ -913,7 +907,7 @@ function downloadMonthlyPaysheet(month, year) {
   var tutor    = getCurrentTutor();
   var key      = 'sn_class_sessions_' + tutor.id;
   var sessions = [];
-  try { sessions = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { sessions = []; }
+  try { sessions = JSON.parse(_getLocalStr(key) || '[]'); } catch (e) { sessions = []; }
 
   // Filter to the requested month/year using endedAt
   var filtered = sessions.filter(function(s) {
@@ -1012,7 +1006,7 @@ function renderEarningsSheet() {
   var tutor    = getCurrentTutor();
   var key      = 'sn_class_sessions_' + tutor.id;
   var sessions = [];
-  try { sessions = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { sessions = []; }
+  try { sessions = JSON.parse(_getLocalStr(key) || '[]'); } catch (e) { sessions = []; }
 
   var now       = new Date();
   var curMonth  = now.getMonth() + 1;
@@ -1071,7 +1065,7 @@ function renderEarningsSheet() {
   // Previous month archive
   var archiveKey  = 'sn_paysheet_archive_' + tutor.id;
   var archives    = [];
-  try { archives = JSON.parse(localStorage.getItem(archiveKey) || '[]'); } catch (e) { archives = []; }
+  try { archives = JSON.parse(_getLocalStr(archiveKey) || '[]'); } catch (e) { archives = []; }
   var prevArchive = archives.find(function(a) { return a.month === prevMonth && a.year === prevYear; });
 
   var prevMonthHTML = prevArchive
@@ -1154,7 +1148,7 @@ function renderEarningsSheet() {
 function _autoArchivePreviousMonth(sessions, prevMonth, prevYear, tutor) {
   var archiveKey = 'sn_paysheet_archive_' + tutor.id;
   var archives   = [];
-  try { archives = JSON.parse(localStorage.getItem(archiveKey) || '[]'); } catch (e) { archives = []; }
+  try { archives = JSON.parse(_getLocalStr(archiveKey) || '[]'); } catch (e) { archives = []; }
 
   // Check if already archived
   var alreadyDone = archives.some(function(a) { return a.month === prevMonth && a.year === prevYear; });
@@ -1180,7 +1174,7 @@ function _autoArchivePreviousMonth(sessions, prevMonth, prevYear, tutor) {
     archivedAt:   new Date().toISOString()
   });
 
-  localStorage.setItem(archiveKey, JSON.stringify(archives));
+  _setLocalStr(archiveKey, JSON.stringify(archives));
 }
 
 /* ─────────────────────────────────────────────────────
@@ -1246,7 +1240,7 @@ function renderClassRecords() {
   var tutor    = _safeGetCurrentTutor();
   var key      = 'sn_class_sessions_' + tutor.id;
   var sessions = [];
-  try { sessions = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) { sessions = []; }
+  try { sessions = JSON.parse(_getLocalStr(key) || '[]'); } catch(e) { sessions = []; }
 
   // Apply date filter
   var now   = new Date();
@@ -1381,20 +1375,24 @@ function saveRecordingLink(bookingId) {
   var tutor = _safeGetCurrentTutor();
   var key   = 'sn_class_sessions_' + tutor.id;
   var sessions = [];
-  try { sessions = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) { sessions = []; }
+  try { sessions = JSON.parse(_getLocalStr(key) || '[]'); } catch(e) { sessions = []; }
 
   var idx = sessions.findIndex(function(s) { return s.bookingId === bookingId; });
   if (idx !== -1) {
     sessions[idx].recordingLink   = link;
     sessions[idx].recordingStatus = 'uploaded';
-    localStorage.setItem(key, JSON.stringify(sessions));
+    _setLocalStr(key, JSON.stringify(sessions));
   }
 
   // Also update the booking record
   try {
-    var bookings = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+    var bookings = window.TUTOR_DATA?.bookings || JSON.parse(_getLocalStr('sn_bookings') || '[]');
     var bi = bookings.findIndex(function(b) { return b.id === bookingId; });
-    if (bi !== -1) { bookings[bi].recordingLink = link; localStorage.setItem('sn_bookings', JSON.stringify(bookings)); }
+    if (bi !== -1) { 
+      bookings[bi].recordingLink = link; 
+      if (window.TUTOR_DATA) window.TUTOR_DATA.bookings = bookings;
+      _setLocalStr('sn_bookings', JSON.stringify(bookings)); 
+    }
   } catch(e) {}
 
   showToast('✅ Recording link saved!');

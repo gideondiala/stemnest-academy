@@ -3,10 +3,48 @@
 ═══════════════════════════════════════════════════════ */
 const OPS_TABS = ['late-joins','penalties','class-log','absent'];
 
+window.OPS_DATA = { lateJoins: [], classReports: [], absentTeachers: [], bookings: [] };
+
+async function _loadOpsFromAPI() {
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    if (!token) {
+      window.OPS_DATA.lateJoins = JSON.parse(localStorage.getItem('sn_late_joins') || '[]');
+      window.OPS_DATA.classReports = JSON.parse(localStorage.getItem('sn_class_reports') || '[]');
+      window.OPS_DATA.absentTeachers = JSON.parse(localStorage.getItem('sn_absent_teachers') || '[]');
+      window.OPS_DATA.bookings = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+      return;
+    }
+    
+    const bRes = await fetch('https://api.stemnestacademy.co.uk/api/bookings?limit=500', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const bData = await bRes.json();
+    if (bData.bookings) {
+      window.OPS_DATA.bookings = bData.bookings;
+    } else {
+      window.OPS_DATA.bookings = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+    }
+    
+    window.OPS_DATA.lateJoins = JSON.parse(localStorage.getItem('sn_late_joins') || '[]');
+    window.OPS_DATA.classReports = JSON.parse(localStorage.getItem('sn_class_reports') || '[]');
+    window.OPS_DATA.absentTeachers = JSON.parse(localStorage.getItem('sn_absent_teachers') || '[]');
+    
+  } catch (e) {
+    console.warn('[Operations] API load failed:', e.message);
+    window.OPS_DATA.lateJoins = JSON.parse(localStorage.getItem('sn_late_joins') || '[]');
+    window.OPS_DATA.classReports = JSON.parse(localStorage.getItem('sn_class_reports') || '[]');
+    window.OPS_DATA.absentTeachers = JSON.parse(localStorage.getItem('sn_absent_teachers') || '[]');
+    window.OPS_DATA.bookings = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('opsDate').textContent = new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  populateMonthFilter();
-  showOpsTab('late-joins');
+  _loadOpsFromAPI().then(() => {
+    populateMonthFilter();
+    showOpsTab('late-joins');
+  });
 });
 
 function showOpsTab(tab) {
@@ -21,8 +59,8 @@ function showOpsTab(tab) {
 
 function refreshOps() { showOpsTab(OPS_TABS.find(t => document.getElementById('tab-'+t)?.style.display !== 'none') || 'late-joins'); showToast('✅ Refreshed!'); }
 
-function getLateJoins() { try { return JSON.parse(localStorage.getItem('sn_late_joins') || '[]'); } catch { return []; } }
-function getClassReports() { try { return JSON.parse(localStorage.getItem('sn_class_reports') || '[]'); } catch { return []; } }
+function getLateJoins() { try { return window.OPS_DATA.lateJoins.length ? window.OPS_DATA.lateJoins : JSON.parse(localStorage.getItem('sn_late_joins') || '[]'); } catch { return []; } }
+function getClassReports() { try { return window.OPS_DATA.classReports.length ? window.OPS_DATA.classReports : JSON.parse(localStorage.getItem('sn_class_reports') || '[]'); } catch { return []; } }
 
 function updateOpsStats() {
   const now = new Date();
@@ -102,7 +140,7 @@ function renderClassLog() {
   const tbody = document.getElementById('classLogBody');
   if (!tbody) return;
   const reports  = getClassReports();
-  const bookings = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+  const bookings = window.OPS_DATA.bookings.length ? window.OPS_DATA.bookings : JSON.parse(localStorage.getItem('sn_bookings') || '[]');
   if (!reports.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--light);">No class reports yet.</td></tr>'; return; }
   tbody.innerHTML = reports.map(r => {
     const b = bookings.find(x => x.id === r.bookingId) || {};
@@ -168,7 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function renderAbsentTeachers() {
   const el   = document.getElementById('tab-absent');
   if (!el) return;
-  const list = JSON.parse(localStorage.getItem('sn_absent_teachers') || '[]')
+  const list = (window.OPS_DATA.absentTeachers.length ? window.OPS_DATA.absentTeachers : JSON.parse(localStorage.getItem('sn_absent_teachers') || '[]'))
     .sort((a, b) => new Date(b.loggedAt) - new Date(a.loggedAt));
 
   const thS = 'padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;letter-spacing:.5px;';

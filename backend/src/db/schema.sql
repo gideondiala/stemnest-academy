@@ -405,3 +405,39 @@ CREATE OR REPLACE TRIGGER trg_courses_updated_at
 CREATE OR REPLACE TRIGGER trg_blog_updated_at
   BEFORE UPDATE ON blog_posts
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TABLE IF NOT EXISTS interviews (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  applicant_id UUID REFERENCES applications(id) ON DELETE CASCADE,
+  name VARCHAR(255) NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  subjects TEXT[] DEFAULT '{}',
+  date DATE NOT NULL,
+  time VARCHAR(50) NOT NULL,
+  status VARCHAR(50) DEFAULT 'scheduled',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS trainings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  trainee VARCHAR(255) NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  date DATE NOT NULL,
+  duration VARCHAR(100),
+  notes TEXT,
+  status VARCHAR(50) DEFAULT 'active',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS job_adverts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title VARCHAR(255) NOT NULL,
+  subject VARCHAR(255),
+  pay VARCHAR(100),
+  description TEXT,
+  deadline DATE,
+  status VARCHAR(50) DEFAULT 'open',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

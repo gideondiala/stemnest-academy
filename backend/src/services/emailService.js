@@ -141,6 +141,26 @@ async function sendWelcomeEmail({ to, name, role, loginUrl, password }) {
   return sendEmail({ to, subject: 'Welcome to StemNest Academy — Your Account is Ready', html, template: 'welcome' });
 }
 
+async function sendOnboardingEmail({ to, name, studentId, password, course, credits, loginUrl }) {
+  const html = _wrap(`
+    <h2>Welcome to StemNest Academy, ${name}! 🎉</h2>
+    <p>Congratulations on your enrollment! Your student dashboard is now active and ready for you.</p>
+    <div class="info-box">
+      <strong>Student Name:</strong> ${name}<br>
+      <strong>Student ID:</strong> ${studentId}<br>
+      <strong>Course:</strong> ${course || 'StemNest Curriculum'}<br>
+      <strong>Available Credits:</strong> ${credits} class${credits !== 1 ? 'es' : ''}<br>
+      <br>
+      <strong>Login Email:</strong> ${to}<br>
+      <strong>Temporary Password:</strong> ${password}
+    </div>
+    <p>Please log in to your dashboard to view your schedule and join your upcoming classes. You can change your password at any time.</p>
+    <a href="${loginUrl || (process.env.APP_URL + '/pages/login.html')}" class="btn">Access Dashboard →</a>
+    <p style="font-size:13px;color:#718096;">If you have any questions, our support team is always here to help.</p>
+  `);
+  return sendEmail({ to, subject: 'Welcome to StemNest Academy! Your Dashboard is Ready 🚀', html, template: 'onboarding' });
+}
+
 async function sendPasswordResetEmail({ to, name, resetUrl }) {
   const html = _wrap(`
     <h2>Reset Your Password 🔐</h2>
@@ -270,4 +290,5 @@ module.exports = {
   sendLowCreditsEmail,
   sendBirthdayEmail,
   sendSalesNotificationEmail,
+  sendOnboardingEmail,
 };

@@ -1,4 +1,4 @@
-﻿/* ═══════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════
    STEMNEST ACADEMY — JOIN CLASS JS
    Lookup booking by email or WhatsApp, show class details,
    Cancel and Reschedule flows.
@@ -146,48 +146,42 @@ function openNotInterestedFlow() {
   document.body.appendChild(modal);
 }
 
-function confirmCancellation() {
+async function confirmCancellation() {
   var reason = document.getElementById('jcCancelReason')?.value.trim();
   if (!reason) { showToast('Please enter a reason for cancellation.', 'error'); return; }
 
-  var bookings = getBookings();
-  var b = bookings.find(function(x) { return x.id === activeJCBookingId; });
-  if (!b) return;
+  try {
+    const res = await fetch(`https://api.stemnestacademy.co.uk/api/bookings/${activeJCBookingId}/cancel`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason })
+    });
+    
+    if (!res.ok) throw new Error('Failed to cancel');
+    
+    // Update local state purely for immediate UI feedback if it's there
+    var all = getBookings();
+    var idx = all.findIndex(function(x) { return x.id === activeJCBookingId; });
+    if (idx !== -1) { 
+      all[idx].status = 'cancelled'; 
+      all[idx].cancelReason = reason; 
+      localStorage.setItem('sn_bookings', JSON.stringify(all)); 
+    }
 
-  var cancelled = JSON.parse(localStorage.getItem('sn_cancelled_classes') || '[]');
-  cancelled.unshift({
-    id:            'CAN-' + Date.now().toString(36).toUpperCase(),
-    bookingId:     b.id,
-    studentName:   b.studentName,
-    email:         b.email,
-    whatsapp:      b.whatsapp,
-    grade:         b.grade,
-    age:           b.age,
-    subject:       b.subject,
-    date:          b.date,
-    time:          b.time,
-    assignedTutor: b.assignedTutor || '—',
-    reason:        reason,
-    cancelledAt:   new Date().toISOString(),
-    source:        'join-class-page',
-  });
-  localStorage.setItem('sn_cancelled_classes', JSON.stringify(cancelled));
+    removeJCModal();
 
-  var all = getBookings();
-  var idx = all.findIndex(function(x) { return x.id === activeJCBookingId; });
-  if (idx !== -1) { all[idx].status = 'cancelled'; all[idx].cancelReason = reason; localStorage.setItem('sn_bookings', JSON.stringify(all)); }
-
-  removeJCModal();
-
-  var joinCard = document.getElementById('joinCard');
-  if (joinCard) {
-    joinCard.innerHTML =
-      '<div style="text-align:center;padding:20px 0;">' +
-        '<div style="font-size:56px;margin-bottom:16px;">✅</div>' +
-        '<div style="font-family:\'Fredoka One\',cursive;font-size:22px;color:#fff;margin-bottom:8px;">Class Cancelled</div>' +
-        '<div style="font-size:14px;color:rgba(255,255,255,.8);line-height:1.7;margin-bottom:20px;">Your cancellation has been received. Our team has been notified.<br>We hope to see you again soon!</div>' +
-        '<a href="free-trial.html" style="display:inline-block;background:#fff;color:#1a56db;padding:12px 28px;border-radius:50px;font-family:\'Nunito\',sans-serif;font-weight:900;font-size:14px;text-decoration:none;">📅 Book a New Demo Class</a>' +
-      '</div>';
+    var joinCard = document.getElementById('joinCard');
+    if (joinCard) {
+      joinCard.innerHTML =
+        '<div style="text-align:center;padding:20px 0;">' +
+          '<div style="font-size:56px;margin-bottom:16px;">✅</div>' +
+          '<div style="font-family:\'Fredoka One\',cursive;font-size:22px;color:#fff;margin-bottom:8px;">Class Cancelled</div>' +
+          '<div style="font-size:14px;color:rgba(255,255,255,.8);line-height:1.7;margin-bottom:20px;">Your cancellation has been received. Our team has been notified.<br>We hope to see you again soon!</div>' +
+          '<a href="free-trial.html" style="display:inline-block;background:#fff;color:#1a56db;padding:12px 28px;border-radius:50px;font-family:\'Nunito\',sans-serif;font-weight:900;font-size:14px;text-decoration:none;">📅 Book a New Demo Class</a>' +
+        '</div>';
+    }
+  } catch (err) {
+    showToast('Failed to cancel class. Please try again.', 'error');
   }
 }
 
@@ -245,62 +239,50 @@ function generateTimeOptions() {
   return slots.join('');
 }
 
-function confirmReschedule() {
+async function confirmReschedule() {
   var date = document.getElementById('jcRescheduleDate')?.value;
   var time = document.getElementById('jcRescheduleTime')?.value;
   if (!date) { showToast('Please select a new date.', 'error'); return; }
   if (!time) { showToast('Please select a new time.', 'error'); return; }
 
-  var bookings = getBookings();
-  var b = bookings.find(function(x) { return x.id === activeJCBookingId; });
-  if (!b) return;
-
-  var requests = JSON.parse(localStorage.getItem('sn_reschedule_requests') || '[]');
-  requests.unshift({
-    id:            'RSC-' + Date.now().toString(36).toUpperCase(),
-    bookingId:     b.id,
-    studentName:   b.studentName,
-    email:         b.email,
-    whatsapp:      b.whatsapp,
-    grade:         b.grade,
-    age:           b.age,
-    subject:       b.subject,
-    originalDate:  b.date,
-    originalTime:  b.time,
-    preferredDate: date,
-    preferredTime: time,
-    status:        'pending',
-    requestedAt:   new Date().toISOString(),
-    source:        'join-class-page',
-  });
-  localStorage.setItem('sn_reschedule_requests', JSON.stringify(requests));
-
-  removeJCModal();
-
-  var formattedDate = date;
   try {
-    formattedDate = new Date(date + 'T12:00:00').toLocaleDateString('en-GB', {
-      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+    const res = await fetch(`https://api.stemnestacademy.co.uk/api/bookings/${activeJCBookingId}/reschedule`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date, time, reason: 'Requested by student via Join Class portal' })
     });
-  } catch(e) {}
+    
+    if (!res.ok) throw new Error('Failed to reschedule');
+    
+    removeJCModal();
 
-  var joinCard = document.getElementById('joinCard');
-  if (joinCard) {
-    joinCard.innerHTML =
-      '<div style="text-align:center;padding:20px 0;">' +
-        '<div style="font-size:56px;margin-bottom:16px;">🎉</div>' +
-        '<div style="font-family:\'Fredoka One\',cursive;font-size:22px;color:#fff;margin-bottom:8px;">Reschedule Requested!</div>' +
-        '<div style="font-size:14px;color:rgba(255,255,255,.85);line-height:1.8;margin-bottom:20px;">' +
-          'Your request has been received.<br>' +
-          '<strong>📅 ' + formattedDate + '</strong><br>' +
-          '<strong>🕐 ' + time + '</strong><br><br>' +
-          'Our team will confirm your new slot shortly.<br>' +
-          'Check your email and WhatsApp for confirmation.' +
-        '</div>' +
-        '<div style="background:rgba(255,255,255,.15);border-radius:14px;padding:14px;font-size:13px;color:rgba(255,255,255,.8);font-weight:700;">' +
-          '💬 Need help? Contact us on WhatsApp or email support@stemnestacademy.co.uk' +
-        '</div>' +
-      '</div>';
+    var formattedDate = date;
+    try {
+      formattedDate = new Date(date + 'T12:00:00').toLocaleDateString('en-GB', {
+        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+      });
+    } catch(e) {}
+
+    var joinCard = document.getElementById('joinCard');
+    if (joinCard) {
+      joinCard.innerHTML =
+        '<div style="text-align:center;padding:20px 0;">' +
+          '<div style="font-size:56px;margin-bottom:16px;">🎉</div>' +
+          '<div style="font-family:\'Fredoka One\',cursive;font-size:22px;color:#fff;margin-bottom:8px;">Reschedule Requested!</div>' +
+          '<div style="font-size:14px;color:rgba(255,255,255,.85);line-height:1.8;margin-bottom:20px;">' +
+            'Your request has been received.<br>' +
+            '<strong>📅 ' + formattedDate + '</strong><br>' +
+            '<strong>🕐 ' + time + '</strong><br><br>' +
+            'Our team will confirm your new slot shortly.<br>' +
+            'Check your email and WhatsApp for confirmation.' +
+          '</div>' +
+          '<div style="background:rgba(255,255,255,.15);border-radius:14px;padding:14px;font-size:13px;color:rgba(255,255,255,.8);font-weight:700;">' +
+            '💬 Need help? Contact us on WhatsApp or email support@stemnestacademy.co.uk' +
+          '</div>' +
+        '</div>';
+    }
+  } catch (err) {
+    showToast('Failed to submit reschedule request.', 'error');
   }
 }
 

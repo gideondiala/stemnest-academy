@@ -9,216 +9,117 @@ const STUDENT = {
 };
 
 /* ── COURSES & PROGRESS ── */
-const COURSES = [
-  { id:1, name:'Python for Beginners',    tutor:'Sarah Rahman',  progress:58, total:24, done:14, color:'blue'   },
-  { id:2, name:'GCSE Maths Prep',         tutor:'James Okafor',  progress:35, total:28, done:10, color:'green'  },
-  { id:3, name:'Scratch & Game Design',   tutor:'Sarah Rahman',  progress:80, total:16, done:13, color:'purple' },
-];
+let COURSES = [];
 
 /* ── UPCOMING LESSONS ── */
-const LESSONS = [
-  {
-    id:1, title:'Python for Beginners', date:'Mon 21 Apr 2026', time:'11:00 AM',
-    tutor:'Sarah Rahman', subject:'Coding', duration:'60 mins', status:'live',
-    modules:[
-      { num:1, title:'Variables & Data Types',      done:true  },
-      { num:2, title:'Conditionals (if/else)',       done:true  },
-      { num:3, title:'Loops (for & while)',          done:true  },
-      { num:4, title:'Functions & Return Values',    done:false, current:true },
-      { num:5, title:'Lists & Dictionaries',         done:false },
-      { num:6, title:'File Handling',                done:false },
-      { num:7, title:'Mini Project: Calculator',     done:false },
-      { num:8, title:'Final Project: Text Game',     done:false },
-    ],
-  },
-  {
-    id:2, title:'GCSE Maths Prep', date:'Tue 22 Apr 2026', time:'3:00 PM',
-    tutor:'James Okafor', subject:'Maths', duration:'45 mins', status:'upcoming',
-    modules:[
-      { num:1, title:'Number & Algebra Basics',      done:true  },
-      { num:2, title:'Fractions & Percentages',      done:true  },
-      { num:3, title:'Equations & Inequalities',     done:false, current:true },
-      { num:4, title:'Geometry & Trigonometry',      done:false },
-      { num:5, title:'Statistics & Probability',     done:false },
-      { num:6, title:'Mock Exam Practice',           done:false },
-    ],
-  },
-  {
-    id:3, title:'Scratch & Game Design', date:'Wed 23 Apr 2026', time:'4:00 PM',
-    tutor:'Sarah Rahman', subject:'Coding', duration:'45 mins', status:'upcoming',
-    modules:[
-      { num:1, title:'Scratch Interface Tour',       done:true  },
-      { num:2, title:'Sprites & Backdrops',          done:true  },
-      { num:3, title:'Motion & Events',              done:true  },
-      { num:4, title:'Loops & Conditions',           done:true  },
-      { num:5, title:'Building a Maze Game',         done:false, current:true },
-      { num:6, title:'Adding Scores & Lives',        done:false },
-    ],
-  },
-  {
-    id:4, title:'Python for Beginners', date:'Mon 28 Apr 2026', time:'11:00 AM',
-    tutor:'Sarah Rahman', subject:'Coding', duration:'60 mins', status:'upcoming',
-    modules:[
-      { num:5, title:'Lists & Dictionaries',         done:false, current:true },
-      { num:6, title:'File Handling',                done:false },
-    ],
-  },
-  {
-    id:5, title:'GCSE Maths Prep', date:'Tue 29 Apr 2026', time:'3:00 PM',
-    tutor:'James Okafor', subject:'Maths', duration:'45 mins', status:'upcoming',
-    modules:[
-      { num:4, title:'Geometry & Trigonometry',      done:false, current:true },
-    ],
-  },
-  {
-    id:6, title:'Scratch & Game Design', date:'Wed 30 Apr 2026', time:'4:00 PM',
-    tutor:'Sarah Rahman', subject:'Coding', duration:'45 mins', status:'upcoming',
-    modules:[
-      { num:6, title:'Adding Scores & Lives',        done:false, current:true },
-    ],
-  },
-];
+let LESSONS = [];
 
 /* ── PROJECTS DATA ── */
-let pendingProjects = [
-  {
-    id:1, emoji:'🎮', title:'Snake Game in Python',
-    course:'Python for Beginners', due:'25 Apr 2026',
-    brief:'Build a classic Snake game using Python and the turtle module.',
-    steps:[
-      'Set up the game window using turtle.Screen()',
-      'Create the snake as a list of turtle segments',
-      'Handle keyboard input (arrow keys) to change direction',
-      'Generate food at random positions on screen',
-      'Detect collisions with walls and the snake itself',
-      'Display and update the score',
-      'Add a game-over screen with restart option',
-    ],
-  },
-  {
-    id:2, emoji:'🌐', title:'Personal Portfolio Website',
-    course:'Python for Beginners', due:'28 Apr 2026',
-    brief:'Design and build a personal portfolio page using HTML and CSS.',
-    steps:[
-      'Create the HTML structure: header, about, projects, contact sections',
-      'Style with CSS using flexbox or grid layout',
-      'Add your name, photo placeholder, and a short bio',
-      'List 2–3 projects you have worked on',
-      'Make it mobile-responsive using media queries',
-      'Add a contact form (no backend needed — just the HTML)',
-    ],
-  },
-  {
-    id:3, emoji:'🧮', title:'Number Guessing Game',
-    course:'Python for Beginners', due:'30 Apr 2026',
-    brief:'Create a number guessing game where the computer picks a random number and the player guesses it.',
-    steps:[
-      'Import the random module and generate a number between 1 and 100',
-      'Ask the player to enter a guess in a loop',
-      'Give hints: "Too high" or "Too low"',
-      'Count the number of attempts',
-      'Congratulate the player when they guess correctly',
-      'Ask if they want to play again',
-    ],
-  },
-];
-
+let pendingProjects = [];
 let submittedProjects = [];
-
 let reviewedProjects = [];
 
 /* ── QUIZZES DATA ── */
-const QUIZ_QUESTIONS = {
-  q1: [
-    { q:'What keyword is used to define a function in Python?',         opts:['func','def','function','define'],       ans:1 },
-    { q:'Which of these is a valid Python variable name?',              opts:['2name','my-var','my_var','class'],       ans:2 },
-    { q:'What does len("hello") return?',                               opts:['4','5','6','hello'],                     ans:1 },
-    { q:'Which symbol is used for comments in Python?',                 opts:['//','/*','#','--'],                      ans:2 },
-    { q:'What is the output of print(2 ** 3)?',                         opts:['6','8','9','5'],                         ans:1 },
-    { q:'Which data type stores True or False?',                        opts:['int','str','bool','float'],              ans:2 },
-    { q:'How do you start a for loop in Python?',                       opts:['for x in range:','for(x=0;x<5;x++)','for x in range(5):','loop x to 5:'], ans:2 },
-    { q:'What does the append() method do to a list?',                  opts:['Removes last item','Adds item to end','Sorts the list','Clears the list'], ans:1 },
-    { q:'Which function converts a string to an integer?',              opts:['str()','float()','int()','num()'],       ans:2 },
-    { q:'What is the correct way to create a dictionary in Python?',    opts:['[key:value]','(key,value)','{key:value}','<key=value>'], ans:2 },
-  ],
-  q2: [
-    { q:'What is 15% of 200?',                                          opts:['25','30','35','40'],                     ans:1 },
-    { q:'Solve: 3x + 7 = 22. What is x?',                              opts:['3','4','5','6'],                         ans:2 },
-    { q:'What is the area of a rectangle 8cm × 5cm?',                   opts:['26cm²','40cm²','13cm²','80cm²'],         ans:1 },
-    { q:'What is the square root of 144?',                              opts:['11','12','13','14'],                     ans:1 },
-    { q:'Simplify: 4/8',                                                opts:['2/4','1/2','3/6','1/4'],                 ans:1 },
-    { q:'What is the gradient of y = 3x + 5?',                         opts:['5','3','8','1'],                         ans:1 },
-    { q:'Convert 0.75 to a fraction.',                                  opts:['3/5','2/3','3/4','4/5'],                 ans:2 },
-    { q:'What is 2³ × 2²?',                                             opts:['2⁵','2⁶','4⁵','8'],                     ans:0 },
-    { q:'The angles in a triangle sum to:',                             opts:['90°','180°','270°','360°'],              ans:1 },
-    { q:'What is the median of: 3, 7, 2, 9, 5?',                       opts:['5','7','3','9'],                         ans:0 },
-  ],
-};
-
-let pendingQuizzes = [
-  { id:'q1', title:'Python Basics Quiz',    course:'Python for Beginners', questions:10, timeLimit:'15 mins', emoji:'💻' },
-  { id:'q2', title:'GCSE Maths — Algebra',  course:'GCSE Maths Prep',      questions:10, timeLimit:'15 mins', emoji:'📐' },
-];
+const QUIZ_QUESTIONS = {};
+let pendingQuizzes = [];
 let completedQuizzes = [];
 
 /* ── CERTIFICATES DATA ── */
-const CERTIFICATES = [
-  {
-    id:1, course:'Scratch & Game Design', instructor:'Sarah Rahman',
-    date:'15 March 2026', grade:'Distinction', emoji:'🎮',
-    color:'purple',
-  },
-  {
-    id:2, course:'Introduction to HTML & CSS', instructor:'Sarah Rahman',
-    date:'10 February 2026', grade:'Merit', emoji:'🌐',
-    color:'blue',
-  },
-];
+let CERTIFICATES = [];
 
-/* ══════════════════════════════════════════════════════
-   INIT
-══════════════════════════════════════════════════════ */
+/* ── STUDENT GLOBAL DATA ── */
+window.STUDENT_DATA = {
+  profile: null,
+  payments: [],
+  courses: []
+};
+
 document.addEventListener('DOMContentLoaded', () => {
   setGreeting();
-  loadStudentFromStorage();
-  renderProgressBars();
-  renderUpcomingPreview();
-  renderLessons();
-  renderProjectSection('pending');
-  renderPendingQuizzes();
-  renderCompletedQuizzes();
-  renderCertificates();
-  bindModalCloseOnOverlay('projectModalOverlay', closeProjectModal);
-  bindModalCloseOnOverlay('quizModalOverlay',    closeQuizModal);
-  bindModalCloseOnOverlay('certModalOverlay',    closeCertModal);
-  bindModalCloseOnOverlay('profileModalOverlay', closeProfileModal);
-  showTab('overview');
+  _loadStudentFromAPI().then(() => {
+    renderProgressBars();
+    renderUpcomingPreview();
+    renderLessons();
+    renderProjectSection('pending');
+    renderPendingQuizzes();
+    renderCompletedQuizzes();
+    renderCertificates();
+    bindModalCloseOnOverlay('projectModalOverlay', closeProjectModal);
+    bindModalCloseOnOverlay('quizModalOverlay',    closeQuizModal);
+    bindModalCloseOnOverlay('certModalOverlay',    closeCertModal);
+    bindModalCloseOnOverlay('profileModalOverlay', closeProfileModal);
+    showTab('overview');
+  });
 });
 
-/* ── Load student from localStorage (if onboarded) ── */
-function loadStudentFromStorage() {
+/* ── Load student from API ── */
+async function _loadStudentFromAPI() {
   try {
-    const email = localStorage.getItem('sn_logged_in_student');
-    if (!email) { updateCreditsDisplay(null); return; }
-    const students = JSON.parse(localStorage.getItem('sn_students') || '[]');
-    const s = students.find(st => st.email === email);
-    if (!s) { updateCreditsDisplay(null); return; }
+    if (typeof isApiAvailable === 'function' && !(await isApiAvailable())) return;
+    const token = localStorage.getItem('sn_access_token');
+    if (!token) return;
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/sync/dashboard/student', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.success) {
+      window.STUDENT_DATA.payments = data.payments || [];
+      window.STUDENT_DATA.profile = data.students?.[0] || null;
+      
+      // Map API courses to UI COURSES
+      COURSES = (data.courses || []).map(c => ({
+        id: c.id,
+        name: c.name,
+        tutor: 'Assigned Tutor',
+        progress: 0,
+        total: c.num_lessons || 10,
+        done: 0,
+        color: 'blue'
+      }));
 
-    // Format ID as S-0001
-    const rawId = s.id || '';
-    const numMatch = rawId.match(/(\d+)$/);
-    const formattedId = numMatch ? 'S-' + numMatch[1].padStart(4, '0') : rawId;
+      // Map API bookings to UI LESSONS
+      LESSONS = (data.bookings || []).map(b => {
+        let dateStr = '—';
+        let timeStr = b.time || '—';
+        try {
+          if (b.date) {
+            const d = new Date(b.date);
+            dateStr = d.toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
+          }
+        } catch(e) {}
+        return {
+          id: b.id,
+          title: b.subject || 'Class',
+          date: dateStr,
+          time: timeStr,
+          tutor: b.tutor_name || 'Tutor',
+          subject: b.subject || '',
+          duration: (b.duration_mins || 60) + ' mins',
+          status: b.status === 'scheduled' ? 'upcoming' : b.status,
+          modules: []
+        };
+      });
 
-    // Update sidebar
-    const nameEl = document.getElementById('sidebarName');
-    if (nameEl) nameEl.textContent = s.name || STUDENT.name;
-    const idEl = document.querySelector('.student-id-badge');
-    if (idEl) idEl.textContent = 'ID: ' + formattedId;
-
-    updateCreditsDisplay(parseInt(s.credits) || 0);
-  } catch(e) { updateCreditsDisplay(null); }
+      // Update UI with profile data
+      if (window.STUDENT_DATA.profile) {
+        const s = window.STUDENT_DATA.profile;
+        const nameEl = document.getElementById('sidebarName');
+        if (nameEl) nameEl.textContent = s.name || STUDENT.name;
+        
+        const rawId = s.id || '';
+        const numMatch = rawId.match(/(\d+)$/);
+        const formattedId = numMatch ? 'S-' + numMatch[1].padStart(4, '0') : rawId.slice(0, 8);
+        const idEl = document.querySelector('.student-id-badge');
+        if (idEl) idEl.textContent = 'ID: ' + formattedId;
+        
+        updateCreditsDisplay(parseInt(s.credits) || 0);
+      } else {
+        updateCreditsDisplay(null);
+      }
+    }
+  } catch (e) { console.warn('[STUDENT] API load failed:', e.message); updateCreditsDisplay(null); }
 }
-
 function updateCreditsDisplay(credits) {
   const statEl  = document.getElementById('statCreditsRemaining');
   const noteEl  = document.getElementById('statCreditsNote');
@@ -268,6 +169,10 @@ function bindModalCloseOnOverlay(overlayId, closeFn) {
 function renderProgressBars() {
   const el = document.getElementById('progressList');
   if (!el) return;
+  if (COURSES.length === 0) {
+    el.innerHTML = '<div style="color:var(--light);font-size:14px;padding:20px;">No active courses.</div>';
+    return;
+  }
   el.innerHTML = COURSES.map(c => `
     <div class="progress-item">
       <div class="progress-top">
@@ -286,6 +191,10 @@ function renderProgressBars() {
 function renderUpcomingPreview() {
   const el = document.getElementById('upcomingPreview');
   if (!el) return;
+  if (LESSONS.length === 0) {
+    el.innerHTML = '<div style="color:var(--light);font-size:14px;padding:20px;">No upcoming lessons.</div>';
+    return;
+  }
   el.innerHTML = LESSONS.slice(0, 3).map(l => buildSessionItem(l)).join('');
 }
 
@@ -320,14 +229,21 @@ function joinClass() {
 function renderLessons() {
   const el = document.getElementById('lessonsList');
   if (!el) return;
+  if (LESSONS.length === 0) {
+    el.innerHTML = '<div class="empty-state">No lessons scheduled.</div>';
+    return;
+  }
   el.innerHTML = LESSONS.map((l, i) => {
     const isLive = l.status === 'live';
+    const parts = l.date.split(' ');
+    const day = parts.length > 1 ? parts[1] : '';
+    const month = parts.length > 2 ? parts[2] : '';
     return `
       <div class="lesson-card${isLive ? ' lesson-live' : ''}" onclick="showModules(${i})">
         <div class="lesson-card-left">
           <div class="lesson-date-box">
-            <div class="lesson-day">${l.date.split(' ')[1]}</div>
-            <div class="lesson-month">${l.date.split(' ')[2]}</div>
+            <div class="lesson-day">${day}</div>
+            <div class="lesson-month">${month}</div>
           </div>
           <div class="lesson-info">
             <div class="lesson-title">${l.title}</div>

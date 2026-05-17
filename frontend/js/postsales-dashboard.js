@@ -1,4 +1,4 @@
-﻿/* ═══════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════
    STEMNEST ACADEMY — POST-SALES DASHBOARD JS
    Receives converted (paid) students, schedules recurring
    paid classes, writes slots to teacher calendar.
@@ -8,28 +8,112 @@ const POS_TABS = ['students', 'topup', 'scheduled', 'paylinks', 'converted'];
 let generatedLink       = null;
 let posScheduleStudentId = null; // booking ID being scheduled
 
+window.POS_DATA = {
+  bookings: [],
+  teachers: [],
+  pipeline: [],
+  students: [],
+  tutorAvail: {},
+  paymentLinks: [],
+  courses: []
+};
+
 /* ── INIT ── */
 document.addEventListener('DOMContentLoaded', () => {
   const dateEl = document.getElementById('posDate');
   if (dateEl) dateEl.textContent = new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  loadCourseDropdown();
-  loadCourseDropdownSchedule();
-  showPOSTab('students');
-  bindPOSModals();
+  
+  _loadPOSFromAPI().then(() => {
+    loadCourseDropdown();
+    loadCourseDropdownSchedule();
+    showPOSTab('students');
+    bindPOSModals();
+  });
 });
 
+async function _loadPOSFromAPI() {
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    if (!token) return;
+
+    // Fetch bookings
+    const bRes = await fetch('https://api.stemnestacademy.co.uk/api/bookings?limit=500', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const bData = await bRes.json();
+    if (bData.bookings) {
+      window.POS_DATA.bookings = bData.bookings.map(b => {
+        let notes = {};
+        try { notes = typeof b.notes === 'string' ? JSON.parse(b.notes) : (b.notes || {}); } catch {}
+        return {
+          id:              b.id,
+          dbId:            b.id,
+          studentName:     b.lesson_name || notes.studentName || '—',
+          studentId:       b.student_id || '',
+          age:             notes.age || b.grade || '—',
+          grade:           b.grade || notes.grade || '—',
+          email:           b.student_email || notes.email || '—',
+          whatsapp:        notes.whatsapp || '—',
+          subject:         b.subject || '—',
+          date:            b.date ? b.date.split('T')[0] : '—',
+          time:            notes.time || b.time || '—',
+          status:          b.status,
+          assignedTutor:   b.tutor_name || '—',
+          assignedSalesId: b.sales_staff_id || b.sales_id || '',
+          salesStatus:     b.salesStatus || (b.status==='completed'?'converted':''),
+          classLink:       b.class_link || '',
+          paidScheduled:   notes.paidScheduled || false,
+          bookedAt:        b.booked_at || b.created_at,
+          scheduledAt:     b.scheduled_at,
+        };
+      });
+    }
+
+    // Attempt to fetch dashboard data (pipeline, students, etc.)
+    try {
+      const dRes = await fetch('https://api.stemnestacademy.co.uk/api/sync/dashboard/postsales', {
+        headers: { 'Authorization': 'Bearer ' + token },
+      });
+      const dData = await dRes.json();
+      if (dData.pipeline) window.POS_DATA.pipeline = dData.pipeline;
+      if (dData.students) window.POS_DATA.students = dData.students;
+      if (dData.teachers) window.POS_DATA.teachers = dData.teachers;
+    } catch {}
+
+    // Fallbacks
+    if (window.POS_DATA.students.length === 0) {
+      window.POS_DATA.students = JSON.parse(localStorage.getItem('sn_students') || '[]');
+    }
+    if (window.POS_DATA.teachers.length === 0) {
+      window.POS_DATA.teachers = JSON.parse(localStorage.getItem('sn_teachers') || '[]');
+    }
+    if (window.POS_DATA.pipeline.length === 0) {
+      const persons = JSON.parse(localStorage.getItem('sn_sales_persons') || '[]');
+      window.POS_DATA.pipeline = persons.flatMap(sp =>
+        JSON.parse(localStorage.getItem('sn_pipeline_' + sp.id) || '[]')
+          .map(p => ({ ...p, salesPersonId: sp.id, salesPersonName: sp.name }))
+      );
+    }
+    window.POS_DATA.paymentLinks = JSON.parse(localStorage.getItem('sn_payment_links') || '[]');
+    window.POS_DATA.courses = JSON.parse(localStorage.getItem('sn_courses') || '[]');
+
+  } catch (e) {
+    console.warn('[PostSales Dashboard] API load failed:', e.message);
+  }
+}
+
 /* ── HELPERS ── */
-function getBookings()  { try { return JSON.parse(localStorage.getItem('sn_bookings') || '[]'); } catch { return []; } }
-function getTeachers()  { try { return JSON.parse(localStorage.getItem('sn_teachers') || '[]'); } catch { return []; } }
-function saveBookings(list) { localStorage.setItem('sn_bookings', JSON.stringify(list)); }
+function getBookings()  { return window.POS_DATA.bookings || []; }
+function getTeachers()  { return window.POS_DATA.teachers || []; }
+function saveBookings(list) { 
+  window.POS_DATA.bookings = list;
+  // Fallback to localStorage
+  localStorage.setItem('sn_bookings', JSON.stringify(list)); 
+}
 function setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
 
 function getAllPipeline() {
-  const persons = JSON.parse(localStorage.getItem('sn_sales_persons') || '[]');
-  return persons.flatMap(sp =>
-    JSON.parse(localStorage.getItem('sn_pipeline_' + sp.id) || '[]')
-      .map(p => ({ ...p, salesPersonId: sp.id, salesPersonName: sp.name }))
-  );
+  return window.POS_DATA.pipeline || [];
 }
 
 function to12h(t) {
@@ -87,7 +171,7 @@ function updatePOSStats() {
   const converted = pipeline.filter(p => p.status === 'converted');
   const rev       = converted.reduce((s, p) => s + (parseFloat(p.paymentAmount) || 0), 0);
   const bookings  = getBookings();
-  const students  = JSON.parse(localStorage.getItem('sn_students') || '[]');
+  const students  = window.POS_DATA.students || [];
 
   // Count students needing top-up (credits ≤ 2)
   const needingTopUp = students.filter(s => (parseInt(s.credits) || 0) <= 2).length;
@@ -200,7 +284,7 @@ function populatePOSTeacherDropdown(subject) {
 function loadCourseDropdownSchedule(subject) {
   const sel = document.getElementById('pos-sm-course');
   if (!sel) return;
-  const courses = JSON.parse(localStorage.getItem('sn_courses') || '[]');
+  const courses = window.POS_DATA.courses || [];
   let filtered = courses;
   if (subject) filtered = courses.filter(c =>
     c.category?.toLowerCase().includes(subject.toLowerCase()) ||
@@ -382,7 +466,7 @@ function renderScheduledPaid() {
 function loadCourseDropdown() {
   const sel = document.getElementById('pl-course');
   if (!sel) return;
-  const courses = JSON.parse(localStorage.getItem('sn_courses') || '[]');
+  const courses = window.POS_DATA.courses || [];
   sel.innerHTML = '<option value="">Select course</option>' +
     courses.map(c => `<option value="${c.name}">£${c.price || '—'} — ${c.name}</option>`).join('');
 }
@@ -431,8 +515,9 @@ async function generatePaymentLink() {
     createdAt: new Date().toISOString(),
     status: 'pending',
   };
-  const all = JSON.parse(localStorage.getItem('sn_payment_links') || '[]');
+  const all = window.POS_DATA.paymentLinks || [];
   all.unshift(record);
+  window.POS_DATA.paymentLinks = all;
   localStorage.setItem('sn_payment_links', JSON.stringify(all));
 
   generatedLink = `https://pay.stemnestacademy.co.uk/checkout?ref=${record.id}&student=${encodeURIComponent(student)}&course=${encodeURIComponent(course)}&amount=${amount}&currency=${currency}`;
@@ -629,6 +714,7 @@ async function confirmOnboard() {
         body:    JSON.stringify({
           name, email, password, role: 'student',
           phone, whatsapp: phone,
+          grade, age, credits, course
         }),
       });
       const data = await res.json();
@@ -644,8 +730,8 @@ async function confirmOnboard() {
   }
 
   /* Generate student ID in S-0001 format if not from API */
+  const existing = window.POS_DATA.students || [];
   if (!studentId) {
-    const existing = JSON.parse(localStorage.getItem('sn_students') || '[]');
     const seqNum   = existing.length + 1;
     studentId = 'S-' + String(seqNum).padStart(4, '0');
   }
@@ -660,11 +746,11 @@ async function confirmOnboard() {
     status:      'active',
   };
 
-  /* Save to localStorage students registry */
-  const existing = JSON.parse(localStorage.getItem('sn_students') || '[]');
+  /* Save to in-memory students registry */
   const existIdx = existing.findIndex(s => s.email === email);
   if (existIdx !== -1) existing[existIdx] = { ...existing[existIdx], ...student };
   else existing.push(student);
+  window.POS_DATA.students = existing;
   localStorage.setItem('sn_students', JSON.stringify(existing));
 
   /* Mark booking as onboarded */
@@ -838,7 +924,7 @@ function renderPaidStudents() {
 }
 
 function redownloadCredentials(bookingId) {
-  const students = JSON.parse(localStorage.getItem('sn_students') || '[]');
+  const students = window.POS_DATA.students || [];
   const student  = students.find(s => s.bookingId === bookingId);
   if (!student) { showToast('Student record not found.', 'error'); return; }
   const text = generateCredentialText(student);
@@ -897,7 +983,10 @@ async function confirmManualOnboard() {
       const res = await fetch('https://api.stemnestacademy.co.uk/api/users', {
         method:  'POST',
         headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ name, email, password, role: 'student', phone, whatsapp: phone }),
+        body:    JSON.stringify({ 
+          name, email, password, role: 'student', phone, whatsapp: phone,
+          grade, age, credits, course
+        }),
       });
       const data = await res.json();
       if (data.success) {
@@ -910,7 +999,7 @@ async function confirmManualOnboard() {
   } catch (e) { console.warn('[ManualOnboard] API error:', e.message); }
 
   // Generate student ID in S-0001 format
-  const existing  = JSON.parse(localStorage.getItem('sn_students') || '[]');
+  const existing  = window.POS_DATA.students || [];
   const seqNum    = existing.length + 1;
   const studentId = dbStudentId || ('S-' + String(seqNum).padStart(4, '0'));
   const initials  = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
@@ -924,6 +1013,7 @@ async function confirmManualOnboard() {
   };
 
   existing.push(student);
+  window.POS_DATA.students = existing;
   localStorage.setItem('sn_students', JSON.stringify(existing));
 
   // Create a booking record so it appears on teacher dashboard
@@ -974,7 +1064,11 @@ async function confirmManualOnboard() {
 
   // Update student record with bookingId
   const sIdx = existing.findIndex(s => s.id === studentId);
-  if (sIdx !== -1) { existing[sIdx].bookingId = bookingId; localStorage.setItem('sn_students', JSON.stringify(existing)); }
+  if (sIdx !== -1) { 
+    existing[sIdx].bookingId = bookingId; 
+    window.POS_DATA.students = existing;
+    localStorage.setItem('sn_students', JSON.stringify(existing)); 
+  }
 
   // Update password registry
   if (typeof updatePasswordRegistry === 'function') {
@@ -1011,7 +1105,7 @@ function renderTopUpStudents() {
   const el = document.getElementById('topupStudentsList');
   if (!el) return;
 
-  const students = JSON.parse(localStorage.getItem('sn_students') || '[]');
+  const students = window.POS_DATA.students || [];
   const bookings = getBookings();
 
   // Merge students from both sources
@@ -1071,7 +1165,7 @@ function renderTopUpStudents() {
             const creditBg    = credits <= 0 ? '#fde8e8' : '#fff3e0';
 
             // Check if a payment link already exists for this student
-            const allLinks = JSON.parse(localStorage.getItem('sn_payment_links') || '[]');
+            const allLinks = window.POS_DATA.paymentLinks || [];
             const existingLink = allLinks.find(l =>
               (l.email === s.email || l.student === s.name) && l.status === 'pending'
             );
@@ -1120,7 +1214,7 @@ function saveTopUpLink(studentId, email, name, subject) {
   if (!url) { showToast('Please paste a payment link first.', 'error'); return; }
 
   // Save to sn_payment_links
-  const all = JSON.parse(localStorage.getItem('sn_payment_links') || '[]');
+  const all = window.POS_DATA.paymentLinks || [];
 
   // Update existing or add new
   const existing = all.findIndex(l => (l.email === email || l.student === name) && l.status === 'pending');
@@ -1145,6 +1239,7 @@ function saveTopUpLink(studentId, email, name, subject) {
     all.unshift(record);
   }
 
+  window.POS_DATA.paymentLinks = all;
   localStorage.setItem('sn_payment_links', JSON.stringify(all));
   updatePOSStats();
   renderTopUpStudents();

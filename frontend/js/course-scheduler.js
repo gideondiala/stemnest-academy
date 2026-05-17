@@ -14,21 +14,24 @@
 /* ─────────────────────────────────────────────────────
    STORAGE HELPERS
 ───────────────────────────────────────────────────── */
-function getEnrolments() {
-  try { return JSON.parse(localStorage.getItem('sn_enrolments') || '[]'); } catch { return []; }
+function _getGlobalData() {
+  return window.PS_DATA || window.ADMIN_DATA || window.TUTOR_DATA || window.STUDENT_DATA || window;
 }
-function saveEnrolments(list) { localStorage.setItem('sn_enrolments', JSON.stringify(list)); }
+
+function getEnrolments() {
+  return _getGlobalData().enrolments || [];
+}
+function saveEnrolments(list) { _getGlobalData().enrolments = list; }
 
 function getAllBookings() {
-  try { return JSON.parse(localStorage.getItem('sn_bookings') || '[]'); } catch { return []; }
+  return _getGlobalData().bookings || [];
 }
-function saveAllBookings(list) { localStorage.setItem('sn_bookings', JSON.stringify(list)); }
+function saveAllBookings(list) { _getGlobalData().bookings = list; }
 
 function getCourseList() {
-  try {
-    const stored = JSON.parse(localStorage.getItem('sn_courses') || '[]');
-    return stored.length ? stored : (typeof DEFAULT_COURSES !== 'undefined' ? DEFAULT_COURSES : []);
-  } catch { return []; }
+  const d = _getGlobalData();
+  if (d.courses && d.courses.length) return d.courses;
+  return (typeof DEFAULT_COURSES !== 'undefined' ? DEFAULT_COURSES : []);
 }
 
 /* ─────────────────────────────────────────────────────
@@ -102,14 +105,16 @@ function nextLearningDay(afterDate, schedule) {
 }
 
 /* ─────────────────────────────────────────────────────
-   WRITE CALENDAR SLOT (mirrors presales-dashboard.js)
+   WRITE CALENDAR SLOT
 ───────────────────────────────────────────────────── */
 function _writeCalendarSlot(teacherId, dateKey, timeKey, bookingId) {
   try {
-    const allAvail   = JSON.parse(localStorage.getItem('sn_all_tutor_avail') || '{}');
-    const teachers   = JSON.parse(localStorage.getItem('sn_teachers') || '[]');
-    const tutorEntry = allAvail[teacherId] || { tutor: teachers.find(t => t.id === teacherId) || {}, slots: {} };
-    const slots      = tutorEntry.slots || {};
+    const d = _getGlobalData();
+    if (!d.tutorAvail) d.tutorAvail = {};
+    const allAvail = d.tutorAvail;
+    const tutors = d.tutors || [];
+    const tutorEntry = allAvail[teacherId] || { tutor: tutors.find(t => t.id === teacherId) || {}, slots: {} };
+    const slots = tutorEntry.slots || {};
 
     slots[dateKey + '|' + timeKey] = { booked: true, bookingId };
     const [h, m] = timeKey.split(':').map(Number);
@@ -118,31 +123,21 @@ function _writeCalendarSlot(teacherId, dateKey, timeKey, bookingId) {
 
     tutorEntry.slots = slots;
     allAvail[teacherId] = tutorEntry;
-    localStorage.setItem('sn_all_tutor_avail', JSON.stringify(allAvail));
-
-    const personal = JSON.parse(localStorage.getItem('sn_tutor_avail_' + teacherId) || '{}');
-    personal[dateKey + '|' + timeKey] = { booked: true, bookingId };
-    personal[dateKey + '|' + nextKey] = { booked: true, bookingId };
-    localStorage.setItem('sn_tutor_avail_' + teacherId, JSON.stringify(personal));
   } catch (e) { console.warn('_writeCalendarSlot error:', e); }
 }
 
 /** Remove a calendar slot (used when rescheduling) */
 function _clearCalendarSlot(teacherId, dateKey, timeKey) {
   try {
-    const allAvail = JSON.parse(localStorage.getItem('sn_all_tutor_avail') || '{}');
+    const d = _getGlobalData();
+    if (!d.tutorAvail) d.tutorAvail = {};
+    const allAvail = d.tutorAvail;
     const slots    = (allAvail[teacherId] && allAvail[teacherId].slots) || {};
     delete slots[dateKey + '|' + timeKey];
     const [h, m] = timeKey.split(':').map(Number);
     const nextKey = m === 0 ? h + ':30' : (h + 1) + ':00';
     delete slots[dateKey + '|' + nextKey];
     if (allAvail[teacherId]) allAvail[teacherId].slots = slots;
-    localStorage.setItem('sn_all_tutor_avail', JSON.stringify(allAvail));
-
-    const personal = JSON.parse(localStorage.getItem('sn_tutor_avail_' + teacherId) || '{}');
-    delete personal[dateKey + '|' + timeKey];
-    delete personal[dateKey + '|' + nextKey];
-    localStorage.setItem('sn_tutor_avail_' + teacherId, JSON.stringify(personal));
   } catch (e) { console.warn('_clearCalendarSlot error:', e); }
 }
 
@@ -396,7 +391,7 @@ function _populateEnrolTeacherDropdown(subjectHint) {
   const sel = document.getElementById('enrol-teacher');
   if (!sel) return;
   try {
-    let teachers = JSON.parse(localStorage.getItem('sn_teachers') || '[]');
+    let teachers = _getGlobalData().tutors || [];
     if (subjectHint) {
       const sub = subjectHint.toLowerCase();
       const filtered = teachers.filter(t => t.subject && t.subject.toLowerCase().includes(sub));
@@ -471,7 +466,7 @@ function confirmEnrolment() {
   const allBookings = getAllBookings();
   const demo = _enrolBookingId ? allBookings.find(b => b.id === _enrolBookingId) : null;
 
-  const teachers = JSON.parse(localStorage.getItem('sn_teachers') || '[]');
+  const teachers = _getGlobalData().tutors || [];
   const teacher  = teachers.find(t => t.id === teacherId);
 
   try {
@@ -570,10 +565,9 @@ function confirmReschedule() {
     if (typeof showToast === 'function') showToast('✅ Lesson rescheduled. All future lessons shifted forward.', 'success');
 
     /* Push updated bookings to API */
-    try {
       const token = localStorage.getItem('sn_access_token');
       if (token) {
-        const allBookings = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+        const allBookings = getAllBookings();
         const enrolmentId = allBookings.find(b => b.id === bookingId)?.enrolmentId;
         if (enrolmentId) {
           const futureLessons = allBookings.filter(b => b.enrolmentId === enrolmentId && b.status === 'scheduled');

@@ -1,4 +1,4 @@
-﻿/* ═══════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════
    STEMNEST ACADEMY — SALES DASHBOARD JS
    Academic Counselor portal: upcoming demos, pipeline,
    pitch logging, conversion tracking.
@@ -7,9 +7,11 @@
 /* ── Load logged-in sales person ── */
 function getLoggedInSales() {
   try {
-    const id  = localStorage.getItem('sn_logged_in_sales');
-    const reg = JSON.parse(localStorage.getItem('sn_sales_persons') || '[]');
-    return (id ? reg.find(s => s.id === id) : null) || {
+    const user = JSON.parse(localStorage.getItem('sn_api_user'));
+    if (user && user.role === 'sales') {
+      return { id: user.staff_id || user.id, name: user.name, initials: user.name.slice(0,2).toUpperCase(), email: user.email, phone: user.phone || '' };
+    }
+    return {
       id:'SP001', name:'Alex Johnson', initials:'AJ',
       email:'alex.johnson@stemnestacademy.co.uk', phone:'', photo:null,
     };
@@ -21,15 +23,85 @@ const SALES_TABS = ['overview','leads','upcoming','pipeline','pitchlog','convert
 let activePitchBookingId = null;
 let selectedInterest = 3;
 
+/* ── STATE MANAGEMENT ── */
+window.SALES_DATA = {
+  bookings: [],
+  pipeline: [],
+  leads: [],
+  courses: [],
+  reports: []
+};
+
 /* ── INIT ── */
 document.addEventListener('DOMContentLoaded', () => {
   SALES = getLoggedInSales();
   setGreeting();
   renderSidebarProfile();
   buildInterestGrid();
-  showSalesTab('overview');
+  
+  _loadSalesFromAPI().then(() => {
+    showSalesTab('overview');
+  });
+  
   bindModalCloses();
 });
+
+async function _loadSalesFromAPI() {
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    if (!token) return;
+
+    // Fetch bookings assigned to me
+    const bRes = await fetch('https://api.stemnestacademy.co.uk/api/bookings?limit=500', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const bData = await bRes.json();
+    if (bData.bookings) {
+      window.SALES_DATA.bookings = bData.bookings.map(b => {
+        let notes = {};
+        try { notes = typeof b.notes === 'string' ? JSON.parse(b.notes) : (b.notes || {}); } catch {}
+        return {
+          id:              b.id,
+          dbId:            b.id,
+          studentName:     b.lesson_name || notes.studentName || '—',
+          age:             notes.age || b.grade || '—',
+          grade:           b.grade || notes.grade || '—',
+          email:           b.student_email || notes.email || '—',
+          whatsapp:        notes.whatsapp || '—',
+          subject:         b.subject || '—',
+          date:            b.date ? b.date.split('T')[0] : '—',
+          time:            notes.time || b.time || '—',
+          status:          b.status,
+          assignedTutor:   b.tutor_name || '—',
+          assignedSalesId: b.sales_staff_id || b.sales_id || '',
+          classLink:       b.class_link || '',
+          bookedAt:        b.booked_at || b.created_at,
+          scheduledAt:     b.scheduled_at,
+          completedAt:     b.completed_at,
+          isDemoClass:     b.is_demo,
+        };
+      });
+    }
+
+    // Attempt to fetch dashboard data (pipeline, leads, etc.)
+    try {
+      const dRes = await fetch('https://api.stemnestacademy.co.uk/api/sync/dashboard/sales', {
+        headers: { 'Authorization': 'Bearer ' + token },
+      });
+      const dData = await dRes.json();
+      if (dData.pipeline) window.SALES_DATA.pipeline = dData.pipeline;
+      if (dData.leads) window.SALES_DATA.leads = dData.leads;
+    } catch {}
+
+    // Fallback: If pipeline is empty from API, try to load from localStorage once to migrate, then keep in memory
+    if (window.SALES_DATA.pipeline.length === 0) {
+      window.SALES_DATA.pipeline = JSON.parse(localStorage.getItem('sn_pipeline_' + SALES.id) || '[]');
+    }
+
+  } catch (e) {
+    console.warn('[Sales Dashboard] API load failed:', e.message);
+  }
+}
 
 function setGreeting() {
   const h = new Date().getHours();
@@ -58,14 +130,16 @@ function renderSidebarProfile() {
 
 /* ── Get my bookings (assigned to this sales person) ── */
 function getMyBookings() {
-  const all = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
-  return all.filter(b => b.assignedSalesId === SALES.id);
+  return window.SALES_DATA.bookings.filter(b => b.assignedSalesId === SALES.id || b.assignedSalesId === '');
 }
 
 function getMyPipeline() {
-  return JSON.parse(localStorage.getItem('sn_pipeline_' + SALES.id) || '[]');
+  return window.SALES_DATA.pipeline || [];
 }
-function saveMyPipeline(list) {
+
+async function saveMyPipeline(list) {
+  window.SALES_DATA.pipeline = list;
+  // Fallback save to localStorage for temporary persistence until backend is fully wired
   localStorage.setItem('sn_pipeline_' + SALES.id, JSON.stringify(list));
 }
 
@@ -94,8 +168,14 @@ function updateStats() {
   const upcoming  = bookings.filter(b => b.status === 'scheduled');
   const converted = pipeline.filter(p => p.status === 'converted');
   const revenue   = converted.reduce((s, p) => s + (parseFloat(p.paymentAmount) || 0), 0);
-  const leads     = JSON.parse(localStorage.getItem('sn_sales_leads') || '[]')
-    .filter(l => l.leadOwnerId === SALES.id || l.assignedSalesId === SALES.id);
+  
+  // Use in-memory leads or calculate from completed bookings if missing
+  let leads = window.SALES_DATA.leads || [];
+  if (leads.length === 0) {
+     leads = bookings.filter(b => b.status === 'completed' && b.isDemoClass).map(b => ({
+        id: b.id, bookingId: b.id, studentName: b.studentName, status: 'new', leadOwnerId: b.assignedSalesId
+     }));
+  }
 
   setText('sStat1', upcoming.length);
   setText('sStat2', pipeline.filter(p => p.status !== 'converted' && p.status !== 'lost').length);
@@ -324,8 +404,7 @@ function renderConverted() {
 
 /* ── PITCH MODAL ── */
 function openPitchModal(bookingId) {
-  const all = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
-  const b   = all.find(x => x.id === bookingId);
+  const b = getMyBookings().find(x => x.id === bookingId);
   if (!b) return;
   activePitchBookingId = bookingId;
 
@@ -384,8 +463,7 @@ function closePitchModal() {
 
 function savePitch() {
   if (!activePitchBookingId) return;
-  const all = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
-  const b   = all.find(x => x.id === activePitchBookingId);
+  const b = getMyBookings().find(x => x.id === activePitchBookingId);
   if (!b) return;
 
   const record = {
@@ -417,16 +495,15 @@ function savePitch() {
     pushPipelineRecord(record);
   }
 
-  // If converted, update booking status and notify admin
+  // If converted, update booking status (Ideally via API)
   if (record.status === 'converted') {
-    const bookings = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
-    const bi = bookings.findIndex(x => x.id === activePitchBookingId);
-    if (bi !== -1) {
-      bookings[bi].salesStatus = 'converted';
-      bookings[bi].paymentAmount = record.paymentAmount;
-      bookings[bi].salesPersonId = SALES.id;
-      bookings[bi].salesPersonName = SALES.name;
-      localStorage.setItem('sn_bookings', JSON.stringify(bookings));
+    if (b.dbId) {
+      const token = localStorage.getItem('sn_access_token');
+      fetch('https://api.stemnestacademy.co.uk/api/bookings/' + b.dbId + '/status', {
+         method: 'PUT',
+         headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+         body: JSON.stringify({ status: 'converted', paymentAmount: record.paymentAmount })
+      }).catch(console.warn);
     }
   }
 
@@ -485,9 +562,7 @@ function saveSalesProfile() {
   SALES.email = document.getElementById('spFieldEmail')?.value.trim() || SALES.email;
   SALES.phone = document.getElementById('spFieldPhone')?.value.trim();
   SALES.initials = SALES.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
-  const reg = JSON.parse(localStorage.getItem('sn_sales_persons') || '[]');
-  const idx = reg.findIndex(s => s.id === SALES.id);
-  if (idx !== -1) { reg[idx] = { ...reg[idx], ...SALES }; localStorage.setItem('sn_sales_persons', JSON.stringify(reg)); }
+  // In a real app we'd update the user profile via API here
   renderSidebarProfile();
   closeSalesProfileModal();
   showToast('✅ Profile updated!');
@@ -569,12 +644,18 @@ document.addEventListener('DOMContentLoaded', () => {
    Status: new | paid | promising | low_interest | lost
 ══════════════════════════════════════════════════════ */
 function getLeads() {
-  const all = JSON.parse(localStorage.getItem('sn_sales_leads') || '[]');
+  let all = window.SALES_DATA.leads || [];
+  if (all.length === 0) {
+      all = JSON.parse(localStorage.getItem('sn_sales_leads') || '[]');
+      window.SALES_DATA.leads = all;
+  }
   // Show leads assigned to this sales person OR where leadOwnerId matches
   return all.filter(l => !l.assignedSalesId || l.assignedSalesId === SALES.id || l.leadOwnerId === SALES.id);
 }
 
 function saveLeads(list) {
+  window.SALES_DATA.leads = list;
+  // Fallback save until backend wired
   localStorage.setItem('sn_sales_leads', JSON.stringify(list));
 }
 
@@ -670,7 +751,7 @@ function renderLeads() {
 
 function updateLeadStatus(leadId, newStatus) {
   if (!newStatus) return;
-  const all = JSON.parse(localStorage.getItem('sn_sales_leads') || '[]');
+  const all = window.SALES_DATA.leads || [];
   const idx = all.findIndex(l => l.id === leadId);
   if (idx !== -1) {
     all[idx].status    = newStatus;
@@ -701,7 +782,7 @@ function updateLeadStatus(leadId, newStatus) {
       }
     }
 
-    localStorage.setItem('sn_sales_leads', JSON.stringify(all));
+    saveLeads(all);
     updateStats();
     renderLeads();
     showToast('✅ Lead status updated!');
@@ -731,16 +812,16 @@ function renderPitchRecords() {
   if (!el) return;
 
   // Get all bookings assigned to this sales person
-  var all      = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
-  var myDemos  = all.filter(function(b) {
-    return b.assignedSalesId === SALES.id &&
-      (b.status === 'completed' || b.status === 'incomplete' || b.status === 'scheduled');
+  var myDemos = getMyBookings().filter(function(b) {
+    return b.status === 'completed' || b.status === 'incomplete' || b.status === 'scheduled';
   });
 
   // Also get pitch log (manually saved records)
-  var pitchKey = 'sn_pitch_log_' + SALES.id;
-  var pitchLog = [];
-  try { pitchLog = JSON.parse(localStorage.getItem(pitchKey) || '[]'); } catch(e) {}
+  var pitchLog = window.SALES_DATA.pitchLog || [];
+  if (!pitchLog.length) {
+      try { pitchLog = JSON.parse(localStorage.getItem('sn_pitch_log_' + SALES.id) || '[]'); } catch(e) {}
+      window.SALES_DATA.pitchLog = pitchLog;
+  }
 
   // Merge: use booking data + any pitch log entries
   var now = new Date();
@@ -843,9 +924,7 @@ function savePitchRecording(bookingId) {
   var link  = input ? input.value.trim() : '';
   if (!link) { showToast('Please paste a recording link.', 'error'); return; }
 
-  var pitchKey = 'sn_pitch_log_' + SALES.id;
-  var log = [];
-  try { log = JSON.parse(localStorage.getItem(pitchKey) || '[]'); } catch(e) {}
+  var log = window.SALES_DATA.pitchLog || [];
 
   var idx = log.findIndex(function(p) { return p.bookingId === bookingId; });
   var entry = idx !== -1 ? log[idx] : { bookingId: bookingId, loggedAt: new Date().toISOString() };
@@ -853,7 +932,8 @@ function savePitchRecording(bookingId) {
   entry.updatedAt     = new Date().toISOString();
 
   if (idx !== -1) log[idx] = entry; else log.unshift(entry);
-  localStorage.setItem(pitchKey, JSON.stringify(log));
+  window.SALES_DATA.pitchLog = log;
+  localStorage.setItem('sn_pitch_log_' + SALES.id, JSON.stringify(log));
 
   showToast('✅ Pitch recording saved!');
   renderPitchRecords();

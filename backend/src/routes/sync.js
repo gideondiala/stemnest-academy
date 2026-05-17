@@ -73,16 +73,26 @@ router.post('/class-reports', requireAuth, async (req, res, next) => {
       );
     });
 
-    /* Update booking status */
+    /* Update booking status and notes */
+    const bResult = await pool.query('SELECT student_id, notes FROM bookings WHERE id = $1', [bookingId]);
+    const booking = bResult.rows[0];
+    
+    let bNotesObj = {};
+    if (booking && booking.notes) {
+      try { bNotesObj = JSON.parse(booking.notes); } catch(e) {}
+    }
+    if (outcome === 'incomplete' && incompleteReason) {
+      bNotesObj.incompleteReason = incompleteReason;
+    }
+
     await pool.query(
-      `UPDATE bookings SET status = $1, completed_at = NOW() WHERE id = $2`,
-      [outcome, bookingId]
+      `UPDATE bookings SET status = $1, completed_at = NOW(), notes = $3 WHERE id = $2`,
+      [outcome, bookingId, Object.keys(bNotesObj).length > 0 ? JSON.stringify(bNotesObj) : null]
     ).catch(() => {});
 
     /* Deduct student credit if completed */
     if (creditDeducted && (outcome === 'completed' || outcome === 'partially_completed')) {
-      const bResult = await pool.query('SELECT student_id FROM bookings WHERE id = $1', [bookingId]);
-      const studentId = bResult.rows[0]?.student_id;
+      const studentId = booking?.student_id;
       if (studentId) {
         await pool.query(
           `UPDATE student_profiles SET credits = GREATEST(0, credits - 1) WHERE user_id = $1`,
@@ -303,6 +313,81 @@ router.get('/dashboard/:role', requireAuth, async (req, res, next) => {
                     ORDER BY u.created_at DESC`),
       ]);
       result.payments = payments.rows;
+      result.students = students.rows;
+    }
+
+    if (role === 'hr') {
+      const [applications, interviews, trainings, jobAdverts] = await Promise.all([
+        pool.query(`SELECT * FROM applications ORDER BY applied_at DESC LIMIT 500`),
+        pool.query(`SELECT * FROM interviews ORDER BY created_at DESC LIMIT 500`),
+        pool.query(`SELECT * FROM trainings ORDER BY created_at DESC LIMIT 500`),
+        pool.query(`SELECT * FROM job_adverts ORDER BY created_at DESC LIMIT 500`)
+      ]);
+      result.applications = applications.rows;
+      result.interviews   = interviews.rows;
+      result.trainings    = trainings.rows;
+      result.jobAdverts   = jobAdverts.rows;
+    }
+
+    if (role === 'admin') {
+      const [bookings, classReports, pipelines, courses, materials, tutors, sales] = await Promise.all([
+        pool.query(`SELECT b.*, u_s.name AS student_name, u_s.email AS student_email,
+                           u_t.name AS tutor_name, u_sp.name AS sales_name
+                    FROM bookings b
+                    LEFT JOIN users u_s  ON u_s.id  = b.student_id
+                    LEFT JOIN users u_t  ON u_t.id  = b.tutor_id
+                    LEFT JOIN users u_sp ON u_sp.id = b.sales_id
+                    ORDER BY b.date DESC LIMIT 1000`),
+        pool.query(`SELECT cr.*, u.name AS tutor_name, b.date, b.time, b.subject
+                    FROM class_reports cr
+                    LEFT JOIN users u ON u.id = cr.tutor_id
+                    LEFT JOIN bookings b ON b.id = cr.booking_id
+                    ORDER BY cr.created_at DESC LIMIT 500`),
+        pool.query(`SELECT p.*, b.date, b.time, b.subject,
+                           u_s.name AS student_name
+                    FROM pipeline p
+                    LEFT JOIN bookings b ON b.id = p.booking_id
+                    LEFT JOIN users u_s ON u_s.id = b.student_id
+                    ORDER BY p.updated_at DESC LIMIT 500`),
+        pool.query(`SELECT * FROM courses ORDER BY name ASC`),
+        pool.query(`SELECT * FROM companion_materials ORDER BY created_at DESC LIMIT 500`),
+        pool.query(`SELECT u.id, u.name, u.email, u.phone, u.whatsapp, u.is_active,
+                           tp.subject, tp.courses, tp.grade_groups, tp.availability
+                    FROM users u
+                    LEFT JOIN tutor_profiles tp ON tp.user_id = u.id
+                    WHERE u.role = 'tutor' ORDER BY u.name ASC`),
+        pool.query(`SELECT id, name, email, phone, whatsapp, is_active FROM users WHERE role = 'sales' ORDER BY name ASC`)
+      ]);
+      result.bookings     = bookings.rows;
+      result.classReports = classReports.rows;
+      result.pipelines    = pipelines.rows;
+      result.courses      = courses.rows;
+      result.materials    = materials.rows;
+      result.tutors       = tutors.rows;
+      result.sales        = sales.rows;
+    }
+
+    if (role === 'student') {
+      const [bookings, topups, courses, students] = await Promise.all([
+        pool.query(`SELECT b.*, u_t.name AS tutor_name, u_t.photo_url AS tutor_photo
+                    FROM bookings b
+                    LEFT JOIN users u_t ON u_t.id = b.tutor_id
+                    WHERE b.student_id = $1
+                    ORDER BY b.date DESC LIMIT 100`, [userId]),
+        pool.query(`SELECT * FROM payments WHERE student_id = $1 ORDER BY created_at DESC LIMIT 100`, [userId]),
+        pool.query(`SELECT c.* FROM courses c
+                    JOIN enrollments e ON e.course_id = c.id
+                    WHERE e.student_id = $1`, [userId]),
+        pool.query(`SELECT u.id, u.name, u.email, u.phone, u.whatsapp, u.staff_id, 
+                           sp.grade, sp.age, sp.credits, sp.enrolled_at, sp.parent_name, sp.parent_email
+                    FROM users u
+                    LEFT JOIN student_profiles sp ON sp.user_id = u.id
+                    WHERE u.id = $1`, [userId])
+      ]);
+      result.bookings = bookings.rows;
+      result.payments = topups.rows;
+      result.topups   = topups.rows;
+      result.courses  = courses.rows;
       result.students = students.rows;
     }
 

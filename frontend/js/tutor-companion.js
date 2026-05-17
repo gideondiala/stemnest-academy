@@ -129,7 +129,7 @@ function updateEarningsBadges() {
    15-MINUTE CLASS REMINDER
 ══════════════════════════════════════════════════════ */
 function startClassReminders() {
-  const bookings = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+  const bookings = window.TUTOR_DATA?.bookings || JSON.parse(localStorage.getItem('sn_bookings') || '[]');
   const myClasses = bookings.filter(b => b.assignedTutorId === TUTOR.id && b.status === 'scheduled');
 
   myClasses.forEach(b => {

@@ -37,6 +37,10 @@ const createUserSchema = z.object({
   staff_id: z.string().optional(),
   phone:    z.string().optional(),
   whatsapp: z.string().optional(),
+  grade:    z.string().optional(),
+  age:      z.string().optional(),
+  credits:  z.number().optional(),
+  course:   z.string().optional(),
 });
 
 /* Postsales can only create students */
@@ -115,12 +119,39 @@ router.post('/', requireAuth, requireRole('admin', 'super_admin', 'postsales'), 
 
     const user = result.rows[0];
 
-    /* Send welcome email */
-    await emailSvc.sendWelcomeEmail({
-      to: data.email, name: data.name, role: data.role,
-      loginUrl: `${process.env.APP_URL}/pages/login.html`,
-      password: data.password,
-    }).catch(e => logger.error('Welcome email failed:', e.message));
+    /* If student, initialize profile */
+    if (data.role === 'student') {
+      await pool.query(
+        `INSERT INTO student_profiles (user_id, grade, age, credits)
+         VALUES ($1, $2, $3, $4)`,
+        [user.id, data.grade || null, data.age || null, data.credits || 0]
+      );
+      
+      if (typeof emailSvc.sendOnboardingEmail === 'function') {
+        await emailSvc.sendOnboardingEmail({
+          to: data.email,
+          name: data.name,
+          studentId: data.staff_id || user.id,
+          password: data.password,
+          course: data.course,
+          credits: data.credits || 0,
+          loginUrl: `${process.env.APP_URL}/pages/login.html`
+        }).catch(e => logger.error('Onboarding email failed:', e.message));
+      } else {
+        await emailSvc.sendWelcomeEmail({
+          to: data.email, name: data.name, role: data.role,
+          loginUrl: `${process.env.APP_URL}/pages/login.html`,
+          password: data.password,
+        }).catch(e => logger.error('Welcome email failed:', e.message));
+      }
+    } else {
+      /* Send welcome email */
+      await emailSvc.sendWelcomeEmail({
+        to: data.email, name: data.name, role: data.role,
+        loginUrl: `${process.env.APP_URL}/pages/login.html`,
+        password: data.password,
+      }).catch(e => logger.error('Welcome email failed:', e.message));
+    }
 
     logger.info(`[CREATE USER] ${data.email} (${data.role}) by admin ${req.user.email}`);
     res.status(201).json({ success: true, user });

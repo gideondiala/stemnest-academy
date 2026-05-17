@@ -51,6 +51,16 @@ const reportSchema = z.object({
   recordingLink:    z.string().url().optional().or(z.literal('')),
 });
 
+const cancelSchema = z.object({
+  reason: z.string().min(1)
+});
+
+const rescheduleSchema = z.object({
+  date: z.string(),
+  time: z.string(),
+  reason: z.string().optional()
+});
+
 /* ══════════════════════════════════════════════
    GET /api/bookings
 ══════════════════════════════════════════════ */
@@ -305,10 +315,19 @@ router.post('/:id/report', requireAuth, requireRole('tutor'), async (req, res, n
        data.recordingLink || null]
     );
 
-    /* Update booking status */
+    /* Update booking status and notes */
+    const booking = bResult.rows[0];
+    let bNotesObj = {};
+    if (booking.notes) {
+      try { bNotesObj = JSON.parse(booking.notes); } catch(e) {}
+    }
+    if (data.outcome === 'incomplete' && data.incompleteReason) {
+      bNotesObj.incompleteReason = data.incompleteReason;
+    }
+
     await pool.query(
-      'UPDATE bookings SET status = $1, completed_at = NOW() WHERE id = $2',
-      [data.outcome, req.params.id]
+      'UPDATE bookings SET status = $1, completed_at = NOW(), notes = $3 WHERE id = $2',
+      [data.outcome, req.params.id, Object.keys(bNotesObj).length > 0 ? JSON.stringify(bNotesObj) : null]
     );
 
     /* Deduct student credit if completed */
@@ -351,6 +370,73 @@ router.post('/:id/report', requireAuth, requireRole('tutor'), async (req, res, n
     if (err.name === 'ZodError') {
       return res.status(400).json({ success: false, error: err.errors[0].message });
     }
+    next(err);
+  }
+});
+
+/* ══════════════════════════════════════════════
+   PUT /api/bookings/:id/cancel
+══════════════════════════════════════════════ */
+router.put('/:id/cancel', async (req, res, next) => {
+  try {
+    const data = cancelSchema.parse(req.body);
+
+    const bResult = await pool.query('SELECT * FROM bookings WHERE id = $1', [req.params.id]);
+    if (!bResult.rows.length) return res.status(404).json({ success: false, error: 'Booking not found' });
+    const booking = bResult.rows[0];
+
+    // Note: We are allowing cancellation without auth because booking ID is a UUID.
+    // In a stricter system, we would verify an email or require auth.
+
+    let bNotesObj = {};
+    if (booking.notes) { try { bNotesObj = JSON.parse(booking.notes); } catch(e) {} }
+    bNotesObj.cancelReason = data.reason;
+
+    await pool.query(
+      `UPDATE bookings SET status = 'cancelled', notes = $1 WHERE id = $2`,
+      [JSON.stringify(bNotesObj), req.params.id]
+    );
+
+    logger.info(`[CANCEL] Booking ${req.params.id} cancelled. Reason: ${data.reason}`);
+    res.json({ success: true, message: 'Class cancelled successfully' });
+  } catch (err) {
+    if (err.name === 'ZodError') return res.status(400).json({ success: false, error: err.errors[0].message });
+    next(err);
+  }
+});
+
+/* ══════════════════════════════════════════════
+   POST /api/bookings/:id/reschedule
+══════════════════════════════════════════════ */
+router.post('/:id/reschedule', async (req, res, next) => {
+  try {
+    const data = rescheduleSchema.parse(req.body);
+
+    const bResult = await pool.query('SELECT * FROM bookings WHERE id = $1', [req.params.id]);
+    if (!bResult.rows.length) return res.status(404).json({ success: false, error: 'Booking not found' });
+    const booking = bResult.rows[0];
+
+    // Note: Allowing without auth as booking ID is a UUID.
+
+    let bNotesObj = {};
+    if (booking.notes) { try { bNotesObj = JSON.parse(booking.notes); } catch(e) {} }
+    
+    bNotesObj.rescheduleNote = {
+      date: data.date,
+      time: data.time,
+      reason: data.reason || 'Reschedule requested by user',
+      actioned: false
+    };
+
+    await pool.query(
+      `UPDATE bookings SET notes = $1 WHERE id = $2`,
+      [JSON.stringify(bNotesObj), req.params.id]
+    );
+
+    logger.info(`[RESCHEDULE] Booking ${req.params.id} reschedule requested for ${data.date} ${data.time}`);
+    res.json({ success: true, message: 'Reschedule request submitted successfully' });
+  } catch (err) {
+    if (err.name === 'ZodError') return res.status(400).json({ success: false, error: err.errors[0].message });
     next(err);
   }
 });

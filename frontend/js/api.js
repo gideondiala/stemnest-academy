@@ -132,6 +132,10 @@ const Auth = {
 
 /* ── Users API ── */
 const Users = {
+  async list(params = {}) {
+    const q = new URLSearchParams(params).toString();
+    return apiCall('/api/users' + (q ? '?' + q : ''));
+  },
   async get(id)         { return apiCall('/api/users/' + id); },
   async update(id, data){ return apiCall('/api/users/' + id, { method:'PUT', body:data }); },
   async changePassword(id, currentPassword, newPassword) {
@@ -215,6 +219,18 @@ const Payments = {
   async createLink(data)  { return apiCall('/api/payments/create-link', { method:'POST', body:data }); },
   async list()            { return apiCall('/api/payments'); },
   async studentHistory(id){ return apiCall('/api/payments/student/' + id); },
+};
+
+/* ── Dashboard & Sync API ── */
+const Dashboard = {
+  async getData(role) { return apiCall('/api/sync/dashboard/' + role); },
+};
+
+const Sync = {
+  async pipeline(record) { return apiCall('/api/sync/pipeline', { method:'POST', body:record }); },
+  async lateJoin(data)   { return apiCall('/api/sync/late-joins', { method:'POST', body:data }); },
+  async credits(data)    { return apiCall('/api/sync/credits', { method:'POST', body:data }); },
+  async classReport(data){ return apiCall('/api/sync/class-reports', { method:'POST', body:data }); },
 };
 
 /* ── Check if API is reachable, fall back to localStorage ── */

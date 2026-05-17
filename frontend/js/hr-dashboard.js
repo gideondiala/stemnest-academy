@@ -3,63 +3,78 @@
 ═══════════════════════════════════════════════════════ */
 const HR_TABS = ['applications','interviews','training','adverts'];
 
+/* ── HR GLOBAL DATA ── */
+window.HR_DATA = {
+  applications: [],
+  interviews: [],
+  trainings: [],
+  adverts: []
+};
+
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('hrDate').textContent = new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  showHRTab('applications');
+  _loadHRFromAPI().then(() => showHRTab('applications'));
 });
 
 function showHRTab(tab) {
   HR_TABS.forEach(t => { const el = document.getElementById('tab-' + t); if (el) el.style.display = t === tab ? 'block' : 'none'; });
   document.querySelectorAll('.sidebar-link[data-tab]').forEach(l => l.classList.toggle('active', l.dataset.tab === tab));
   updateHRStats();
-  if (tab === 'applications') {
-    /* Load from API first, then render */
-    loadApplicationsFromAPI().then(() => renderApplications());
-  }
+  if (tab === 'applications') renderApplications();
   if (tab === 'interviews')   renderInterviews();
   if (tab === 'training')     renderTraining();
   if (tab === 'adverts')      renderAdverts();
 }
 
-function getApplications() { try { return JSON.parse(localStorage.getItem('sn_applications') || '[]'); } catch { return []; } }
-
-async function loadApplicationsFromAPI() {
+function getApplications() { 
+  const apiApps = window.HR_DATA.applications || [];
   try {
+    const local = JSON.parse(localStorage.getItem('sn_applications') || '[]');
+    const apiIds = new Set(apiApps.map(a => a.id));
+    const localOnly = local.filter(a => !apiIds.has(a.id));
+    return [...apiApps, ...localOnly];
+  } catch { return apiApps; }
+}
+
+async function _loadHRFromAPI() {
+  try {
+    if (typeof isApiAvailable === 'function' && !(await isApiAvailable())) return;
     const token = localStorage.getItem('sn_access_token');
-    if (!token) return null;
-    const res = await fetch('https://api.stemnestacademy.co.uk/api/applications', {
+    if (!token) return;
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/sync/dashboard/hr', {
       headers: { 'Authorization': 'Bearer ' + token },
     });
-    if (!res.ok) return null;
+    if (!res.ok) return;
     const data = await res.json();
-    if (data.applications) {
-      /* Normalise API fields to match localStorage format */
-      const apps = data.applications.map(a => ({
-        id:        a.id,
-        name:      a.name,
-        email:     a.email,
-        phone:     a.phone || '—',
-        country:   a.country || '—',
-        qual:      a.qualification || '—',
-        exp:       a.experience_years || '0',
-        subjects:  a.subjects || [],
-        topics:    a.topics || '',
-        ageGroups: a.age_groups || [],
-        hours:     a.hours_per_week || '',
-        times:     a.preferred_times || '',
-        device:    a.device || '',
-        bio:       a.bio || '',
-        linkedin:  a.linkedin || '',
-        source:    a.source || '',
-        status:    a.status || 'pending',
-        appliedAt: a.applied_at,
-        _fromApi:  true,
-      }));
-      localStorage.setItem('sn_applications', JSON.stringify(apps));
-      return apps;
+    if (data.success) {
+      if (data.applications) {
+        window.HR_DATA.applications = data.applications.map(a => ({
+          id:        a.id,
+          name:      a.name,
+          email:     a.email,
+          phone:     a.phone || '—',
+          country:   a.country || '—',
+          qual:      a.qualification || '—',
+          exp:       a.experience_years || '0',
+          subjects:  a.subjects || [],
+          topics:    a.topics || '',
+          ageGroups: a.age_groups || [],
+          hours:     a.hours_per_week || '',
+          times:     a.preferred_times || '',
+          device:    a.device || '',
+          bio:       a.bio || '',
+          linkedin:  a.linkedin || '',
+          source:    a.source || '',
+          status:    a.status || 'pending',
+          appliedAt: a.applied_at,
+          _fromApi:  true,
+        }));
+      }
+      window.HR_DATA.interviews = data.interviews || [];
+      window.HR_DATA.trainings  = data.trainings || [];
+      window.HR_DATA.adverts    = data.jobAdverts || [];
     }
   } catch (e) { console.warn('[HR] API load failed:', e.message); }
-  return null;
 }
 
 async function updateAppStatusAPI(appId, status) {
@@ -73,9 +88,35 @@ async function updateAppStatusAPI(appId, status) {
     });
   } catch (e) { /* silent */ }
 }
-function getInterviews()   { try { return JSON.parse(localStorage.getItem('sn_interviews') || '[]'); } catch { return []; } }
-function getTrainings()    { try { return JSON.parse(localStorage.getItem('sn_trainings') || '[]'); } catch { return []; } }
-function getAdverts()      { try { return JSON.parse(localStorage.getItem('sn_job_adverts') || '[]'); } catch { return []; } }
+function getInterviews()   { 
+  const apiInterviews = window.HR_DATA.interviews || [];
+  try {
+    const local = JSON.parse(localStorage.getItem('sn_interviews') || '[]');
+    const apiIds = new Set(apiInterviews.map(i => i.id));
+    const localOnly = local.filter(i => !apiIds.has(i.id));
+    return [...apiInterviews, ...localOnly];
+  } catch { return apiInterviews; }
+}
+
+function getTrainings()    { 
+  const apiTrainings = window.HR_DATA.trainings || [];
+  try {
+    const local = JSON.parse(localStorage.getItem('sn_trainings') || '[]');
+    const apiIds = new Set(apiTrainings.map(t => t.id));
+    const localOnly = local.filter(t => !apiIds.has(t.id));
+    return [...apiTrainings, ...localOnly];
+  } catch { return apiTrainings; }
+}
+
+function getAdverts()      { 
+  const apiAdverts = window.HR_DATA.adverts || [];
+  try {
+    const local = JSON.parse(localStorage.getItem('sn_job_adverts') || '[]');
+    const apiIds = new Set(apiAdverts.map(a => a.id));
+    const localOnly = local.filter(a => !apiIds.has(a.id));
+    return [...apiAdverts, ...localOnly];
+  } catch { return apiAdverts; }
+}
 
 function updateHRStats() {
   const apps = getApplications();

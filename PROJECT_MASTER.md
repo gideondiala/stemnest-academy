@@ -241,34 +241,19 @@ stemnest-academy/
 
 ---
 
-## 8. DATA SYNC ARCHITECTURE
+## 8. DATA ARCHITECTURE
 
-The frontend uses a **dual-layer data strategy**:
+The frontend is fully real-time and communicates directly with the API:
 
 ```
-API (PostgreSQL) ←→ api-sync.js ←→ localStorage ←→ Dashboard JS
+API (PostgreSQL) ←→ api.js ←→ Dashboard JS
 ```
 
-- **On page load:** `api-sync.js` fetches from API → writes to localStorage
-- **Every 30 seconds:** Silent background refresh
-- **On write:** Dashboard JS writes to localStorage → pushes to API in background
-- **Fallback:** If API is offline, localStorage data is used
+- **On page load:** Dashboards fetch data directly from the backend via `api.js`.
+- **Every 30 seconds:** Dashboards quietly re-fetch their relevant data to stay live.
+- **On write:** Dashboards send the action to the API immediately and await success.
 
-This means all dashboards work offline AND sync across devices.
-
-**Key localStorage keys:**
-- `sn_bookings` — all bookings
-- `sn_teachers` — teacher registry
-- `sn_students` — student registry
-- `sn_sales_persons` — sales team
-- `sn_courses` — course catalogue
-- `sn_pipeline_SP001` — sales pipeline per person
-- `sn_class_sessions_CT001` — class records per tutor
-- `sn_incomplete_demos` — incomplete demo records
-- `sn_completed_demos` — completed demo records
-- `sn_sales_leads` — leads from completed demos
-- `sn_late_joins` — late join records
-- `sn_absent_teachers` — absent teacher records
+**localStorage keys (strictly for auth/session):**
 - `sn_access_token` — JWT access token
 - `sn_refresh_token` — JWT refresh token
 - `sn_api_user` — logged-in user object
@@ -392,7 +377,7 @@ A CloudFront Function (`stemnest-url-rewrite`) handles clean URLs:
 ## 15. IMPORTANT NOTES FOR DEVELOPERS
 
 1. **No build tools** — pure HTML/CSS/JS. No webpack, no npm for frontend.
-2. **localStorage is the fallback** — all dashboard JS reads from localStorage. The API syncs data into localStorage. Never break the localStorage keys.
+2. **Real-time API Model** — all dashboard JS reads from and writes to the live backend. `localStorage` is used ONLY for authentication tokens (`sn_access_token`, `sn_refresh_token`, `sn_api_user`). Do not store business data in `localStorage`.
 3. **Staff IDs matter** — tutors use `CT001`, `MT001` etc. as their ID. The DB stores UUIDs. The `api-sync.js` maps `tutor_staff_id` → `assignedTutorId` so the tutor dashboard filter works.
 4. **Date format** — API returns `2026-05-12T00:00:00.000Z`. The `_formatApiTime()` function in `api-sync.js` converts to `H:MM AM/PM`. Always strip the timestamp: `b.date.split('T')[0]`.
 5. **Completed classes** — once a class is marked completed/incomplete, `api-sync.js` preserves that status and won't overwrite it from the API. This prevents the 30s sync from resurrecting ended classes.

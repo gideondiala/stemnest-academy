@@ -1,4 +1,4 @@
-﻿
+
 /* ═══════════════════════════════════════════════════════
    STEMNEST ACADEMY — ADMIN DASHBOARD JS
    Teacher registry, smart assign (subject + availability),
@@ -31,25 +31,24 @@ const TUTOR_COLORS = [
 ];
 
 function getTeachers() {
-  try {
-    const stored = JSON.parse(localStorage.getItem('sn_teachers') || '[]');
-    // Seed default teachers if empty
-    if (stored.length === 0) {
-      const defaults = [
-        { id:'CT001', name:'Sarah Rahman',  initials:'SR', subject:'Coding',   email:'sarah.rahman@stemnestacademy.co.uk',  phone:'+44 7700 111001', password:'StemNest2024!', courses:['Python for Beginners','Scratch & Game Design','Web Dev: HTML/CSS/JS'], gradeGroups:['Year 7–9','Year 10–11'], bio:'Former software engineer turned educator. 6+ years helping young people fall in love with coding.', availability:'Mon–Fri, 9am–6pm', dbs:'yes', color:TUTOR_COLORS[0], photo:null },
-        { id:'MT001', name:'James Okafor',  initials:'JO', subject:'Maths',    email:'james.okafor@stemnestacademy.co.uk',  phone:'+44 7700 111002', password:'StemNest2024!', courses:['Primary Maths Boost','GCSE Maths Prep','A-Level Maths Mastery'],         gradeGroups:['Year 7–9','Year 10–11','Year 12–13'], bio:'PGCE-qualified Maths specialist. Helped 150+ students achieve their target GCSE and A-Level grades.', availability:'Mon–Sat, 10am–7pm', dbs:'yes', color:TUTOR_COLORS[1], photo:null },
-        { id:'ST001', name:'Lisa Patel',    initials:'LP', subject:'Sciences', email:'lisa.patel@stemnestacademy.co.uk',    phone:'+44 7700 111003', password:'StemNest2024!', courses:['GCSE Biology','GCSE Chemistry','A-Level Physics'],                         gradeGroups:['Year 10–11','Year 12–13'], bio:'Biology & Chemistry graduate from UCL with a talent for making complex science click.', availability:'Tue–Sat, 11am–6pm', dbs:'yes', color:TUTOR_COLORS[2], photo:null },
-        { id:'CT002', name:'Marcus King',   initials:'MK', subject:'Coding',   email:'marcus.king@stemnestacademy.co.uk',   phone:'+44 7700 111004', password:'StemNest2024!', courses:['Python for Beginners','AI Literacy','A-Level Computer Science'],           gradeGroups:['Year 10–11','Year 12–13'], bio:'Tech innovator passionate about preparing the next generation for an AI-first world.', availability:'Mon–Fri, 2pm–9pm', dbs:'yes', color:TUTOR_COLORS[3], photo:null },
-      ];
-      localStorage.setItem('sn_teachers', JSON.stringify(defaults));
-      return defaults;
-    }
-    return stored;
-  } catch { return []; }
+  return window.ADMIN_DATA.tutors.map(t => ({
+    id: t.id,
+    name: t.name,
+    initials: t.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase(),
+    subject: t.subject || '—',
+    email: t.email,
+    phone: t.phone || '—',
+    courses: t.courses || [],
+    gradeGroups: t.grade_groups || [],
+    availability: t.availability || '—',
+    color: TUTOR_COLORS[0],
+    photo: null
+  }));
 }
 
 function saveTeachers(list) {
-  localStorage.setItem('sn_teachers', JSON.stringify(list));
+  // Now handled by backend API. Local state updated for immediate rendering.
+  window.ADMIN_DATA.tutors = list;
 }
 
 function nextTeacherId(subject) {
@@ -64,10 +63,7 @@ function nextTeacherId(subject) {
    AVAILABILITY HELPERS
 ══════════════════════════════════════════════════════ */
 function getTeacherAvailability(teacherId) {
-  try {
-    const shared = JSON.parse(localStorage.getItem('sn_all_tutor_avail') || '{}');
-    return shared[teacherId]?.slots || {};
-  } catch { return {}; }
+  return window.ADMIN_DATA.tutorAvail?.[teacherId]?.slots || {};
 }
 
 function getAvailableSlotsForDate(teacherId, dateStr) {
@@ -88,68 +84,55 @@ let filteredBookings = [];
 let activeAssignId   = null;
 const ADMIN_TABS     = ['bookings','scheduled','completed','tutors','add-teacher','courses','add-course'];
 
+/* ── ADMIN GLOBAL DATA ── */
+window.ADMIN_DATA = {
+  bookings: [],
+  classReports: [],
+  pipelines: [],
+  courses: [],
+  materials: [],
+  tutors: [],
+  sales: []
+};
+
 /* ── INIT ── */
 document.addEventListener('DOMContentLoaded', () => {
   setAdminDate();
-  loadBookings();
-  renderTutors();
-  buildAddTeacherForm();
-  bindModalCloses();
-  // Seed courses if needed
-  getAdminCourses();
-  showAdminTab('bookings');
-  // Sync bookings from API in background
-  _syncBookingsFromAPI();
+  _loadAdminFromAPI().then(() => {
+    loadBookings();
+    renderTutors();
+    buildAddTeacherForm();
+    bindModalCloses();
+    showAdminTab('bookings');
+  });
 });
 
-/* ── Sync bookings from real API into localStorage ── */
-async function _syncBookingsFromAPI() {
+/* ── Sync from real API into window.ADMIN_DATA ── */
+async function _loadAdminFromAPI() {
   try {
-    const online = await isApiAvailable();
-    if (!online) return;
+    if (typeof isApiAvailable === 'function' && !(await isApiAvailable())) return;
     const token = localStorage.getItem('sn_access_token');
     if (!token) return;
-    const data = await Bookings.list({ limit: 200 });
-    if (!data.success || !data.bookings) return;
 
-    // Merge API bookings into localStorage
-    const local = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
-    const localIds = new Set(local.map(b => b.id));
-
-    data.bookings.forEach(b => {
-      // Normalise API booking to match localStorage shape
-      const normalised = {
-        id:              b.id,
-        studentName:     b.student_name || b.notes?.studentName || '—',
-        age:             b.notes?.age || '—',
-        grade:           b.grade || b.notes?.grade || '—',
-        email:           b.student_email || b.notes?.email || '—',
-        whatsapp:        b.student_phone || b.notes?.whatsapp || '—',
-        subject:         b.subject,
-        status:          b.status,
-        date:            b.date,
-        time:            b.time,
-        assignedTutor:   b.tutor_name || '',
-        assignedTutorId: b.tutor_id || '',
-        classLink:       b.class_link || '',
-        bookedAt:        b.booked_at || b.scheduled_at,
-        scheduledAt:     b.scheduled_at,
-        _fromAPI:        true,
-      };
-
-      if (!localIds.has(b.id)) {
-        local.unshift(normalised);
-      } else {
-        // Update existing
-        const idx = local.findIndex(x => x.id === b.id);
-        if (idx !== -1) local[idx] = { ...local[idx], ...normalised };
-      }
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/sync/dashboard/admin', {
+      headers: { 'Authorization': 'Bearer ' + token }
     });
-
-    localStorage.setItem('sn_bookings', JSON.stringify(local));
-    loadBookings(); // refresh the table
-  } catch (e) { /* silent */ }
+    if (!res.ok) return;
+    
+    const data = await res.json();
+    if (data.success) {
+      window.ADMIN_DATA.bookings     = data.bookings || [];
+      window.ADMIN_DATA.classReports = data.classReports || [];
+      window.ADMIN_DATA.pipelines    = data.pipelines || [];
+      window.ADMIN_DATA.courses      = data.courses || [];
+      window.ADMIN_DATA.materials    = data.materials || [];
+      window.ADMIN_DATA.tutors       = data.tutors || [];
+      window.ADMIN_DATA.sales        = data.sales || [];
+    }
+  } catch (e) { console.warn('[ADMIN] API load failed:', e.message); }
 }
+
+
 function setAdminDate() {
   const el = document.getElementById('adminDate');
   if (el) el.textContent = new Date().toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
@@ -176,40 +159,33 @@ function showAdminTab(tab) {
    BOOKINGS
 ══════════════════════════════════════════════════════ */
 async function loadBookings() {
+  const apiBookings = window.ADMIN_DATA.bookings.map(b => ({
+    id:              b.id,
+    studentName:     b.student_name || b.notes?.studentName || '—',
+    age:             b.notes?.age   || b.grade || '—',
+    grade:           b.grade        || b.notes?.grade || '—',
+    email:           b.student_email || b.notes?.email || '—',
+    whatsapp:        b.notes?.whatsapp || '—',
+    subject:         b.subject,
+    date:            b.date,
+    time:            b.time,
+    status:          b.status,
+    assignedTutor:   b.tutor_name   || '—',
+    assignedTutorId: b.tutor_id,
+    classLink:       b.class_link   || '',
+    bookedAt:        b.booked_at    || b.created_at,
+    isDemoClass:     b.is_demo,
+    _fromApi:        true,
+  }));
+  
   try {
-    /* Try real API first */
-    if (typeof isApiAvailable === 'function' && await isApiAvailable()) {
-      const data = await Bookings.list({ limit: 500 });
-      /* Merge API bookings with localStorage (keep both in sync) */
-      const apiBookings = (data.bookings || []).map(b => ({
-        id:              b.id,
-        studentName:     b.student_name || b.notes?.studentName || '—',
-        age:             b.notes?.age   || b.grade || '—',
-        grade:           b.grade        || b.notes?.grade || '—',
-        email:           b.student_email || b.notes?.email || '—',
-        whatsapp:        b.notes?.whatsapp || '—',
-        subject:         b.subject,
-        date:            b.date,
-        time:            b.time,
-        status:          b.status,
-        assignedTutor:   b.tutor_name   || '—',
-        assignedTutorId: b.tutor_id,
-        classLink:       b.class_link   || '',
-        bookedAt:        b.booked_at    || b.created_at,
-        isDemoClass:     b.is_demo,
-        _fromApi:        true,
-      }));
-      /* Also keep any localStorage-only bookings not yet in DB */
-      const localBookings = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
-      const apiIds = new Set(apiBookings.map(b => b.id));
-      const localOnly = localBookings.filter(b => !apiIds.has(b.id) && !b._fromApi);
-      allBookings = [...apiBookings, ...localOnly];
-    } else {
-      allBookings = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
-    }
+    allBookings = apiBookings;
   } catch {
-    allBookings = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+    allBookings = apiBookings;
   }
+    allBookings = apiBookings;
+  }
+  
   filteredBookings = [...allBookings];
   updateStats();
   renderBookingsTable(filteredBookings);
@@ -340,9 +316,9 @@ function markComplete(id) {
 }
 
 function updateBooking(id, changes) {
-  const all = JSON.parse(localStorage.getItem('sn_bookings')||'[]');
+  const all = window.ADMIN_DATA.bookings;
   const idx = all.findIndex(b=>b.id===id);
-  if (idx!==-1) { all[idx]={...all[idx],...changes}; localStorage.setItem('sn_bookings',JSON.stringify(all)); }
+  if (idx!==-1) { all[idx]={...all[idx],...changes}; }
 }
 
 /* ══════════════════════════════════════════════════════
@@ -638,7 +614,7 @@ function saveNewTeacher() {
 
   // Save DOB if provided (Phase 6)
   const dob = document.getElementById('at-dob')?.value;
-  if (dob) localStorage.setItem('sn_dob_' + id, dob);
+  // localStorage.setItem('sn_dob_' + id, dob); - handled by API now
 
   // Simulate welcome email
   console.log(`📧 WELCOME EMAIL TO: ${email}
@@ -729,30 +705,11 @@ let editingCourseId = null; // null = adding new, string = editing existing
 
 /* ── Helpers ── */
 function getAdminCourses() {
-  try {
-    const stored = JSON.parse(localStorage.getItem('sn_courses') || '[]');
-    if (stored.length === 0) {
-      // Seed defaults from courses.js DEFAULT_COURSES equivalent
-      const defaults = [
-        { id:'CRS001', name:'Python for Beginners',    desc:'Learn to code from scratch with Python — variables, loops, functions and your first real programs.',                subject:'coding',   age:'Ages 10–14', price:99,  classes:24, rating:4.9, students:312, emoji:'💻', color:'blue',   badge:'popular', level:'Beginner',     duration:'6 months' },
-        { id:'CRS002', name:'Scratch & Game Design',   desc:'Build fun interactive games using Scratch. Perfect intro to computational thinking.',                              subject:'coding',   age:'Ages 7–10',  price:79,  classes:16, rating:4.8, students:245, emoji:'🎮', color:'purple', badge:'',        level:'Beginner',     duration:'4 months' },
-        { id:'CRS003', name:'Web Dev: HTML, CSS & JS', desc:'Design and build real websites from zero. HTML structure, CSS styling and JavaScript interactivity.',               subject:'coding',   age:'Ages 13–19', price:129, classes:32, rating:4.9, students:178, emoji:'📱', color:'blue',   badge:'new',     level:'Intermediate', duration:'8 months' },
-        { id:'CRS004', name:'GCSE Maths Prep',         desc:'Targeted support aligned to the GCSE syllabus. Master number, algebra, geometry and statistics.',                  subject:'maths',    age:'Ages 14–16', price:109, classes:28, rating:4.9, students:401, emoji:'📐', color:'green',  badge:'popular', level:'Intermediate', duration:'7 months' },
-        { id:'CRS005', name:'Primary Maths Boost',     desc:'Build strong foundations in numbers, fractions, times tables and problem solving for KS2 learners.',               subject:'maths',    age:'Ages 7–11',  price:79,  classes:20, rating:4.8, students:293, emoji:'📊', color:'teal',   badge:'',        level:'Beginner',     duration:'5 months' },
-        { id:'CRS006', name:'A-Level Maths Mastery',   desc:'Deep-dive into pure maths, statistics and mechanics for A-Level students aiming for top grades.',                  subject:'maths',    age:'Ages 16–19', price:149, classes:40, rating:4.9, students:134, emoji:'🧠', color:'green',  badge:'',        level:'Advanced',     duration:'10 months' },
-        { id:'CRS007', name:'GCSE Biology',            desc:'Cells, genetics, ecosystems and the human body — expert-led sessions covering the full GCSE spec.',                subject:'sciences', age:'Ages 14–16', price:109, classes:28, rating:4.7, students:221, emoji:'🧬', color:'orange', badge:'',        level:'Intermediate', duration:'7 months' },
-        { id:'CRS008', name:'GCSE Chemistry',          desc:'From atomic structure to organic chemistry — build exam confidence with a specialist chemistry tutor.',             subject:'sciences', age:'Ages 14–16', price:109, classes:28, rating:4.8, students:198, emoji:'⚗️', color:'orange', badge:'',        level:'Intermediate', duration:'7 months' },
-        { id:'CRS009', name:'A-Level Physics',         desc:'Mechanics, waves, electricity and modern physics — for students pushing for top university offers.',                subject:'sciences', age:'Ages 16–19', price:149, classes:40, rating:4.9, students:97,  emoji:'🛰️', color:'teal',   badge:'new',     level:'Advanced',     duration:'10 months' },
-      ];
-      localStorage.setItem('sn_courses', JSON.stringify(defaults));
-      return defaults;
-    }
-    return stored;
-  } catch { return []; }
+  return window.ADMIN_DATA.courses || [];
 }
 
 function saveAdminCourses(list) {
-  localStorage.setItem('sn_courses', JSON.stringify(list));
+  window.ADMIN_DATA.courses = list;
 }
 
 function nextCourseId() {
@@ -1031,19 +988,18 @@ const SP_COLORS = [
 ];
 
 function getSalesPersons() {
-  try {
-    const stored = JSON.parse(localStorage.getItem('sn_sales_persons') || '[]');
-    if (stored.length === 0) {
-      const defaults = [
-        { id:'SP001', name:'Alex Johnson', initials:'AJ', email:'alex.johnson@stemnestacademy.co.uk', phone:'+44 7700 222001', password:'StemNest2024!', region:'UK & Europe', bio:'Senior academic counselor with 3 years experience.', color:SP_COLORS[0], photo:null, createdAt: new Date().toISOString() },
-      ];
-      localStorage.setItem('sn_sales_persons', JSON.stringify(defaults));
-      return defaults;
-    }
-    return stored;
-  } catch { return []; }
+  return window.ADMIN_DATA.sales.map(s => ({
+    id: s.id,
+    name: s.name,
+    initials: s.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase(),
+    email: s.email,
+    phone: s.phone || '—',
+    region: 'Global',
+    color: SP_COLORS[0],
+    createdAt: new Date().toISOString()
+  }));
 }
-function saveSalesPersons(list) { localStorage.setItem('sn_sales_persons', JSON.stringify(list)); }
+function saveSalesPersons(list) { window.ADMIN_DATA.sales = list; }
 
 function nextSalesId() {
   const all  = getSalesPersons();
@@ -1065,7 +1021,7 @@ function renderSalesGrid() {
   }
 
   grid.innerHTML = persons.map(s => {
-    const pipeline = JSON.parse(localStorage.getItem('sn_pipeline_' + s.id) || '[]');
+    const pipeline = window.ADMIN_DATA.pipelines.filter(p => p.assignedSalesId === s.id) || [];
     const converted = pipeline.filter(p => p.status === 'converted').length;
     const revenue   = pipeline.filter(p => p.status === 'converted').reduce((sum, p) => sum + (parseFloat(p.paymentAmount) || 0), 0);
     return `
@@ -1087,7 +1043,7 @@ function renderSalesGrid() {
 function viewSalesPerson(id) {
   const s = getSalesPersons().find(x => x.id === id);
   if (!s) return;
-  const pipeline  = JSON.parse(localStorage.getItem('sn_pipeline_' + id) || '[]');
+  const pipeline = window.ADMIN_DATA.pipelines.filter(p => p.assignedSalesId === id) || [];
   const converted = pipeline.filter(p => p.status === 'converted').length;
   showToast(`${s.name} · ${converted} conversions`, 'info');
 }
@@ -1174,8 +1130,8 @@ function renderClassReports() {
   const tbody = document.getElementById('classReportsBody');
   if (!tbody) return;
   const filter  = document.getElementById('reportFilter')?.value || 'all';
-  const reports = JSON.parse(localStorage.getItem('sn_class_reports') || '[]');
-  const bookings = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+  const reports = window.ADMIN_DATA.classReports || [];
+  const bookings = window.ADMIN_DATA.bookings || [];
 
   let list = reports;
   if (filter === 'completed')  list = reports.filter(r => r.outcome === 'completed');
@@ -1192,7 +1148,7 @@ function renderClassReports() {
 
   tbody.innerHTML = list.map(r => {
     const b = bookings.find(x => x.id === r.bookingId) || {};
-    const pipeline = JSON.parse(localStorage.getItem('sn_pipeline_' + (b.assignedSalesId || '')) || '[]');
+    const pipeline = window.ADMIN_DATA.pipelines.filter(p => p.assignedSalesId === b.assignedSalesId) || [];
     const pitchRecord = pipeline.find(p => p.bookingId === r.bookingId);
     return `
       <tr>
@@ -1282,10 +1238,9 @@ updateStats = function() {
 ══════════════════════════════════════════════════════ */
 
 function getMaterials() {
-  try { return JSON.parse(localStorage.getItem('sn_companion_materials') || '[]'); }
-  catch { return []; }
+  return window.ADMIN_DATA.materials || [];
 }
-function saveMaterials(list) { localStorage.setItem('sn_companion_materials', JSON.stringify(list)); }
+function saveMaterials(list) { window.ADMIN_DATA.materials = list; }
 
 function nextMaterialId() {
   const all  = getMaterials();

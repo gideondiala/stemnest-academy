@@ -1,3 +1,17 @@
+
+function _getGlobalData() { return window.TUTOR_DATA || window.ADMIN_DATA || window.PS_DATA || window.STUDENT_DATA || window; }
+function _getLocalStr(key) {
+  if (key === 'sn_access_token' || key === 'sn_logged_in_teacher') return _getLocalStr(key);
+  let d = _getGlobalData()[key];
+  if (typeof d === 'string') return d;
+  if (d !== undefined && d !== null) return JSON.stringify(d);
+  return null;
+}
+function _setLocalStr(key, val) {
+  if (key === 'sn_logged_in_teacher') { _setLocalStr(key, val); return; }
+  try { _getGlobalData()[key] = JSON.parse(val); } catch(e) { _getGlobalData()[key] = val; }
+}
+
 ﻿/* ═══════════════════════════════════════════════════════
    STEMNEST ACADEMY — TUTOR SESSION LIFECYCLE (tutor-sessions.js)
    - 15-min join window enforcement
@@ -11,15 +25,15 @@
 
 /* ── HELPERS ── */
 function getBookings() {
-  try { return JSON.parse(localStorage.getItem('sn_bookings') || '[]'); } catch { return []; }
+  try { return JSON.parse(_getLocalStr('sn_bookings') || '[]'); } catch { return []; }
 }
-function saveBookings(list) { localStorage.setItem('sn_bookings', JSON.stringify(list)); }
+function saveBookings(list) { _setLocalStr('sn_bookings', JSON.stringify(list)); }
 
 /* Always get the freshest TUTOR object — avoids timing issues */
 function getCurrentTutor() {
   try {
-    const id       = localStorage.getItem('sn_logged_in_teacher');
-    const registry = JSON.parse(localStorage.getItem('sn_teachers') || '[]');
+    const id       = _getLocalStr('sn_logged_in_teacher');
+    const registry = JSON.parse(_getLocalStr('sn_teachers') || '[]');
     const found    = id ? registry.find(t => t.id === id) : null;
     return found || (typeof TUTOR !== 'undefined' ? TUTOR : { id: 'CT001' });
   } catch {
@@ -56,9 +70,9 @@ function parseClassDateTime(dateStr, timeStr) {
 }
 
 function logEmail(to, subject, body) {
-  const log = JSON.parse(localStorage.getItem('sn_email_log') || '[]');
+  const log = JSON.parse(_getLocalStr('sn_email_log') || '[]');
   log.unshift({ to, subject, body, sentAt: new Date().toISOString(), status: 'simulated' });
-  localStorage.setItem('sn_email_log', JSON.stringify(log));
+  _setLocalStr('sn_email_log', JSON.stringify(log));
   console.log('📧 EMAIL TO:', to, '\nSUBJECT:', subject, '\n', body);
 }
 
@@ -171,9 +185,9 @@ function teacherJoinClass(bookingId, classLink) {
 
   if (!alreadyJoined) {
     // Record join (start) time for this session
-    const startTimes = JSON.parse(localStorage.getItem('sn_session_start_times') || '{}');
+    const startTimes = JSON.parse(_getLocalStr('sn_session_start_times') || '{}');
     startTimes[bookingId] = new Date().toISOString();
-    localStorage.setItem('sn_session_start_times', JSON.stringify(startTimes));
+    _setLocalStr('sn_session_start_times', JSON.stringify(startTimes));
 
     // First join — check if late (> 4 mins after class start time)
     const b = getBookings().find(x => x.id === bookingId);
@@ -232,7 +246,7 @@ function markTeacherAbsent(booking) {
   }
 
   // Log to operations
-  const ops = JSON.parse(localStorage.getItem('sn_absent_teachers') || '[]');
+  const ops = JSON.parse(_getLocalStr('sn_absent_teachers') || '[]');
   ops.unshift({
     id:          'ABS-' + Date.now().toString(36).toUpperCase(),
     bookingId:   booking.id,
@@ -244,7 +258,7 @@ function markTeacherAbsent(booking) {
     time:        booking.time,
     loggedAt:    new Date().toISOString(),
   });
-  localStorage.setItem('sn_absent_teachers', JSON.stringify(ops));
+  _setLocalStr('sn_absent_teachers', JSON.stringify(ops));
 
   showToast('⚠️ Session auto-closed — teacher did not join within 15 minutes. Operations notified.', 'error');
   renderSessionsTab();

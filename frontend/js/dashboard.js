@@ -1,4 +1,4 @@
-﻿/* ═══════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════
    STEMNEST ACADEMY — TUTOR DASHBOARD JS
    Loads logged-in teacher from localStorage registry,
    weekly availability calendar, photo upload, notifications.
@@ -25,6 +25,10 @@ function getLoggedInTutor() {
 }
 
 let TUTOR = getLoggedInTutor();
+window.TUTOR_DATA = {
+  bookings: [],
+  materials: []
+};
 
 /* ── TABS ── */
 const TABS = ['overview', 'sessions', 'projects', 'calendar'];
@@ -90,11 +94,68 @@ document.addEventListener('DOMContentLoaded', () => {
   setGreeting();
   renderSidebarProfile();
   populateProfileModal();
-  buildCalStrip();
-  bindProfileModal();
-  checkAssignedClasses();
-  showDashTab('overview');
+  
+  _loadTutorFromAPI().then(() => {
+    buildCalStrip();
+    bindProfileModal();
+    checkAssignedClasses();
+    showDashTab('overview');
+  });
 });
+
+async function _loadTutorFromAPI() {
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    if (!token) {
+        window.TUTOR_DATA.bookings = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+        return;
+    }
+
+    const bRes = await fetch('https://api.stemnestacademy.co.uk/api/bookings?limit=500', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const bData = await bRes.json();
+    if (bData.bookings) {
+      window.TUTOR_DATA.bookings = bData.bookings.map(b => {
+        let notes = {};
+        try { notes = typeof b.notes === 'string' ? JSON.parse(b.notes) : (b.notes || {}); } catch {}
+        return {
+          id:              b.id,
+          dbId:            b.id,
+          studentName:     b.lesson_name || notes.studentName || '—',
+          studentId:       b.student_id || '',
+          age:             notes.age || b.grade || '—',
+          grade:           b.grade || notes.grade || '—',
+          email:           b.student_email || notes.email || '—',
+          whatsapp:        notes.whatsapp || '—',
+          subject:         b.subject || '—',
+          date:            b.date ? b.date.split('T')[0] : '—',
+          time:            notes.time || b.time || '—',
+          status:          b.status,
+          assignedTutor:   b.tutor_name || '—',
+          assignedTutorId: b.tutor_staff_id || b.tutor_id || '',
+          classLink:       b.class_link || '',
+          paidScheduled:   notes.paidScheduled || false,
+          isRecurring:     b.is_recurring,
+          isDemoClass:     b.is_demo || !b.payment_amount,
+          paymentAmount:   b.payment_amount,
+          lessonName:      b.lesson_name_full || b.lesson_name || '',
+          lessonNumber:    b.lesson_number,
+          totalLessons:    b.total_lessons,
+          activityLink:    b.lesson_activity || b.activity_link || '',
+          slidesLink:      b.lesson_slides   || b.slides_link || '',
+          courseName:      b.course_name || '',
+          bookedAt:        b.booked_at || b.created_at,
+          scheduledAt:     b.scheduled_at,
+        };
+      });
+    }
+
+  } catch (e) {
+    console.warn('[Dashboard] API load failed:', e.message);
+    window.TUTOR_DATA.bookings = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+  }
+}
 
 /* ── GREETING ── */
 function setGreeting() {
@@ -155,7 +216,7 @@ function checkAssignedClasses() {
   const banner = document.getElementById('assignedClassBanner');
   if (!banner) return;
   const tutorId = localStorage.getItem('sn_logged_in_teacher') || (typeof TUTOR !== 'undefined' ? TUTOR.id : 'CT001');
-  const bookings = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+  const bookings = window.TUTOR_DATA?.bookings || JSON.parse(localStorage.getItem('sn_bookings') || '[]');
   const mine = bookings.filter(b =>
     b.status === 'scheduled' && b.assignedTutorId === tutorId
   );
@@ -224,7 +285,7 @@ function timeToMins(t) {
 /* Get all bookings assigned to this tutor */
 function getTutorBookings() {
   try {
-    const all = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+    const all = window.TUTOR_DATA?.bookings || JSON.parse(localStorage.getItem('sn_bookings') || '[]');
     return all.filter(b =>
       (b.assignedTutorId === TUTOR.id || b.assignedTutorId === TUTOR.staffId || b.tutor_staff_id === TUTOR.id) &&
       (b.status === 'scheduled' || b.status === 'completed')
@@ -471,7 +532,7 @@ function renderWeeklyCalendar() {
 
 /* ── Show booking detail popup ── */
 function showBookingPopup(bookingId) {
-  const all = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+  const all = window.TUTOR_DATA?.bookings || JSON.parse(localStorage.getItem('sn_bookings') || '[]');
   const b   = all.find(x => x.id === bookingId);
   if (!b) return;
 
@@ -705,7 +766,7 @@ function openEndClassModal(bookingId) {
   activeEndClassId = bookingId;
 
   // Try to find booking details
-  const all = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+  const all = window.TUTOR_DATA?.bookings || JSON.parse(localStorage.getItem('sn_bookings') || '[]');
   const b   = all.find(x => x.id === bookingId);
 
   const infoEl = document.getElementById('endClassBookingInfo');
@@ -766,12 +827,13 @@ function submitEndClassReport() {
   localStorage.setItem('sn_class_reports', JSON.stringify(reports));
 
   // Update booking status
-  const all = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+  const all = window.TUTOR_DATA?.bookings || JSON.parse(localStorage.getItem('sn_bookings') || '[]');
   const bi  = all.findIndex(b => b.id === activeEndClassId);
   if (bi !== -1) {
     all[bi].status        = outcome === 'completed' ? 'completed' : 'incomplete';
     all[bi].classReport   = report;
     all[bi].tutorNotified = true;
+    window.TUTOR_DATA.bookings = all;
     localStorage.setItem('sn_bookings', JSON.stringify(all));
   }
 

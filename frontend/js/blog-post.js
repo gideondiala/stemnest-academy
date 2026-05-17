@@ -12,23 +12,32 @@ const CATEGORIES = {
 };
 
 /* ── DATA ── */
-function getBlogPosts() {
-  try { return JSON.parse(localStorage.getItem('sn_blog_posts') || '[]'); } catch { return []; }
-}
+let allBlogPosts = [];
 
 /* ── INIT ── */
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
+  try {
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/blogs');
+    const data = await res.json();
+    if (data.success) {
+      allBlogPosts = data.posts;
+    }
+  } catch (e) {
+    console.error('Failed to load blog posts', e);
+  }
+
   var params = new URLSearchParams(window.location.search);
   var postId = params.get('id');
+  var postSlug = params.get('slug');
 
-  if (!postId) {
+  if (!postId && !postSlug) {
     showNotFound();
     return;
   }
 
-  var post = getBlogPosts().find(function(p) { return p.id === postId; });
+  var post = allBlogPosts.find(function(p) { return (postSlug && p.slug === postSlug) || (postId && p.id === postId); });
 
-  if (!post || !post.published) {
+  if (!post || (!post.is_published && !post.published)) {
     showNotFound();
     return;
   }
@@ -80,15 +89,15 @@ function renderPost(post) {
 
     '<div class="post-meta-bar">' +
       '<div class="post-author-chip">' +
-        '<div class="post-author-av">' + (post.authorInitials || post.author.slice(0,2).toUpperCase()) + '</div>' +
-        '<span>' + post.author + '</span>' +
+        '<div class="post-author-av">' + (post.authorInitials || (post.author_name ? post.author_name.slice(0,2).toUpperCase() : '')) + '</div>' +
+        '<span>' + (post.author_name || post.author) + '</span>' +
       '</div>' +
-      '<span>📅 ' + formatBlogDate(post.date) + '</span>' +
-      '<span>⏱ ' + readTime(post.body) + ' min read</span>' +
+      '<span>📅 ' + formatBlogDate(post.published_at || post.date) + '</span>' +
+      '<span>⏱ ' + readTime(post.content || post.body) + ' min read</span>' +
       '<span class="blog-card-cat ' + cat.color + '" style="margin:0;">' + cat.emoji + ' ' + cat.label + '</span>' +
     '</div>' +
 
-    '<div class="post-body">' + post.body + '</div>' +
+    '<div class="post-body">' + (post.content || post.body) + '</div>' +
 
     (tagsHtml ? '<div class="post-tags">' + tagsHtml + '</div>' : '') +
 
@@ -109,8 +118,8 @@ function renderPost(post) {
   if (container) container.innerHTML = html;
 
   // Render related posts
-  var related = getBlogPosts()
-    .filter(function(p) { return p.published && p.id !== post.id && p.category === post.category; })
+  var related = allBlogPosts
+    .filter(function(p) { return (p.is_published || p.published) && p.id !== post.id && p.category === post.category; })
     .slice(0, 3);
 
   var relEl = document.getElementById('relatedPosts');
@@ -120,11 +129,11 @@ function renderPost(post) {
         var thumb = p.coverImage
           ? '<img src="' + p.coverImage + '" alt="">'
           : '<span style="font-size:40px;">' + (p.emoji || '📝') + '</span>';
-        return '<div class="blog-card" onclick="window.location.href=\'blog-post.html?id=' + p.id + '\'">' +
+          '<div class="blog-card" onclick="window.location.href=\'blog-post.html?slug=' + (p.slug || p.id) + '\'">' +
           '<div class="blog-card-img" style="height:140px;">' + thumb + '</div>' +
           '<div class="blog-card-body">' +
             '<div class="blog-card-title" style="font-size:15px;">' + p.title + '</div>' +
-            '<div class="blog-card-meta" style="margin-top:8px;"><span>📅 ' + formatBlogDate(p.date) + '</span></div>' +
+            '<div class="blog-card-meta" style="margin-top:8px;"><span>📅 ' + formatBlogDate(p.published_at || p.date) + '</span></div>' +
           '</div>' +
         '</div>';
       }).join('');
@@ -144,7 +153,7 @@ function renderSidebar(currentPost) {
 function renderSidebarCategories() {
   var el    = document.getElementById('sidebarCats');
   if (!el) return;
-  var posts = getBlogPosts().filter(function(p) { return p.published; });
+  var posts = allBlogPosts.filter(function(p) { return p.is_published || p.published; });
   el.innerHTML = Object.entries(CATEGORIES).map(function(entry) {
     var key   = entry[0];
     var cat   = entry[1];
@@ -160,18 +169,18 @@ function renderSidebarCategories() {
 function renderSidebarRecent(currentId) {
   var el = document.getElementById('sidebarRecent');
   if (!el) return;
-  var recent = getBlogPosts()
-    .filter(function(p) { return p.published && p.id !== currentId; })
-    .sort(function(a, b) { return new Date(b.createdAt) - new Date(a.createdAt); })
+  var recent = allBlogPosts
+    .filter(function(p) { return (p.is_published || p.published) && p.id !== currentId; })
+    .sort(function(a, b) { return new Date(b.created_at || b.createdAt) - new Date(a.created_at || a.createdAt); })
     .slice(0, 4);
   el.innerHTML = recent.map(function(p) {
     var thumb = p.coverImage
       ? '<img src="' + p.coverImage + '" alt="">'
       : (p.emoji || '📝');
-    return '<div class="sidebar-recent-item" onclick="window.location.href=\'blog-post.html?id=' + p.id + '\'">' +
+    return '<div class="sidebar-recent-item" onclick="window.location.href=\'blog-post.html?slug=' + (p.slug || p.id) + '\'">' +
       '<div class="sidebar-recent-thumb">' + thumb + '</div>' +
       '<div><div class="sidebar-recent-title">' + p.title + '</div>' +
-      '<div class="sidebar-recent-date">📅 ' + formatBlogDate(p.date) + '</div></div>' +
+      '<div class="sidebar-recent-date">📅 ' + formatBlogDate(p.published_at || p.date) + '</div></div>' +
     '</div>';
   }).join('');
 }
@@ -179,8 +188,8 @@ function renderSidebarRecent(currentId) {
 function renderSidebarTags() {
   var el = document.getElementById('sidebarTags');
   if (!el) return;
-  var allTags = getBlogPosts()
-    .filter(function(p) { return p.published; })
+  var allTags = allBlogPosts
+    .filter(function(p) { return p.is_published || p.published; })
     .reduce(function(acc, p) { return acc.concat(p.tags || []); }, []);
   var unique = allTags.filter(function(t, i) { return allTags.indexOf(t) === i; }).slice(0, 20);
   el.innerHTML = unique.map(function(t) {

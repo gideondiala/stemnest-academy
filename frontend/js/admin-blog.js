@@ -1,7 +1,27 @@
 /* STEMNEST ACADEMY — ADMIN BLOG MANAGER */
-function getBlogPosts(){try{return JSON.parse(localStorage.getItem('sn_blog_posts')||'[]');}catch{return[];}}
-function saveBlogPosts(p){localStorage.setItem('sn_blog_posts',JSON.stringify(p));updateBlogBadge();}
-function updateBlogBadge(){var el=document.getElementById('blogBadge');if(el)el.textContent=getBlogPosts().filter(function(p){return p.published;}).length;}
+let adminBlogPosts = [];
+
+async function fetchAdminBlogPosts() {
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/blogs?all=true', {
+      headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+    });
+    const data = await res.json();
+    if (data.success) {
+      adminBlogPosts = data.posts;
+      updateBlogBadge();
+      renderAdminBlogList();
+    }
+  } catch(e) {
+    console.error('Failed to fetch admin blogs', e);
+  }
+}
+
+function updateBlogBadge(){
+  var el = document.getElementById('blogBadge');
+  if(el) el.textContent = adminBlogPosts.filter(function(p){return p.is_published || p.published;}).length;
+}
 
 function injectBlogTabs(){
   var dashMain=document.querySelector('.dash-main');
@@ -25,10 +45,7 @@ function injectBlogTabs(){
     +'<option value="news">📰 EdTech News</option>'
     +'<option value="tips">✏️ Study Tips</option>'
     +'</select></div>'
-    +'<div class="atf-field"><label>Author Name <span class="req">*</span></label><input type="text" id="bp-author" placeholder="e.g. Sarah Rahman"></div>'
-    +'<div class="atf-field"><label>Publish Date</label><input type="date" id="bp-date"></div>'
-    +'<div class="atf-field"><label>Cover Image URL (optional)</label><input type="url" id="bp-image" placeholder="https://... or leave blank for emoji"></div>'
-    +'<div class="atf-field"><label>Post Emoji (shown if no image)</label><input type="text" id="bp-emoji" placeholder="e.g. 🎮" maxlength="4"></div>'
+    +'<div class="atf-field"><label>Cover Image URL (optional)</label><input type="url" id="bp-image" placeholder="https://... or leave blank"></div>'
     +'<div class="atf-field atf-full"><label>Tags (comma-separated)</label><input type="text" id="bp-tags" placeholder="e.g. Python, Beginner, Games"></div>'
     +'<div class="atf-field atf-full"><label>Excerpt / Summary <span class="req">*</span></label>'
     +'<textarea id="bp-excerpt" style="min-height:70px;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:\'Nunito\',sans-serif;font-size:14px;width:100%;outline:none;" placeholder="A short 1-2 sentence summary shown on the blog listing page..."></textarea></div>'
@@ -53,7 +70,7 @@ function injectBlogTabs(){
 function renderAdminBlogList(){
   var el=document.getElementById('adminBlogList');
   if(!el)return;
-  var posts=getBlogPosts().sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt);});
+  var posts = adminBlogPosts.sort(function(a,b){return new Date(b.created_at || b.createdAt) - new Date(a.created_at || a.createdAt);});
   if(!posts.length){
     el.innerHTML='<div style="text-align:center;padding:60px 20px;"><div style="font-size:48px;margin-bottom:12px;">✍️</div>'
       +'<div style="font-family:\'Fredoka One\',cursive;font-size:20px;color:var(--dark);">No posts yet</div>'
@@ -63,18 +80,19 @@ function renderAdminBlogList(){
   var catLabel={'learn-by-doing':'🛠️ Learn by Doing','tech-explained':'💡 Tech Explained','news':'📰 EdTech News','tips':'✏️ Study Tips'};
   var rows=posts.map(function(p,i){
     var bg=i%2===0?'':'background:#fafbff;';
-    var status=p.published
+    var isPub = p.is_published || p.published;
+    var status=isPub
       ?'<span style="background:var(--green-light);color:var(--green-dark);font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">✅ Published</span>'
       :'<span style="background:#fff3e0;color:#e65100;font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">📝 Draft</span>';
-    var pubBtnBg=p.published?'#fde8e8':'var(--green-light)';
-    var pubBtnColor=p.published?'#c53030':'var(--green-dark)';
-    var pubBtnLabel=p.published?'⬇ Unpublish':'🚀 Publish';
+    var pubBtnBg=isPub?'#fde8e8':'var(--green-light)';
+    var pubBtnColor=isPub?'#c53030':'var(--green-dark)';
+    var pubBtnLabel=isPub?'⬇ Unpublish':'🚀 Publish';
     return '<tr style="border-bottom:1px solid #f0f2f8;'+bg+'">'
-      +'<td style="padding:14px 16px;"><div style="font-weight:800;color:var(--dark);max-width:300px;">'+(p.emoji||'')+' '+p.title+'</div>'
+      +'<td style="padding:14px 16px;"><div style="font-weight:800;color:var(--dark);max-width:300px;">'+p.title+'</div>'
       +'<div style="font-size:11px;color:var(--light);font-weight:700;margin-top:2px;">'+p.id+'</div></td>'
       +'<td style="padding:14px 16px;font-weight:700;color:var(--mid);">'+(catLabel[p.category]||p.category)+'</td>'
-      +'<td style="padding:14px 16px;font-weight:700;color:var(--mid);">'+p.author+'</td>'
-      +'<td style="padding:14px 16px;font-size:12px;color:var(--light);font-weight:700;">'+(p.date||'—')+'</td>'
+      +'<td style="padding:14px 16px;font-weight:700;color:var(--mid);">'+(p.author_name || p.author)+'</td>'
+      +'<td style="padding:14px 16px;font-size:12px;color:var(--light);font-weight:700;">'+((p.created_at || p.createdAt || '').split('T')[0]||'—')+'</td>'
       +'<td style="padding:14px 16px;text-align:center;">'+status+'</td>'
       +'<td style="padding:14px 16px;text-align:center;">'
       +'<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">'
@@ -92,81 +110,128 @@ function renderAdminBlogList(){
     +'</tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
 
-function saveBlogPost(publish){
+async function saveBlogPost(publish){
   var title=document.getElementById('bp-title')?.value.trim();
   var excerpt=document.getElementById('bp-excerpt')?.value.trim();
   var body=document.getElementById('bp-body')?.value.trim();
-  var author=document.getElementById('bp-author')?.value.trim();
   if(!title){showToast('Please enter a post title.','error');return;}
   if(!excerpt){showToast('Please enter an excerpt.','error');return;}
   if(!body){showToast('Please write the post body.','error');return;}
-  if(!author){showToast('Please enter the author name.','error');return;}
+  
   var existingId=document.getElementById('bp-id')?.value;
-  var posts=getBlogPosts();
   var tagsRaw=document.getElementById('bp-tags')?.value||'';
   var tags=tagsRaw.split(',').map(function(t){return t.trim();}).filter(Boolean);
-  var post={
-    id:existingId||'post-'+Date.now().toString(36),
-    title:title,
-    category:document.getElementById('bp-category')?.value||'learn-by-doing',
-    tags:tags,
-    author:author,
-    authorInitials:author.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase(),
-    date:document.getElementById('bp-date')?.value||new Date().toISOString().split('T')[0],
-    emoji:document.getElementById('bp-emoji')?.value||'📝',
-    coverImage:document.getElementById('bp-image')?.value.trim()||'',
-    excerpt:excerpt,
-    body:body,
-    published:publish||document.getElementById('bp-published')?.checked||false,
-    createdAt:existingId?(posts.find(function(p){return p.id===existingId;})||{}).createdAt||new Date().toISOString():new Date().toISOString(),
-    updatedAt:new Date().toISOString(),
+  var isPublished = publish || document.getElementById('bp-published')?.checked || false;
+
+  var payload = {
+    title: title,
+    category: document.getElementById('bp-category')?.value||'learn-by-doing',
+    tags: tags,
+    cover_image: document.getElementById('bp-image')?.value.trim()||'',
+    excerpt: excerpt,
+    content: body,
+    is_published: isPublished
   };
-  if(existingId){
-    var idx=posts.findIndex(function(p){return p.id===existingId;});
-    if(idx!==-1)posts[idx]=post; else posts.unshift(post);
-  } else {
-    posts.unshift(post);
+
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    let url = 'https://api.stemnestacademy.co.uk/api/blogs';
+    let method = 'POST';
+    if (existingId) {
+      url += '/' + existingId;
+      method = 'PUT';
+    }
+
+    const res = await fetch(url, {
+      method,
+      headers: { 
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+      },
+      body: JSON.stringify(payload)
+    });
+    
+    const data = await res.json();
+    if (data.success) {
+      clearBlogForm();
+      showAdminTab('blog-posts');
+      showToast(isPublished ? '🚀 Post published!' : '💾 Draft saved!', 'success');
+      fetchAdminBlogPosts();
+    } else {
+      showToast('Error: ' + data.error, 'error');
+    }
+  } catch(e) {
+    showToast('Failed to save post', 'error');
   }
-  saveBlogPosts(posts);
-  clearBlogForm();
-  showAdminTab('blog-posts');
-  showToast(publish?'🚀 Post published!':'💾 Draft saved!');
 }
 
 function editBlogPost(postId){
-  var post=getBlogPosts().find(function(p){return p.id===postId;});
+  var post = adminBlogPosts.find(function(p){return p.id===postId;});
   if(!post)return;
   showAdminTab('blog-new');
   var titleEl=document.getElementById('blogEditorTitle');
   if(titleEl)titleEl.textContent='✏️ Edit Post';
   var set=function(id,val){var el=document.getElementById(id);if(el)el.value=val||'';};
-  set('bp-id',post.id); set('bp-title',post.title); set('bp-category',post.category);
-  set('bp-author',post.author); set('bp-date',post.date); set('bp-image',post.coverImage);
-  set('bp-emoji',post.emoji); set('bp-tags',(post.tags||[]).join(', '));
-  set('bp-excerpt',post.excerpt); set('bp-body',post.body);
+  set('bp-id',post.id); 
+  set('bp-title',post.title); 
+  set('bp-category',post.category);
+  set('bp-image',post.cover_image || post.coverImage);
+  set('bp-tags',(post.tags||[]).join(', '));
+  set('bp-excerpt',post.excerpt); 
+  set('bp-body',post.content || post.body);
   var pubEl=document.getElementById('bp-published');
-  if(pubEl)pubEl.checked=!!post.published;
+  if(pubEl)pubEl.checked=!!(post.is_published || post.published);
 }
 
-function togglePublish(postId){
-  var posts=getBlogPosts();
-  var idx=posts.findIndex(function(p){return p.id===postId;});
-  if(idx===-1)return;
-  posts[idx].published=!posts[idx].published;
-  saveBlogPosts(posts);
-  renderAdminBlogList();
-  showToast(posts[idx].published?'🚀 Post published!':'Post unpublished.');
+async function togglePublish(postId){
+  var post = adminBlogPosts.find(function(p){return p.id===postId;});
+  if(!post)return;
+  
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const isPub = !(post.is_published || post.published);
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/blogs/' + postId, {
+      method: 'PUT',
+      headers: { 
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+      },
+      body: JSON.stringify({ is_published: isPub })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(isPub ? '🚀 Post published!' : 'Post unpublished.', 'success');
+      fetchAdminBlogPosts();
+    } else {
+      showToast('Error: ' + data.error, 'error');
+    }
+  } catch(e) {
+    showToast('Failed to toggle publish', 'error');
+  }
 }
 
-function deleteBlogPost(postId){
+async function deleteBlogPost(postId){
   if(!confirm('Delete this post? This cannot be undone.'))return;
-  saveBlogPosts(getBlogPosts().filter(function(p){return p.id!==postId;}));
-  renderAdminBlogList();
-  showToast('Post deleted.');
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/blogs/' + postId, {
+      method: 'DELETE',
+      headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Post deleted.', 'success');
+      fetchAdminBlogPosts();
+    } else {
+      showToast('Error: ' + data.error, 'error');
+    }
+  } catch(e) {
+    showToast('Failed to delete post', 'error');
+  }
 }
 
 function clearBlogForm(){
-  ['bp-id','bp-title','bp-author','bp-date','bp-image','bp-emoji','bp-tags','bp-excerpt','bp-body'].forEach(function(id){
+  ['bp-id','bp-title','bp-image','bp-tags','bp-excerpt','bp-body'].forEach(function(id){
     var el=document.getElementById(id);if(el)el.value='';
   });
   var catEl=document.getElementById('bp-category');if(catEl)catEl.value='learn-by-doing';
@@ -177,10 +242,13 @@ function clearBlogForm(){
 /* Hook into showAdminTab */
 document.addEventListener('DOMContentLoaded',function(){
   injectBlogTabs();
-  updateBlogBadge();
+  fetchAdminBlogPosts();
+  
   var _orig=window.showAdminTab;
-  window.showAdminTab=function(tab){
-    _orig(tab);
-    if(tab==='blog-posts')renderAdminBlogList();
-  };
+  if (typeof _orig === 'function') {
+    window.showAdminTab=function(tab){
+      _orig(tab);
+      if(tab==='blog-posts') renderAdminBlogList();
+    };
+  }
 });
