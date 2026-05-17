@@ -177,15 +177,7 @@ async function loadBookings() {
     isDemoClass:     b.is_demo,
     _fromApi:        true,
   }));
-  
-  try {
-    allBookings = apiBookings;
-  } catch {
-    allBookings = apiBookings;
-  }
-    allBookings = apiBookings;
-  }
-  
+  allBookings = apiBookings;
   filteredBookings = [...allBookings];
   updateStats();
   renderBookingsTable(filteredBookings);
@@ -567,7 +559,7 @@ function resetAddTeacherForm() {
   document.querySelectorAll('input[name="at-course"], input[name="at-grade"]').forEach(cb => cb.checked = false);
 }
 
-function saveNewTeacher() {
+async function saveNewTeacher() {
   const name     = document.getElementById('at-name')?.value.trim();
   const email    = document.getElementById('at-email')?.value.trim();
   const password = document.getElementById('at-password')?.value.trim();
@@ -588,55 +580,58 @@ function saveNewTeacher() {
   if (courses.length === 0)     { showToast('Please select at least one course.', 'error'); return; }
   if (gradeGroups.length === 0) { showToast('Please select at least one grade group.', 'error'); return; }
 
-  // Check duplicate email
-  const existing = getTeachers();
-  if (existing.some(t => t.email.toLowerCase() === email.toLowerCase())) {
-    showToast('A teacher with this email already exists.', 'error'); return;
-  }
-
   const id       = nextTeacherId(subject);
-  const initials = name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
-  const colorIdx = existing.length % TUTOR_COLORS.length;
 
-  const newTeacher = {
-    id, name, initials, email, password, phone, subject, bio,
-    courses, gradeGroups,
+  const payload = {
+    name,
+    email,
+    password,
+    role: 'tutor',
+    staff_id: id,
+    phone,
+    subject,
+    courses,
+    gradeGroups,
     availability: avail,
-    dbs,
-    color: TUTOR_COLORS[colorIdx],
-    photo: null,
-    createdAt: new Date().toISOString(),
+    dbs
   };
 
-  existing.push(newTeacher);
-  saveTeachers(existing);
-  updateStats();
+  try {
+    const btn = document.querySelector('button[onclick="saveNewTeacher()"]');
+    if (btn) btn.disabled = true;
 
-  // Save DOB if provided (Phase 6)
-  const dob = document.getElementById('at-dob')?.value;
-  // localStorage.setItem('sn_dob_' + id, dob); - handled by API now
+    const token = localStorage.getItem('sn_access_token');
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/users', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify(payload)
+    });
 
-  // Simulate welcome email
-  console.log(`📧 WELCOME EMAIL TO: ${email}
-Subject: Welcome to StemNest Academy — Your Account is Ready!
+    const data = await res.json();
+    if (btn) btn.disabled = false;
 
-Hi ${name.split(' ')[0]},
+    if (!data.success) {
+      showToast(data.error || 'Failed to create teacher', 'error');
+      return;
+    }
 
-Your StemNest Academy teacher account has been created.
+    showToast(`✅ ${name} added successfully! Welcome email sent.`);
+    resetAddTeacherForm();
+    
+    // Refresh tutors from API
+    await _loadAdminFromAPI();
+    showAdminTab('tutors');
+    updateStats();
 
-🆔 Teacher ID: ${id}
-📧 Email: ${email}
-🔑 Temporary Password: ${password}
-
-Please log in and change your password on first login.
-Dashboard: ${window.location.origin}/frontend/pages/tutor-dashboard.html
-
-Welcome to the team!
-StemNest Academy`);
-
-  showToast(`✅ ${name} (${id}) added successfully! Welcome email sent.`);
-  resetAddTeacherForm();
-  showAdminTab('tutors');
+  } catch (err) {
+    console.error('Teacher creation failed:', err);
+    showToast('A network error occurred. Please try again.', 'error');
+    const btn = document.querySelector('button[onclick="saveNewTeacher()"]');
+    if (btn) btn.disabled = false;
+  }
 }
 
 /* ══════════════════════════════════════════════════════

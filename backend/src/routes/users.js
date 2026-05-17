@@ -41,6 +41,11 @@ const createUserSchema = z.object({
   age:      z.string().optional(),
   credits:  z.number().optional(),
   course:   z.string().optional(),
+  subject:  z.string().optional(),
+  courses:  z.array(z.string()).optional(),
+  gradeGroups: z.array(z.string()).optional(),
+  availability: z.string().optional(),
+  dbs:      z.string().optional(),
 });
 
 /* Postsales can only create students */
@@ -144,6 +149,21 @@ router.post('/', requireAuth, requireRole('admin', 'super_admin', 'postsales'), 
           password: data.password,
         }).catch(e => logger.error('Welcome email failed:', e.message));
       }
+    } else if (data.role === 'tutor') {
+      const colors = ['linear-gradient(135deg,var(--blue),#4f87f5)','linear-gradient(135deg,var(--green),#3dd9a4)','linear-gradient(135deg,var(--orange),#ffaa80)','linear-gradient(135deg,var(--purple),#a78bfa)'];
+      const randomColor = colors[Math.floor(Math.random() * colors.length)];
+      await pool.query(
+        `INSERT INTO tutor_profiles (user_id, subject, courses, grade_groups, availability, dbs_checked, color)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [user.id, data.subject || null, data.courses || [], data.gradeGroups || [], data.availability || null, data.dbs || 'pending', randomColor]
+      );
+
+      /* Send welcome email */
+      await emailSvc.sendWelcomeEmail({
+        to: data.email, name: data.name, role: data.role,
+        loginUrl: `${process.env.APP_URL}/pages/login.html`,
+        password: data.password,
+      }).catch(e => logger.error('Welcome email failed:', e.message));
     } else {
       /* Send welcome email */
       await emailSvc.sendWelcomeEmail({
