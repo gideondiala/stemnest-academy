@@ -2,10 +2,10 @@ const { Pool } = require('pg');
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
 
 const pool = new Pool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
+  host: process.env.DB_HOST || 'stemnest-db.cfk6s86i4abg.eu-west-2.rds.amazonaws.com',
+  user: process.env.DB_USER || 'stemnest_user',
+  password: process.env.DB_PASSWORD || 'StemNestDB2024Secure',
+  database: process.env.DB_NAME || 'stemnest',
   port: process.env.DB_PORT || 5432,
   ssl: { rejectUnauthorized: false }
 });
