@@ -351,7 +351,7 @@ router.get('/dashboard/:role', requireAuth, async (req, res, next) => {
                     ORDER BY p.updated_at DESC LIMIT 500`),
         pool.query(`SELECT * FROM courses ORDER BY name ASC`),
         pool.query(`SELECT * FROM companion_materials ORDER BY created_at DESC LIMIT 500`),
-        pool.query(`SELECT u.id, u.name, u.email, u.phone, u.whatsapp, u.is_active,
+        pool.query(`SELECT u.id, u.staff_id, u.name, u.email, u.phone, u.whatsapp, u.is_active,
                            tp.subject, tp.courses, tp.grade_groups, tp.availability
                     FROM users u
                     LEFT JOIN tutor_profiles tp ON tp.user_id = u.id
