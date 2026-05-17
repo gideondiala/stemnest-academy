@@ -33,6 +33,7 @@ const TUTOR_COLORS = [
 function getTeachers() {
   return window.ADMIN_DATA.tutors.map(t => ({
     id: t.id,
+    staff_id: t.staff_id,
     name: t.name,
     initials: t.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase(),
     subject: t.subject || '—',
