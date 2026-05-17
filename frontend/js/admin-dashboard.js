@@ -54,7 +54,7 @@ function saveTeachers(list) {
 function nextTeacherId(subject) {
   const prefix  = SUBJECT_PREFIX[subject] || 'TT';
   const teachers = getTeachers();
-  const existing = teachers.filter(t => t.id.startsWith(prefix)).map(t => parseInt(t.id.slice(2)) || 0);
+  const existing = teachers.map(t => t.staff_id || t.id).filter(id => id && id.startsWith(prefix)).map(id => parseInt(id.slice(2)) || 0);
   const next     = existing.length ? Math.max(...existing) + 1 : 1;
   return prefix + String(next).padStart(3, '0');
 }
