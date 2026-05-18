@@ -1,61 +1,119 @@
 # Directive: Authentication
 
-## Goal
-Replace the simulated login in `frontend/js/login.js` with real JWT-based auth
-backed by the Express API.
+## Status: ✅ COMPLETE — JWT auth fully implemented
 
-## Frontend changes (`frontend/js/login.js`)
+---
 
-### Current behaviour
-`handleLogin()` fakes a 1.6s delay then redirects. No real API call.
+## How Login Works
 
-### Target behaviour
-```js
-async function handleLogin() {
-  // 1. Validate inputs (non-empty)
-  // 2. POST to /api/auth/login with { email, password, role }
-  // 3. On success: store JWT in localStorage, redirect by role
-  // 4. On failure: show error toast, shake button
+1. User visits `https://stemnestacademy.co.uk/pages/login.html`
+2. Selects role tab: "I'm a Tutor" (for all staff) or "I'm a Student"
+3. Enters email + password → `handleLogin()` in `login.js`
+4. Calls `Auth.login(email, password)` from `api.js`
+5. API returns `{ accessToken, refreshToken, user: { id, name, email, role, staffId } }`
+6. Tokens stored in localStorage: `sn_access_token`, `sn_refresh_token`
+7. Role-specific data stored:
+   - Tutor: `sn_logged_in_teacher` (staff_id), `sn_current_tutor` (full profile JSON)
+   - Student: `sn_logged_in_student` (email)
+8. Redirected to the correct dashboard by role
+
+---
+
+## Role → Dashboard Routing
+
+| Role         | Dashboard URL                          |
+|--------------|----------------------------------------|
+| `tutor`      | `/pages/tutor-dashboard.html`          |
+| `student`    | `/pages/student-dashboard.html`        |
+| `sales`      | `/pages/sales-dashboard.html`          |
+| `presales`   | `/pages/presales-dashboard.html`       |
+| `postsales`  | `/pages/postsales-dashboard.html`      |
+| `operations` | `/pages/operations-dashboard.html`     |
+| `hr`         | `/pages/hr-dashboard.html`             |
+| `admin`      | `/pages/admin-dashboard.html`          |
+| `super_admin`| `/pages/super-admin.html`              |
+
+---
+
+## Token Lifecycle
+
+| Token         | Expiry  | Storage key          | Purpose                    |
+|---------------|---------|----------------------|----------------------------|
+| Access token  | 7 days  | `sn_access_token`    | Sent with every API request |
+| Refresh token | 30 days | `sn_refresh_token`   | Used to get new access token |
+
+When the access token expires, `apiCall()` in `api.js` automatically calls `POST /api/auth/refresh` and retries the original request.
+
+---
+
+## JWT Payload
+
+```json
+{
+  "id": "uuid",
+  "email": "user@example.com",
+  "role": "tutor",
+  "staffId": "CT004",
+  "iat": 1234567890,
+  "exp": 1234567890
 }
 ```
 
-### Token storage
-Store as `localStorage.setItem('sn_token', token)`.
-Include on all subsequent API requests: `Authorization: Bearer <token>`.
+---
 
-### Redirect after login
-- Tutor  → `pages/tutor-dashboard.html`
-- Student → `pages/student-dashboard.html`
+## Middleware
 
-## Backend changes (`backend/src/routes/auth.js`)
+```js
+// backend/src/middleware/auth.js
+requireAuth      // Verifies JWT, attaches req.user
+requireRole(...) // Checks req.user.role against allowed roles
+```
 
-### POST /api/auth/login
-Input:  `{ email, password, role }`
-Output: `{ success: true, token, user: { id, name, email, role } }`
-Errors: 401 if credentials invalid, 400 if missing fields
+Usage:
+```js
+router.get('/admin-only', requireAuth, requireRole('admin', 'super_admin'), handler);
+router.get('/staff',      requireAuth, requireRole('admin', 'super_admin', 'presales', 'postsales'), handler);
+```
 
-### POST /api/auth/register
-Input:  `{ name, email, password, role }`
-Output: `{ success: true, token, user }`
-Errors: 409 if email already exists
+---
 
-### GET /api/auth/me
-Header: `Authorization: Bearer <token>`
-Output: `{ success: true, user: { id, name, email, role } }`
-Errors: 401 if token missing or invalid
+## `sn_current_tutor` — Critical for Tutor Dashboard
 
-## JWT middleware (`backend/src/middleware/auth.js`)
-- Reads `Authorization` header
-- Verifies token with `JWT_SECRET` from `.env`
-- Attaches `req.user` for downstream handlers
-- Returns 401 on failure
+When a tutor logs in, `login.js` stores their full profile:
+```js
+localStorage.setItem('sn_current_tutor', JSON.stringify({
+  id:      user.staffId,   // e.g. "CT004"
+  dbId:    user.id,        // UUID
+  name:    user.name,
+  email:   user.email,
+  role:    'tutor',
+  initials: ...,
+}));
+```
 
-## Password rules
-- Minimum 8 characters
-- Hashed with bcrypt (salt rounds: 12)
-- Never stored or logged in plaintext
+`dashboard.js` reads this on load via `getLoggedInTutor()`. Then `_loadTutorFromAPI()` fetches the full profile from `GET /api/auth/me` + `GET /api/users/:id` and updates `sn_current_tutor` with subject, courses, grade groups, etc.
 
-## Edge cases
-- Expired token → 401, frontend clears localStorage and redirects to login
-- Wrong role (tutor token used on student route) → 403
-- Rate limiting: max 10 login attempts per IP per 15 minutes (use `express-rate-limit`)
+**Never read from `sn_teachers` localStorage** — that key is dead and must not be used.
+
+---
+
+## Password Reset Flow
+
+1. User clicks "Forgot Password" on login page
+2. Enters email → `POST /api/auth/forgot-password`
+3. Backend generates a secure token, stores hash in `password_reset_tokens` table
+4. Sends email with reset link: `https://stemnestacademy.co.uk/pages/login.html?reset=<token>`
+5. User clicks link → frontend detects `?reset=` param → shows reset form
+6. User enters new password → `POST /api/auth/reset-password` with `{ token, password }`
+7. Backend verifies token, updates password, revokes all refresh tokens (forces re-login everywhere)
+
+---
+
+## Security Notes
+
+- Passwords hashed with bcrypt (12 rounds) — never stored in plaintext
+- `POST /api/users` requires `requireAuth` — only logged-in staff can create accounts
+- Rate limiting on auth routes: 10 attempts per 15 minutes per IP
+- Refresh tokens stored as SHA-256 hashes in the DB — raw token never stored
+- `POST /api/bookings` (demo booking) is public — no auth needed (students book without accounts)
+- `PUT /api/bookings/:id/cancel` and `POST /api/bookings/:id/reschedule` are public — booking UUID acts as auth
