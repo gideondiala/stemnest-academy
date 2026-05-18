@@ -1,14 +1,19 @@
 
 function _getGlobalData() { return window.TUTOR_DATA || window.ADMIN_DATA || window.PS_DATA || window.STUDENT_DATA || window; }
 function _getLocalStr(key) {
-  if (key === 'sn_access_token' || key === 'sn_logged_in_teacher') return _getLocalStr(key);
+  /* Auth keys always come from real localStorage */
+  if (key === 'sn_access_token')      return localStorage.getItem('sn_access_token');
+  if (key === 'sn_logged_in_teacher') return localStorage.getItem('sn_logged_in_teacher');
+  if (key === 'sn_current_tutor')     return localStorage.getItem('sn_current_tutor');
   let d = _getGlobalData()[key];
   if (typeof d === 'string') return d;
   if (d !== undefined && d !== null) return JSON.stringify(d);
   return null;
 }
 function _setLocalStr(key, val) {
-  if (key === 'sn_logged_in_teacher') { _setLocalStr(key, val); return; }
+  /* Auth keys always go to real localStorage */
+  if (key === 'sn_logged_in_teacher') { localStorage.setItem('sn_logged_in_teacher', val); return; }
+  if (key === 'sn_current_tutor')     { localStorage.setItem('sn_current_tutor', val); return; }
   try { _getGlobalData()[key] = JSON.parse(val); } catch(e) { _getGlobalData()[key] = val; }
 }
 
@@ -65,7 +70,6 @@ function getMyBookings() {
     b.status === 'scheduled' || b.status === 'completed' ||
     b.status === 'incomplete' || b.status === 'teacher_absent'
   );
-}
 }
 
 function parseClassDateTime(dateStr, timeStr) {
@@ -225,12 +229,15 @@ function teacherJoinClass(bookingId, classLink) {
   }
 
   // Open class link
-  if (classLink) window.open(classLink, '_blank');
-  else showToast('No class link set for this session.', 'error');
+  if (classLink) {
+    window.open(classLink, '_blank');
+  } else {
+    showToast('⚠️ No class link set yet. Contact your admin. You can still end the class when done.', 'error');
+  }
 
-  // Re-render to enable End Class button after 15 mins
+  // Re-render to enable End Class button immediately (not after 15 mins)
   renderSessionsTab();
-  setTimeout(renderSessionsTab, 15 * 60 * 1000 + 1000);
+  if (typeof renderOverviewSessions === 'function') renderOverviewSessions();
 }
 
 /* ── AUTO-ABSENT WATCHER ── */

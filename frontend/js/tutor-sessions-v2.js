@@ -6,14 +6,17 @@
 
 function _getGlobalData() { return window.TUTOR_DATA || window.ADMIN_DATA || window.PS_DATA || window.STUDENT_DATA || window; }
 function _getLocalStr(key) {
-  if (key === 'sn_access_token' || key === 'sn_logged_in_teacher') return _getLocalStr(key);
+  if (key === 'sn_access_token')      return localStorage.getItem('sn_access_token');
+  if (key === 'sn_logged_in_teacher') return localStorage.getItem('sn_logged_in_teacher');
+  if (key === 'sn_current_tutor')     return localStorage.getItem('sn_current_tutor');
   let d = _getGlobalData()[key];
   if (typeof d === 'string') return d;
   if (d !== undefined && d !== null) return JSON.stringify(d);
   return null;
 }
 function _setLocalStr(key, val) {
-  if (key === 'sn_logged_in_teacher') { _setLocalStr(key, val); return; }
+  if (key === 'sn_logged_in_teacher') { localStorage.setItem('sn_logged_in_teacher', val); return; }
+  if (key === 'sn_current_tutor')     { localStorage.setItem('sn_current_tutor', val); return; }
   try { _getGlobalData()[key] = JSON.parse(val); } catch(e) { _getGlobalData()[key] = val; }
 }
 
