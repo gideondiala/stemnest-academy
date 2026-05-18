@@ -36,8 +36,10 @@ const bookingSchema = z.object({
 
 const assignSchema = z.object({
   tutorId:    z.string().uuid(),
-  salesId:    z.string().uuid().optional(),
+  salesId:    z.string().optional(),   // UUID or staff_id — resolved server-side
   classLink:  z.string().url(),
+  date:       z.string().optional(),   // allow updating date
+  time:       z.string().optional(),   // allow updating time
   notes:      z.string().optional(),
 });
 
@@ -273,13 +275,29 @@ router.put('/:id/assign', requireAuth, requireRole('admin','super_admin','presal
     const booking = bResult.rows[0];
     if (!booking) return res.status(404).json({ success: false, error: 'Booking not found' });
 
-    /* Update booking */
+    /* Update booking — always set tutor, sales, link, status; optionally update date/time */
+    const updateFields = [
+      'tutor_id = $1',
+      'sales_id = $2',
+      'class_link = $3',
+      "status = 'scheduled'",
+      'scheduled_at = NOW()',
+    ];
+    const updateParams = [tutor.id, salesDbId, classLink, req.params.id];
+
+    if (data.date) {
+      updateParams.splice(3, 0, data.date);  // insert before bookingId
+      updateFields.push(`date = $${updateParams.length - 1}::date`);
+    }
+    if (data.time) {
+      updateParams.splice(data.date ? 4 : 3, 0, data.time);
+      updateFields.push(`time = $${updateParams.length - 1}::time`);
+    }
+
+    // bookingId is always last param
     await pool.query(
-      `UPDATE bookings
-       SET tutor_id = $1, sales_id = $2, class_link = $3,
-           status = 'scheduled', scheduled_at = NOW()
-       WHERE id = $4`,
-      [tutor.id, salesDbId, classLink, req.params.id]
+      `UPDATE bookings SET ${updateFields.join(', ')} WHERE id = $${updateParams.length}`,
+      updateParams
     );
 
     /* Notify tutor */

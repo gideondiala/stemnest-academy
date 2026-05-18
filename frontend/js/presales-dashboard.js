@@ -78,25 +78,30 @@ async function _loadPresalesFromAPI() {
       });
     }
 
-    // Fetch teachers
+    // Fetch teachers — store BOTH staff_id and UUID
     const tRes = await fetch('https://api.stemnestacademy.co.uk/api/users?role=tutor', {
       headers: { 'Authorization': 'Bearer ' + token },
     });
     const tData = await tRes.json();
     if (tData.users) {
       window.PS_DATA.teachers = tData.users.map(u => ({
-        id: u.staff_id || u.id, name: u.name, subject: u.subject || 'Coding'
+        id:      u.id,          // UUID — used for API calls
+        staffId: u.staff_id,    // e.g. CT004 — used for display
+        name:    u.name,
+        subject: u.subject || 'Coding'
       }));
     }
 
-    // Fetch sales
+    // Fetch sales — store BOTH staff_id and UUID
     const sRes = await fetch('https://api.stemnestacademy.co.uk/api/users?role=sales', {
       headers: { 'Authorization': 'Bearer ' + token },
     });
     const sData = await sRes.json();
     if (sData.users) {
       window.PS_DATA.sales = sData.users.map(u => ({
-        id: u.staff_id || u.id, name: u.name
+        id:      u.id,          // UUID — used for API calls
+        staffId: u.staff_id,    // e.g. SP001 — used for display
+        name:    u.name
       }));
     }
 
@@ -310,11 +315,9 @@ function populateTeacherDropdown(subject) {
   if (subject) teachers = teachers.filter(t => t.subject === subject);
 
   sel.innerHTML = '<option value="">— Select a teacher —</option>' +
-    teachers.map(t => {
-      const avail = getTeacherAvailability(t.id);
-      const slotCount = Object.keys(avail).filter(k => avail[k] === true || (avail[k] && !avail[k].booked)).length / 2;
-      return `<option value="${t.id}">${t.name} (${t.id}) · ${t.subject} · ${Math.round(slotCount)} slots available</option>`;
-    }).join('');
+    teachers.map(t =>
+      `<option value="${t.id}">${t.name} (${t.staffId || t.id}) · ${t.subject}</option>`
+    ).join('');
 }
 
 function populateSalesDropdown() {
@@ -322,7 +325,9 @@ function populateSalesDropdown() {
   if (!sel) return;
   const salesPersons = getSales();
   sel.innerHTML = '<option value="">— Select a sales person —</option>' +
-    salesPersons.map(s => `<option value="${s.id}">${s.name} (${s.id})</option>`).join('');
+    salesPersons.map(s =>
+      `<option value="${s.id}">${s.name} (${s.staffId || s.id})</option>`
+    ).join('');
 }
 
 async function confirmScheduleDemo() {
@@ -339,49 +344,54 @@ async function confirmScheduleDemo() {
   if (!time)      { showToast('Please select a time.', 'error'); return; }
   if (!link)      { showToast('Please enter a class link.', 'error'); return; }
 
-  /* Show loading state on button */
   const btn = document.querySelector('#scheduleModalOverlay .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Scheduling…'; }
 
-  const teacher      = getTeachers().find(t => t.id === teacherId);
-  const salesPersons = getSales();
-  const salesPerson  = salesPersons.find(s => s.id === salesId);
-  const timeKey      = time;
+  const teacher = getTeachers().find(t => t.id === teacherId);
 
-  /* ── Assign in real DB directly ── */
   try {
     const token = localStorage.getItem('sn_access_token');
-    if (token) {
-      const localBooking = getBookings().find(b => b.id === psScheduleBookingId);
-      if (localBooking && localBooking.dbId) {
-        // We know the dbId because we loaded it from API
-        await fetch('https://api.stemnestacademy.co.uk/api/bookings/' + localBooking.dbId + '/assign', {
-          method:  'PUT',
-          headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ tutorId: teacherId, salesId: salesId, classLink: link, notes: notes || undefined }),
-        });
-      }
+    if (!token) throw new Error('Not logged in');
+
+    const bookingId = psScheduleBookingId;
+    if (!bookingId) throw new Error('No booking selected');
+
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/bookings/' + bookingId + '/assign', {
+      method:  'PUT',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        tutorId:   teacherId,   // UUID
+        salesId:   salesId,     // UUID
+        classLink: link,
+        date:      date,
+        time:      time,
+        notes:     notes || undefined
+      }),
+    });
+
+    const data = await res.json();
+
+    if (btn) { btn.disabled = false; btn.textContent = '✅ Confirm & Schedule'; }
+
+    if (!data.success) {
+      showToast('Failed to schedule: ' + (data.error || 'Unknown error'), 'error');
+      return;
     }
+
+    closeScheduleModal();
+
+    /* Refresh UI from API so incoming moves to scheduled */
+    await _loadPresalesFromAPI();
+    updatePSStats();
+    renderIncoming();
+    renderScheduled();
+    showToast('✅ Demo scheduled with ' + (teacher?.name || 'teacher') + ' on ' + date + ' at ' + to12h(time) + '!');
+
   } catch (e) {
-    console.warn('[Presales] DB assign failed:', e.message);
+    if (btn) { btn.disabled = false; btn.textContent = '✅ Confirm & Schedule'; }
+    console.error('[Presales] Schedule failed:', e);
+    showToast('Error: ' + e.message, 'error');
   }
-
-  if (typeof emailDemoBookedToTeacher === 'function') {
-    const updatedBooking = getBookings().find(b => b.id === psScheduleBookingId) || {};
-    emailDemoBookedToTeacher({ ...updatedBooking, date, time: to12h(time), classLink: link, notes }, teacher);
-  }
-
-  /* Restore button */
-  if (btn) { btn.disabled = false; btn.textContent = '✅ Confirm & Schedule'; }
-
-  closeScheduleModal();
-  
-  /* Refresh UI directly from API */
-  await _loadPresalesFromAPI();
-  updatePSStats();
-  renderIncoming();
-  renderScheduled();
-  showToast('Demo scheduled with ' + (teacher?.name || 'teacher') + ' on ' + date + ' at ' + to12h(time) + '!');
 }
 
 function closeScheduleModal() {

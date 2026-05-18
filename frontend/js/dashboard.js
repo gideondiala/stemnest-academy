@@ -272,10 +272,13 @@ function populateProfileModal() {
 function checkAssignedClasses() {
   const banner = document.getElementById('assignedClassBanner');
   if (!banner) return;
-  const tutorId = localStorage.getItem('sn_logged_in_teacher') || (typeof TUTOR !== 'undefined' ? TUTOR.id : 'CT001');
-  const bookings = window.TUTOR_DATA?.bookings || JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+  const tutorId = TUTOR.id;
+  const tutorDbId = TUTOR.dbId;
+  const bookings = window.TUTOR_DATA?.bookings || [];
   const mine = bookings.filter(b =>
-    b.status === 'scheduled' && b.assignedTutorId === tutorId
+    b.status === 'scheduled' &&
+    (b.assignedTutorId === tutorId || b.assignedTutorId === tutorDbId ||
+     b.tutor_staff_id === tutorId  || b.tutor_id === tutorDbId)
   );
   if (mine.length === 0) { banner.style.display = 'none'; return; }
   banner.style.display = 'block';
@@ -342,11 +345,18 @@ function timeToMins(t) {
 /* Get all bookings assigned to this tutor */
 function getTutorBookings() {
   try {
-    const all = window.TUTOR_DATA?.bookings || JSON.parse(localStorage.getItem('sn_bookings') || '[]');
-    return all.filter(b =>
-      (b.assignedTutorId === TUTOR.id || b.assignedTutorId === TUTOR.staffId || b.tutor_staff_id === TUTOR.id) &&
-      (b.status === 'scheduled' || b.status === 'completed')
-    );
+    const all = window.TUTOR_DATA?.bookings || [];
+    const myStaffId = TUTOR.id;    // e.g. CT004
+    const myDbId    = TUTOR.dbId;  // UUID
+    return all.filter(b => {
+      const bid = b.assignedTutorId || '';
+      return (
+        (myStaffId && bid === myStaffId) ||
+        (myDbId    && bid === myDbId)    ||
+        (myStaffId && b.tutor_staff_id === myStaffId) ||
+        (myDbId    && b.tutor_id === myDbId)
+      );
+    }).filter(b => b.status === 'scheduled' || b.status === 'completed');
   } catch { return []; }
 }
 

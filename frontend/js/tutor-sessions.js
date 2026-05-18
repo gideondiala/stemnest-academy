@@ -51,10 +51,21 @@ function getCurrentTutor() {
 /* Get bookings for the currently logged-in teacher */
 function getMyBookings() {
   const tutor = getCurrentTutor();
-  return getBookings().filter(b =>
-    (b.assignedTutorId === tutor.id || b.assignedTutorId === tutor.staffId || b.tutor_staff_id === tutor.id) &&
-    (b.status === 'scheduled' || b.status === 'completed' || b.status === 'incomplete' || b.status === 'teacher_absent')
+  const myStaffId = tutor.id;       // e.g. CT004
+  const myDbId    = tutor.dbId;     // UUID
+  return getBookings().filter(b => {
+    const bid = b.assignedTutorId || '';
+    return (
+      (myStaffId && bid === myStaffId) ||
+      (myDbId    && bid === myDbId)    ||
+      (myStaffId && b.tutor_staff_id === myStaffId) ||
+      (myDbId    && b.tutor_id === myDbId)
+    );
+  }).filter(b =>
+    b.status === 'scheduled' || b.status === 'completed' ||
+    b.status === 'incomplete' || b.status === 'teacher_absent'
   );
+}
 }
 
 function parseClassDateTime(dateStr, timeStr) {
