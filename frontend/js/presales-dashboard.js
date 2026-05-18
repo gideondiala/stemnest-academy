@@ -34,12 +34,18 @@ document.addEventListener('DOMContentLoaded', () => {
 async function _loadPresalesFromAPI() {
   try {
     const token = localStorage.getItem('sn_access_token');
-    if (!token) return;
+    if (!token) { console.warn('[Presales] No token'); return; }
     
-    // Fetch bookings
-    const bRes = await fetch('https://api.stemnestacademy.co.uk/api/bookings?limit=500', {
+    // Fetch bookings — use the sync/dashboard/presales endpoint which is purpose-built
+    const bRes = await fetch('https://api.stemnestacademy.co.uk/api/sync/dashboard/presales', {
       headers: { 'Authorization': 'Bearer ' + token },
     });
+
+    if (!bRes.ok) {
+      console.error('[Presales] Bookings fetch failed:', bRes.status, await bRes.text());
+      return;
+    }
+
     const bData = await bRes.json();
     
     if (bData.bookings) {
@@ -82,43 +88,37 @@ async function _loadPresalesFromAPI() {
     const tRes = await fetch('https://api.stemnestacademy.co.uk/api/users?role=tutor', {
       headers: { 'Authorization': 'Bearer ' + token },
     });
-    const tData = await tRes.json();
-    if (tData.users) {
-      window.PS_DATA.teachers = tData.users.map(u => ({
-        id:      u.id,          // UUID — used for API calls
-        staffId: u.staff_id,    // e.g. CT004 — used for display
-        name:    u.name,
-        subject: u.subject || 'Coding'
-      }));
+    if (tRes.ok) {
+      const tData = await tRes.json();
+      if (tData.users) {
+        window.PS_DATA.teachers = tData.users.map(u => ({
+          id:      u.id,
+          staffId: u.staff_id,
+          name:    u.name,
+          subject: u.subject || 'Coding'
+        }));
+      }
     }
 
     // Fetch sales — store BOTH staff_id and UUID
     const sRes = await fetch('https://api.stemnestacademy.co.uk/api/users?role=sales', {
       headers: { 'Authorization': 'Bearer ' + token },
     });
-    const sData = await sRes.json();
-    if (sData.users) {
-      window.PS_DATA.sales = sData.users.map(u => ({
-        id:      u.id,          // UUID — used for API calls
-        staffId: u.staff_id,    // e.g. SP001 — used for display
-        name:    u.name
-      }));
+    if (sRes.ok) {
+      const sData = await sRes.json();
+      if (sData.users) {
+        window.PS_DATA.sales = sData.users.map(u => ({
+          id:      u.id,
+          staffId: u.staff_id,
+          name:    u.name
+        }));
+      }
     }
 
-    // Fetch class reports (for incomplete reasons)
-    try {
-      const dRes = await fetch('https://api.stemnestacademy.co.uk/api/sync/dashboard/presales', {
-        headers: { 'Authorization': 'Bearer ' + token },
-      });
-      const dData = await dRes.json();
-      if (dData.classReports) window.PS_DATA.reports = dData.classReports;
-    } catch {}
-
   } catch (e) {
-    console.warn('[Presales] API load failed:', e.message);
+    console.error('[Presales] API load failed:', e.message);
   }
 }
-
 /* ── HELPERS ── */
 function getBookings()  { return window.PS_DATA.bookings || []; }
 function getTeachers()  { return window.PS_DATA.teachers || []; }

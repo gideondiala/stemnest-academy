@@ -265,7 +265,7 @@ router.put('/:id/assign', requireAuth, requireRole('admin','super_admin','presal
     let salesDbId = salesId || null;
     if (salesId) {
       const salesResult = await pool.query(
-        'SELECT id FROM users WHERE id = $1 OR staff_id = $1', [salesId]
+        'SELECT id FROM users WHERE id::text = $1 OR staff_id = $1', [salesId]
       );
       if (salesResult.rows.length) salesDbId = salesResult.rows[0].id;
     }
