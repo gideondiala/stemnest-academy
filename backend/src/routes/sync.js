@@ -375,7 +375,7 @@ router.get('/dashboard/:role', requireAuth, async (req, res, next) => {
                     ORDER BY b.date DESC LIMIT 100`, [userId]),
         pool.query(`SELECT * FROM payments WHERE student_id = $1 ORDER BY created_at DESC LIMIT 100`, [userId]),
         pool.query(`SELECT c.* FROM courses c
-                    JOIN enrollments e ON e.course_id = c.id
+                    JOIN enrolments e ON e.course_id = c.id
                     WHERE e.student_id = $1`, [userId]),
         pool.query(`SELECT u.id, u.name, u.email, u.phone, u.whatsapp, u.staff_id, 
                            sp.grade, sp.age, sp.credits, sp.enrolled_at, sp.parent_name, sp.parent_email
