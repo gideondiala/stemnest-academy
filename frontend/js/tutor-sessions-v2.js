@@ -22,11 +22,12 @@ function _setLocalStr(key, val) {
 function _safeGetCurrentTutor() {
   if (typeof getCurrentTutor === 'function') return getCurrentTutor();
   try {
-    var id  = _getLocalStr('sn_logged_in_teacher');
-    var reg = JSON.parse(_getLocalStr('sn_teachers') || '[]');
-    var f   = id ? reg.find(function(t) { return t.id === id; }) : null;
-    return f || { id: id || 'CT001', name: 'Teacher', subject: 'Coding' };
-  } catch(e) { return { id: 'CT001', name: 'Teacher', subject: 'Coding' }; }
+    /* Read from the profile stored at login — never from sn_teachers */
+    var stored = localStorage.getItem('sn_current_tutor');
+    if (stored) { var t = JSON.parse(stored); if (t && t.id) return t; }
+    var id = localStorage.getItem('sn_logged_in_teacher');
+    return { id: id || 'unknown', name: 'Tutor', subject: 'Coding' };
+  } catch(e) { return { id: 'unknown', name: 'Tutor', subject: 'Coding' }; }
 }
 
 function _safeGetMyBookings() {

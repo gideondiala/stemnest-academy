@@ -1,27 +1,39 @@
 /* ═══════════════════════════════════════════════════════
    STEMNEST ACADEMY — TUTOR DASHBOARD JS
-   Loads logged-in teacher from localStorage registry,
+   Loads logged-in teacher from API session profile,
    weekly availability calendar, photo upload, notifications.
 ═══════════════════════════════════════════════════════ */
 
 /* ── LOAD LOGGED-IN TUTOR ── */
-// Admin creates teachers via sn_teachers registry.
-// Login stores the active teacher id in sn_logged_in_teacher.
-// Fall back to a default so the page still works standalone.
+// Login stores the full tutor profile in sn_current_tutor.
+// We read that here — never from the old sn_teachers registry.
 function getLoggedInTutor() {
   try {
-    const id      = localStorage.getItem('sn_logged_in_teacher');
-    const registry = JSON.parse(localStorage.getItem('sn_teachers') || '[]');
-    const found   = id ? registry.find(t => t.id === id) : null;
-    return found || {
-      id: 'CT001', name: 'Sarah Rahman', initials: 'SR',
-      role: 'Coding Tutor', subject: 'Coding',
-      email: 'sarah.rahman@stemnestacademy.co.uk',
-      courses: ['Python for Beginners','Scratch & Game Design','Web Dev'],
-      gradeGroups: ['Year 7–9','Year 10–11'],
-      photo: null,
-    };
-  } catch { return { id:'CT001', name:'Sarah Rahman', initials:'SR', role:'Coding Tutor', subject:'Coding', photo:null }; }
+    const stored = localStorage.getItem('sn_current_tutor');
+    if (stored) {
+      const t = JSON.parse(stored);
+      if (t && t.id) {
+        return {
+          id:          t.id,
+          dbId:        t.dbId || t.id,
+          name:        t.name || 'Tutor',
+          initials:    t.initials || (t.name || 'T').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase(),
+          role:        t.role || 'tutor',
+          subject:     t.subject || 'Coding',
+          email:       t.email || '',
+          courses:     t.courses || [],
+          gradeGroups: t.gradeGroups || t.grade_groups || [],
+          availability:t.availability || '',
+          photo:       t.photo || null,
+        };
+      }
+    }
+    /* Fallback: blank profile — will be filled by _loadTutorFromAPI */
+    const id = localStorage.getItem('sn_logged_in_teacher') || '';
+    return { id, name: 'Loading…', initials: '…', role: 'tutor', subject: 'Coding', photo: null };
+  } catch {
+    return { id: '', name: 'Loading…', initials: '…', role: 'tutor', subject: 'Coding', photo: null };
+  }
 }
 
 let TUTOR = getLoggedInTutor();
@@ -106,11 +118,57 @@ document.addEventListener('DOMContentLoaded', () => {
 async function _loadTutorFromAPI() {
   try {
     const token = localStorage.getItem('sn_access_token');
-    if (!token) {
-        window.TUTOR_DATA.bookings = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
-        return;
+    if (!token) return;
+
+    /* ── Fetch full tutor profile from API ── */
+    const meRes = await fetch('https://api.stemnestacademy.co.uk/api/auth/me', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (meRes.ok) {
+      const meData = await meRes.json();
+      if (meData.user) {
+        const u = meData.user;
+        /* Also fetch tutor_profiles data */
+        const profRes = await fetch('https://api.stemnestacademy.co.uk/api/users/' + u.id, {
+          headers: { 'Authorization': 'Bearer ' + token },
+        });
+        let subject = 'Coding', courses = [], gradeGroups = [], availability = '';
+        if (profRes.ok) {
+          const profData = await profRes.json();
+          if (profData.user) {
+            subject      = profData.user.subject      || 'Coding';
+            courses      = profData.user.courses      || [];
+            gradeGroups  = profData.user.grade_groups || [];
+            availability = profData.user.availability || '';
+          }
+        }
+
+        /* Update TUTOR with real data */
+        TUTOR.id          = u.staff_id || u.id;
+        TUTOR.dbId        = u.id;
+        TUTOR.name        = u.name;
+        TUTOR.initials    = u.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+        TUTOR.email       = u.email;
+        TUTOR.subject     = subject;
+        TUTOR.courses     = courses;
+        TUTOR.gradeGroups = gradeGroups;
+        TUTOR.availability= availability;
+        TUTOR.photo       = u.photo_url || null;
+
+        /* Persist updated profile so other JS files can read it */
+        localStorage.setItem('sn_current_tutor', JSON.stringify({
+          id: TUTOR.id, dbId: TUTOR.dbId, name: TUTOR.name,
+          initials: TUTOR.initials, email: TUTOR.email, role: 'tutor',
+          subject, courses, gradeGroups, availability,
+        }));
+
+        /* Re-render sidebar with real data */
+        renderSidebarProfile();
+        populateProfileModal();
+      }
     }
 
+    /* ── Fetch bookings for this tutor ── */
     const bRes = await fetch('https://api.stemnestacademy.co.uk/api/bookings?limit=500', {
       headers: { 'Authorization': 'Bearer ' + token },
     });
@@ -153,7 +211,6 @@ async function _loadTutorFromAPI() {
 
   } catch (e) {
     console.warn('[Dashboard] API load failed:', e.message);
-    window.TUTOR_DATA.bookings = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
   }
 }
 

@@ -330,7 +330,7 @@ router.get('/dashboard/:role', requireAuth, async (req, res, next) => {
     }
 
     if (role === 'admin') {
-      const [bookings, classReports, pipelines, courses, materials, tutors, sales] = await Promise.all([
+      const [bookings, classReports, pipelines, courses, tutors, sales] = await Promise.all([
         pool.query(`SELECT b.*, u_s.name AS student_name, u_s.email AS student_email,
                            u_t.name AS tutor_name, u_sp.name AS sales_name
                     FROM bookings b
@@ -350,7 +350,6 @@ router.get('/dashboard/:role', requireAuth, async (req, res, next) => {
                     LEFT JOIN users u_s ON u_s.id = b.student_id
                     ORDER BY p.updated_at DESC LIMIT 500`),
         pool.query(`SELECT * FROM courses ORDER BY name ASC`),
-        pool.query(`SELECT * FROM companion_materials ORDER BY created_at DESC LIMIT 500`),
         pool.query(`SELECT u.id, u.staff_id, u.name, u.email, u.phone, u.whatsapp, u.is_active,
                            tp.subject, tp.courses, tp.grade_groups, tp.availability
                     FROM users u
@@ -362,7 +361,7 @@ router.get('/dashboard/:role', requireAuth, async (req, res, next) => {
       result.classReports = classReports.rows;
       result.pipelines    = pipelines.rows;
       result.courses      = courses.rows;
-      result.materials    = materials.rows;
+      result.materials    = []; // companion_materials table may not exist yet
       result.tutors       = tutors.rows;
       result.sales        = sales.rows;
     }

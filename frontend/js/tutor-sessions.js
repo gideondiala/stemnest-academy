@@ -29,15 +29,22 @@ function getBookings() {
 }
 function saveBookings(list) { _setLocalStr('sn_bookings', JSON.stringify(list)); }
 
-/* Always get the freshest TUTOR object — avoids timing issues */
+/* Always get the freshest TUTOR object from login session or API */
 function getCurrentTutor() {
   try {
-    const id       = _getLocalStr('sn_logged_in_teacher');
-    const registry = JSON.parse(_getLocalStr('sn_teachers') || '[]');
-    const found    = id ? registry.find(t => t.id === id) : null;
-    return found || (typeof TUTOR !== 'undefined' ? TUTOR : { id: 'CT001' });
+    /* First: use the profile stored at login time (most reliable) */
+    const stored = localStorage.getItem('sn_current_tutor');
+    if (stored) {
+      const t = JSON.parse(stored);
+      if (t && t.id) return t;
+    }
+    /* Second: fall back to window.TUTOR_DATA if dashboard loaded it */
+    if (typeof TUTOR !== 'undefined' && TUTOR && TUTOR.id) return TUTOR;
+    /* Last resort: use the raw ID stored at login */
+    const id = localStorage.getItem('sn_logged_in_teacher');
+    return { id: id || 'unknown', name: 'Tutor' };
   } catch {
-    return typeof TUTOR !== 'undefined' ? TUTOR : { id: 'CT001' };
+    return typeof TUTOR !== 'undefined' ? TUTOR : { id: 'unknown', name: 'Tutor' };
   }
 }
 

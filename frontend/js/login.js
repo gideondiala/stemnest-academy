@@ -70,44 +70,18 @@ const loginConfig = {
 
 /* ── INIT ── */
 document.addEventListener('DOMContentLoaded', () => {
-  seedRegistries();   // ensure defaults exist before any login attempt
   switchRole('student');
   document.addEventListener('keydown', e => {
     if (e.key === 'Enter') handleLogin();
   });
 });
 
-/* ── SEED DEFAULT REGISTRIES (runs once, skips if already populated) ── */
+/* ── SEED DEFAULT REGISTRIES — REMOVED
+   All user data now comes from the real database via API.
+   No hardcoded teachers, sales, or staff in localStorage.
+── */
 function seedRegistries() {
-  // Teachers
-  if (!localStorage.getItem('sn_teachers') || JSON.parse(localStorage.getItem('sn_teachers')).length === 0) {
-    const teachers = [
-      { id:'CT001', name:'Sarah Rahman',  initials:'SR', subject:'Coding',   email:'sarah.rahman@stemnestacademy.co.uk',  password:'StemNest2024!', courses:['Python for Beginners','Scratch & Game Design','Web Dev: HTML/CSS/JS'], gradeGroups:['Year 7–9','Year 10–11'], availability:'Mon–Fri, 9am–6pm', dbs:'yes', color:'linear-gradient(135deg,#1a56db,#4f87f5)', photo:null },
-      { id:'MT001', name:'James Okafor',  initials:'JO', subject:'Maths',    email:'james.okafor@stemnestacademy.co.uk',  password:'StemNest2024!', courses:['Primary Maths Boost','GCSE Maths Prep','A-Level Maths Mastery'],         gradeGroups:['Year 7–9','Year 10–11','Year 12–13'], availability:'Mon–Sat, 10am–7pm', dbs:'yes', color:'linear-gradient(135deg,#0e9f6e,#3dd9a4)', photo:null },
-      { id:'ST001', name:'Lisa Patel',    initials:'LP', subject:'Sciences', email:'lisa.patel@stemnestacademy.co.uk',    password:'StemNest2024!', courses:['GCSE Biology','GCSE Chemistry','A-Level Physics'],                         gradeGroups:['Year 10–11','Year 12–13'], availability:'Tue–Sat, 11am–6pm', dbs:'yes', color:'linear-gradient(135deg,#ff6b35,#ffaa80)', photo:null },
-      { id:'CT002', name:'Marcus King',   initials:'MK', subject:'Coding',   email:'marcus.king@stemnestacademy.co.uk',   password:'StemNest2024!', courses:['Python for Beginners','AI Literacy','A-Level Computer Science'],           gradeGroups:['Year 10–11','Year 12–13'], availability:'Mon–Fri, 2pm–9pm', dbs:'yes', color:'linear-gradient(135deg,#7c3aed,#a78bfa)', photo:null },
-    ];
-    localStorage.setItem('sn_teachers', JSON.stringify(teachers));
-  }
-
-  // Sales persons
-  if (!localStorage.getItem('sn_sales_persons') || JSON.parse(localStorage.getItem('sn_sales_persons')).length === 0) {
-    const salesPersons = [
-      { id:'SP001', name:'Alex Johnson', initials:'AJ', email:'alex.johnson@stemnestacademy.co.uk', password:'StemNest2024!', region:'UK & Europe',   bio:'Senior academic counselor.', color:'linear-gradient(135deg,#ff6b35,#fbbf24)', photo:null },
-    ];
-    localStorage.setItem('sn_sales_persons', JSON.stringify(salesPersons));
-  }
-
-  // Operations, Pre-Sales, Post-Sales, HR staff
-  if (!localStorage.getItem('sn_staff') || JSON.parse(localStorage.getItem('sn_staff')).length === 0) {
-    const staff = [
-      { id:'OPS001', name:'Operations Team', email:'ops@stemnestacademy.co.uk',      password:'StemNest2024!', role:'operations' },
-      { id:'PS001',  name:'Pre-Sales Team',  email:'presales@stemnestacademy.co.uk', password:'StemNest2024!', role:'presales'   },
-      { id:'POS001', name:'Post-Sales Team', email:'postsales@stemnestacademy.co.uk',password:'StemNest2024!', role:'postsales'  },
-      { id:'HR001',  name:'HR Team',         email:'hr@stemnestacademy.co.uk',       password:'StemNest2024!', role:'hr'         },
-    ];
-    localStorage.setItem('sn_staff', JSON.stringify(staff));
-  }
+  // No-op: data is loaded from the API, not seeded locally.
 }
 
 /* ── SWITCH ROLE ── */
@@ -207,8 +181,19 @@ async function handleLogin() {
 
       const dest = roleRoutes[user.role];
       if (dest) {
-        /* Store role-specific IDs for dashboard JS compatibility */
-        if (user.role === 'tutor')   localStorage.setItem('sn_logged_in_teacher', user.staffId || user.id);
+        /* Store auth token and full user profile for dashboard use */
+        if (user.role === 'tutor') {
+          localStorage.setItem('sn_logged_in_teacher', user.staffId || user.id);
+          /* Store full tutor profile so dashboard doesn't need to look up sn_teachers */
+          localStorage.setItem('sn_current_tutor', JSON.stringify({
+            id:           user.staffId || user.id,
+            dbId:         user.id,
+            name:         user.name,
+            email:        user.email,
+            role:         user.role,
+            initials:     user.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase(),
+          }));
+        }
         if (user.role === 'sales')   localStorage.setItem('sn_logged_in_sales',   user.staffId || user.id);
         if (user.role === 'student') localStorage.setItem('sn_logged_in_student', user.email);
         setTimeout(() => navigate(dest), 700);
