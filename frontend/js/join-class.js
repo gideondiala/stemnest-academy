@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-function findClass() {
+async function findClass() {
   const raw   = (document.getElementById('lookupInput')?.value || '').trim();
   const query = raw.toLowerCase();
   if (!query) { showToast('Please enter your Gmail or WhatsApp number.', 'error'); return; }
@@ -21,12 +21,35 @@ function findClass() {
   const btn = document.getElementById('lookupBtnText');
   if (btn) btn.textContent = 'Searching...';
 
-  setTimeout(() => {
+  try {
+    /* Fetch all bookings from the API — no auth needed for public lookup */
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/bookings/lookup?q=' + encodeURIComponent(raw));
+    const data = await res.json();
+
     if (btn) btn.textContent = 'Find My Class';
 
-    const bookings = getBookings();
-    const normalise = s => s.replace(/[\s\-\(\)]/g, '').toLowerCase();
-    const matches = bookings.filter(b =>
+    const allBookings = (data.bookings || []).map(b => {
+      let notes = {};
+      try { notes = typeof b.notes === 'string' ? JSON.parse(b.notes) : (b.notes || {}); } catch {}
+      return {
+        id:              b.id,
+        studentName:     b.lesson_name || notes.studentName || '—',
+        age:             notes.age || b.grade || '—',
+        grade:           b.grade || notes.grade || '—',
+        email:           b.student_email || notes.email || '—',
+        whatsapp:        notes.whatsapp || '—',
+        subject:         b.subject || '—',
+        date:            b.date ? b.date.split('T')[0] : '—',
+        time:            notes.time || b.time || '—',
+        status:          b.status,
+        assignedTutor:   b.tutor_name || '—',
+        classLink:       b.class_link || '',
+        bookedAt:        b.booked_at || b.created_at,
+      };
+    });
+
+    const normalise = s => s.replace(/[\s\-\(\)\+]/g, '').toLowerCase();
+    const matches = allBookings.filter(b =>
       b.email?.toLowerCase() === query ||
       normalise(b.whatsapp || '') === normalise(raw)
     );
@@ -44,7 +67,11 @@ function findClass() {
     show('classScreen');
     hide('lookupScreen');
     hide('noBookingScreen');
-  }, 800);
+  } catch (err) {
+    if (btn) btn.textContent = 'Find My Class';
+    console.error('[JoinClass] Lookup failed:', err);
+    showToast('Could not connect to server. Please try again.', 'error');
+  }
 }
 
 function renderClassScreen(b, allMatches) {
@@ -159,15 +186,6 @@ async function confirmCancellation() {
     
     if (!res.ok) throw new Error('Failed to cancel');
     
-    // Update local state purely for immediate UI feedback if it's there
-    var all = getBookings();
-    var idx = all.findIndex(function(x) { return x.id === activeJCBookingId; });
-    if (idx !== -1) { 
-      all[idx].status = 'cancelled'; 
-      all[idx].cancelReason = reason; 
-      localStorage.setItem('sn_bookings', JSON.stringify(all)); 
-    }
-
     removeJCModal();
 
     var joinCard = document.getElementById('joinCard');
@@ -300,8 +318,9 @@ function resetLookup() {
 }
 
 /* ── Helpers ── */
-function getBookings() {
-  try { return JSON.parse(localStorage.getItem('sn_bookings') || '[]'); } catch { return []; }
+async function getBookings() {
+  // Always fetch from API — no localStorage for business data
+  return [];
 }
 function show(id) { var el = document.getElementById(id); if (el) el.style.display = 'flex'; }
 function hide(id) { var el = document.getElementById(id); if (el) el.style.display = 'none'; }

@@ -3,9 +3,9 @@
    Tabs, lessons, projects, quizzes, certificates, PDF.
 ═══════════════════════════════════════════════════════ */
 
-/* ── STUDENT DATA ── */
+/* ── STUDENT DATA — populated from API, not hardcoded ── */
 const STUDENT = {
-  name: 'James Okafor', initials: 'JO', id: 'S-0047', year: 'Year 9',
+  name: '', initials: '', id: '', year: '',
 };
 
 /* ── COURSES & PROGRESS ── */
@@ -104,14 +104,20 @@ async function _loadStudentFromAPI() {
       // Update UI with profile data
       if (window.STUDENT_DATA.profile) {
         const s = window.STUDENT_DATA.profile;
-        const nameEl = document.getElementById('sidebarName');
-        if (nameEl) nameEl.textContent = s.name || STUDENT.name;
         
+        // Populate the STUDENT object from real API data
+        STUDENT.name = s.name || '';
+        STUDENT.year = s.grade || '';
         const rawId = s.id || '';
         const numMatch = rawId.match(/(\d+)$/);
-        const formattedId = numMatch ? 'S-' + numMatch[1].padStart(4, '0') : rawId.slice(0, 8);
+        STUDENT.id = numMatch ? 'S-' + numMatch[1].padStart(4, '0') : (s.staff_id || rawId.slice(0, 8));
+        STUDENT.initials = (s.name || '').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+
+        const nameEl = document.getElementById('sidebarName');
+        if (nameEl) nameEl.textContent = s.name || '';
+        
         const idEl = document.querySelector('.student-id-badge');
-        if (idEl) idEl.textContent = 'ID: ' + formattedId;
+        if (idEl) idEl.textContent = 'ID: ' + STUDENT.id;
         
         updateCreditsDisplay(parseInt(s.credits) || 0);
       } else {
@@ -454,14 +460,15 @@ function submitProject() {
   const project = pendingProjects.splice(idx, 1)[0];
   submittedProjects.push({ ...project, submission: text, submittedAt: new Date().toISOString() });
 
-  // Save to localStorage so teacher can see it
-  try {
-    const email = localStorage.getItem('sn_logged_in_student') || STUDENT.id;
-    const key = 'sn_submitted_projects_' + email;
-    const saved = JSON.parse(localStorage.getItem(key) || '[]');
-    saved.unshift({ ...project, submission: text, submittedAt: new Date().toISOString(), status: 'submitted' });
-    localStorage.setItem(key, JSON.stringify(saved));
-  } catch(e) {}
+  // Submit to API
+  const token = localStorage.getItem('sn_access_token');
+  if (token && project.id) {
+    fetch('https://api.stemnestacademy.co.uk/api/projects/' + project.id + '/submit', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ submission: text })
+    }).catch(e => console.warn('[Student] Project submit API failed:', e.message));
+  }
 
   closeProjectModal();
   renderPendingProjects();

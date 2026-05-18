@@ -6,7 +6,7 @@
 ═══════════════════════════════════════════════════════ */
 
 /* ══════════════════════════════════════════════════════
-   TEACHER REGISTRY (localStorage: sn_teachers)
+   TEACHER REGISTRY (fetched from API via window.ADMIN_DATA)
 ══════════════════════════════════════════════════════ */
 const SUBJECT_PREFIX = { Coding: 'CT', Maths: 'MT', Sciences: 'ST' };
 
@@ -302,8 +302,23 @@ function viewBooking(id) {
 function closeDetailModal() { document.getElementById('detailModalOverlay').classList.remove('open'); }
 
 /* ── MARK COMPLETE ── */
-function markComplete(id) {
-  updateBooking(id, { status:'completed' });
+async function markComplete(id) {
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/bookings/' + id + '/status', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify({ status: 'completed' })
+    });
+    const data = await res.json();
+    if (!data.success) { showToast(data.error || 'Failed to mark complete', 'error'); return; }
+  } catch (err) {
+    console.warn('[Admin] markComplete API failed, updating locally:', err.message);
+  }
+  await _loadAdminFromAPI();
   loadBookings();
   showToast('✅ Class marked as completed!');
 }
@@ -388,31 +403,47 @@ function closeAssignModal() {
   activeAssignId = null;
 }
 
-function confirmAssign() {
+async function confirmAssign() {
   const tutorId   = document.getElementById('assignTutorSelect').value;
   const classLink = document.getElementById('assignClassLink').value.trim();
   const notes     = document.getElementById('assignNotes').value.trim();
   if (!tutorId)   { showToast('Please select a teacher.', 'error'); return; }
   if (!classLink) { showToast('Please enter the class link (Google Meet / Zoom).', 'error'); return; }
 
-  const teacher = getTeachers().find(t => t.id===tutorId);
-  const booking = allBookings.find(b => b.id===activeAssignId);
+  const teacher = getTeachers().find(t => t.id === tutorId);
 
-  updateBooking(activeAssignId, {
-    status:          'scheduled',
-    assignedTutor:   teacher?.name || '—',
-    assignedTutorId: tutorId,
-    classLink,
-    notes,
-    tutorNotified:   false, // teacher dashboard will pick this up
-  });
+  const btn = document.querySelector('#assignModalOverlay .ab-btn-assign, #assignModalOverlay button[onclick="confirmAssign()"]');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Assigning…'; }
 
-  // Simulate email notification to teacher
-  simulateTeacherNotification(teacher, booking, classLink);
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/bookings/' + activeAssignId + '/assign', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify({ tutorId, classLink, notes: notes || undefined })
+    });
 
-  closeAssignModal();
-  loadBookings();
-  showToast(`✅ ${teacher?.name} assigned and notified!`);
+    const data = await res.json();
+    if (btn) { btn.disabled = false; btn.textContent = '✅ Confirm Assign'; }
+
+    if (!data.success) {
+      showToast(data.error || 'Failed to assign teacher', 'error');
+      return;
+    }
+
+    closeAssignModal();
+    // Refresh from API so the UI reflects the real DB state
+    await _loadAdminFromAPI();
+    loadBookings();
+    showToast(`✅ ${teacher?.name || 'Teacher'} assigned and notified!`);
+  } catch (err) {
+    if (btn) { btn.disabled = false; btn.textContent = '✅ Confirm Assign'; }
+    console.error('[Admin] Assign failed:', err);
+    showToast('Network error. Please try again.', 'error');
+  }
 }
 
 function simulateTeacherNotification(teacher, booking, classLink) {

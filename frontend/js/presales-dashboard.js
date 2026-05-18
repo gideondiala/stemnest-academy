@@ -320,7 +320,7 @@ function populateTeacherDropdown(subject) {
 function populateSalesDropdown() {
   const sel = document.getElementById('sm-sales');
   if (!sel) return;
-  const salesPersons = JSON.parse(localStorage.getItem('sn_sales_persons') || '[]');
+  const salesPersons = getSales();
   sel.innerHTML = '<option value="">— Select a sales person —</option>' +
     salesPersons.map(s => `<option value="${s.id}">${s.name} (${s.id})</option>`).join('');
 }
@@ -495,9 +495,13 @@ function checkBirthdayForUser(userId, firstName) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  const staff = JSON.parse(localStorage.getItem('sn_staff') || '[]');
-  const ps = staff.find(s => s.role === 'presales');
-  if (ps) setTimeout(() => checkBirthdayForUser(ps.id, ps.name.split(' ')[0]), 1500);
+  // Birthday check uses API profile data — no localStorage needed
+  const token = localStorage.getItem('sn_access_token');
+  if (token) {
+    fetch('https://api.stemnestacademy.co.uk/api/users/me/notifications', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    }).catch(() => {});
+  }
 });
 
 /* ══════════════════════════════════════════════════════

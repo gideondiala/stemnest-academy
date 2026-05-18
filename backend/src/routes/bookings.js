@@ -62,7 +62,44 @@ const rescheduleSchema = z.object({
 });
 
 /* ══════════════════════════════════════════════
-   GET /api/bookings
+   GET /api/bookings/lookup  (public — by email or whatsapp)
+   Used by the join-class page so students can find their booking
+   without needing to log in.
+══════════════════════════════════════════════ */
+router.get('/lookup', async (req, res, next) => {
+  try {
+    const { q } = req.query;
+    if (!q || q.trim().length < 5) {
+      return res.status(400).json({ success: false, error: 'Query too short' });
+    }
+
+    const search = q.trim().toLowerCase();
+    /* Normalise phone: strip spaces, dashes, brackets, leading + */
+    const phoneNorm = search.replace(/[\s\-\(\)\+]/g, '');
+
+    /* Search inside the notes JSON column for email or whatsapp */
+    const result = await pool.query(
+      `SELECT b.id, b.subject, b.grade, b.date, b.time, b.status,
+              b.class_link, b.notes, b.booked_at, b.lesson_name,
+              u_t.name AS tutor_name
+       FROM bookings b
+       LEFT JOIN users u_t ON u_t.id = b.tutor_id
+       WHERE b.is_demo = TRUE
+         AND (
+           LOWER(b.notes::text) LIKE $1
+           OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(b.notes::text,' ',''),'-',''),'(',''),')',''),'+','') LIKE $2
+         )
+       ORDER BY b.booked_at DESC
+       LIMIT 20`,
+      ['%' + search + '%', '%' + phoneNorm + '%']
+    );
+
+    res.json({ success: true, bookings: result.rows });
+  } catch (err) { next(err); }
+});
+
+/* ══════════════════════════════════════════════
+   GET /api/bookings  (authenticated)
 ══════════════════════════════════════════════ */
 router.get('/', requireAuth, async (req, res, next) => {
   try {
@@ -285,6 +322,30 @@ router.put('/:id/assign', requireAuth, requireRole('admin','super_admin','presal
     }
     next(err);
   }
+});
+
+/* ══════════════════════════════════════════════
+   PUT /api/bookings/:id/status  (admin/tutor)
+══════════════════════════════════════════════ */
+router.put('/:id/status', requireAuth, requireRole('admin','super_admin','tutor','presales','postsales'), async (req, res, next) => {
+  try {
+    const { status } = req.body;
+    const allowed = ['pending','scheduled','completed','incomplete','cancelled','teacher_absent'];
+    if (!allowed.includes(status)) {
+      return res.status(400).json({ success: false, error: 'Invalid status: ' + status });
+    }
+
+    const bResult = await pool.query('SELECT id FROM bookings WHERE id = $1', [req.params.id]);
+    if (!bResult.rows.length) return res.status(404).json({ success: false, error: 'Booking not found' });
+
+    await pool.query(
+      `UPDATE bookings SET status = $1${status === 'completed' ? ', completed_at = NOW()' : ''} WHERE id = $2`,
+      [status, req.params.id]
+    );
+
+    logger.info(`[STATUS] Booking ${req.params.id} → ${status} by ${req.user.email}`);
+    res.json({ success: true, message: 'Status updated' });
+  } catch (err) { next(err); }
 });
 
 /* ══════════════════════════════════════════════
