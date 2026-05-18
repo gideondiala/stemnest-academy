@@ -79,9 +79,10 @@ async function _loadStudentFromAPI() {
       }));
 
       // Map API bookings to UI LESSONS
-      LESSONS = (data.bookings || []).map(b => {
+      LESSONS = (data.bookings || []).filter(b => b.status === 'scheduled').map(b => {
         let dateStr = '—';
-        let timeStr = b.time || '—';
+        // Strip seconds from time: "14:00:00" → "14:00"
+        let timeStr = (b.time || '—').replace(/^(\d{1,2}:\d{2}):\d{2}$/, '$1');
         try {
           if (b.date) {
             const d = new Date(b.date);
@@ -97,8 +98,32 @@ async function _loadStudentFromAPI() {
           subject: b.subject || '',
           duration: (b.duration_mins || 60) + ' mins',
           status: b.status === 'scheduled' ? 'upcoming' : b.status,
+          classLink: b.class_link || '',
           modules: []
         };
+      });
+
+      // Map API projects to UI project arrays
+      pendingProjects   = [];
+      submittedProjects = [];
+      reviewedProjects  = [];
+      (data.projects || []).forEach((p, i) => {
+        const proj = {
+          id:         p.id || i,
+          title:      p.title || 'Project',
+          course:     p.course_name || '—',
+          brief:      p.brief || 'Complete this project as instructed by your tutor.',
+          due:        p.due_date ? new Date(p.due_date).toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'}) : 'No deadline',
+          emoji:      '💻',
+          steps:      ['Read the brief carefully', 'Plan your approach', 'Build and test', 'Submit your work'],
+          submission: p.submission || '',
+          remarks:    p.remarks || '',
+          score:      p.score,
+          reviewedBy: 'Tutor',
+        };
+        if (p.status === 'reviewed')   reviewedProjects.push(proj);
+        else if (p.status === 'submitted') submittedProjects.push(proj);
+        else pendingProjects.push(proj);
       });
 
       // Update UI with profile data

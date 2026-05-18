@@ -367,7 +367,7 @@ router.get('/dashboard/:role', requireAuth, async (req, res, next) => {
     }
 
     if (role === 'student') {
-      const [bookings, topups, courses, students] = await Promise.all([
+      const [bookings, topups, courses, students, projects] = await Promise.all([
         pool.query(`SELECT b.*, u_t.name AS tutor_name, u_t.photo_url AS tutor_photo
                     FROM bookings b
                     LEFT JOIN users u_t ON u_t.id = b.tutor_id
@@ -381,13 +381,21 @@ router.get('/dashboard/:role', requireAuth, async (req, res, next) => {
                            sp.grade, sp.age, sp.credits, sp.enrolled_at, sp.parent_name, sp.parent_email
                     FROM users u
                     LEFT JOIN student_profiles sp ON sp.user_id = u.id
-                    WHERE u.id = $1`, [userId])
+                    WHERE u.id = $1`, [userId]),
+        pool.query(`SELECT p.id, p.title, p.brief, p.due_date, p.status,
+                           p.submission, p.remarks, p.score, p.submitted_at, p.reviewed_at,
+                           c.name AS course_name
+                    FROM projects p
+                    LEFT JOIN courses c ON c.id = p.course_id
+                    WHERE p.student_id = $1
+                    ORDER BY p.created_at DESC LIMIT 100`, [userId]).catch(() => ({ rows: [] })),
       ]);
       result.bookings = bookings.rows;
       result.payments = topups.rows;
       result.topups   = topups.rows;
       result.courses  = courses.rows;
       result.students = students.rows;
+      result.projects = projects.rows;
     }
 
     res.json({ success: true, ...result });

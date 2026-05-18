@@ -126,8 +126,8 @@ router.get('/', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-/* ── POST /api/users (admin only) — create any user ── */
-router.post('/', async (req, res, next) => {
+/* ── POST /api/users — create any user (requires login) ── */
+router.post('/', requireAuth, async (req, res, next) => {
   try {
     const data = createUserSchema.parse(req.body);
 

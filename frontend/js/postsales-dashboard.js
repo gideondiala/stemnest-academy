@@ -80,22 +80,33 @@ async function _loadPOSFromAPI() {
       if (dData.teachers) window.POS_DATA.teachers = dData.teachers;
     } catch {}
 
-    // Fallbacks
-    if (window.POS_DATA.students.length === 0) {
-      window.POS_DATA.students = JSON.parse(localStorage.getItem('sn_students') || '[]');
-    }
+    // If teachers still empty, fetch from API
     if (window.POS_DATA.teachers.length === 0) {
-      window.POS_DATA.teachers = JSON.parse(localStorage.getItem('sn_teachers') || '[]');
+      try {
+        const tRes = await fetch('https://api.stemnestacademy.co.uk/api/users?role=tutor', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (tRes.ok) {
+          const tData = await tRes.json();
+          window.POS_DATA.teachers = (tData.users || []).map(u => ({
+            id: u.id, staffId: u.staff_id, name: u.name, subject: u.subject || 'Coding'
+          }));
+        }
+      } catch {}
     }
-    if (window.POS_DATA.pipeline.length === 0) {
-      const persons = JSON.parse(localStorage.getItem('sn_sales_persons') || '[]');
-      window.POS_DATA.pipeline = persons.flatMap(sp =>
-        JSON.parse(localStorage.getItem('sn_pipeline_' + sp.id) || '[]')
-          .map(p => ({ ...p, salesPersonId: sp.id, salesPersonName: sp.name }))
-      );
-    }
+
+    // Courses from API
+    try {
+      const cRes = await fetch('https://api.stemnestacademy.co.uk/api/courses', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      if (cRes.ok) {
+        const cData = await cRes.json();
+        window.POS_DATA.courses = cData.courses || [];
+      }
+    } catch {}
+
     window.POS_DATA.paymentLinks = JSON.parse(localStorage.getItem('sn_payment_links') || '[]');
-    window.POS_DATA.courses = JSON.parse(localStorage.getItem('sn_courses') || '[]');
 
   } catch (e) {
     console.warn('[PostSales Dashboard] API load failed:', e.message);
@@ -751,7 +762,7 @@ async function confirmOnboard() {
   if (existIdx !== -1) existing[existIdx] = { ...existing[existIdx], ...student };
   else existing.push(student);
   window.POS_DATA.students = existing;
-  localStorage.setItem('sn_students', JSON.stringify(existing));
+  // Data is in the DB — no localStorage write needed
 
   /* Mark booking as onboarded */
   const all = getBookings();
@@ -1014,9 +1025,7 @@ async function confirmManualOnboard() {
 
   existing.push(student);
   window.POS_DATA.students = existing;
-  localStorage.setItem('sn_students', JSON.stringify(existing));
-
-  // Create a booking record so it appears on teacher dashboard
+  // Data is in the DB — no localStorage write needed
   // (Pre-Sales style — status 'converted', salesStatus 'converted')
   const bookingId = 'MOB-' + Date.now().toString(36).toUpperCase();
   const booking = {
@@ -1067,7 +1076,7 @@ async function confirmManualOnboard() {
   if (sIdx !== -1) { 
     existing[sIdx].bookingId = bookingId; 
     window.POS_DATA.students = existing;
-    localStorage.setItem('sn_students', JSON.stringify(existing)); 
+    // Data is in the DB — no localStorage write needed
   }
 
   // Update password registry
