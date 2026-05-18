@@ -339,7 +339,6 @@ async function confirmScheduleDemo() {
   const notes      = document.getElementById('sm-notes')?.value.trim();
 
   if (!teacherId) { showToast('Please select a teacher.', 'error'); return; }
-  if (!salesId)   { showToast('Please select a sales person.', 'error'); return; }
   if (!date)      { showToast('Please select a date.', 'error'); return; }
   if (!time)      { showToast('Please select a time.', 'error'); return; }
   if (!link)      { showToast('Please enter a class link.', 'error'); return; }
@@ -356,17 +355,19 @@ async function confirmScheduleDemo() {
     const bookingId = psScheduleBookingId;
     if (!bookingId) throw new Error('No booking selected');
 
+    const assignPayload = {
+      tutorId:   teacherId,
+      classLink: link,
+      date:      date,
+      time:      time,
+    };
+    if (salesId) assignPayload.salesId = salesId;
+    if (notes)   assignPayload.notes   = notes;
+
     const res = await fetch('https://api.stemnestacademy.co.uk/api/bookings/' + bookingId + '/assign', {
       method:  'PUT',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body:    JSON.stringify({
-        tutorId:   teacherId,   // UUID
-        salesId:   salesId,     // UUID
-        classLink: link,
-        date:      date,
-        time:      time,
-        notes:     notes || undefined
-      }),
+      body:    JSON.stringify(assignPayload),
     });
 
     const data = await res.json();

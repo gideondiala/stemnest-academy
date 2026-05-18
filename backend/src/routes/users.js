@@ -80,23 +80,46 @@ router.put('/me/notifications/:id/read', requireAuth, async (req, res, next) => 
   } catch (err) { next(err); }
 });
 
-/* ── GET /api/users (admin only) ── */
-router.get('/', requireAuth, requireRole('admin', 'super_admin'), async (req, res, next) => {
+/* ── GET /api/users ── */
+/* Admin/super_admin: full access. Presales/postsales: can only list tutors and sales. */
+router.get('/', requireAuth, async (req, res, next) => {
   try {
     const { role, search } = req.query;
-    let query = 'SELECT id, name, email, role, staff_id, phone, is_active, created_at FROM users WHERE 1=1';
+    const callerRole = req.user.role;
+
+    /* Access control */
+    const isAdmin = ['admin', 'super_admin'].includes(callerRole);
+    const isStaff = ['presales', 'postsales', 'sales', 'operations', 'hr'].includes(callerRole);
+
+    if (!isAdmin && !isStaff) {
+      return res.status(403).json({ success: false, error: 'Access denied' });
+    }
+
+    /* Staff (non-admin) can only query tutors or sales — not all users */
+    if (!isAdmin && role && !['tutor', 'sales'].includes(role)) {
+      return res.status(403).json({ success: false, error: 'Access denied for this role filter' });
+    }
+    if (!isAdmin && !role) {
+      return res.status(403).json({ success: false, error: 'Role filter required' });
+    }
+
+    let query = `SELECT id, name, email, role, staff_id, phone, is_active, created_at,
+                        tp.subject, tp.courses, tp.grade_groups, tp.availability
+                 FROM users
+                 LEFT JOIN tutor_profiles tp ON tp.user_id = users.id
+                 WHERE 1=1`;
     const params = [];
 
     if (role) {
       params.push(role);
-      query += ` AND role = $${params.length}`;
+      query += ` AND users.role = $${params.length}`;
     }
     if (search) {
       params.push(`%${search}%`);
-      query += ` AND (name ILIKE $${params.length} OR email ILIKE $${params.length})`;
+      query += ` AND (users.name ILIKE $${params.length} OR users.email ILIKE $${params.length})`;
     }
 
-    query += ' ORDER BY created_at DESC';
+    query += ' ORDER BY users.created_at DESC';
     const result = await pool.query(query, params);
     res.json({ success: true, users: result.rows });
   } catch (err) { next(err); }
