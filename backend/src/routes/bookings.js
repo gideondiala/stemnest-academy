@@ -250,7 +250,7 @@ router.get('/:id', requireAuth, async (req, res, next) => {
 ══════════════════════════════════════════════ */
 router.put('/:id/assign', requireAuth, requireRole('admin','super_admin','presales','postsales'), async (req, res, next) => {
   try {
-    const { tutorId, salesId, classLink, notes } = assignSchema.parse(req.body);
+    const { tutorId, salesId, classLink, notes, date, time } = assignSchema.parse(req.body);
 
     /* Support both UUID and staff_id for tutorId */
     let tutorResult = await pool.query('SELECT * FROM users WHERE id = $1', [tutorId]);
@@ -283,18 +283,19 @@ router.put('/:id/assign', requireAuth, requireRole('admin','super_admin','presal
       "status = 'scheduled'",
       'scheduled_at = NOW()',
     ];
-    const updateParams = [tutor.id, salesDbId, classLink, req.params.id];
+    const updateParams = [tutor.id, salesDbId, classLink];
 
-    if (data.date) {
-      updateParams.splice(3, 0, data.date);  // insert before bookingId
-      updateFields.push(`date = $${updateParams.length - 1}::date`);
+    if (date) {
+      updateFields.push(`date = $${updateParams.length + 1}::date`);
+      updateParams.push(date);
     }
-    if (data.time) {
-      updateParams.splice(data.date ? 4 : 3, 0, data.time);
-      updateFields.push(`time = $${updateParams.length - 1}::time`);
+    if (time) {
+      updateFields.push(`time = $${updateParams.length + 1}::time`);
+      updateParams.push(time);
     }
 
     // bookingId is always last param
+    updateParams.push(req.params.id);
     await pool.query(
       `UPDATE bookings SET ${updateFields.join(', ')} WHERE id = $${updateParams.length}`,
       updateParams
