@@ -103,7 +103,8 @@ router.get('/', requireAuth, async (req, res, next) => {
       return res.status(403).json({ success: false, error: 'Role filter required' });
     }
 
-    let query = `SELECT id, name, email, role, staff_id, phone, is_active, created_at,
+    let query = `SELECT users.id, users.name, users.email, users.role, users.staff_id,
+                        users.phone, users.is_active, users.created_at,
                         tp.subject, tp.courses, tp.grade_groups, tp.availability
                  FROM users
                  LEFT JOIN tutor_profiles tp ON tp.user_id = users.id
