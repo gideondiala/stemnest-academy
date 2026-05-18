@@ -53,10 +53,14 @@ function saveTeachers(list) {
 }
 
 function nextTeacherId(subject) {
-  const prefix  = SUBJECT_PREFIX[subject] || 'TT';
-  const teachers = getTeachers();
-  const existing = teachers.map(t => t.staff_id || t.id).filter(id => id && id.startsWith(prefix)).map(id => parseInt(id.slice(2)) || 0);
-  const next     = existing.length ? Math.max(...existing) + 1 : 1;
+  const prefix   = SUBJECT_PREFIX[subject] || 'TT';
+  const teachers = window.ADMIN_DATA.tutors || [];
+  /* Look at ALL users with this prefix in the DB (via loaded tutors) */
+  const existing = teachers
+    .map(t => t.staff_id || '')
+    .filter(id => id && id.startsWith(prefix))
+    .map(id => parseInt(id.slice(prefix.length)) || 0);
+  const next = existing.length ? Math.max(...existing) + 1 : 1;
   return prefix + String(next).padStart(3, '0');
 }
 

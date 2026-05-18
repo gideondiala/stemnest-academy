@@ -106,7 +106,6 @@ router.get('/', requireAuth, requireRole('admin', 'super_admin'), async (req, re
 router.post('/', async (req, res, next) => {
   try {
     const data = createUserSchema.parse(req.body);
-    // validateCreateRole(req, data);
 
     /* Check duplicate email */
     const exists = await pool.query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [data.email]);
@@ -114,12 +113,32 @@ router.post('/', async (req, res, next) => {
       return res.status(409).json({ success: false, error: 'Email already registered' });
     }
 
+    /* If a staff_id was provided, check it's not already taken and auto-increment if needed */
+    let finalStaffId = data.staff_id || null;
+    if (finalStaffId) {
+      const staffExists = await pool.query('SELECT id FROM users WHERE staff_id = $1', [finalStaffId]);
+      if (staffExists.rows.length) {
+        /* Auto-increment: find the highest existing ID with the same prefix and go one higher */
+        const prefix = finalStaffId.replace(/\d+$/, '');
+        const numPart = parseInt(finalStaffId.replace(/^\D+/, '')) || 0;
+        const taken = await pool.query(
+          `SELECT staff_id FROM users WHERE staff_id LIKE $1 ORDER BY staff_id`,
+          [prefix + '%']
+        );
+        const takenNums = taken.rows
+          .map(r => parseInt((r.staff_id || '').replace(/^\D+/, '')) || 0)
+          .filter(n => !isNaN(n));
+        const nextNum = takenNums.length ? Math.max(...takenNums) + 1 : numPart + 1;
+        finalStaffId = prefix + String(nextNum).padStart(3, '0');
+      }
+    }
+
     const passwordHash = await bcrypt.hash(data.password, 12);
     const result = await pool.query(
       `INSERT INTO users (name, email, password_hash, role, staff_id, phone, whatsapp)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING id, name, email, role, staff_id`,
-      [data.name, data.email, passwordHash, data.role, data.staff_id || null, data.phone || null, data.whatsapp || null]
+      [data.name, data.email, passwordHash, data.role, finalStaffId, data.phone || null, data.whatsapp || null]
     );
 
     const user = result.rows[0];
@@ -178,6 +197,16 @@ router.post('/', async (req, res, next) => {
   } catch (err) {
     if (err.name === 'ZodError') {
       return res.status(400).json({ success: false, error: err.errors[0].message });
+    }
+    /* Postgres unique constraint violations — return friendly messages */
+    if (err.code === '23505') {
+      if (err.constraint === 'users_staff_id_key') {
+        return res.status(409).json({ success: false, error: 'Staff ID already in use. Please try again.' });
+      }
+      if (err.constraint === 'users_email_key') {
+        return res.status(409).json({ success: false, error: 'Email already registered.' });
+      }
+      return res.status(409).json({ success: false, error: 'Duplicate entry: ' + (err.detail || err.message) });
     }
     next(err);
   }
