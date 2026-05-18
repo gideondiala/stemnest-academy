@@ -11,8 +11,11 @@ document.addEventListener('DOMContentLoaded', () => {
     weekday:'long', day:'numeric', month:'long', year:'numeric'
   });
   loadSettings();
-  showSATab('overview');
-  bindExpenseModal();
+  /* Load real data from API first, then render */
+  _loadSAFromAPI().then(() => {
+    showSATab('overview');
+    bindExpenseModal();
+  });
 });
 
 /* ── TAB SWITCHING ── */
@@ -44,10 +47,76 @@ function refreshAllReports() {
 }
 
 /* ── DATA HELPERS ── */
-function getBookings()    { try { return JSON.parse(localStorage.getItem('sn_bookings') || '[]'); } catch { return []; } }
-function getTeachers()    { try { return JSON.parse(localStorage.getItem('sn_teachers') || '[]'); } catch { return []; } }
-function getSalesPersons(){ try { return JSON.parse(localStorage.getItem('sn_sales_persons') || '[]'); } catch { return []; } }
+function getBookings()    { return window.SA_DATA?.bookings || []; }
+function getTeachers()    { return window.SA_DATA?.tutors   || []; }
+function getSalesPersons(){ return window.SA_DATA?.sales    || []; }
 function getExpenses()    { try { return JSON.parse(localStorage.getItem('sn_expenses') || '[]'); } catch { return []; } }
+
+/* ── LOAD FROM API ── */
+window.SA_DATA = { bookings: [], tutors: [], sales: [] };
+
+async function _loadSAFromAPI() {
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    if (!token) return;
+
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/sync/dashboard/admin', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data.success) return;
+
+    /* Map bookings to the shape the rest of the JS expects */
+    window.SA_DATA.bookings = (data.bookings || []).map(b => {
+      let notes = {};
+      try { notes = typeof b.notes === 'string' ? JSON.parse(b.notes) : (b.notes || {}); } catch {}
+      return {
+        id:              b.id,
+        studentName:     b.lesson_name || notes.studentName || '—',
+        age:             notes.age     || b.grade || '—',
+        grade:           b.grade       || notes.grade || '—',
+        email:           b.student_email || notes.email || '—',
+        whatsapp:        notes.whatsapp || '—',
+        subject:         b.subject || '—',
+        date:            b.date ? b.date.split('T')[0] : '—',
+        time:            b.time || '—',
+        status:          b.status,
+        assignedTutor:   b.tutor_name  || '—',
+        assignedTutorId: b.tutor_staff_id || b.tutor_id || '',
+        classLink:       b.class_link  || '',
+        paymentAmount:   b.payment_amount || 0,
+        bookedAt:        b.booked_at   || b.created_at,
+        isDemoClass:     b.is_demo,
+      };
+    });
+
+    /* Map tutors */
+    window.SA_DATA.tutors = (data.tutors || []).map(t => ({
+      id:           t.staff_id || t.id,
+      dbId:         t.id,
+      name:         t.name,
+      email:        t.email,
+      subject:      t.subject || 'Coding',
+      courses:      t.courses || [],
+      gradeGroups:  t.grade_groups || [],
+      availability: t.availability || '—',
+      isActive:     t.is_active !== false,
+      discontinued: t.is_active === false,
+    }));
+
+    /* Map sales */
+    window.SA_DATA.sales = (data.sales || []).map(s => ({
+      id:    s.staff_id || s.id,
+      dbId:  s.id,
+      name:  s.name,
+      email: s.email,
+    }));
+
+  } catch (e) {
+    console.warn('[SuperAdmin] API load failed:', e.message);
+  }
+}
 function getClassReports(){ try { return JSON.parse(localStorage.getItem('sn_class_reports') || '[]'); } catch { return []; } }
 
 function filterByPeriod(list, dateField, period) {

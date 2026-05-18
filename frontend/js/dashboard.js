@@ -395,10 +395,12 @@ async function getTutorBookingsFromAPI() {
 /* Parse a booking's time string to 24h "HH:MM" */
 function parseBookingTime(timeStr) {
   if (!timeStr) return null;
-  // Already 24h
-  if (/^\d{1,2}:\d{2}$/.test(timeStr)) return timeStr.padStart(5, '0');
+  // Strip seconds if present: "14:00:00" → "14:00"
+  const stripped = timeStr.replace(/^(\d{1,2}:\d{2}):\d{2}$/, '$1');
+  // Already 24h "HH:MM"
+  if (/^\d{1,2}:\d{2}$/.test(stripped)) return stripped.padStart(5, '0');
   // 12h format e.g. "11:00 AM"
-  const m = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  const m = stripped.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
   if (!m) return null;
   let h = parseInt(m[1]);
   const min = m[2];
