@@ -44,6 +44,20 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   
   bindModalCloses();
+
+  /* Auto-refresh every 60 seconds */
+  setInterval(() => {
+    _loadSalesFromAPI().then(() => {
+      updateStats();
+      const activeTab = SALES_TABS.find(t => {
+        const el = document.getElementById('tab-' + t);
+        return el && el.style.display !== 'none';
+      });
+      if (activeTab === 'overview')  renderOverview();
+      if (activeTab === 'upcoming')  renderUpcoming();
+      if (activeTab === 'pipeline')  renderPipeline();
+    });
+  }, 60000);
 });
 
 async function _loadSalesFromAPI() {
@@ -93,10 +107,21 @@ async function _loadSalesFromAPI() {
       if (dData.leads) window.SALES_DATA.leads = dData.leads;
     } catch {}
 
-    // Fallback: If pipeline is empty from API, try to load from localStorage once to migrate, then keep in memory
+    // If pipeline is empty from API, it's just empty — no localStorage fallback
     if (window.SALES_DATA.pipeline.length === 0) {
-      window.SALES_DATA.pipeline = JSON.parse(localStorage.getItem('sn_pipeline_' + SALES.id) || '[]');
+      window.SALES_DATA.pipeline = [];
     }
+
+    // Fetch courses for pitch dropdown
+    try {
+      const cRes = await fetch('https://api.stemnestacademy.co.uk/api/courses', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      if (cRes.ok) {
+        const cData = await cRes.json();
+        window.SALES_DATA.courses = cData.courses || [];
+      }
+    } catch {}
 
   } catch (e) {
     console.warn('[Sales Dashboard] API load failed:', e.message);
@@ -139,8 +164,26 @@ function getMyPipeline() {
 
 async function saveMyPipeline(list) {
   window.SALES_DATA.pipeline = list;
-  // Fallback save to localStorage for temporary persistence until backend is fully wired
-  localStorage.setItem('sn_pipeline_' + SALES.id, JSON.stringify(list));
+  // Push to API
+  const token = localStorage.getItem('sn_access_token');
+  if (token && list.length > 0) {
+    const latest = list[0];
+    fetch('https://api.stemnestacademy.co.uk/api/sync/pipeline', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        bookingId:       latest.bookingId,
+        studentName:     latest.studentName,
+        subject:         latest.subject,
+        course:          latest.course,
+        status:          latest.status,
+        interest:        latest.interest,
+        purchasingPower: latest.purchasingPower,
+        paymentAmount:   latest.paymentAmount,
+        notes:           latest.notes,
+      })
+    }).catch(e => console.warn('[Sales] Pipeline save failed:', e.message));
+  }
 }
 
 /* ── TAB SWITCHING ── */
@@ -438,20 +481,18 @@ function openPitchModal(bookingId) {
 function _populatePitchCourseDropdown(subjectHint, selectedCourse) {
   const sel = document.getElementById('pitchCourse');
   if (!sel) return;
-  try {
-    const courses = JSON.parse(localStorage.getItem('sn_courses') || '[]');
-    let filtered = courses;
-    if (subjectHint) {
-      const sub = subjectHint.toLowerCase();
-      const f = courses.filter(c => c.subject && c.subject.toLowerCase().includes(sub));
-      if (f.length) filtered = f;
-    }
-    sel.innerHTML = '<option value="">— Select a course —</option>' +
-      filtered.map(c => `<option value="${c.name}" ${selectedCourse === c.name ? 'selected' : ''}>${c.name}${c.price ? ' — £' + c.price + '/mo' : ''}</option>`).join('') +
-      (filtered.length < courses.length ? '<optgroup label="── All Courses ──">' +
-        courses.filter(c => !filtered.includes(c)).map(c => `<option value="${c.name}" ${selectedCourse === c.name ? 'selected' : ''}>${c.name}${c.price ? ' — £' + c.price + '/mo' : ''}</option>`).join('') +
-        '</optgroup>' : '');
-  } catch(e) { /* silent */ }
+  const courses = window.SALES_DATA.courses || [];
+  let filtered = courses;
+  if (subjectHint) {
+    const sub = subjectHint.toLowerCase();
+    const f = courses.filter(c => c.subject && c.subject.toLowerCase().includes(sub));
+    if (f.length) filtered = f;
+  }
+  sel.innerHTML = '<option value="">— Select a course —</option>' +
+    filtered.map(c => `<option value="${c.name}" ${selectedCourse === c.name ? 'selected' : ''}>${c.name}${c.price ? ' — £' + c.price + '/mo' : ''}</option>`).join('') +
+    (filtered.length < courses.length ? '<optgroup label="── All Courses ──">' +
+      courses.filter(c => !filtered.includes(c)).map(c => `<option value="${c.name}" ${selectedCourse === c.name ? 'selected' : ''}>${c.name}${c.price ? ' — £' + c.price + '/mo' : ''}</option>`).join('') +
+      '</optgroup>' : '');
 }
 
 function openPitchModalById(bookingId) { openPitchModal(bookingId); }
