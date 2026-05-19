@@ -46,18 +46,21 @@ async function sendEmail({ to, subject, html, text, template }) {
     }
   }
 
-  /* ── Development: Nodemailer SMTP ── */
+  /* ── SMTP (Zoho or any SMTP provider) ── */
   if (process.env.SMTP_HOST && process.env.SMTP_USER) {
     try {
       const nodemailer = require('nodemailer');
+      const port   = parseInt(process.env.SMTP_PORT || '465');
+      const secure = port === 465; // Zoho port 465 = SSL, port 587 = STARTTLS
       const transporter = nodemailer.createTransport({
         host:   process.env.SMTP_HOST,
-        port:   parseInt(process.env.SMTP_PORT || '587'),
-        secure: false,
+        port,
+        secure,
         auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+        tls: { rejectUnauthorized: false }, // allow self-signed certs
       });
       const info = await transporter.sendMail({ from, to, subject, html, text });
-      logger.info(`[EMAIL SENT via SMTP] To: ${to} | ID: ${info.messageId}`);
+      logger.info(`[EMAIL SENT via SMTP] To: ${to} | Subject: ${subject} | ID: ${info.messageId}`);
       await _logEmail(to, subject, template, 'sent', info.messageId, null);
       return info;
     } catch (err) {

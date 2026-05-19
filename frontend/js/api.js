@@ -53,6 +53,13 @@ async function apiCall(endpoint, options = {}) {
     }
   }
 
+  /* 401 with no refresh token — force re-login */
+  if (res.status === 401) {
+    clearTokens();
+    window.location.href = '/pages/login.html';
+    return;
+  }
+
   const data = await res.json();
 
   if (!res.ok) {
