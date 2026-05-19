@@ -599,72 +599,99 @@ function renderWeeklyCalendar() {
   container.innerHTML = html;
 }
 
-/* ── Show booking detail popup ── */
+/* ── Show booking detail popup from calendar slot click ── */
 function showBookingPopup(bookingId) {
-  const all = window.TUTOR_DATA?.bookings || JSON.parse(localStorage.getItem('sn_bookings') || '[]');
+  const all = window.TUTOR_DATA?.bookings || [];
   const b   = all.find(x => x.id === bookingId);
   if (!b) return;
 
-  const isDemo = b.status === 'demo' || !b.paymentAmount || b.isDemoStudent;
+  const isDemo = b.isDemoClass || !b.paymentAmount;
+  const phone  = b.whatsapp || b.phone || '—';
+  // Strip seconds from time
+  const timeDisplay = (b.time || '—').replace(/^(\d{1,2}:\d{2}):\d{2}$/, '$1');
+  const isJoined = typeof joinedSessions !== 'undefined' && joinedSessions.has(b.id);
 
-  // Remove any existing popup
   document.getElementById('calBookingPopup')?.remove();
-
   const popup = document.createElement('div');
   popup.id = 'calBookingPopup';
   popup.style.cssText = 'position:fixed;inset:0;background:rgba(10,20,50,.6);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
 
   if (isDemo) {
+    // DEMO popup: student name, grade, date, time, subject, phone (copy), class material link, join, end, close
     popup.innerHTML = `
-      <div style="background:var(--white);border-radius:20px;padding:28px 32px;max-width:400px;width:100%;box-shadow:0 16px 60px rgba(0,0,0,.25);">
+      <div style="background:var(--white);border-radius:20px;padding:28px 32px;max-width:420px;width:100%;box-shadow:0 16px 60px rgba(0,0,0,.25);">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-          <div style="font-family:'Fredoka One',cursive;font-size:20px;color:var(--orange-dark);">🎓 Demo Class</div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="background:#fff3e0;color:#e65100;font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">🎓 DEMO CLASS</span>
+          </div>
           <button onclick="document.getElementById('calBookingPopup').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--light);">✕</button>
         </div>
-        <div style="background:var(--orange-light);border-radius:12px;padding:16px;margin-bottom:16px;">
-          <div style="font-weight:900;font-size:16px;color:var(--dark);margin-bottom:8px;">${b.studentName}</div>
-          <div style="font-size:13px;color:var(--mid);font-weight:700;line-height:1.8;">
+        <div style="background:var(--orange-light);border-radius:12px;padding:16px;margin-bottom:14px;">
+          <div style="font-weight:900;font-size:18px;color:var(--dark);margin-bottom:10px;">${b.studentName || '—'}</div>
+          <div style="font-size:13px;color:var(--mid);font-weight:700;line-height:2;">
             🎓 Grade: <strong>${b.grade || '—'}</strong><br>
-            📅 ${b.date || '—'} at ${b.time || '—'}<br>
-            📚 Subject: <strong>${b.subject || '—'}</strong>
+            📚 Subject: <strong>${b.subject || '—'}</strong><br>
+            📅 <strong>${b.date || '—'}</strong> at <strong>${timeDisplay}</strong>
           </div>
         </div>
-        <div style="background:var(--bg);border-radius:12px;padding:14px;margin-bottom:16px;">
-          <div style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:var(--light);margin-bottom:6px;">📱 Parent / Student Phone</div>
+        <div style="background:var(--bg);border-radius:12px;padding:14px;margin-bottom:14px;">
+          <div style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:var(--light);margin-bottom:8px;">📱 Parent / Student Phone</div>
           <div style="display:flex;align-items:center;gap:10px;">
-            <span id="popupPhone" style="font-size:15px;font-weight:800;color:var(--dark);">${b.whatsapp || b.phone || '—'}</span>
-            ${(b.whatsapp || b.phone) ? `<button onclick="copyPhone('${b.whatsapp || b.phone}')" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:800;cursor:pointer;">📋 Copy</button>` : ''}
+            <span style="font-size:15px;font-weight:800;color:var(--dark);">${phone}</span>
+            ${phone !== '—' ? `<button onclick="copyPhone('${phone}')" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:800;cursor:pointer;">📋 Copy</button>` : ''}
           </div>
         </div>
-        ${b.classLink ? `<a href="${b.classLink}" target="_blank" style="display:block;background:var(--orange);color:#fff;text-align:center;padding:12px;border-radius:12px;font-weight:900;font-size:14px;text-decoration:none;margin-bottom:10px;">🚀 Join Class</a>` : ''}
+        <a href="#" onclick="showToast('Class material page coming soon — will be set up per lesson topic.','info');return false;" style="display:flex;align-items:center;justify-content:space-between;background:var(--bg);border:1.5px solid #e8eaf0;border-radius:12px;padding:12px 16px;text-decoration:none;color:var(--dark);font-weight:800;font-size:13px;margin-bottom:14px;">
+          📖 Class Material &amp; Lesson Plan <span style="color:var(--blue);font-size:11px;">Coming Soon ↗</span>
+        </a>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+          ${b.classLink
+            ? `<a href="${b.classLink}" target="_blank" onclick="teacherJoinClass('${b.id}','${b.classLink}')" style="display:block;background:var(--blue);color:#fff;text-align:center;padding:12px;border-radius:12px;font-weight:900;font-size:13px;text-decoration:none;">🚀 Join Class</a>`
+            : `<button onclick="showToast('No class link set yet. Contact admin.','error')" style="background:var(--blue);color:#fff;border:none;border-radius:12px;padding:12px;font-weight:900;font-size:13px;cursor:pointer;width:100%;">🚀 Join Class</button>`}
+          <button onclick="document.getElementById('calBookingPopup').remove();openEndSessionModal('${b.id}')" style="background:var(--orange);color:#fff;border:none;border-radius:12px;padding:12px;font-family:'Nunito',sans-serif;font-weight:900;font-size:13px;cursor:pointer;">🔴 End Demo</button>
+        </div>
         <button onclick="document.getElementById('calBookingPopup').remove()" style="width:100%;background:var(--bg);border:1.5px solid #e8eaf0;border-radius:12px;padding:10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;cursor:pointer;color:var(--mid);">Close</button>
       </div>`;
   } else {
+    // PAID popup: topic, date, time, student phone, join, end, reschedule, close
+    const topic = b.lessonName || b.courseName || b.subject || '—';
     popup.innerHTML = `
       <div style="background:var(--white);border-radius:20px;padding:28px 32px;max-width:440px;width:100%;box-shadow:0 16px 60px rgba(0,0,0,.25);">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-          <div style="font-family:'Fredoka One',cursive;font-size:20px;color:var(--blue);">📚 Paid Class</div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="background:var(--blue-light);color:var(--blue);font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">📚 PAID CLASS</span>
+          </div>
           <button onclick="document.getElementById('calBookingPopup').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--light);">✕</button>
         </div>
-        <div style="background:var(--blue-light);border-radius:12px;padding:16px;margin-bottom:16px;">
-          <div style="font-weight:900;font-size:16px;color:var(--dark);margin-bottom:8px;">${b.studentName}</div>
-          <div style="font-size:13px;color:var(--mid);font-weight:700;line-height:1.9;">
-            ${b.lessonNumber ? `<div>📖 <strong>Lesson ${b.lessonNumber}${b.totalLessons ? ' of ' + b.totalLessons : ''}</strong></div>` : ''}
-            <div>📝 <strong>${b.lessonName || b.topic || b.subject || '—'}</strong></div>
-            <div>🎓 Grade: <strong>${b.grade || '—'}</strong></div>
-            <div>📅 ${b.date || '—'} at ${b.time || '—'}</div>
-            <div>⏱ Duration: <strong>${b.duration || '60 mins'}</strong></div>
-            ${b.courseName ? `<div>📚 Course: <strong>${b.courseName}</strong></div>` : ''}
+        <div style="background:var(--blue-light);border-radius:12px;padding:16px;margin-bottom:14px;">
+          <div style="font-weight:900;font-size:16px;color:var(--dark);margin-bottom:4px;">${b.studentName || '—'}</div>
+          <div style="font-size:13px;color:var(--mid);font-weight:700;line-height:2;">
+            📖 <strong>${topic}</strong>${b.lessonNumber ? ' · Lesson ' + b.lessonNumber + (b.totalLessons ? ' of ' + b.totalLessons : '') : ''}<br>
+            🎓 Grade: <strong>${b.grade || '—'}</strong><br>
+            📅 <strong>${b.date || '—'}</strong> at <strong>${timeDisplay}</strong><br>
+            ⏱ Duration: <strong>${b.duration || '60 mins'}</strong>
           </div>
         </div>
         ${(b.activityLink || b.slidesLink) ? `
         <div style="background:var(--bg);border-radius:12px;padding:14px;margin-bottom:14px;">
-          <div style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:var(--light);margin-bottom:10px;">📎 Class Resources</div>
-          ${b.activityLink ? `<a href="${b.activityLink}" target="_blank" style="display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid #e8eaf0;border-radius:10px;padding:10px 14px;text-decoration:none;color:var(--dark);font-weight:800;font-size:13px;margin-bottom:8px;">🔗 Activity Link <span style="margin-left:auto;color:var(--blue);font-size:11px;">Open ↗</span></a>` : ''}
-          ${b.slidesLink ? `<a href="${b.slidesLink}" target="_blank" style="display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid #e8eaf0;border-radius:10px;padding:10px 14px;text-decoration:none;color:var(--dark);font-weight:800;font-size:13px;">📊 Slides / Explanation <span style="margin-left:auto;color:var(--blue);font-size:11px;">Open ↗</span></a>` : ''}
+          <div style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:var(--light);margin-bottom:8px;">📎 Class Resources</div>
+          ${b.activityLink ? `<a href="${b.activityLink}" target="_blank" style="display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid #e8eaf0;border-radius:10px;padding:10px 14px;text-decoration:none;color:var(--dark);font-weight:800;font-size:13px;margin-bottom:8px;">🔗 Activity / Class Material <span style="margin-left:auto;color:var(--blue);font-size:11px;">Open ↗</span></a>` : ''}
+          ${b.slidesLink ? `<a href="${b.slidesLink}" target="_blank" style="display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid #e8eaf0;border-radius:10px;padding:10px 14px;text-decoration:none;color:var(--dark);font-weight:800;font-size:13px;">📊 Slides <span style="margin-left:auto;color:var(--blue);font-size:11px;">Open ↗</span></a>` : ''}
         </div>` : ''}
-        ${b.classLink ? `<a href="${b.classLink}" target="_blank" style="display:block;background:var(--blue);color:#fff;text-align:center;padding:12px;border-radius:12px;font-weight:900;font-size:14px;text-decoration:none;margin-bottom:10px;">🚀 Join Class</a>` : ''}
-        <button onclick="openEndClassDialogV2 ? openEndClassDialogV2('${b.id}') : openEndClassModal('${b.id}')" style="width:100%;background:var(--green);color:#fff;border:none;border-radius:12px;padding:12px;font-family:'Nunito',sans-serif;font-weight:900;font-size:14px;cursor:pointer;margin-bottom:10px;">✅ End Class</button>
+        <div style="background:var(--bg);border-radius:12px;padding:14px;margin-bottom:14px;">
+          <div style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:var(--light);margin-bottom:8px;">📱 Student Phone</div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:15px;font-weight:800;color:var(--dark);">${phone}</span>
+            ${phone !== '—' ? `<button onclick="copyPhone('${phone}')" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:800;cursor:pointer;">📋 Copy</button>` : ''}
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+          ${b.classLink
+            ? `<a href="${b.classLink}" target="_blank" onclick="teacherJoinClass('${b.id}','${b.classLink}')" style="display:block;background:var(--blue);color:#fff;text-align:center;padding:12px;border-radius:12px;font-weight:900;font-size:13px;text-decoration:none;">🚀 Join Class</a>`
+            : `<button onclick="showToast('No class link set yet. Contact admin.','error')" style="background:var(--blue);color:#fff;border:none;border-radius:12px;padding:12px;font-weight:900;font-size:13px;cursor:pointer;width:100%;">🚀 Join Class</button>`}
+          <button onclick="document.getElementById('calBookingPopup').remove();openEndSessionModal('${b.id}')" style="background:var(--green);color:#fff;border:none;border-radius:12px;padding:12px;font-family:'Nunito',sans-serif;font-weight:900;font-size:13px;cursor:pointer;">✅ End Class</button>
+        </div>
+        <button onclick="document.getElementById('calBookingPopup').remove();openRescheduleModal && openRescheduleModal('${b.id}')" style="width:100%;background:var(--bg);border:1.5px solid var(--blue);border-radius:12px;padding:10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;color:var(--blue);margin-bottom:10px;">🔄 Reschedule Class</button>
         <button onclick="document.getElementById('calBookingPopup').remove()" style="width:100%;background:var(--bg);border:1.5px solid #e8eaf0;border-radius:12px;padding:10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;cursor:pointer;color:var(--mid);">Close</button>
       </div>`;
   }
@@ -677,7 +704,6 @@ function copyPhone(phone) {
   navigator.clipboard.writeText(phone)
     .then(() => showToast('📋 Phone number copied!'))
     .catch(() => {
-      // Fallback
       const el = document.createElement('textarea');
       el.value = phone;
       document.body.appendChild(el);

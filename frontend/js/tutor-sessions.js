@@ -359,6 +359,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 /* ══════════════════════════════════════════════════════
    OVERVIEW SESSIONS — shows next 4 sessions with Join buttons
+   Demo card: student name, grade, time, DEMO badge, Join + End
+   Paid card: topic, student name, date/time, Join + End
 ══════════════════════════════════════════════════════ */
 function renderOverviewSessions() {
   const el = document.getElementById('overviewSessionsList');
@@ -383,41 +385,68 @@ function renderOverviewSessions() {
     const minsElapsed = classTime ? Math.floor((now - classTime) / 60000) : -999;
     const hasStarted  = minsElapsed >= 0;
     const isJoined    = joinedSessions.has(b.id);
-    const typeCls     = isDemo ? 'sb-demo' : 'sb-paid';
-    const typeLabel   = isDemo ? '🎓 Demo' : '📚 Paid';
 
-    const badge = isPast
+    // Strip seconds from time display
+    const timeDisplay = (b.time || '—').replace(/^(\d{1,2}:\d{2}):\d{2}$/, '$1');
+    const dateLabel   = b.date
+      ? new Date(b.date.replace(/^[A-Za-z]+\s/, '')).toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' })
+      : '—';
+
+    const statusBadge = isPast
       ? '<span class="sess-badge sb-done">✅ Done</span>'
       : hasStarted
-        ? '<span class="sess-badge sb-live"><span class="live-dot"></span> Live</span>'
+        ? '<span class="sess-badge sb-live"><span class="live-dot"></span> Live Now</span>'
         : '<span class="sess-badge sb-upcoming">Upcoming</span>';
 
     let actions = '';
     if (!isPast) {
-      actions = '<button class="join-btn" onclick="teacherJoinClass(\'' + b.id + '\',\'' + (b.classLink || '') + '\')">🚀 Join</button>';
+      actions += '<button class="join-btn" onclick="teacherJoinClass(\'' + b.id + '\',\'' + (b.classLink || '') + '\')">🚀 Join</button>';
+      const endLabel = isDemo ? '🔴 End Demo' : '🔴 End Class';
       if (isJoined) {
-        const endLabel = isDemo ? '🔴 End Demo' : '🔴 End Class';
         actions += '<button class="end-class-btn" onclick="openEndSessionModal(\'' + b.id + '\')">' + endLabel + '</button>';
+      } else {
+        actions += '<button class="end-class-btn" style="opacity:.4;cursor:not-allowed;" disabled title="Join class first">' + endLabel + '</button>';
       }
     }
 
-    const dateLabel = b.date
-      ? new Date(b.date.replace(/^[A-Za-z]+\s/, '')).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-      : '—';
-
-    return '<div class="session-item' + (hasStarted && !isPast ? ' live' : '') + '">' +
-      '<div class="sess-time">' +
-        '<div class="sess-time-val">' + (b.time ? b.time.split(' ')[0] : '—') + '</div>' +
-        '<div class="sess-time-label">' + dateLabel + '</div>' +
-      '</div>' +
-      '<div class="sess-divider"></div>' +
-      '<div class="sess-info">' +
-        '<div class="sess-student">' + (b.studentName || '—') + ' <span class="sess-badge ' + typeCls + '" style="font-size:10px;padding:2px 8px;">' + typeLabel + '</span></div>' +
-        '<div class="sess-subject">' + (b.subject || '—') + ' · ' + (b.grade || '—') + '</div>' +
-      '</div>' +
-      badge +
-      '<div style="display:flex;gap:8px;align-items:center;flex-shrink:0;">' + actions + '</div>' +
-    '</div>';
+    if (isDemo) {
+      // DEMO CARD: student name, grade, time, DEMO badge
+      return '<div class="session-item' + (hasStarted && !isPast ? ' live' : '') + '" style="border-left:4px solid var(--orange);">' +
+        '<div class="sess-time">' +
+          '<div class="sess-time-val">' + timeDisplay.split(':')[0] + ':' + (timeDisplay.split(':')[1] || '00') + '</div>' +
+          '<div class="sess-time-label">' + dateLabel + '</div>' +
+        '</div>' +
+        '<div class="sess-divider"></div>' +
+        '<div class="sess-info">' +
+          '<div class="sess-student" style="display:flex;align-items:center;gap:6px;">' +
+            '<span style="background:#fff3e0;color:#e65100;font-size:10px;font-weight:900;padding:2px 8px;border-radius:50px;flex-shrink:0;">🎓 DEMO</span>' +
+            '<strong>' + (b.studentName || '—') + '</strong>' +
+          '</div>' +
+          '<div class="sess-subject" style="color:var(--mid);">📚 ' + (b.subject || '—') + ' &nbsp;·&nbsp; ' + (b.grade || '—') + '</div>' +
+        '</div>' +
+        statusBadge +
+        '<div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">' + actions + '</div>' +
+      '</div>';
+    } else {
+      // PAID CARD: topic, student name, date/time
+      const topic = b.lessonName || b.courseName || b.subject || '—';
+      return '<div class="session-item' + (hasStarted && !isPast ? ' live' : '') + '" style="border-left:4px solid var(--blue);">' +
+        '<div class="sess-time">' +
+          '<div class="sess-time-val">' + timeDisplay.split(':')[0] + ':' + (timeDisplay.split(':')[1] || '00') + '</div>' +
+          '<div class="sess-time-label">' + dateLabel + '</div>' +
+        '</div>' +
+        '<div class="sess-divider"></div>' +
+        '<div class="sess-info">' +
+          '<div class="sess-student" style="display:flex;align-items:center;gap:6px;">' +
+            '<span style="background:var(--blue-light);color:var(--blue);font-size:10px;font-weight:900;padding:2px 8px;border-radius:50px;flex-shrink:0;">📚 PAID</span>' +
+            '<strong>' + (b.studentName || '—') + '</strong>' +
+          '</div>' +
+          '<div class="sess-subject" style="color:var(--mid);">📖 ' + topic + (b.lessonNumber ? ' · Lesson ' + b.lessonNumber : '') + '</div>' +
+        '</div>' +
+        statusBadge +
+        '<div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">' + actions + '</div>' +
+      '</div>';
+    }
   }).join('');
 }
 
