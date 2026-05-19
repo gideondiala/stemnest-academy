@@ -77,9 +77,15 @@ This document lists features that are partially built, not yet built, or need im
 - Most dashboards are not mobile-optimised
 - The public pages (homepage, courses, free-trial) are responsive
 
-### 6.2 Email Confirmation on Demo Booking
-- `notifyDemoConfirmed()` sends email to parent
-- Verify this is working with real Zoho SMTP credentials
+### 6.2 Email — Zoho SMTP Password Needs Regenerating
+- The email service uses Zoho SMTP (`smtp.zoho.com:465`)
+- Current app password `ybKC76bCr1LN` is failing with `535 Authentication Failed`
+- **Action needed:** Log into https://accounts.zoho.com → Security → App Passwords → generate new password → update server:
+  ```bash
+  ssh -i C:\Users\hp\stemnest-key.pem ubuntu@13.40.64.172
+  sed -i 's/SMTP_PASS=.*/SMTP_PASS=NEW_PASSWORD/' /home/ubuntu/stemnest-academy/backend/.env
+  pm2 reload stemnest-api --update-env
+  ```
 
 ### 6.3 Password Change for Students/Tutors
 - `PUT /api/users/:id/password` endpoint exists
@@ -95,10 +101,17 @@ This document lists features that are partially built, not yet built, or need im
 - `sales-dashboard.js` — verify it loads pipeline from API correctly
 - Should use `GET /api/sync/dashboard/sales`
 
+### 6.6 Quizzes & Assignments — Recommended Approach
+See `10_quizzes_and_assignments.md` for the full design.
+
 ---
 
-## Things That Are Intentionally Simple (Don't Over-Engineer)
+## ✅ Completed Since Last Update (May 2026)
 
-- **Expenses** in founder dashboard: stored in localStorage — this is fine for now, the founder manually enters them
-- **Payment links**: stored in localStorage — acceptable until Stripe is fully integrated
-- **Tutor availability**: stored in localStorage — acceptable until the DB table is wired up
+- Auto-refresh on all dashboards (60s interval) — no cache clearing needed
+- Tutor overview cards: demo/paid distinction, phone copy button, join/end buttons
+- Calendar popup: full details, phone copy, class material link, join/end/reschedule
+- Presales 403 fix: revoked 133 stale tokens, all staff must re-login once
+- Email service: fixed SMTP port to 465 for Zoho SSL
+- Student dashboard: projects from API, time display fix, clean state for new students
+- Post-sales: removed localStorage writes, loads teachers/courses from API
