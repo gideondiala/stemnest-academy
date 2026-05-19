@@ -29,6 +29,14 @@ document.addEventListener('DOMContentLoaded', () => {
     showPOSTab('students');
     bindPOSModals();
   });
+
+  /* Auto-refresh every 60 seconds */
+  setInterval(() => {
+    _loadPOSFromAPI().then(() => {
+      updatePOSStats();
+      renderPaidStudents();
+    });
+  }, 60000);
 });
 
 async function _loadPOSFromAPI() {

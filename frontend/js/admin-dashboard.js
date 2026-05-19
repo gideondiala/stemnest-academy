@@ -110,6 +110,14 @@ document.addEventListener('DOMContentLoaded', () => {
     bindModalCloses();
     showAdminTab('bookings');
   });
+
+  /* Auto-refresh every 60 seconds */
+  setInterval(() => {
+    _loadAdminFromAPI().then(() => {
+      loadBookings();
+      updateStats();
+    });
+  }, 60000);
 });
 
 /* ── Sync from real API into window.ADMIN_DATA ── */

@@ -50,6 +50,15 @@ document.addEventListener('DOMContentLoaded', () => {
     bindModalCloseOnOverlay('profileModalOverlay', closeProfileModal);
     showTab('overview');
   });
+
+  /* Auto-refresh every 90 seconds */
+  setInterval(() => {
+    _loadStudentFromAPI().then(() => {
+      renderProgressBars();
+      renderUpcomingPreview();
+      renderLessons();
+    });
+  }, 90000);
 });
 
 /* ── Load student from API ── */

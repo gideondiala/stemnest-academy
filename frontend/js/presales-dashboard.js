@@ -29,6 +29,21 @@ document.addEventListener('DOMContentLoaded', () => {
     showPSTab('incoming');
   });
   bindScheduleModal();
+
+  /* Auto-refresh every 60 seconds — no cache clearing needed */
+  setInterval(() => {
+    _loadPresalesFromAPI().then(() => {
+      updatePSStats();
+      const activeTab = PS_TABS.find(t => {
+        const el = document.getElementById('tab-' + t);
+        return el && el.style.display !== 'none';
+      });
+      if (activeTab === 'incoming')   renderIncoming();
+      if (activeTab === 'scheduled')  renderScheduled();
+      if (activeTab === 'completed')  renderCompletedDemos();
+      if (activeTab === 'incomplete') renderIncomplete();
+    });
+  }, 60000);
 });
 
 async function _loadPresalesFromAPI() {

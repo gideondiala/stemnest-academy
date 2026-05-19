@@ -113,6 +113,18 @@ document.addEventListener('DOMContentLoaded', () => {
     checkAssignedClasses();
     showDashTab('overview');
   });
+
+  /* Auto-refresh bookings every 60 seconds */
+  setInterval(() => {
+    _loadTutorFromAPI().then(() => {
+      checkAssignedClasses();
+      if (typeof renderOverviewSessions === 'function') renderOverviewSessions();
+      if (typeof renderSessionsTab === 'function') {
+        const sessTab = document.getElementById('tab-sessions');
+        if (sessTab && sessTab.style.display !== 'none') renderSessionsTab();
+      }
+    });
+  }, 60000);
 });
 
 async function _loadTutorFromAPI() {
