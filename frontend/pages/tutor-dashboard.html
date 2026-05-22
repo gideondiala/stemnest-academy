@@ -96,13 +96,11 @@
 
     <!-- ── TAB: OVERVIEW ── -->
     <div id="tab-overview">
-      <!-- Assigned class notification banner -->
-      <div id="assignedClassBanner" style="display:none;"></div>
 
       <!-- UPCOMING SESSIONS — 3 cards always visible -->
       <div class="dash-section-header" style="margin-bottom:16px;">
         <div class="dash-section-title">📡 Upcoming Sessions</div>
-        <button class="btn btn-outline" style="font-size:12px;" onclick="renderUpcomingCards()">🔄 Refresh</button>
+        <button class="btn btn-outline" style="font-size:12px;" onclick="if(typeof renderUpcomingCards==='function')renderUpcomingCards()">🔄 Refresh</button>
       </div>
       <div id="upcomingSessionCards" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px;">
 

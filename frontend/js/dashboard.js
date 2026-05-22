@@ -110,14 +110,15 @@ document.addEventListener('DOMContentLoaded', () => {
   _loadTutorFromAPI().then(() => {
     buildCalStrip();
     bindProfileModal();
-    checkAssignedClasses();
     showDashTab('overview');
+    /* Render session cards NOW that bookings are loaded */
+    if (typeof renderUpcomingCards === 'function') renderUpcomingCards();
   });
 
   /* Auto-refresh bookings every 60 seconds */
   setInterval(() => {
     _loadTutorFromAPI().then(() => {
-      checkAssignedClasses();
+      if (typeof renderUpcomingCards === 'function') renderUpcomingCards();
       if (typeof renderOverviewSessions === 'function') renderOverviewSessions();
       if (typeof renderSessionsTab === 'function') {
         const sessTab = document.getElementById('tab-sessions');

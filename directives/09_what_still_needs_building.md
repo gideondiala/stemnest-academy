@@ -77,15 +77,15 @@ This document lists features that are partially built, not yet built, or need im
 - Most dashboards are not mobile-optimised
 - The public pages (homepage, courses, free-trial) are responsive
 
-### 6.2 Email — Zoho SMTP Password Needs Regenerating
-- The email service uses Zoho SMTP (`smtp.zoho.com:465`)
-- Current app password `ybKC76bCr1LN` is failing with `535 Authentication Failed`
-- **Action needed:** Log into https://accounts.zoho.com → Security → App Passwords → generate new password → update server:
-  ```bash
-  ssh -i C:\Users\hp\stemnest-key.pem ubuntu@13.40.64.172
-  sed -i 's/SMTP_PASS=.*/SMTP_PASS=NEW_PASSWORD/' /home/ubuntu/stemnest-academy/backend/.env
-  pm2 reload stemnest-api --update-env
-  ```
+### 6.2 Email — PENDING FIX (Zoho SMTP not available on free plan)
+- **Status:** ⚠️ Blocked — Zoho free plan does not support SMTP
+- **Current behaviour:** Emails are simulated (logged but not sent). AWS SES is configured but in sandbox mode (can only send to verified addresses).
+- **Options to fix:**
+  1. **Resend.com** (recommended) — free tier 3,000 emails/month, no sandbox, 5-min setup. Sign up at https://resend.com, verify domain `stemnestacademy.co.uk`, get API key, update `emailService.js`
+  2. **Upgrade Zoho Mail** to paid plan (~£1/month) — enables SMTP on port 465
+  3. **Re-apply for AWS SES production access** with stronger justification
+- **When ready:** Tell the developer "fix email" and implement Resend.com integration in `backend/src/services/emailService.js`
+- **Impact:** Password reset emails, welcome emails, and demo confirmation emails are not being delivered to real users
 
 ### 6.3 Password Change for Students/Tutors
 - `PUT /api/users/:id/password` endpoint exists
