@@ -264,158 +264,104 @@ function _btnDanger(extra) {
 
 /**
  * Renders the next 3 upcoming sessions as cards into #upcomingSessionCards.
- * If no real bookings exist, shows placeholder cards so the UI is always visible.
+ * Reads directly from window.TUTOR_DATA.bookings (API data).
  */
 function renderUpcomingCards() {
-  var tutor = _safeGetCurrentTutor();
-  var now   = new Date();
+  var now = new Date();
 
-  /* ── Step 1: get bookings from sn_bookings (assigned by Pre-Sales) ── */
-  var fromBookings = _safeGetMyBookings()
-    .filter(function(b) { return b.status === 'scheduled'; });
+  /* ── Get all scheduled bookings from API data ── */
+  var allBookings = (window.TUTOR_DATA && window.TUTOR_DATA.bookings) ? window.TUTOR_DATA.bookings : [];
 
-  /* ── Step 2: get booked slots from the calendar store ── */
-  var fromCalendar = [];
-  try {
-    var allAvail = JSON.parse(_getLocalStr('sn_all_tutor_avail') || '{}');
-    var tutorSlots = (allAvail[tutor.id] && allAvail[tutor.id].slots) || {};
-    // Also check personal store
-    var personalSlots = JSON.parse(_getLocalStr('sn_tutor_avail_' + tutor.id) || '{}');
-    var merged = Object.assign({}, tutorSlots, personalSlots);
+  /* Filter to scheduled only, sort by date+time ascending, take first 3 */
+  var upcoming = allBookings
+    .filter(function(b) { return b.status === 'scheduled'; })
+    .sort(function(a, b) {
+      /* Normalise date: strip T... suffix if present */
+      var da = (a.date || '').split('T')[0];
+      var db = (b.date || '').split('T')[0];
+      /* Normalise time: strip seconds */
+      var ta = (a.time || '00:00').replace(/^(\d{1,2}:\d{2}):\d{2}$/, '$1');
+      var tb = (b.time || '00:00').replace(/^(\d{1,2}:\d{2}):\d{2}$/, '$1');
+      return new Date(da + 'T' + ta) - new Date(db + 'T' + tb);
+    })
+    .slice(0, 3);
 
-    Object.keys(merged).forEach(function(key) {
-      var val = merged[key];
-      // A booked slot has { booked: true, bookingId: '...' }
-      if (val && typeof val === 'object' && val.booked) {
-        var parts = key.split('|');
-        if (parts.length !== 2) return;
-        var dateKey = parts[0];
-        var timeKey = parts[1];
+  console.log('[Cards] TUTOR_DATA bookings:', allBookings.length, '| scheduled:', upcoming.length);
 
-        // Only include :00 slots (start of 1-hr block, not the :30 continuation)
-        if (timeKey.indexOf(':30') !== -1) return;
-
-        // Skip slots whose booking is already completed/incomplete
-        if (val.bookingId) {
-          var allBk = window.TUTOR_DATA?.bookings || JSON.parse(_getLocalStr('sn_bookings') || '[]');
-          var bk = allBk.find(function(b) { return b.id === val.bookingId; });
-          if (bk && (bk.status === 'completed' || bk.status === 'incomplete' ||
-              bk.status === 'partially_completed' || bk.status === 'cancelled' ||
-              bk.status === 'teacher_absent')) return;
-        }
-
-        // Convert timeKey "H:MM" to 12h display
-        var hh = parseInt(timeKey.split(':')[0]);
-        var mm = timeKey.split(':')[1] || '00';
-        var period = hh >= 12 ? 'PM' : 'AM';
-        var h12 = hh % 12 === 0 ? 12 : hh % 12;
-        var timeDisplay = h12 + ':' + mm + ' ' + period;
-
-        // Find matching booking in sn_bookings if bookingId exists
-        var matchedBooking = null;
-        if (val.bookingId) {
-          var allBookings = window.TUTOR_DATA?.bookings || JSON.parse(_getLocalStr('sn_bookings') || '[]');
-          matchedBooking = allBookings.find(function(b) { return b.id === val.bookingId; });
-        }
-
-        // Build a synthetic session object from calendar slot
-        fromCalendar.push({
-          id:              val.bookingId || ('CAL-' + dateKey + '-' + timeKey),
-          studentName:     matchedBooking ? matchedBooking.studentName : 'Student',
-          grade:           matchedBooking ? matchedBooking.grade : '',
-          subject:         matchedBooking ? matchedBooking.subject : (tutor.subject || 'Class'),
-          topic:           matchedBooking ? (matchedBooking.topic || matchedBooking.subject) : '',
-          date:            dateKey,
-          time:            timeDisplay,
-          classLink:       matchedBooking ? matchedBooking.classLink : '',
-          isDemoClass:     matchedBooking ? (matchedBooking.isDemoClass || !matchedBooking.paymentAmount) : false,
-          paymentAmount:   matchedBooking ? matchedBooking.paymentAmount : null,
-          status:          'scheduled',
-          _fromCalendar:   true,
-        });
-      }
-    });
-  } catch(e) { /* silent */ }
-
-  /* ── Step 3: merge, deduplicate, sort, take first 3 ── */
-  var seen = {};
-  var all  = [];
-
-  fromBookings.forEach(function(b) {
-    if (!seen[b.id]) { seen[b.id] = true; all.push(b); }
-  });
-  fromCalendar.forEach(function(b) {
-    if (!seen[b.id]) { seen[b.id] = true; all.push(b); }
-  });
-
-  all.sort(function(a, b) {
-    var da = _safeParseClassDateTime(a.date, a.time) || new Date(0);
-    var db = _safeParseClassDateTime(b.date, b.time) || new Date(0);
-    return da - db;
-  });
-
-  var bookings = all.slice(0, 3);
-
-  // Debug: log what was found
-  console.log('[Sessions] Teacher:', tutor.id, tutor.name,
-    '| sn_bookings matches:', fromBookings.length,
-    '| calendar slots:', fromCalendar.length,
-    '| total after merge:', all.length);
-
-  /* ── Step 4: render each card ── */
+  /* ── Render each of the 3 cards ── */
   var colors = ['#1a56db', '#0e9f6e', '#ff6b35'];
   var titles = ['Current Class', 'Next Class', 'Next Class'];
 
   for (var idx = 0; idx < 3; idx++) {
     var card = document.getElementById('sessionCard' + idx);
     if (!card) continue;
-    var b = bookings[idx];
+    var b = upcoming[idx];
 
     if (!b) {
+      /* Empty card */
       card.style.borderTopColor = colors[idx];
       card.innerHTML =
         '<div style="font-family:\'Fredoka One\',cursive;font-size:12px;color:' + colors[idx] + ';text-transform:uppercase;letter-spacing:.5px;">' + titles[idx] + '</div>' +
         '<div style="font-family:\'Fredoka One\',cursive;font-size:18px;color:#1a202c;">No session</div>' +
         '<div style="font-size:13px;font-weight:700;color:#a0aec0;flex:1;">No class scheduled yet.</div>' +
         '<div style="display:flex;gap:8px;margin-top:12px;">' +
-          '<button style="background:#0e9f6e;color:#fff;border:none;border-radius:12px;padding:10px 14px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:12px;cursor:not-allowed;flex:1;opacity:.4;" disabled>Join</button>' +
-          '<button style="background:#c53030;color:rgba(255,255,255,.4);border:none;border-radius:12px;padding:10px 14px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:12px;cursor:not-allowed;flex:1;opacity:.4;" disabled>End</button>' +
+          '<button style="background:#0e9f6e;color:#fff;border:none;border-radius:12px;padding:10px 14px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:12px;cursor:not-allowed;flex:1;opacity:.4;" disabled>🚀 Join</button>' +
+          '<button style="background:#c53030;color:rgba(255,255,255,.4);border:none;border-radius:12px;padding:10px 14px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:12px;cursor:not-allowed;flex:1;opacity:.4;" disabled>🔴 End</button>' +
         '</div>';
       continue;
     }
 
-    var classTime   = _safeParseClassDateTime(b.date, b.time);
-    var isDemo      = b.isDemoClass || !b.paymentAmount;
-    var topic       = isDemo ? 'Demo Class' : (b.topic || b.subject || 'Class');
-    var minsElapsed = classTime ? Math.floor((now - classTime) / 60000) : -999;
-    var hasJoined   = typeof joinedSessions !== 'undefined' && joinedSessions.has(b.id);
-    var canEnd      = minsElapsed >= 15 && hasJoined;
-    var accent      = isDemo ? '#ff6b35' : colors[idx];
+    /* Normalise date and time from API format */
+    var dateStr  = (b.date || '').split('T')[0];  /* "2026-05-22T00:00:00.000Z" → "2026-05-22" */
+    var timeStr  = (b.time || '').replace(/^(\d{1,2}:\d{2}):\d{2}$/, '$1');  /* "23:11:00" → "23:11" */
+    var isDemo   = b.isDemoClass || !b.paymentAmount;
+    var accent   = isDemo ? '#ff6b35' : colors[idx];
+    var typeBadge = isDemo
+      ? '<span style="background:#fff3e0;color:#e65100;font-size:10px;font-weight:900;padding:2px 8px;border-radius:50px;">🎓 DEMO</span>'
+      : '<span style="background:#dbeafe;color:#1a56db;font-size:10px;font-weight:900;padding:2px 8px;border-radius:50px;">📚 PAID</span>';
 
-    var dateDisplay = b.date || '';
+    /* Format date for display */
+    var dateDisplay = dateStr;
     try {
-      var clean = b.date.replace(/^[A-Za-z]+\s/, '');
-      var d = new Date(clean + 'T12:00:00');
-      if (!isNaN(d)) dateDisplay = d.toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
+      dateDisplay = new Date(dateStr + 'T12:00:00').toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
     } catch(e) {}
 
-    var endStyle = canEnd
+    /* Convert 24h time to 12h for display */
+    var timeDisplay = timeStr;
+    try {
+      var parts = timeStr.split(':');
+      var hh = parseInt(parts[0]);
+      var mm = parts[1] || '00';
+      var period = hh >= 12 ? 'PM' : 'AM';
+      var h12 = hh % 12 === 0 ? 12 : hh % 12;
+      timeDisplay = h12 + ':' + mm + ' ' + period;
+    } catch(e) {}
+
+    /* Check if teacher has joined (in-memory) */
+    var hasJoined = typeof joinedSessions !== 'undefined' && joinedSessions.has(b.id);
+
+    /* End button: active only after joining */
+    var endStyle = hasJoined
       ? 'background:#c53030;color:#fff;border:none;border-radius:12px;padding:10px 14px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:12px;cursor:pointer;flex:1;'
-      : 'background:#c53030;color:rgba(255,255,255,.45);border:none;border-radius:12px;padding:10px 14px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:12px;cursor:not-allowed;flex:1;opacity:.65;';
-    var endAttr = canEnd
+      : 'background:#c53030;color:rgba(255,255,255,.4);border:none;border-radius:12px;padding:10px 14px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:12px;cursor:not-allowed;flex:1;opacity:.5;';
+    var endAttr = hasJoined
       ? 'onclick="openEndClassDialogV2(\'' + b.id + '\')"'
-      : 'disabled title="' + (!hasJoined ? 'Join class first' : 'Active 15 mins after start') + '"';
+      : 'disabled title="Join class first, then End becomes active"';
 
     card.style.borderTopColor = accent;
     card.innerHTML =
-      '<div style="font-family:\'Fredoka One\',cursive;font-size:12px;color:' + accent + ';text-transform:uppercase;letter-spacing:.5px;">' + titles[idx] + '</div>' +
-      '<div style="font-family:\'Fredoka One\',cursive;font-size:18px;color:#1a202c;line-height:1.2;">' + (b.studentName || 'Student') + '</div>' +
-      '<div style="font-size:13px;font-weight:700;color:#4a5568;">&#128336; ' + (b.time || '') + ' &middot; ' + dateDisplay + '</div>' +
-      '<div style="font-size:13px;font-weight:700;color:#4a5568;">' + (isDemo ? '&#127891;' : '&#128218;') + ' ' + topic + '</div>' +
-      '<div style="display:flex;gap:8px;margin-top:auto;">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">' +
+        '<div style="font-family:\'Fredoka One\',cursive;font-size:12px;color:' + accent + ';text-transform:uppercase;letter-spacing:.5px;">' + titles[idx] + '</div>' +
+        typeBadge +
+      '</div>' +
+      '<div style="font-family:\'Fredoka One\',cursive;font-size:18px;color:#1a202c;line-height:1.2;margin-bottom:4px;">' + (b.studentName || '—') + '</div>' +
+      '<div style="font-size:13px;font-weight:700;color:#4a5568;margin-bottom:2px;">🕐 ' + timeDisplay + ' · ' + dateDisplay + '</div>' +
+      '<div style="font-size:13px;font-weight:700;color:#4a5568;margin-bottom:2px;">📚 ' + (b.subject || '—') + (b.grade ? ' · ' + b.grade : '') + '</div>' +
+      (b.classLink ? '<div style="font-size:11px;color:#1a56db;font-weight:700;">🔗 Class link ready</div>' : '<div style="font-size:11px;color:#a0aec0;font-weight:700;">⏳ No class link yet</div>') +
+      '<div style="display:flex;gap:8px;margin-top:auto;padding-top:10px;">' +
         '<button style="background:#0e9f6e;color:#fff;border:none;border-radius:12px;padding:10px 14px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:12px;cursor:pointer;flex:1;" ' +
-        'onclick="teacherJoinClass(\'' + b.id + '\',\'' + (b.classLink || '') + '\')">&#128640; Join</button>' +
-        '<button style="' + endStyle + '" ' + endAttr + '>&#128308; End</button>' +
+        'onclick="teacherJoinClass(\'' + b.id + '\',\'' + (b.classLink || '') + '\')">🚀 Join</button>' +
+        '<button style="' + endStyle + '" ' + endAttr + '>🔴 End</button>' +
       '</div>';
   }
 }
