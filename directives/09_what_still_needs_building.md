@@ -115,3 +115,11 @@ See `10_quizzes_and_assignments.md` for the full design.
 - Email service: fixed SMTP port to 465 for Zoho SSL
 - Student dashboard: projects from API, time display fix, clean state for new students
 - Post-sales: removed localStorage writes, loads teachers/courses from API
+- **Free trial date defaults to today** (not tomorrow)
+- **Email OR phone required** (not both) on free trial form
+- **Duplicate booking**: same parent + different kids = allowed with notice; exact duplicate = blocked
+- **Timezone display**: student local time + WAT shown in presales incoming/scheduled tables
+- **Teacher earnings persist**: loaded from DB via API, not reset on refresh
+- **Completed classes tab**: now loads from API, shows all completed/incomplete/partial with recording link
+- **Paysheet download**: reads from API data, generates CSV with correct earnings
+- **Teacher regions**: DB column added, admin form has region checkboxes, stored in tutor_profiles.regions
