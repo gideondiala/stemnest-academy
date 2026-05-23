@@ -559,6 +559,7 @@ function viewTeacher(id) {
       ['DBS',        t.dbs==='yes'?'✅ Verified':t.dbs==='pending'?'⏳ Pending':'❌ Not yet'],
       ['Courses',    (t.courses||[]).join(', ')||'—'],
       ['Grade Groups',(t.gradeGroups||[]).join(', ')||'—'],
+      ['Regions',    (t.regions||['Global']).join(', ')],
       ['Bio',        t.bio||'—'],
       ['Avail Slots', Object.keys(avail).length + ' slots set'],
     ].map(([l,v])=>`<div class="detail-row"><div class="detail-label">${l}</div><div class="detail-val">${v}</div></div>`).join('')}`;
@@ -599,6 +600,16 @@ function buildAddTeacherForm() {
       <label class="atf-check-opt">
         <input type="checkbox" name="at-grade" value="${g}">
         <span>${g}</span>
+      </label>`).join('');
+  }
+  // Regions checkboxes
+  const rg = document.getElementById('atRegionsGrid');
+  const ALL_REGIONS = ['Africa','Europe','Asia','North America','South America','Middle East','Oceania','Global'];
+  if (rg) {
+    rg.innerHTML = ALL_REGIONS.map(r => `
+      <label class="atf-check-opt">
+        <input type="checkbox" name="at-region" value="${r}" ${r === 'Global' ? 'checked' : ''}>
+        <span>${r}</span>
       </label>`).join('');
   }
 }
@@ -642,24 +653,17 @@ async function saveNewTeacher() {
 
   const courses     = [...document.querySelectorAll('input[name="at-course"]:checked')].map(c => c.value);
   const gradeGroups = [...document.querySelectorAll('input[name="at-grade"]:checked')].map(c => c.value);
+  const regions     = [...document.querySelectorAll('input[name="at-region"]:checked')].map(c => c.value);
 
   if (courses.length === 0)     { showToast('Please select at least one course.', 'error'); return; }
   if (gradeGroups.length === 0) { showToast('Please select at least one grade group.', 'error'); return; }
 
-  const id       = nextTeacherId(subject);
+  const id = nextTeacherId(subject);
 
   const payload = {
-    name,
-    email,
-    password,
-    role: 'tutor',
-    staff_id: id,
-    phone,
-    subject,
-    courses,
-    gradeGroups,
-    availability: avail,
-    dbs
+    name, email, password, role: 'tutor', staff_id: id, phone, subject,
+    courses, gradeGroups, availability: avail, dbs,
+    regions: regions.length > 0 ? regions : ['Global']
   };
 
   try {

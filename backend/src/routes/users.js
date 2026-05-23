@@ -46,6 +46,7 @@ const createUserSchema = z.object({
   gradeGroups: z.array(z.string()).optional(),
   availability: z.string().optional(),
   dbs:      z.string().optional(),
+  regions:  z.array(z.string()).optional(),
 });
 
 /* Postsales can only create students */
@@ -105,7 +106,7 @@ router.get('/', requireAuth, async (req, res, next) => {
 
     let query = `SELECT users.id, users.name, users.email, users.role, users.staff_id,
                         users.phone, users.is_active, users.created_at,
-                        tp.subject, tp.courses, tp.grade_groups, tp.availability
+                        tp.subject, tp.courses, tp.grade_groups, tp.availability, tp.regions
                  FROM users
                  LEFT JOIN tutor_profiles tp ON tp.user_id = users.id
                  WHERE 1=1`;
@@ -196,9 +197,9 @@ router.post('/', requireAuth, async (req, res, next) => {
       const colors = ['linear-gradient(135deg,var(--blue),#4f87f5)','linear-gradient(135deg,var(--green),#3dd9a4)','linear-gradient(135deg,var(--orange),#ffaa80)','linear-gradient(135deg,var(--purple),#a78bfa)'];
       const randomColor = colors[Math.floor(Math.random() * colors.length)];
       await pool.query(
-        `INSERT INTO tutor_profiles (user_id, subject, courses, grade_groups, availability, dbs_checked, color)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [user.id, data.subject || null, data.courses || [], data.gradeGroups || [], data.availability || null, data.dbs || 'pending', randomColor]
+        `INSERT INTO tutor_profiles (user_id, subject, courses, grade_groups, availability, dbs_checked, color, regions)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [user.id, data.subject || null, data.courses || [], data.gradeGroups || [], data.availability || null, data.dbs || 'pending', randomColor, data.regions || []]
       );
 
       /* Send welcome email */
