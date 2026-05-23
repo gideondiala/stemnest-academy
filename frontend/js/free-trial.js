@@ -28,16 +28,13 @@ document.addEventListener('DOMContentLoaded', () => {
   bindScrollReveal();
 });
 
-/* ── Set minimum date to today ── */
+/* ── Set minimum date to today, default to today ── */
 function setMinDate() {
   const dateInput = document.getElementById('f-date');
   if (!dateInput) return;
   const today = new Date().toISOString().split('T')[0];
   dateInput.min = today;
-  // Default to tomorrow
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  dateInput.value = tomorrow.toISOString().split('T')[0];
+  dateInput.value = today; // Default to TODAY, not tomorrow
 }
 
 /* ── Build time slot grid ── */
@@ -115,15 +112,19 @@ function submitBooking() {
   if (!studentName) { shakeField('f-student-name'); showToast('Please enter the student\'s name.', 'error'); return; }
   if (!age)         { shakeField('f-age');           showToast('Please select the student\'s age.', 'error'); return; }
   if (!grade)       { shakeField('f-grade');         showToast('Please select the school year/grade.', 'error'); return; }
-  if (!email || !email.includes('@')) { shakeField('f-email'); showToast('Please enter a valid Gmail address.', 'error'); return; }
-  if (!whatsapp)    { shakeField('f-whatsapp');      showToast('Please enter a WhatsApp number.', 'error'); return; }
+  // Email OR WhatsApp — at least one required
+  if (!email && !whatsapp) {
+    showToast('Please enter at least an email address or WhatsApp number so we can reach you.', 'error');
+    return;
+  }
+  if (email && !email.includes('@')) { shakeField('f-email'); showToast('Please enter a valid email address.', 'error'); return; }
   if (!subject)     { showToast('Please select a subject (Coding, Maths or Sciences).', 'error'); return; }
   if (!device)      { showToast('Please select your device type.', 'error'); return; }
   if (!timezone)    { shakeField('f-timezone');      showToast('Please select your country/timezone.', 'error'); return; }
   if (!date)        { shakeField('f-date');          showToast('Please select a preferred date.', 'error'); return; }
   if (!selectedTime){ showToast('Please select a preferred time slot.', 'error'); return; }
 
-  const fullPhone = countryCode + ' ' + whatsapp;
+  const fullPhone = whatsapp ? (countryCode + ' ' + whatsapp) : '';
 
   // ── Build booking object ──
   const booking = {
@@ -131,7 +132,7 @@ function submitBooking() {
     studentName,
     age,
     grade,
-    email:       email.toLowerCase(),
+    email:       email ? email.toLowerCase() : '',
     whatsapp:    fullPhone,
     parentName:  parentName || '—',
     subject,
@@ -143,16 +144,25 @@ function submitBooking() {
     status:      'pending',
   };
 
-  // ── Duplicate check: same email+studentName OR same whatsapp+studentName ──
+  // ── Duplicate check ──
+  // Same contact + same student name + pending = exact duplicate → block
+  // Same contact + different student name = parent booking for multiple kids → allow with notice
   const existing = getBookings();
-  const isDuplicate = existing.some(b =>
-    b.studentName.toLowerCase() === studentName.toLowerCase() &&
-    (b.email === booking.email || b.whatsapp === booking.whatsapp)
+  const contactMatches = existing.filter(b =>
+    (booking.email && b.email === booking.email) ||
+    (fullPhone && b.whatsapp === fullPhone)
   );
-
-  if (isDuplicate) {
-    showToast('This student already has a booking with this contact. Check your email for details.', 'error');
+  const exactDuplicate = contactMatches.some(b =>
+    b.studentName.toLowerCase() === studentName.toLowerCase() && b.status === 'pending'
+  );
+  if (exactDuplicate) {
+    showToast(`${studentName} already has a pending booking with this contact. Check your email or WhatsApp for details.`, 'error');
     return;
+  }
+  // Different student, same contact — allowed, just show a notice
+  if (contactMatches.length > 0) {
+    const otherNames = [...new Set(contactMatches.map(b => b.studentName))].join(', ');
+    showToast(`Note: This contact already has bookings for ${otherNames}. Adding new booking for ${studentName}...`, 'info');
   }
 
   // ── Save to localStorage (admin reads from here) ──
@@ -310,7 +320,7 @@ function showSuccessScreen(b) {
   details.innerHTML = `
     📚 <strong>${b.subject}</strong> &nbsp;·&nbsp;
     📅 <strong>${formatDate(b.date)}</strong> &nbsp;·&nbsp;
-    🕐 <strong>${b.time}</strong><br>
+    🕐 <strong>${b.time}</strong> (${b.timezone})<br>
     🎓 <strong>${b.studentName}</strong> (${b.grade}) &nbsp;·&nbsp;
     🆔 Booking: <strong>${b.id}</strong>
   `;

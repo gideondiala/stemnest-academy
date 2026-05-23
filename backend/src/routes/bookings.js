@@ -24,14 +24,16 @@ const bookingSchema = z.object({
   studentName:  z.string().min(2),
   age:          z.string(),
   grade:        z.string(),
-  email:        z.string().email(),
-  whatsapp:     z.string().min(7),
+  email:        z.string().email().optional().or(z.literal('')),
+  whatsapp:     z.string().optional().or(z.literal('')),
   parentName:   z.string().optional(),
   subject:      z.enum(['Coding','Maths','Sciences']),
   device:       z.string(),
   timezone:     z.string(),
   date:         z.string(),
   time:         z.string(),
+}).refine(data => data.email || data.whatsapp, {
+  message: 'Either email or WhatsApp number is required',
 });
 
 const assignSchema = z.object({
@@ -156,15 +158,27 @@ router.post('/', async (req, res, next) => {
   try {
     const data = bookingSchema.parse(req.body);
 
-    /* Duplicate check */
-    const dup = await pool.query(
-      `SELECT id FROM bookings
-       WHERE LOWER(b.student_email) = LOWER($1) AND status = 'pending'
-         AND booked_at > NOW() - INTERVAL '24 hours'`,
-      [data.email]
-    ).catch(() => ({ rows: [] }));
+    /* Convert student's local time to WAT (UTC+1) for display in presales */
+    let watTime = data.time;
+    try {
+      if (data.timezone && data.date && data.time) {
+        // Parse the time in student's timezone and convert to WAT
+        const [h, m] = data.time.split(':').map(Number);
+        const studentDt = new Date(`${data.date}T${String(h).padStart(2,'0')}:${String(m||0).padStart(2,'0')}:00`);
+        // Get WAT offset: Africa/Lagos = UTC+1
+        const watOffset = 60; // minutes
+        const studentOffset = -new Date().toLocaleString('en', { timeZone: data.timezone, timeZoneName: 'short' })
+          .match(/GMT([+-]\d+)/)?.[1] * 60 || 0;
+        const diffMins = watOffset - studentOffset;
+        const watDt = new Date(studentDt.getTime() + diffMins * 60000);
+        const wh = watDt.getHours(), wm = watDt.getMinutes();
+        const period = wh >= 12 ? 'PM' : 'AM';
+        const wh12 = wh % 12 === 0 ? 12 : wh % 12;
+        watTime = `${wh12}:${String(wm).padStart(2,'0')} ${period} WAT`;
+      }
+    } catch(e) { /* keep original time if conversion fails */ }
 
-    /* Insert booking (student_id may be null for demo — not yet registered) */
+    /* Insert booking */
     const result = await pool.query(
       `INSERT INTO bookings
          (subject, grade, date, time, class_link, status, is_demo, notes, booked_at)
@@ -174,21 +188,20 @@ router.post('/', async (req, res, next) => {
        JSON.stringify({
          studentName: data.studentName,
          age:         data.age,
-         email:       data.email,
-         whatsapp:    data.whatsapp,
+         email:       data.email || '',
+         whatsapp:    data.whatsapp || '',
          parentName:  data.parentName,
          device:      data.device,
          timezone:    data.timezone,
+         timeLocal:   data.time,       // student's local time
+         timeWAT:     watTime,         // WAT equivalent
        })]
     );
 
     const bookingId = result.rows[0].id;
 
-    /* Also update the booking with student info in dedicated columns for easier querying */
     await pool.query(
-      `UPDATE bookings SET
-         lesson_name = $1
-       WHERE id = $2`,
+      `UPDATE bookings SET lesson_name = $1 WHERE id = $2`,
       [data.studentName, bookingId]
     ).catch(() => {});
 

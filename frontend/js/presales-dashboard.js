@@ -79,6 +79,7 @@ async function _loadPresalesFromAPI() {
           subject:         b.subject || '—',
           date:            b.date ? b.date.split('T')[0] : '—',
           time:            notes.time || b.time || '—',
+          timeWAT:         notes.timeWAT || '',
           timezone:        notes.timezone || '—',
           device:          notes.device || '—',
           status:          b.status,
@@ -253,7 +254,10 @@ function renderIncoming() {
                     : `📱 ${b.whatsapp || '—'}`}
                 </div>
               </td>
-              <td style="padding:14px 16px;font-weight:700;color:var(--mid);">${b.date || '—'}<br><span style="font-size:11px;">${b.time || '—'}</span></td>
+              <td style="padding:14px 16px;font-weight:700;color:var(--mid);">${b.date || '—'}<br>
+                <span style="font-size:11px;color:var(--mid);">🕐 ${b.time || '—'} (local)</span>
+                ${b.timeWAT ? `<br><span style="font-size:11px;color:var(--blue);font-weight:800;">🇳🇬 ${b.timeWAT}</span>` : ''}
+              </td>
               <td style="padding:14px 16px;font-size:12px;color:var(--light);font-weight:700;">${b.bookedAt ? new Date(b.bookedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '—'}</td>
               <td style="padding:14px 16px;text-align:center;">
                 <div style="display:flex;flex-direction:column;gap:6px;align-items:center;">
@@ -489,7 +493,10 @@ function renderScheduled() {
               </td>
               <td style="padding:14px 16px;font-weight:700;color:var(--mid);">${b.subject}</td>
               <td style="padding:14px 16px;font-weight:700;color:var(--mid);">${b.assignedTutor || '—'}</td>
-              <td style="padding:14px 16px;font-weight:700;color:var(--mid);">${b.date || '—'}<br><span style="font-size:11px;">${b.time || '—'}</span></td>
+              <td style="padding:14px 16px;font-weight:700;color:var(--mid);">${b.date || '—'}<br>
+                <span style="font-size:11px;color:var(--mid);">🕐 ${b.time || '—'} (local)</span>
+                ${b.timeWAT ? `<br><span style="font-size:11px;color:var(--blue);font-weight:800;">🇳🇬 ${b.timeWAT}</span>` : ''}
+              </td>
               <td style="padding:14px 16px;font-size:12px;color:var(--mid);">📧 ${b.email}<br>📱 ${b.whatsapp || '—'}</td>
               <td style="padding:14px 16px;text-align:center;">
                 <button onclick="addParentNote('${b.id}')"

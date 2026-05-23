@@ -88,30 +88,29 @@ function getPayRates() {
    INTERNAL HELPERS
 ───────────────────────────────────────────────────── */
 
-/** Add earnings to the current tutor's running total */
+/** Add earnings to the current tutor's running total — persists to API */
 function _addEarnings(amount) {
   if (!amount || amount <= 0) return;
   var tutor = getCurrentTutor();
-  var key   = 'sn_earnings_' + tutor.id;
-  var data  = JSON.parse(_getLocalStr(key) || '{"total":0,"sessions":[]}');
-  data.total = (data.total || 0) + amount;
-  _setLocalStr(key, JSON.stringify(data));
 
-  // Also update the shared teacher record
-  try {
-    var teachers = JSON.parse(_getLocalStr('sn_teachers') || '[]');
-    var idx = teachers.findIndex(function(t) { return t.id === tutor.id; });
-    if (idx !== -1) {
-      teachers[idx].earnings = (teachers[idx].earnings || 0) + amount;
-      _setLocalStr('sn_teachers', JSON.stringify(teachers));
-    }
-  } catch (e) { /* silent */ }
+  // Update display immediately
+  var currentEl = document.getElementById('overviewEarnings');
+  var liveEl    = document.getElementById('liveEarnings');
+  var current   = parseFloat((currentEl ? currentEl.textContent.replace('£','') : '0')) || 0;
+  var newTotal  = (current + amount).toFixed(2);
 
-  // Refresh overview earnings display
-  var earningsEl = document.getElementById('overviewEarnings');
-  if (earningsEl) earningsEl.textContent = '\u00a3' + (data.total || 0).toFixed(2);
-  var liveEl = document.getElementById('liveEarnings');
-  if (liveEl) liveEl.textContent = '\u00a3' + (data.total || 0).toFixed(2);
+  if (currentEl) currentEl.textContent = '£' + newTotal;
+  if (liveEl)    liveEl.textContent    = '£' + newTotal;
+
+  // Push to API so it persists across devices and refreshes
+  var token = localStorage.getItem('sn_access_token');
+  if (token && tutor.dbId) {
+    fetch('https://api.stemnestacademy.co.uk/api/sync/class-reports', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payAmount: amount, creditDeducted: false, outcome: 'completed', bookingId: 'earnings-update' })
+    }).catch(function() { /* silent */ });
+  }
 }
 
 /** Deduct 1 credit from a student booking and log the transaction */
@@ -770,16 +769,22 @@ function _refreshOverviewCards() {
   if (typeof syncOverviewStats === 'function') {
     syncOverviewStats();
   }
-  // Update earnings display from stored value
+  // Load earnings from API (tutor_profiles.earnings) — persists across devices
+  var token = localStorage.getItem('sn_access_token');
   var tutor = getCurrentTutor();
-  try {
-    var data = JSON.parse(_getLocalStr('sn_earnings_' + tutor.id) || '{"total":0}');
-    var total = (data.total || 0).toFixed(2);
-    var earningsEl = document.getElementById('overviewEarnings');
-    if (earningsEl) earningsEl.textContent = '\u00a3' + total;
-    var liveEl = document.getElementById('liveEarnings');
-    if (liveEl) liveEl.textContent = '\u00a3' + total;
-  } catch (e) { /* silent */ }
+  if (token && tutor.dbId) {
+    fetch('https://api.stemnestacademy.co.uk/api/users/' + tutor.dbId, {
+      headers: { 'Authorization': 'Bearer ' + token }
+    }).then(function(r) { return r.json(); }).then(function(d) {
+      if (d.user) {
+        var total = parseFloat(d.user.earnings || 0).toFixed(2);
+        var earningsEl = document.getElementById('overviewEarnings');
+        if (earningsEl) earningsEl.textContent = '£' + total;
+        var liveEl = document.getElementById('liveEarnings');
+        if (liveEl) liveEl.textContent = '£' + total;
+      }
+    }).catch(function() { /* silent */ });
+  }
 }
 
 /* ─────────────────────────────────────────────────────
