@@ -36,6 +36,7 @@
       <a class="sidebar-link"        data-tab="scheduled" onclick="showPOSTab('scheduled')"><span class="sl-icon">📅</span> Scheduled Classes</a>
       <a class="sidebar-link"        data-tab="paylinks"  onclick="showPOSTab('paylinks')"> <span class="sl-icon">🔗</span> Payment Links</a>
       <a class="sidebar-link"        data-tab="converted" onclick="showPOSTab('converted')"><span class="sl-icon">✅</span> Converted</a>
+      <a class="sidebar-link"        data-tab="website-enquiries" onclick="showPOSTab('website-enquiries')"><span class="sl-icon">🌐</span> Website Enquiries</a>
     </div>
     <div class="sidebar-bottom">
       <button class="logout-btn" onclick="window.location.href='login.html'">🚪 Log Out</button>
@@ -138,6 +139,18 @@
     <div id="tab-converted" style="display:none;">
       <div class="dash-section-header"><div class="dash-section-title">✅ Converted Students</div></div>
       <div id="posConvertedList"></div>
+    </div>
+
+    <!-- WEBSITE ENQUIRIES -->
+    <div id="tab-website-enquiries" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🌐 Direct Website Enquiries</div>
+        <button class="btn btn-outline" style="font-size:12px;" onclick="renderWebsiteEnquiries()">🔄 Refresh</button>
+      </div>
+      <div style="background:#f0f4ff;border-radius:12px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:#1e40af;font-weight:700;">
+        📋 These are parents who clicked "Enrol Now" on the courses page. Contact them to arrange payment and schedule their first class.
+      </div>
+      <div id="websiteEnquiriesList"></div>
     </div>
 
   </div><!-- end dash-main -->

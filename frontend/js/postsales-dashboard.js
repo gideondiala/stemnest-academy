@@ -4,7 +4,7 @@
    paid classes, writes slots to teacher calendar.
 ═══════════════════════════════════════════════════════ */
 
-const POS_TABS = ['students', 'topup', 'scheduled', 'paylinks', 'converted'];
+const POS_TABS = ['students', 'topup', 'scheduled', 'paylinks', 'converted', 'website-enquiries'];
 let generatedLink       = null;
 let posScheduleStudentId = null; // booking ID being scheduled
 
@@ -126,8 +126,17 @@ function getBookings()  { return window.POS_DATA.bookings || []; }
 function getTeachers()  { return window.POS_DATA.teachers || []; }
 function saveBookings(list) { 
   window.POS_DATA.bookings = list;
-  // Fallback to localStorage
-  localStorage.setItem('sn_bookings', JSON.stringify(list)); 
+  // Push status updates to API for any modified bookings
+  const token = localStorage.getItem('sn_access_token');
+  if (token) {
+    list.filter(b => b._dirty).forEach(b => {
+      fetch('https://api.stemnestacademy.co.uk/api/bookings/' + b.id + '/status', {
+        method: 'PUT',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: b.status })
+      }).catch(() => {});
+    });
+  }
 }
 function setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
 
@@ -178,10 +187,11 @@ function showPOSTab(tab) {
   });
   document.querySelectorAll('.sidebar-link[data-tab]').forEach(l => l.classList.toggle('active', l.dataset.tab === tab));
   updatePOSStats();
-  if (tab === 'students')  renderPaidStudents();
-  if (tab === 'topup')     renderTopUpStudents();
-  if (tab === 'scheduled') renderScheduledPaid();
-  if (tab === 'converted') renderPOSConverted();
+  if (tab === 'students')           renderPaidStudents();
+  if (tab === 'topup')              renderTopUpStudents();
+  if (tab === 'scheduled')          renderScheduledPaid();
+  if (tab === 'converted')          renderPOSConverted();
+  if (tab === 'website-enquiries')  renderWebsiteEnquiries();
 }
 
 /* ── STATS ── */
@@ -624,6 +634,83 @@ function renderPOSConverted() {
         </tbody>
       </table>
     </div>`;
+}
+
+/* ══════════════════════════════════════════════════════
+   WEBSITE ENQUIRIES — Direct course enrolment requests
+   from the public courses page "Enrol Now" button
+══════════════════════════════════════════════════════ */
+async function renderWebsiteEnquiries() {
+  const el = document.getElementById('websiteEnquiriesList');
+  if (!el) return;
+
+  el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--light);font-weight:700;">⏳ Loading enquiries...</div>';
+
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/payments?status=enquiry', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    const enquiries = (data.payments || []).filter(p => {
+      try {
+        const n = typeof p.notes === 'string' ? JSON.parse(p.notes) : p.notes;
+        return n && n.source === 'direct_website';
+      } catch { return false; }
+    });
+
+    if (!enquiries.length) {
+      el.innerHTML = '<div style="text-align:center;padding:48px;color:var(--light);font-weight:700;">No website enquiries yet.<br><span style="font-size:13px;">When parents click "Enrol Now" on the courses page, their details appear here.</span></div>';
+      return;
+    }
+
+    el.innerHTML = `
+      <div style="overflow-x:auto;border-radius:16px;border:1.5px solid #e8eaf0;background:var(--white);">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">
+              <th style="${thStyle()}">Student</th>
+              <th style="${thStyle()}">Course</th>
+              <th style="${thStyle()}">Contact</th>
+              <th style="${thStyle()}">Timezone</th>
+              <th style="${thStyle()}">Amount</th>
+              <th style="${thStyle()}">Received</th>
+              <th style="${thStyle('center')}">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${enquiries.map((p, i) => {
+              let n = {};
+              try { n = typeof p.notes === 'string' ? JSON.parse(p.notes) : (p.notes || {}); } catch {}
+              return `
+                <tr style="border-bottom:1px solid #f0f2f8;${i%2===0?'':'background:#fafbff;'}">
+                  <td style="${tdStyle()}">
+                    <div style="font-weight:800;color:var(--dark);">${n.studentName || '—'}</div>
+                    <div style="font-size:11px;color:var(--light);">Age/Year: ${n.age || '—'}</div>
+                  </td>
+                  <td style="${tdStyle()};font-weight:700;color:var(--mid);">${n.courseName || '—'}</td>
+                  <td style="${tdStyle()}">
+                    <div style="font-size:12px;font-weight:700;color:var(--mid);">📧 ${n.email || '—'}</div>
+                    <div style="font-size:12px;font-weight:700;color:var(--mid);">📱 ${n.phone || '—'}</div>
+                  </td>
+                  <td style="${tdStyle()};font-size:12px;color:var(--mid);">${n.timezone || '—'}</td>
+                  <td style="${tdStyle()};font-weight:800;color:var(--green-dark);">£${parseFloat(p.amount||0).toFixed(0)}/mo</td>
+                  <td style="${tdStyle()};font-size:12px;color:var(--light);">${p.created_at ? new Date(p.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—'}</td>
+                  <td style="${tdStyle('center')}">
+                    <div style="display:flex;flex-direction:column;gap:6px;align-items:center;">
+                      ${n.phone ? `<a href="https://wa.me/${n.phone.replace(/[\s\-\(\)\+]/g,'')}" target="_blank" style="background:#25D366;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;text-decoration:none;white-space:nowrap;">💬 WhatsApp</a>` : ''}
+                      ${n.email ? `<a href="mailto:${n.email}" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;text-decoration:none;white-space:nowrap;">📧 Email</a>` : ''}
+                    </div>
+                  </td>
+                </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:10px;font-size:12px;font-weight:700;color:var(--light);text-align:right;">${enquiries.length} enquir${enquiries.length!==1?'ies':'y'}</div>`;
+  } catch(e) {
+    el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--orange);font-weight:700;">Failed to load enquiries. Please refresh.</div>';
+  }
 }
 
 /* ── BIND MODALS ── */

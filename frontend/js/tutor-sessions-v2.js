@@ -113,44 +113,22 @@ function _addEarnings(amount) {
   }
 }
 
-/** Deduct 1 credit from a student booking and log the transaction */
+/** Deduct 1 credit from a student booking via API */
 function _deductStudentCredit(booking) {
   try {
-    // Update sn_students registry
-    var students = JSON.parse(_getLocalStr('sn_students') || '[]');
-    var idx = students.findIndex(function(s) {
-      return s.email === booking.email || s.id === booking.studentId;
-    });
-    if (idx !== -1) {
-      students[idx].credits = (parseInt(students[idx].credits) || 0) - 1;
-      _setLocalStr('sn_students', JSON.stringify(students));
+    var token = localStorage.getItem('sn_access_token');
+    if (token && booking.email) {
+      fetch('https://api.stemnestacademy.co.uk/api/sync/credits', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentEmail:  booking.email,
+          type:          'class_deduction',
+          description:   'Class completed — 1 credit used',
+          bookingId:     booking.id,
+        })
+      }).catch(function() { /* silent */ });
     }
-
-    // Also update booking record
-    var bookings = window.TUTOR_DATA?.bookings || JSON.parse(_getLocalStr('sn_bookings') || '[]');
-    var bi = bookings.findIndex(function(b) { return b.id === booking.id; });
-    if (bi !== -1) {
-      bookings[bi].studentCredits = (parseInt(bookings[bi].studentCredits) || 0) - 1;
-      window.TUTOR_DATA.bookings = bookings;
-      _setLocalStr('sn_bookings', JSON.stringify(bookings));
-    }
-
-    // Log the deduction in the student's credit log (append-only)
-    var studentKey = booking.studentId || booking.email || booking.id;
-    var logKey = 'sn_credit_log_' + studentKey;
-    var log = [];
-    try { log = JSON.parse(_getLocalStr(logKey) || '[]'); } catch(e) {}
-    log.push({
-      id:          'TXN-' + Date.now().toString(36).toUpperCase(),
-      type:        'class_deduction',
-      description: 'Class completed — 1 credit used',
-      credits:     -1,
-      date:        new Date().toISOString(),
-      loggedAt:    new Date().toISOString(),
-      bookingId:   booking.id,
-      _readonly:   true,
-    });
-    _setLocalStr(logKey, JSON.stringify(log));
   } catch (e) { /* silent */ }
 }
 

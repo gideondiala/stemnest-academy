@@ -188,16 +188,20 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 /* ── GET /api/payments ── */
 router.get('/', requireAuth, requireRole('admin','super_admin','postsales'), async (req, res, next) => {
   try {
-    const result = await pool.query(
-      `SELECT p.*, u_s.name AS student_name, u_s.email AS student_email,
+    const { status } = req.query;
+    let query = `SELECT p.*, u_s.name AS student_name, u_s.email AS student_email,
               u_sp.name AS sales_name, c.name AS course_name
        FROM payments p
        LEFT JOIN users u_s  ON u_s.id  = p.student_id
        LEFT JOIN users u_sp ON u_sp.id = p.sales_id
-       LEFT JOIN courses c  ON c.id    = p.course_id
-       ORDER BY p.created_at DESC
-       LIMIT 200`
-    );
+       LEFT JOIN courses c  ON c.id    = p.course_id`;
+    const params = [];
+    if (status) {
+      params.push(status);
+      query += ` WHERE p.status = $1`;
+    }
+    query += ` ORDER BY p.created_at DESC LIMIT 500`;
+    const result = await pool.query(query, params);
     res.json({ success: true, payments: result.rows });
   } catch (err) { next(err); }
 });
