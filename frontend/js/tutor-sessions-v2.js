@@ -859,64 +859,57 @@ function recordClassSession(booking, outcome, reason, payAmount, creditDeducted)
  * @param {number} year  - Full year e.g. 2025
  */
 function downloadMonthlyPaysheet(month, year) {
-  var tutor    = getCurrentTutor();
-  var key      = 'sn_class_sessions_' + tutor.id;
-  var sessions = [];
-  try { sessions = JSON.parse(_getLocalStr(key) || '[]'); } catch (e) { sessions = []; }
+  var tutor = getCurrentTutor();
 
-  // Filter to the requested month/year using endedAt
-  var filtered = sessions.filter(function(s) {
-    if (!s.endedAt) return false;
-    var d = new Date(s.endedAt);
+  /* ── Load from API data (window.TUTOR_DATA.bookings) ── */
+  var allBookings = (window.TUTOR_DATA && window.TUTOR_DATA.bookings) ? window.TUTOR_DATA.bookings : [];
+  var completedStatuses = ['completed', 'incomplete', 'partially_completed'];
+
+  var filtered = allBookings.filter(function(b) {
+    if (completedStatuses.indexOf(b.status) === -1) return false;
+    var dateStr = (b.date || '').split('T')[0];
+    if (!dateStr) return false;
+    var d = new Date(dateStr + 'T12:00:00');
     return d.getFullYear() === year && (d.getMonth() + 1) === month;
   });
 
   var monthNames = ['January','February','March','April','May','June',
                     'July','August','September','October','November','December'];
-  var monthName  = monthNames[month - 1] || String(month);
+  var monthName = monthNames[month - 1] || String(month);
+
+  var rates = getPayRates();
 
   // CSV header
   var rows = [
-    ['Date', 'Time Ended', 'Student', 'Subject', 'Type', 'Outcome', 'Reason', 'Pay (\u00a3)', 'Credits Deducted']
+    ['Date', 'Student', 'Subject', 'Grade', 'Type', 'Outcome', 'Pay (£)']
   ];
 
-  var totalPay     = 0;
-  var totalCredits = 0;
+  var totalPay = 0;
 
-  filtered.forEach(function(s) {
-    var endedDate = s.endedAt ? new Date(s.endedAt).toLocaleDateString('en-GB') : s.date;
-    var endedTime = s.endedAt ? new Date(s.endedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : s.time;
-    var pay       = typeof s.payAmount === 'number' ? s.payAmount : 0;
-    var credits   = s.creditDeducted ? 1 : 0;
-    totalPay     += pay;
-    totalCredits += credits;
+  filtered.forEach(function(b) {
+    var dateStr = (b.date || '').split('T')[0];
+    var dateDisplay = dateStr ? new Date(dateStr + 'T12:00:00').toLocaleDateString('en-GB') : '—';
+    var isDemo = b.isDemoClass || !b.paymentAmount;
+    var pay = b.status === 'completed' ? (isDemo ? rates.demo : rates.paid) :
+              b.status === 'partially_completed' ? parseFloat((rates.paid / 3).toFixed(2)) : 0;
+    totalPay += pay;
 
     rows.push([
-      endedDate,
-      endedTime,
-      s.studentName  || '—',
-      s.subject      || '—',
-      s.type         || '—',
-      s.outcome      || '—',
-      s.reason       || '',
-      pay.toFixed(2),
-      credits
+      dateDisplay,
+      b.studentName || '—',
+      b.subject || '—',
+      b.grade || '—',
+      isDemo ? 'Demo' : 'Paid',
+      b.status === 'completed' ? 'Completed' : b.status === 'partially_completed' ? 'Partial' : 'Incomplete',
+      pay.toFixed(2)
     ]);
   });
 
-  // Totals row
-  rows.push([
-    'TOTAL', '', '', '', '', '',
-    filtered.length + ' session(s)',
-    totalPay.toFixed(2),
-    totalCredits
-  ]);
+  rows.push(['TOTAL', '', '', '', '', filtered.length + ' session(s)', totalPay.toFixed(2)]);
 
-  // Build CSV string
   var csv = rows.map(function(row) {
     return row.map(function(cell) {
       var val = String(cell === null || cell === undefined ? '' : cell);
-      // Escape double quotes and wrap in quotes if needed
       if (val.indexOf(',') !== -1 || val.indexOf('"') !== -1 || val.indexOf('\n') !== -1) {
         val = '"' + val.replace(/"/g, '""') + '"';
       }
@@ -924,17 +917,13 @@ function downloadMonthlyPaysheet(month, year) {
     }).join(',');
   }).join('\r\n');
 
-  // Sanitise tutor name for filename
   var safeName = (tutor.name || 'Tutor').replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '-');
-  var filename  = 'StemNest-Paysheet-' + safeName + '-' + monthName + '-' + year + '.csv';
+  var filename = 'StemNest-Paysheet-' + safeName + '-' + monthName + '-' + year + '.csv';
 
-  // Trigger download
   var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   var url  = URL.createObjectURL(blob);
   var a    = document.createElement('a');
-  a.href     = url;
-  a.download = filename;
-  a.style.display = 'none';
+  a.href = url; a.download = filename; a.style.display = 'none';
   document.body.appendChild(a);
   a.click();
   setTimeout(function() {
