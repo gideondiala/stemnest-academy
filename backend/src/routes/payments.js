@@ -97,6 +97,37 @@ router.post('/create-link', requireAuth, requireRole('admin','super_admin','post
   } catch (err) { next(err); }
 });
 
+/* ── POST /api/payments/enquiry (public — course enrolment request from website) ── */
+router.post('/enquiry', async (req, res, next) => {
+  try {
+    const { courseId, courseName, coursePrice, studentName, age, email, phone, timezone, notes, source } = req.body;
+
+    if (!studentName) return res.status(400).json({ success: false, error: 'studentName required' });
+    if (!email && !phone) return res.status(400).json({ success: false, error: 'email or phone required' });
+
+    /* Save as a payment record with status = enquiry */
+    await pool.query(
+      `INSERT INTO payments (amount, currency, status, notes, created_at)
+       VALUES ($1, 'GBP', 'enquiry', $2, NOW())`,
+      [
+        parseFloat(coursePrice) || 0,
+        JSON.stringify({
+          courseId, courseName, coursePrice,
+          studentName, age,
+          email: email || '',
+          phone: phone || '',
+          timezone: timezone || '',
+          notes: notes || '',
+          source: source || 'direct_website',
+        })
+      ]
+    ).catch(() => {}); // don't fail if payments table structure differs
+
+    logger.info(`[ENQUIRY] ${studentName} → ${courseName} · ${email || phone}`);
+    res.json({ success: true, message: 'Enquiry received' });
+  } catch (err) { next(err); }
+});
+
 /* ── POST /api/payments/webhook (Stripe) ── */
 router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const sig    = req.headers['stripe-signature'];

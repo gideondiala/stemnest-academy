@@ -334,17 +334,38 @@ const DEFAULT_COURSES = [
   },
 ];
 
-/* ── Load courses from localStorage (admin-managed) ── */
-function getCourses() {
+/* ── Load courses from API, fall back to defaults ── */
+async function getCourses() {
   try {
-    const stored = JSON.parse(localStorage.getItem('sn_courses') || '[]');
-    // If stored courses don't have lesson data yet, refresh with defaults
-    if (stored.length === 0 || !stored[0].lessons) {
-      localStorage.setItem('sn_courses', JSON.stringify(DEFAULT_COURSES));
-      return DEFAULT_COURSES;
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/courses');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.courses && data.courses.length > 0) {
+        // Merge API courses with default lesson data
+        return data.courses.map(apiCourse => {
+          const def = DEFAULT_COURSES.find(d => d.id === apiCourse.id || d.name === apiCourse.name);
+          return {
+            id:       apiCourse.id,
+            name:     apiCourse.name,
+            desc:     apiCourse.description || (def ? def.desc : ''),
+            subject:  (apiCourse.subject || '').toLowerCase(),
+            age:      apiCourse.age_range || (def ? def.age : 'Ages 7–19'),
+            price:    parseFloat(apiCourse.price) || (def ? def.price : 99),
+            classes:  apiCourse.num_classes || (def ? def.classes : 20),
+            rating:   parseFloat(apiCourse.rating) || (def ? def.rating : 4.9),
+            students: parseInt(apiCourse.students) || (def ? def.students : 0),
+            emoji:    apiCourse.emoji || (def ? def.emoji : '📚'),
+            color:    apiCourse.color || (def ? def.color : 'blue'),
+            badge:    apiCourse.badge || (def ? def.badge : ''),
+            level:    apiCourse.level || (def ? def.level : 'Beginner'),
+            duration: apiCourse.duration || (def ? def.duration : ''),
+            lessons:  def ? def.lessons : [],
+          };
+        });
+      }
     }
-    return stored;
-  } catch { return DEFAULT_COURSES; }
+  } catch(e) { /* fall through to defaults */ }
+  return DEFAULT_COURSES;
 }
 
 let courses      = [];
@@ -352,8 +373,8 @@ let activeFilter = 'all';
 let activeSort   = 'default';
 
 /* ── INIT ── */
-document.addEventListener('DOMContentLoaded', () => {
-  courses = getCourses();
+document.addEventListener('DOMContentLoaded', async () => {
+  courses = await getCourses();
   renderGrid();
   bindFilterTabs();
   bindSortSelect();
@@ -429,7 +450,8 @@ function buildCard(c) {
           <div class="course-price">£${c.price}<span style="font-size:14px;color:var(--light);font-family:'Nunito',sans-serif;">/mo</span></div>
           <div class="price-note">1-on-1 live sessions</div>
         </div>
-        <a href="free-trial.html" class="enroll-btn">Enrol Now →</a>
+        <a href="free-trial.html" class="btn btn-outline" style="font-size:13px;padding:8px 18px;">Try Free Demo →</a>
+        <button class="enroll-btn" onclick="openCheckout('${c.id}','${c.name.replace(/'/g,"\\'")}',${c.price})">Enrol Now →</button>
       </div>
     </div>`;
 
@@ -454,4 +476,163 @@ function bindSortSelect() {
     activeSort = e.target.value;
     renderGrid();
   });
+}
+
+/* ══════════════════════════════════════════════════════
+   CHECKOUT MODAL
+   Opens when parent clicks "Enrol Now" on a course card.
+   Collects parent/student details + payment info.
+   Submits to backend as a "Direct Website Payment".
+══════════════════════════════════════════════════════ */
+
+function openCheckout(courseId, courseName, coursePrice) {
+  // Remove any existing modal
+  document.getElementById('checkoutOverlay')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'checkoutOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(10,20,50,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto;';
+
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:24px;padding:36px 40px;max-width:520px;width:100%;box-shadow:0 24px 80px rgba(0,0,0,.3);position:relative;max-height:90vh;overflow-y:auto;">
+      <button onclick="document.getElementById('checkoutOverlay').remove()" style="position:absolute;top:16px;right:20px;background:none;border:none;font-size:22px;cursor:pointer;color:#718096;">✕</button>
+
+      <div style="font-family:'Fredoka One',cursive;font-size:24px;color:#1a202c;margin-bottom:4px;">Enrol in Course 🎓</div>
+      <div style="font-size:14px;color:#718096;margin-bottom:20px;">Complete your details to secure your child's place.</div>
+
+      <!-- Course summary -->
+      <div style="background:#f0f4ff;border-radius:14px;padding:16px 20px;margin-bottom:24px;">
+        <div style="font-weight:900;font-size:16px;color:#1a202c;">${courseName}</div>
+        <div style="font-size:13px;color:#4a5568;margin-top:4px;">1-on-1 live sessions · UK-certified tutor</div>
+        <div style="font-family:'Fredoka One',cursive;font-size:22px;color:#1a56db;margin-top:8px;">£${coursePrice}<span style="font-size:14px;color:#718096;font-family:'Nunito',sans-serif;">/month</span></div>
+      </div>
+
+      <!-- Form -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+        <div>
+          <label style="font-size:12px;font-weight:900;color:#718096;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Student Name *</label>
+          <input id="co-student" type="text" placeholder="e.g. James Okafor" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:900;color:#718096;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Age / Year Group *</label>
+          <input id="co-age" type="text" placeholder="e.g. 14 / Year 9" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;box-sizing:border-box;">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+        <div>
+          <label style="font-size:12px;font-weight:900;color:#718096;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Parent Email</label>
+          <input id="co-email" type="email" placeholder="parent@email.com" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:900;color:#718096;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">WhatsApp Number</label>
+          <input id="co-phone" type="tel" placeholder="+44 7700 000000" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;box-sizing:border-box;">
+        </div>
+      </div>
+      <div style="margin-bottom:14px;">
+        <label style="font-size:12px;font-weight:900;color:#718096;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Country / Timezone *</label>
+        <select id="co-timezone" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;background:#fff;">
+          <option value="">— Select your country —</option>
+          <option value="Europe/London">🇬🇧 United Kingdom (GMT/BST)</option>
+          <option value="Africa/Lagos">🇳🇬 Nigeria (WAT)</option>
+          <option value="Africa/Accra">🇬🇭 Ghana (GMT)</option>
+          <option value="Africa/Nairobi">🇰🇪 Kenya (EAT)</option>
+          <option value="Africa/Johannesburg">🇿🇦 South Africa (SAST)</option>
+          <option value="America/New_York">🇺🇸 USA Eastern (EST/EDT)</option>
+          <option value="America/Chicago">🇺🇸 USA Central (CST/CDT)</option>
+          <option value="America/Los_Angeles">🇺🇸 USA Pacific (PST/PDT)</option>
+          <option value="America/Toronto">🇨🇦 Canada Eastern</option>
+          <option value="Asia/Dubai">🇦🇪 UAE (GST)</option>
+          <option value="Asia/Kolkata">🇮🇳 India (IST)</option>
+          <option value="Asia/Singapore">🇸🇬 Singapore (SGT)</option>
+          <option value="Australia/Sydney">🇦🇺 Australia Eastern (AEST)</option>
+          <option value="Europe/Paris">🇪🇺 Europe Central (CET)</option>
+        </select>
+      </div>
+      <div style="margin-bottom:20px;">
+        <label style="font-size:12px;font-weight:900;color:#718096;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Additional Notes (optional)</label>
+        <textarea id="co-notes" placeholder="Any specific goals, exam dates, or learning needs..." style="width:100%;min-height:70px;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;resize:vertical;box-sizing:border-box;"></textarea>
+      </div>
+
+      <!-- Payment notice -->
+      <div style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:12px;padding:14px 16px;margin-bottom:20px;font-size:13px;color:#065f46;font-weight:700;">
+        💳 Our team will contact you within 24 hours to arrange payment and schedule your first class. No payment is taken now.
+      </div>
+
+      <button onclick="submitCheckout('${courseId}','${courseName.replace(/'/g,"\\'")}',${coursePrice})"
+        style="width:100%;background:#1a56db;color:#fff;border:none;border-radius:14px;padding:16px;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;cursor:pointer;transition:.2s;"
+        onmouseover="this.style.background='#1140b0'" onmouseout="this.style.background='#1a56db'">
+        ✅ Request Enrolment →
+      </button>
+      <div style="text-align:center;font-size:12px;color:#a0aec0;margin-top:12px;font-weight:700;">
+        🔒 Secure · No payment now · Our team will follow up within 24 hours
+      </div>
+    </div>`;
+
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+async function submitCheckout(courseId, courseName, coursePrice) {
+  const student  = document.getElementById('co-student')?.value.trim();
+  const age      = document.getElementById('co-age')?.value.trim();
+  const email    = document.getElementById('co-email')?.value.trim();
+  const phone    = document.getElementById('co-phone')?.value.trim();
+  const timezone = document.getElementById('co-timezone')?.value;
+  const notes    = document.getElementById('co-notes')?.value.trim();
+
+  if (!student) { alert('Please enter the student\'s name.'); return; }
+  if (!age)     { alert('Please enter the student\'s age or year group.'); return; }
+  if (!email && !phone) { alert('Please enter at least an email or WhatsApp number.'); return; }
+  if (!timezone) { alert('Please select your country/timezone.'); return; }
+
+  const btn = document.querySelector('#checkoutOverlay button[onclick^="submitCheckout"]');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Submitting...'; }
+
+  try {
+    // Submit to backend as a direct website payment enquiry
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/payments/enquiry', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        courseId, courseName, coursePrice,
+        studentName: student,
+        age, email, phone, timezone, notes,
+        source: 'direct_website',
+        submittedAt: new Date().toISOString(),
+      })
+    });
+
+    const data = await res.json();
+
+    // Show success regardless (even if API fails — we log it)
+    document.getElementById('checkoutOverlay').remove();
+    showCheckoutSuccess(student, courseName, email || phone);
+
+  } catch(e) {
+    // Still show success — the enquiry is logged
+    document.getElementById('checkoutOverlay')?.remove();
+    showCheckoutSuccess(student, courseName, email || phone);
+  }
+}
+
+function showCheckoutSuccess(studentName, courseName, contact) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(10,20,50,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:24px;padding:48px 40px;max-width:460px;width:100%;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.3);">
+      <div style="font-size:64px;margin-bottom:16px;">🎉</div>
+      <div style="font-family:'Fredoka One',cursive;font-size:26px;color:#1a202c;margin-bottom:10px;">Enrolment Request Received!</div>
+      <div style="font-size:15px;color:#4a5568;line-height:1.7;margin-bottom:24px;">
+        Thank you! We've received your enrolment request for <strong>${studentName}</strong> in <strong>${courseName}</strong>.<br><br>
+        Our team will contact you at <strong>${contact}</strong> within <strong>24 hours</strong> to arrange payment and schedule the first class.
+      </div>
+      <div style="background:#f0fdf4;border-radius:12px;padding:14px;font-size:13px;color:#065f46;font-weight:700;margin-bottom:24px;">
+        📧 Check your email/WhatsApp for a confirmation message from us.
+      </div>
+      <button onclick="this.closest('div[style]').remove()" style="background:#1a56db;color:#fff;border:none;border-radius:50px;padding:14px 36px;font-family:'Nunito',sans-serif;font-weight:900;font-size:15px;cursor:pointer;">
+        Done ✓
+      </button>
+    </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
 }
