@@ -364,7 +364,7 @@ async function confirmScheduleDemo() {
   const teacher = getTeachers().find(t => t.id === teacherId);
 
   try {
-    const token = localStorage.getItem('sn_access_token');
+    let token = localStorage.getItem('sn_access_token');
     if (!token) throw new Error('Not logged in');
 
     const bookingId = psScheduleBookingId;
@@ -379,11 +379,43 @@ async function confirmScheduleDemo() {
     if (salesId) assignPayload.salesId = salesId;
     if (notes)   assignPayload.notes   = notes;
 
-    const res = await fetch('https://api.stemnestacademy.co.uk/api/bookings/' + bookingId + '/assign', {
-      method:  'PUT',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body:    JSON.stringify(assignPayload),
-    });
+    /* ── Helper: do the assign call ── */
+    const doAssign = async (tok) => fetch(
+      'https://api.stemnestacademy.co.uk/api/bookings/' + bookingId + '/assign',
+      { method: 'PUT', headers: { 'Authorization': 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: JSON.stringify(assignPayload) }
+    );
+
+    let res = await doAssign(token);
+
+    /* ── If 401/403: try refreshing the token once, then retry ── */
+    if (res.status === 401 || res.status === 403) {
+      const refreshToken = localStorage.getItem('sn_refresh_token');
+      if (refreshToken) {
+        try {
+          const rRes = await fetch('https://api.stemnestacademy.co.uk/api/auth/refresh', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refreshToken })
+          });
+          const rData = await rRes.json();
+          if (rData.success && rData.accessToken) {
+            localStorage.setItem('sn_access_token', rData.accessToken);
+            if (rData.refreshToken) localStorage.setItem('sn_refresh_token', rData.refreshToken);
+            token = rData.accessToken;
+            res = await doAssign(token); // retry with new token
+          }
+        } catch (refreshErr) { /* fall through to error below */ }
+      }
+    }
+
+    /* ── If still 401/403 after refresh attempt: session expired ── */
+    if (res.status === 401 || res.status === 403) {
+      if (btn) { btn.disabled = false; btn.textContent = '✅ Confirm & Schedule'; }
+      closeScheduleModal();
+      showToast('⚠️ Your session has expired. Please log in again.', 'error');
+      setTimeout(() => { window.location.href = '/pages/login.html'; }, 2000);
+      return;
+    }
 
     const data = await res.json();
 

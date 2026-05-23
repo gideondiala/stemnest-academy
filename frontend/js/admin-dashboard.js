@@ -427,16 +427,39 @@ async function confirmAssign() {
   const btn = document.querySelector('#assignModalOverlay .ab-btn-assign, #assignModalOverlay button[onclick="confirmAssign()"]');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Assigning…'; }
 
+  const doAssign = async (tok) => fetch(
+    'https://api.stemnestacademy.co.uk/api/bookings/' + activeAssignId + '/assign',
+    { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok }, body: JSON.stringify({ tutorId, classLink, notes: notes || undefined }) }
+  );
+
   try {
-    const token = localStorage.getItem('sn_access_token');
-    const res = await fetch('https://api.stemnestacademy.co.uk/api/bookings/' + activeAssignId + '/assign', {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + token
-      },
-      body: JSON.stringify({ tutorId, classLink, notes: notes || undefined })
-    });
+    let token = localStorage.getItem('sn_access_token');
+    let res = await doAssign(token);
+
+    /* Auto-refresh token on 401/403 */
+    if (res.status === 401 || res.status === 403) {
+      const refreshToken = localStorage.getItem('sn_refresh_token');
+      if (refreshToken) {
+        const rRes = await fetch('https://api.stemnestacademy.co.uk/api/auth/refresh', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refreshToken })
+        });
+        const rData = await rRes.json();
+        if (rData.success) {
+          localStorage.setItem('sn_access_token', rData.accessToken);
+          if (rData.refreshToken) localStorage.setItem('sn_refresh_token', rData.refreshToken);
+          token = rData.accessToken;
+          res = await doAssign(token);
+        }
+      }
+    }
+
+    if (res.status === 401 || res.status === 403) {
+      if (btn) { btn.disabled = false; btn.textContent = '✅ Confirm Assign'; }
+      closeAssignModal();
+      showToast('⚠️ Session expired. Please log in again.', 'error');
+      setTimeout(() => { window.location.href = '/pages/login.html'; }, 2000);
+      return;
+    }
 
     const data = await res.json();
     if (btn) { btn.disabled = false; btn.textContent = '✅ Confirm Assign'; }
@@ -447,7 +470,6 @@ async function confirmAssign() {
     }
 
     closeAssignModal();
-    // Refresh from API so the UI reflects the real DB state
     await _loadAdminFromAPI();
     loadBookings();
     showToast(`✅ ${teacher?.name || 'Teacher'} assigned and notified!`);
