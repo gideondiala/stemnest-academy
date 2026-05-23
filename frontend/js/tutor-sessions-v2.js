@@ -1192,19 +1192,36 @@ function renderClassRecords() {
   var el = document.getElementById('classRecordsTable');
   if (!el) return;
 
-  var tutor    = _safeGetCurrentTutor();
-  var key      = 'sn_class_sessions_' + tutor.id;
-  var sessions = [];
-  try { sessions = JSON.parse(_getLocalStr(key) || '[]'); } catch(e) { sessions = []; }
+  /* ── Load from API data (window.TUTOR_DATA.bookings) ── */
+  var allBookings = (window.TUTOR_DATA && window.TUTOR_DATA.bookings) ? window.TUTOR_DATA.bookings : [];
+  var completedStatuses = ['completed', 'incomplete', 'partially_completed'];
+  var sessions = allBookings.filter(function(b) {
+    return completedStatuses.indexOf(b.status) !== -1;
+  }).map(function(b) {
+    var dateStr = (b.date || '').split('T')[0];
+    return {
+      bookingId:    b.id,
+      studentName:  b.studentName || '—',
+      subject:      b.subject || '—',
+      topic:        b.lessonName || b.courseName || b.subject || '—',
+      type:         (b.isDemoClass || !b.paymentAmount) ? 'demo' : 'paid',
+      outcome:      b.status,
+      date:         dateStr,
+      endedAt:      b.completedAt || b.scheduledAt || (dateStr + 'T00:00:00Z'),
+      startedAt:    b.scheduledAt || null,
+      durationMins: b.duration_mins || 60,
+      recordingLink: b.recordingLink || null,
+      reason:       b.incompleteReason || '',
+      payAmount:    b.paymentAmount || 0,
+    };
+  });
 
   // Apply date filter
-  var now   = new Date();
+  var now = new Date();
   var filtered = sessions.filter(function(s) {
-    if (!s.endedAt) return false;
+    if (!s.endedAt) return _currentRecFilter === 'all';
     var d = new Date(s.endedAt);
-    if (_currentRecFilter === 'today') {
-      return d.toDateString() === now.toDateString();
-    }
+    if (_currentRecFilter === 'today') return d.toDateString() === now.toDateString();
     if (_currentRecFilter === 'week') {
       var weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7);
       return d >= weekAgo;
@@ -1215,11 +1232,14 @@ function renderClassRecords() {
     return true; // 'all'
   });
 
+  // Sort newest first
+  filtered.sort(function(a, b) { return new Date(b.endedAt) - new Date(a.endedAt); });
+
   if (!filtered.length) {
     el.innerHTML = '<div style="text-align:center;padding:48px 20px;background:var(--white);border-radius:20px;box-shadow:0 4px 20px rgba(0,0,0,.06);">' +
       '<div style="font-size:48px;margin-bottom:12px;">📋</div>' +
       '<div style="font-family:\'Fredoka One\',cursive;font-size:20px;color:#1a202c;margin-bottom:8px;">No records found</div>' +
-      '<div style="font-size:14px;color:#a0aec0;font-weight:700;">No classes recorded for this period. Complete a class to see it here.</div>' +
+      '<div style="font-size:14px;color:#a0aec0;font-weight:700;">No completed classes for this period.</div>' +
       '</div>';
     return;
   }
@@ -1229,52 +1249,35 @@ function renderClassRecords() {
 
   var rows = filtered.map(function(s, i) {
     var bg = i % 2 === 0 ? '' : 'background:#fafbff;';
+    var dateDisplay = s.date ? new Date(s.date + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }) : '—';
 
-    // Format times
-    var startDisplay = s.startedAt
-      ? new Date(s.startedAt).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' })
-      : '—';
-    var endDisplay = s.endedAt
-      ? new Date(s.endedAt).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' })
-      : '—';
-    var dateDisplay = s.endedAt
-      ? new Date(s.endedAt).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' })
-      : (s.date || '—');
-    var duration = s.durationMins ? s.durationMins + ' mins' : '—';
-
-    // Outcome badge
     var outcomeColor = s.outcome === 'completed' ? '#065f46' : s.outcome === 'partially_completed' ? '#e65100' : '#c53030';
     var outcomeBg    = s.outcome === 'completed' ? '#d1fae5' : s.outcome === 'partially_completed' ? '#fff3e0' : '#fde8e8';
     var outcomeLabel = s.outcome === 'completed' ? '✅ Completed' : s.outcome === 'partially_completed' ? '⚡ Partial' : '❌ Incomplete';
 
-    // Type badge
     var typeBg    = s.type === 'demo' ? '#fff3e0' : '#dbeafe';
     var typeColor = s.type === 'demo' ? '#e65100' : '#1e40af';
 
-    // Recording link
     var recCell;
     if (s.recordingLink) {
       recCell = '<a href="' + s.recordingLink + '" target="_blank" style="color:#1a56db;font-weight:800;font-size:12px;text-decoration:none;">▶ View Recording</a>' +
-        '<br><span class="rec-status-uploaded">✅ Uploaded</span>';
+        '<br><span style="background:#d1fae5;color:#065f46;font-size:10px;font-weight:900;padding:2px 8px;border-radius:50px;">✅ Uploaded</span>';
     } else {
-      recCell = '<span class="rec-status-pending">⏳ Pending</span>' +
+      recCell = '<span style="background:#fff3e0;color:#e65100;font-size:10px;font-weight:900;padding:2px 8px;border-radius:50px;">⏳ Pending</span>' +
         '<br><button onclick="openRecordingInput(\'' + s.bookingId + '\')" ' +
-        'style="margin-top:4px;background:var(--blue-light);color:var(--blue);border:none;border-radius:8px;padding:4px 10px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:11px;cursor:pointer;">+ Add Link</button>';
+        'style="margin-top:4px;background:#dbeafe;color:#1a56db;border:none;border-radius:8px;padding:4px 10px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:11px;cursor:pointer;">+ Add Link</button>';
     }
 
     return '<tr style="border-bottom:1px solid #f0f2f8;' + bg + '">' +
       '<td style="' + tdS + '">' +
-        '<div style="font-weight:800;color:#1a202c;">' + (s.studentName || '—') + '</div>' +
+        '<div style="font-weight:800;color:#1a202c;">' + s.studentName + '</div>' +
         '<div style="font-size:11px;color:#a0aec0;">' + dateDisplay + '</div>' +
       '</td>' +
-      '<td style="' + tdS + ';font-weight:700;color:#4a5568;">' + (s.topic || s.subject || '—') + '</td>' +
+      '<td style="' + tdS + ';font-weight:700;color:#4a5568;">' + s.topic + '</td>' +
       '<td style="' + tdS + '">' +
         '<span style="background:' + typeBg + ';color:' + typeColor + ';font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">' +
         (s.type === 'demo' ? '🎓 Demo' : '📚 Paid') + '</span>' +
       '</td>' +
-      '<td style="' + tdS + ';font-size:12px;color:#4a5568;font-weight:700;">' + startDisplay + '</td>' +
-      '<td style="' + tdS + ';font-size:12px;color:#4a5568;font-weight:700;">' + endDisplay + '</td>' +
-      '<td style="' + tdS + ';font-size:12px;color:#4a5568;font-weight:700;">' + duration + '</td>' +
       '<td style="' + tdS + '">' +
         '<span style="background:' + outcomeBg + ';color:' + outcomeColor + ';font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">' + outcomeLabel + '</span>' +
         (s.reason ? '<div style="font-size:11px;color:#a0aec0;margin-top:3px;">' + s.reason + '</div>' : '') +
@@ -1290,9 +1293,6 @@ function renderClassRecords() {
       '<th style="' + thS + '">Student</th>' +
       '<th style="' + thS + '">Topic</th>' +
       '<th style="' + thS + '">Type</th>' +
-      '<th style="' + thS + '">Start Time</th>' +
-      '<th style="' + thS + '">End Time</th>' +
-      '<th style="' + thS + '">Duration</th>' +
       '<th style="' + thS + '">Outcome</th>' +
       '<th style="' + thS + '">Recording</th>' +
     '</tr></thead>' +
@@ -1305,7 +1305,6 @@ function renderClassRecords() {
 
 /* ── Add recording link inline ── */
 function openRecordingInput(bookingId) {
-  // Remove any existing input
   var existing = document.getElementById('recLinkInput_' + bookingId);
   if (existing) { existing.remove(); return; }
 
@@ -1314,7 +1313,7 @@ function openRecordingInput(bookingId) {
   container.id = 'recLinkInput_' + bookingId;
   container.style.cssText = 'margin-top:6px;display:flex;gap:6px;';
   container.innerHTML =
-    '<input type="url" placeholder="Paste Google Drive link..." ' +
+    '<input type="url" placeholder="Paste Google Drive / YouTube link..." ' +
     'style="flex:1;padding:6px 10px;border:2px solid #e8eaf0;border-radius:8px;font-family:\'Nunito\',sans-serif;font-size:12px;outline:none;" ' +
     'id="recLinkVal_' + bookingId + '">' +
     '<button onclick="saveRecordingLink(\'' + bookingId + '\')" ' +
@@ -1327,30 +1326,26 @@ function saveRecordingLink(bookingId) {
   var link  = input ? input.value.trim() : '';
   if (!link) { showToast('Please paste a recording link.', 'error'); return; }
 
-  var tutor = _safeGetCurrentTutor();
-  var key   = 'sn_class_sessions_' + tutor.id;
-  var sessions = [];
-  try { sessions = JSON.parse(_getLocalStr(key) || '[]'); } catch(e) { sessions = []; }
-
-  var idx = sessions.findIndex(function(s) { return s.bookingId === bookingId; });
-  if (idx !== -1) {
-    sessions[idx].recordingLink   = link;
-    sessions[idx].recordingStatus = 'uploaded';
-    _setLocalStr(key, JSON.stringify(sessions));
+  // Update in-memory bookings immediately
+  if (window.TUTOR_DATA && window.TUTOR_DATA.bookings) {
+    var bi = window.TUTOR_DATA.bookings.findIndex(function(b) { return b.id === bookingId; });
+    if (bi !== -1) window.TUTOR_DATA.bookings[bi].recordingLink = link;
   }
 
-  // Also update the booking record
-  try {
-    var bookings = window.TUTOR_DATA?.bookings || JSON.parse(_getLocalStr('sn_bookings') || '[]');
-    var bi = bookings.findIndex(function(b) { return b.id === bookingId; });
-    if (bi !== -1) { 
-      bookings[bi].recordingLink = link; 
-      if (window.TUTOR_DATA) window.TUTOR_DATA.bookings = bookings;
-      _setLocalStr('sn_bookings', JSON.stringify(bookings)); 
-    }
-  } catch(e) {}
+  // Save to API
+  var token = localStorage.getItem('sn_access_token');
+  if (token) {
+    fetch('https://api.stemnestacademy.co.uk/api/sync/class-reports', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bookingId: bookingId, recordingLink: link, outcome: 'completed', payAmount: 0, creditDeducted: false })
+    }).catch(function() { /* silent */ });
+  }
 
   showToast('✅ Recording link saved!');
+  // Remove the input and re-render
+  var container = document.getElementById('recLinkInput_' + bookingId);
+  if (container) container.remove();
   renderClassRecords();
 }
 
