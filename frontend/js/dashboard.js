@@ -45,17 +45,57 @@ window.TUTOR_DATA = {
 /* ── TABS ── */
 const TABS = ['overview', 'sessions', 'projects', 'calendar'];
 
-/* ── AVAILABILITY STORE ── */
+/* ── AVAILABILITY STORE — synced to DB ── */
 function getAvailability() {
-  try { return JSON.parse(localStorage.getItem('sn_tutor_avail_' + TUTOR.id) || '{}'); }
-  catch { return {}; }
+  /* Return in-memory cache; populated by _loadAvailabilityFromAPI */
+  return window._tutorAvailCache || {};
 }
-function saveAvailability(avail) {
-  localStorage.setItem('sn_tutor_avail_' + TUTOR.id, JSON.stringify(avail));
-  // Sync to shared store so admin can read it
-  const shared = JSON.parse(localStorage.getItem('sn_all_tutor_avail') || '{}');
-  shared[TUTOR.id] = { tutor: TUTOR, slots: avail };
-  localStorage.setItem('sn_all_tutor_avail', JSON.stringify(shared));
+
+async function _loadAvailabilityFromAPI() {
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    if (!token || !TUTOR.dbId) return;
+    /* Load next 8 weeks of availability */
+    const from = new Date().toISOString().split('T')[0];
+    const toDate = new Date(); toDate.setDate(toDate.getDate() + 56);
+    const to = toDate.toISOString().split('T')[0];
+    const res = await fetch(
+      `https://api.stemnestacademy.co.uk/api/sessions/availability/${TUTOR.dbId}?from=${from}&to=${to}`,
+      { headers: { 'Authorization': 'Bearer ' + token } }
+    );
+    if (!res.ok) return;
+    const data = await res.json();
+    /* Convert DB rows to the key format: "2026-06-01|18:00" → true */
+    const cache = {};
+    (data.slots || []).forEach(s => {
+      const timeKey = s.time_slot.replace(/^(\d{2}:\d{2}):\d{2}$/, '$1'); // strip seconds
+      const key = s.date.split('T')[0] + '|' + timeKey;
+      cache[key] = s.is_booked ? { booked: true, bookingId: s.booking_id } : true;
+    });
+    window._tutorAvailCache = cache;
+  } catch(e) { console.warn('[Avail] Load failed:', e.message); }
+}
+
+async function saveAvailability(avail) {
+  window._tutorAvailCache = avail;
+  /* Push to API */
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    if (!token) return;
+    /* Convert cache keys back to slot objects */
+    const slots = Object.keys(avail)
+      .filter(k => avail[k] === true) // only free slots (not booked)
+      .map(k => {
+        const [date, time] = k.split('|');
+        return { date, time };
+      });
+    if (slots.length === 0) return;
+    await fetch('https://api.stemnestacademy.co.uk/api/sessions/availability', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slots })
+    });
+  } catch(e) { console.warn('[Avail] Save failed:', e.message); }
 }
 
 /* Return the "next :30" key for a given time key, e.g. "9:00" → "9:30", "9:30" → "10:00", "23:30" → "0:00" */
@@ -71,16 +111,23 @@ function nextHalfKey(timeKey) {
    Marks both timeKey and timeKey+30min as a pair.
    If the block is already set, clears both. */
 function toggleSlot(dk, timeKey) {
-  const avail    = getAvailability();
-  const key1     = dk + '|' + timeKey;
-  const key2     = dk + '|' + nextHalfKey(timeKey);
+  const avail = getAvailability();
+  const key1  = dk + '|' + timeKey;
+  const key2  = dk + '|' + nextHalfKey(timeKey);
 
   if (avail[key1]) {
-    // Already set — clear the whole 1-hour block
     delete avail[key1];
     delete avail[key2];
+    /* Also delete from DB */
+    const token = localStorage.getItem('sn_access_token');
+    if (token) {
+      fetch('https://api.stemnestacademy.co.uk/api/sessions/availability', {
+        method: 'DELETE',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dk })
+      }).catch(() => {});
+    }
   } else {
-    // Mark both halves of the 1-hour block
     avail[key1] = true;
     avail[key2] = true;
   }
@@ -108,11 +155,12 @@ document.addEventListener('DOMContentLoaded', () => {
   populateProfileModal();
   
   _loadTutorFromAPI().then(() => {
-    buildCalStrip();
-    bindProfileModal();
-    showDashTab('overview');
-    /* Render session cards NOW that bookings are loaded */
-    if (typeof renderUpcomingCards === 'function') renderUpcomingCards();
+    _loadAvailabilityFromAPI().then(() => {
+      buildCalStrip();
+      bindProfileModal();
+      showDashTab('overview');
+      if (typeof renderUpcomingCards === 'function') renderUpcomingCards();
+    });
   });
 
   /* Auto-refresh bookings every 60 seconds */
@@ -732,11 +780,20 @@ function changeWeek(dir) { weekOffset += dir; renderWeeklyCalendar(); }
 function clearWeekAvailability() {
   const days  = getWeekDates(weekOffset);
   const avail = getAvailability();
+  const token = localStorage.getItem('sn_access_token');
   days.forEach(d => {
     const dk = toDateKey(d);
     Object.keys(avail).forEach(k => { if (k.startsWith(dk + '|')) delete avail[k]; });
+    /* Delete from DB */
+    if (token) {
+      fetch('https://api.stemnestacademy.co.uk/api/sessions/availability', {
+        method: 'DELETE',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dk })
+      }).catch(() => {});
+    }
   });
-  saveAvailability(avail);
+  window._tutorAvailCache = avail;
   renderWeeklyCalendar();
   showToast('Week availability cleared.');
 }
