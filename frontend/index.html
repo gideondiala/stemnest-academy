@@ -57,18 +57,42 @@
 <!-- ═══ HERO ═══ -->
 <section class="hero" style="position:relative;overflow:hidden;">
 
-  <!-- YouTube background video -->
-  <div style="position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden;">
-    <iframe
-      src="https://www.youtube.com/embed/1lAN0MQX8dg?autoplay=1&mute=1&loop=1&playlist=1lAN0MQX8dg&controls=0&showinfo=0&rel=0&modestbranding=1&playsinline=1&enablejsapi=0"
-      style="position:absolute;top:50%;left:50%;width:177.78vh;min-width:100%;height:56.25vw;min-height:100%;transform:translate(-50%,-50%);border:none;opacity:0.18;"
-      allow="autoplay; encrypted-media"
-      allowfullscreen
-      title="Background video">
-    </iframe>
-    <!-- Dark overlay so text stays readable -->
-    <div style="position:absolute;inset:0;background:linear-gradient(160deg,rgba(240,244,255,0.88) 0%,rgba(232,248,242,0.85) 50%,rgba(255,245,239,0.88) 100%);"></div>
+  <!-- Background video container -->
+  <div id="heroBgContainer" style="position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden;background:linear-gradient(160deg,#f0f4ff 0%,#e8f8f2 50%,#fff5ef 100%);">
+    <!-- YouTube player div — controlled by YT API -->
+    <div id="ytBgPlayer" style="position:absolute;top:50%;left:50%;width:177.78vh;min-width:100%;height:56.25vw;min-height:100%;transform:translate(-50%,-50%);opacity:0.35;"></div>
+    <!-- Gradient overlay -->
+    <div style="position:absolute;inset:0;background:linear-gradient(160deg,rgba(240,244,255,0.72) 0%,rgba(232,248,242,0.68) 50%,rgba(255,245,239,0.72) 100%);"></div>
   </div>
+
+  <script>
+    // YouTube IFrame API
+    var ytBgReady = false;
+    function onYouTubeIframeAPIReady() {
+      ytBgReady = true;
+      new YT.Player('ytBgPlayer', {
+        videoId: '1lAN0MQX8dg',
+        playerVars: {
+          autoplay: 1, mute: 1, loop: 1, playlist: '1lAN0MQX8dg',
+          controls: 0, showinfo: 0, rel: 0, modestbranding: 1,
+          playsinline: 1, disablekb: 1, fs: 0, iv_load_policy: 3
+        },
+        events: {
+          onReady: function(e) { e.target.mute(); e.target.playVideo(); },
+          onStateChange: function(e) {
+            if (e.data === YT.PlayerState.ENDED) e.target.playVideo();
+          }
+        }
+      });
+    }
+    // Load YouTube API
+    (function() {
+      var tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      var first = document.getElementsByTagName('script')[0];
+      first.parentNode.insertBefore(tag, first);
+    })();
+  </script>
 
   <div class="hero-left" style="position:relative;z-index:1;">
     <div class="hero-badge"><div class="dot"></div>Now enrolling — Ages 7 to 19</div>
