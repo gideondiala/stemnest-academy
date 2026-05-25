@@ -334,38 +334,34 @@ const DEFAULT_COURSES = [
   },
 ];
 
-/* ── Load courses from API, fall back to defaults ── */
+/* ── Load courses from API only — no hardcoded fallback ── */
 async function getCourses() {
   try {
     const res = await fetch('https://api.stemnestacademy.co.uk/api/courses');
     if (res.ok) {
       const data = await res.json();
       if (data.courses && data.courses.length > 0) {
-        // Merge API courses with default lesson data
-        return data.courses.map(apiCourse => {
-          const def = DEFAULT_COURSES.find(d => d.id === apiCourse.id || d.name === apiCourse.name);
-          return {
-            id:       apiCourse.id,
-            name:     apiCourse.name,
-            desc:     apiCourse.description || (def ? def.desc : ''),
-            subject:  (apiCourse.subject || '').toLowerCase(),
-            age:      apiCourse.age_range || (def ? def.age : 'Ages 7–19'),
-            price:    parseFloat(apiCourse.price) || (def ? def.price : 99),
-            classes:  apiCourse.num_classes || (def ? def.classes : 20),
-            rating:   parseFloat(apiCourse.rating) || (def ? def.rating : 4.9),
-            students: parseInt(apiCourse.students) || (def ? def.students : 0),
-            emoji:    apiCourse.emoji || (def ? def.emoji : '📚'),
-            color:    apiCourse.color || (def ? def.color : 'blue'),
-            badge:    apiCourse.badge || (def ? def.badge : ''),
-            level:    apiCourse.level || (def ? def.level : 'Beginner'),
-            duration: apiCourse.duration || (def ? def.duration : ''),
-            lessons:  def ? def.lessons : [],
-          };
-        });
+        return data.courses.map(apiCourse => ({
+          id:       apiCourse.id,
+          name:     apiCourse.name,
+          desc:     apiCourse.description || '',
+          subject:  (apiCourse.subject || '').toLowerCase(),
+          age:      apiCourse.age_range || 'Ages 7–19',
+          price:    parseFloat(apiCourse.price) || 99,
+          classes:  apiCourse.num_classes || 20,
+          rating:   parseFloat(apiCourse.rating) || 5.0,
+          students: parseInt(apiCourse.students) || 0,
+          emoji:    apiCourse.emoji || '📚',
+          color:    apiCourse.color || 'blue',
+          badge:    apiCourse.badge || '',
+          level:    apiCourse.level || 'Beginner',
+          duration: apiCourse.duration || '',
+          lessons:  [],
+        }));
       }
     }
-  } catch(e) { /* fall through to defaults */ }
-  return DEFAULT_COURSES;
+  } catch(e) { console.warn('[Courses] API load failed:', e.message); }
+  return []; // Return empty — admin must create courses
 }
 
 let courses      = [];

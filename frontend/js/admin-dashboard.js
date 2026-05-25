@@ -775,6 +775,7 @@ function getAdminCourses() {
 
 function saveAdminCourses(list) {
   window.ADMIN_DATA.courses = list;
+  // Note: individual save/delete calls handle API persistence
 }
 
 function nextCourseId() {
@@ -955,18 +956,29 @@ function editCourse(id) {
 }
 
 /* ── Delete course ── */
-function deleteCourse(id) {
+async function deleteCourse(id) {
   const c = getAdminCourses().find(x => x.id === id);
   if (!c) return;
   if (!confirm(`Delete "${c.name}" (${c.id})? This will remove it from the public catalogue.`)) return;
-  const updated = getAdminCourses().filter(x => x.id !== id);
-  saveAdminCourses(updated);
+
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/courses/' + id, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    if (!data.success) { showToast(data.error || 'Failed to delete', 'error'); return; }
+  } catch(e) { showToast('Network error', 'error'); return; }
+
+  await _loadAdminFromAPI();
   renderCoursesTable();
+  updateStats();
   showToast(`"${c.name}" deleted.`);
 }
 
 /* ── Save / update course ── */
-function saveCourse() {
+async function saveCourse() {
   const name    = document.getElementById('ac-name')?.value.trim();
   const desc    = document.getElementById('ac-desc')?.value.trim();
   const subject = document.getElementById('ac-subject')?.value;
@@ -983,42 +995,71 @@ function saveCourse() {
   if (!price || isNaN(price)) { showToast('Please enter a valid price.', 'error'); return; }
   if (!classes || isNaN(classes)) { showToast('Please enter the number of classes.', 'error'); return; }
 
+  const lessons = _lessonRows.filter(r => r.name).map(r => ({
+    number:       r.number,
+    name:         r.name.trim(),
+    activityLink: r.activityLink?.trim() || '',
+    slidesLink:   r.slidesLink?.trim() || '',
+  }));
+
   const courseData = {
-    id:       editingCourseId || nextCourseId(),
+    id:          editingCourseId || nextCourseId(),
     name,
-    desc,
+    description: desc,
     subject,
     level,
-    age,
+    age_range:   age,
     price,
-    classes,
-    duration: document.getElementById('ac-duration')?.value.trim() || '',
-    students: parseInt(document.getElementById('ac-students')?.value) || 0,
-    rating:   parseFloat(document.getElementById('ac-rating')?.value) || 5.0,
-    badge:    document.getElementById('ac-badge')?.value || '',
-    emoji:    acSelectedEmoji,
-    color:    acSelectedColor,
-    lessons:  _lessonRows.filter(r => r.name).map(r => ({
-      number:       r.number,
-      name:         r.name.trim(),
-      activityLink: r.activityLink.trim(),
-      slidesLink:   r.slidesLink.trim(),
-    })),
+    num_classes: classes,
+    duration:    document.getElementById('ac-duration')?.value.trim() || '',
+    students:    parseInt(document.getElementById('ac-students')?.value) || 0,
+    rating:      parseFloat(document.getElementById('ac-rating')?.value) || 5.0,
+    badge:       document.getElementById('ac-badge')?.value || '',
+    emoji:       acSelectedEmoji,
+    color:       acSelectedColor,
+    lessons,
   };
 
-  const all = getAdminCourses();
-  if (editingCourseId) {
-    const idx = all.findIndex(c => c.id === editingCourseId);
-    if (idx !== -1) all[idx] = courseData;
-    showToast(`✅ "${name}" updated successfully!`);
-  } else {
-    all.push(courseData);
-    showToast(`✅ "${name}" (${courseData.id}) added to catalogue!`);
-  }
+  const btn = document.getElementById('saveCourseBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Saving…'; }
 
-  saveAdminCourses(all);
-  resetCourseForm();
-  showAdminTab('courses');
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    let res;
+
+    if (editingCourseId) {
+      /* Update existing course */
+      res = await fetch('https://api.stemnestacademy.co.uk/api/courses/' + editingCourseId, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify(courseData)
+      });
+    } else {
+      /* Create new course */
+      res = await fetch('https://api.stemnestacademy.co.uk/api/courses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify(courseData)
+      });
+    }
+
+    const data = await res.json();
+    if (btn) { btn.disabled = false; btn.textContent = editingCourseId ? '✦ Update Course' : '✦ Save Course'; }
+
+    if (!data.success) {
+      showToast(data.error || 'Failed to save course', 'error');
+      return;
+    }
+
+    showToast(editingCourseId ? `✅ "${name}" updated!` : `✅ "${name}" added to catalogue!`);
+    resetCourseForm();
+    await _loadAdminFromAPI();
+    showAdminTab('courses');
+
+  } catch (err) {
+    if (btn) { btn.disabled = false; btn.textContent = editingCourseId ? '✦ Update Course' : '✦ Save Course'; }
+    showToast('Network error. Please try again.', 'error');
+  }
 }
 
 /* ── Reset course form ── */

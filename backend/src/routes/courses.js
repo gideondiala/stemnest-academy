@@ -92,6 +92,23 @@ router.post('/', requireAuth, requireRole('admin','super_admin'), async (req, re
        data.color || 'blue', data.badge || null]
     );
 
+    /* Save lessons if provided */
+    if (req.body.lessons && Array.isArray(req.body.lessons)) {
+      const lessons = req.body.lessons.filter(l => l.name);
+      if (lessons.length) {
+        const params = lessons.flatMap(l => [
+          courseId, l.number || l.lesson_number, l.name,
+          l.activityLink || l.activity_link || null,
+          l.slidesLink || l.slides_link || null,
+        ]);
+        await pool.query(
+          `INSERT INTO lessons (course_id, lesson_number, name, activity_link, slides_link)
+           VALUES ${lessons.map((_, idx) => `($${idx*5+1},$${idx*5+2},$${idx*5+3},$${idx*5+4},$${idx*5+5})`).join(',')}`,
+          params
+        );
+      }
+    }
+
     res.status(201).json({ success: true, course: result.rows[0] });
   } catch (err) {
     if (err.name === 'ZodError') {
@@ -118,16 +135,34 @@ router.put('/:id', requireAuth, requireRole('admin','super_admin'), async (req, 
       }
     });
 
-    if (!fields.length) return res.status(400).json({ success: false, error: 'Nothing to update' });
+    if (fields.length) {
+      values.push(req.params.id);
+      const result = await pool.query(
+        `UPDATE courses SET ${fields.join(', ')}, updated_at = NOW() WHERE id = $${i} RETURNING *`,
+        values
+      );
+      if (!result.rows.length) return res.status(404).json({ success: false, error: 'Course not found' });
+    }
 
-    values.push(req.params.id);
-    const result = await pool.query(
-      `UPDATE courses SET ${fields.join(', ')}, updated_at = NOW() WHERE id = $${i} RETURNING *`,
-      values
-    );
+    /* Also save lessons if provided */
+    if (req.body.lessons && Array.isArray(req.body.lessons)) {
+      await pool.query('DELETE FROM lessons WHERE course_id = $1', [req.params.id]);
+      const lessons = req.body.lessons.filter(l => l.name);
+      if (lessons.length) {
+        const params = lessons.flatMap(l => [
+          req.params.id, l.number || l.lesson_number, l.name,
+          l.activityLink || l.activity_link || null,
+          l.slidesLink || l.slides_link || null,
+        ]);
+        await pool.query(
+          `INSERT INTO lessons (course_id, lesson_number, name, activity_link, slides_link)
+           VALUES ${lessons.map((_, idx) => `($${idx*5+1},$${idx*5+2},$${idx*5+3},$${idx*5+4},$${idx*5+5})`).join(',')}`,
+          params
+        );
+      }
+    }
 
-    if (!result.rows.length) return res.status(404).json({ success: false, error: 'Course not found' });
-    res.json({ success: true, course: result.rows[0] });
+    res.json({ success: true, message: 'Course updated' });
   } catch (err) {
     if (err.name === 'ZodError') {
       return res.status(400).json({ success: false, error: err.errors[0].message });
