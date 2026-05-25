@@ -55,8 +55,22 @@
 </div>
 
 <!-- ═══ HERO ═══ -->
-<section class="hero">
-  <div class="hero-left">
+<section class="hero" style="position:relative;overflow:hidden;">
+
+  <!-- YouTube background video -->
+  <div style="position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden;">
+    <iframe
+      src="https://www.youtube.com/embed/1lAN0MQX8dg?autoplay=1&mute=1&loop=1&playlist=1lAN0MQX8dg&controls=0&showinfo=0&rel=0&modestbranding=1&playsinline=1&enablejsapi=0"
+      style="position:absolute;top:50%;left:50%;width:177.78vh;min-width:100%;height:56.25vw;min-height:100%;transform:translate(-50%,-50%);border:none;opacity:0.18;"
+      allow="autoplay; encrypted-media"
+      allowfullscreen
+      title="Background video">
+    </iframe>
+    <!-- Dark overlay so text stays readable -->
+    <div style="position:absolute;inset:0;background:linear-gradient(160deg,rgba(240,244,255,0.88) 0%,rgba(232,248,242,0.85) 50%,rgba(255,245,239,0.88) 100%);"></div>
+  </div>
+
+  <div class="hero-left" style="position:relative;z-index:1;">
     <div class="hero-badge"><div class="dot"></div>Now enrolling — Ages 7 to 19</div>
     <h1>Where Kids<br><span class="word-rotate">Code</span><br>Their Future</h1>
     <p>Expert 1-on-1 online tutoring in <strong>Coding</strong>, <strong>Maths</strong> and <strong>Sciences</strong> — tailored for every child aged 7–19. Based in the UK. Available everywhere.</p>
@@ -70,7 +84,7 @@
       <div class="trust-item"><div class="trust-icon ti-orange">⚡</div>Live 1-on-1 Sessions</div>
     </div>
   </div>
-  <div class="hero-right">
+  <div class="hero-right" style="position:relative;z-index:1;">
     <div class="float-card card-stat">
       <div class="stat-num">500+</div>
       <div class="stat-label">Happy Students</div>
