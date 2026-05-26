@@ -911,8 +911,8 @@ async function submitReferral() {
       });
       const demoYes = document.getElementById('ref-demo-yes');
       if (demoYes) demoYes.checked = true;
-      /* Reload referrals list */
-      loadMyReferrals();
+      /* Reload referrals list — don't let this failure affect the success message */
+      loadMyReferrals().catch(() => {});
       showToast('✅ Referral sent! Credits will be added when they enroll.');
     } else {
       showToast('Failed: ' + (data.error || 'Unknown error'), 'error');
@@ -936,6 +936,12 @@ async function loadMyReferrals() {
     const res = await fetch('https://api.stemnestacademy.co.uk/api/enrollments/referrals', {
       headers: { 'Authorization': 'Bearer ' + token }
     });
+
+    if (!res.ok) {
+      el.innerHTML = '<div style="text-align:center;padding:32px;color:var(--light);font-weight:700;">Your referrals will appear here once submitted.</div>';
+      return;
+    }
+
     const data = await res.json();
     /* Filter to only this student's referrals */
     const profile = window.STUDENT_DATA?.profile;
@@ -968,6 +974,6 @@ async function loadMyReferrals() {
       </div>
       <div style="margin-top:10px;font-size:12px;font-weight:700;color:var(--light);text-align:right;">${referrals.length} referral${referrals.length!==1?'s':''}</div>`;
   } catch(e) {
-    el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--orange);font-weight:700;">Failed to load referrals.</div>';
+    el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--light);font-weight:700;">Your referrals will appear here once submitted.</div>';
   }
 }
