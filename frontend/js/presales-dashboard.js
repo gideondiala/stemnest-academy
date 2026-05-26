@@ -131,6 +131,47 @@ async function _loadPresalesFromAPI() {
       }
     }
 
+    // Fetch pipeline records with status='converted' — these are students marked paid by sales
+    // They should appear in the presales Enrolments tab with an Enroll button
+    try {
+      const pRes = await fetch('https://api.stemnestacademy.co.uk/api/sync/dashboard/presales', {
+        headers: { 'Authorization': 'Bearer ' + token },
+      });
+      // Already fetched above — enrolments come from pipeline converted records
+      // We'll derive them from bookings with salesStatus = converted
+    } catch {}
+
+    // Enrolments = bookings that have been marked converted by sales (pipeline)
+    // Fetch pipeline data
+    try {
+      const plRes = await fetch('https://api.stemnestacademy.co.uk/api/sync/dashboard/sales', {
+        headers: { 'Authorization': 'Bearer ' + token },
+      });
+      if (plRes.ok) {
+        const plData = await plRes.json();
+        // Store converted pipeline records as enrolments for presales
+        const converted = (plData.pipeline || []).filter(p => p.status === 'converted');
+        window.PS_DATA.enrolments = converted.map(p => ({
+          id:              p.booking_id || p.bookingId,
+          bookingId:       p.booking_id || p.bookingId,
+          studentName:     p.student_name || p.studentName || '—',
+          email:           p.student_email || p.email || '—',
+          subject:         p.subject || '—',
+          grade:           p.grade || '—',
+          age:             p.age || '—',
+          whatsapp:        p.whatsapp || '—',
+          salesPersonName: p.sales_name || p.salesPersonName || '—',
+          paymentAmount:   p.payment_amount || p.paymentAmount || 0,
+          course:          p.course_pitched || p.course || '—',
+          status:          'pending_enrol',
+          createdAt:       p.updated_at || new Date().toISOString(),
+        }));
+        setText('enrolmentsBadge', window.PS_DATA.enrolments.length);
+      }
+    } catch(e) {
+      console.warn('[Presales] Pipeline fetch failed:', e.message);
+    }
+
   } catch (e) {
     console.error('[Presales] API load failed:', e.message);
   }
@@ -951,6 +992,8 @@ function renderCompletedDemos() {
 
 /* ══════════════════════════════════════════════════════
    ENROLMENTS TAB
+   Shows students marked as paid by Learning Advisor (sales)
+   Each record has an "Enroll" button to move to postsales
 ══════════════════════════════════════════════════════ */
 function renderEnrolments() {
   const el = document.getElementById('enrolmentsList');
@@ -962,7 +1005,7 @@ function renderEnrolments() {
     el.innerHTML = `<div style="text-align:center;padding:60px 20px;">
       <div style="font-size:48px;margin-bottom:12px;">🎓</div>
       <div style="font-family:'Fredoka One',cursive;font-size:20px;color:var(--dark);">No enrolments yet</div>
-      <div style="font-size:14px;color:var(--light);margin-top:6px;">Once a demo converts to a paid course, click "Enrol" on the Completed Demos tab.</div>
+      <div style="font-size:14px;color:var(--light);margin-top:6px;">When a Learning Advisor marks a student as paid, they appear here with an Enroll button.</div>
     </div>`;
     return;
   }
@@ -971,63 +1014,88 @@ function renderEnrolments() {
   const tdS = 'padding:14px 16px;vertical-align:middle;';
 
   el.innerHTML = `
+    <div style="background:#f0f4ff;border-radius:12px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:#1e40af;font-weight:700;">
+      🎓 These students have been marked as paid by the Learning Advisor. Click <strong>Enroll</strong> to move them to Post-Sales for onboarding.
+    </div>
     <div style="overflow-x:auto;border-radius:16px;border:1.5px solid #e8eaf0;background:var(--white);">
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
         <thead>
           <tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">
-            <th style="${thS}">Enrolment ID</th>
             <th style="${thS}">Student</th>
-            <th style="${thS}">Course</th>
-            <th style="${thS}">Teacher</th>
-            <th style="${thS}">Schedule</th>
-            <th style="${thS}">Start Date</th>
-            <th style="${thS}">Lessons</th>
+            <th style="${thS}">Subject / Course</th>
+            <th style="${thS}">Contact</th>
+            <th style="${thS}">Amount</th>
+            <th style="${thS}">Learning Advisor</th>
             <th style="${thS}">Status</th>
+            <th style="${thS};text-align:center;">Action</th>
           </tr>
         </thead>
         <tbody>
-          ${list.map((enr, i) => {
-            const scheduleStr = (enr.schedule || []).map(s => {
-              const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-              return (days[s.weekday] || '?') + ' ' + s.time;
-            }).join(', ');
-            // Count completed lessons
-            const allBk = getBookings();
-            const enrBk = allBk.filter(b => b.enrolmentId === enr.id);
-            const done  = enrBk.filter(b => b.status === 'completed').length;
-            const total = enr.totalLessons || enrBk.length;
-            return `
+          ${list.map((enr, i) => `
             <tr style="border-bottom:1px solid #f0f2f8;${i%2===0?'':'background:#fafbff;'}">
               <td style="${tdS}">
-                <span style="font-family:'Fredoka One',cursive;font-size:12px;color:var(--blue);">${enr.id}</span>
+                <div style="font-weight:800;color:var(--dark);">${enr.studentName || '—'}</div>
+                <div style="font-size:11px;color:var(--light);">${enr.grade || '—'} · Age ${enr.age || '—'}</div>
               </td>
               <td style="${tdS}">
-                <div style="font-weight:800;color:var(--dark);">${enr.studentName||'—'}</div>
-                <div style="font-size:11px;color:var(--light);">${enr.studentEmail||'—'}</div>
+                <div style="font-weight:800;color:var(--dark);">${enr.subject || '—'}</div>
+                <div style="font-size:11px;color:var(--light);">${enr.course || '—'}</div>
               </td>
               <td style="${tdS}">
-                <div style="font-weight:800;color:var(--dark);">${enr.courseName||'—'}</div>
-                <div style="font-size:11px;color:var(--light);">${enr.courseId||'—'}</div>
+                <div style="font-size:12px;font-weight:700;color:var(--mid);">📧 ${enr.email || '—'}</div>
+                <div style="font-size:12px;font-weight:700;color:var(--mid);">📱 ${enr.whatsapp || '—'}</div>
               </td>
-              <td style="${tdS};font-weight:700;color:var(--mid);">${enr.teacherName||'—'}</td>
-              <td style="${tdS};font-size:12px;color:var(--mid);">${scheduleStr||'—'}</td>
-              <td style="${tdS};font-size:12px;color:var(--mid);">${enr.startDate||'—'}</td>
+              <td style="${tdS};font-weight:800;color:var(--green-dark);">${enr.paymentAmount ? '£' + enr.paymentAmount : '—'}</td>
+              <td style="${tdS};font-weight:700;color:var(--blue);">💼 ${enr.salesPersonName || '—'}</td>
               <td style="${tdS}">
-                <div style="font-weight:800;color:var(--dark);">${done} / ${total}</div>
-                <div style="background:#e8eaf0;border-radius:50px;height:6px;margin-top:4px;overflow:hidden;">
-                  <div style="background:var(--green);height:100%;width:${total>0?Math.round(done/total*100):0}%;border-radius:50px;"></div>
-                </div>
+                ${enr.enrolled
+                  ? '<span style="background:var(--green-light);color:var(--green-dark);font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">✅ Enrolled</span>'
+                  : '<span style="background:#fff3e0;color:#e65100;font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">⏳ Awaiting Enrolment</span>'}
               </td>
-              <td style="${tdS}">
-                <span style="background:${enr.status==='active'?'var(--green-light)':'#f0f2f8'};color:${enr.status==='active'?'var(--green-dark)':'var(--light)'};font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">
-                  ${enr.status==='active'?'✅ Active':'⏸ Inactive'}
-                </span>
+              <td style="${tdS};text-align:center;">
+                ${!enr.enrolled
+                  ? `<button onclick="enrollStudentToPostSales('${enr.bookingId || enr.id}', ${JSON.stringify(enr).replace(/"/g,'&quot;')})"
+                      style="background:var(--green);color:#fff;border:none;border-radius:10px;padding:9px 18px;font-family:'Nunito',sans-serif;font-weight:900;font-size:13px;cursor:pointer;white-space:nowrap;">
+                      🎓 Enroll
+                    </button>`
+                  : '<span style="font-size:12px;color:var(--light);font-weight:700;">Done</span>'}
               </td>
-            </tr>`;
-          }).join('')}
+            </tr>`).join('')}
         </tbody>
       </table>
     </div>`;
+}
+
+/* Move student from presales enrolments → postsales paid students */
+async function enrollStudentToPostSales(bookingId, enrolment) {
+  if (!confirm('Move ' + (enrolment.studentName || 'this student') + ' to Post-Sales for onboarding?')) return;
+
+  const token = localStorage.getItem('sn_access_token');
+  if (!token) { showToast('Not logged in.', 'error'); return; }
+
+  try {
+    /* Update booking status to 'converted' so postsales paid students tab picks it up */
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/bookings/' + bookingId + '/status', {
+      method: 'PUT',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'completed' })
+    });
+    const data = await res.json();
+
+    if (data.success || res.ok) {
+      /* Mark as enrolled in local state */
+      const idx = (window.PS_DATA.enrolments || []).findIndex(e => (e.bookingId || e.id) === bookingId);
+      if (idx !== -1) window.PS_DATA.enrolments[idx].enrolled = true;
+
+      setText('enrolmentsBadge', (window.PS_DATA.enrolments || []).filter(e => !e.enrolled).length);
+      renderEnrolments();
+      showToast('✅ Student moved to Post-Sales! They will appear in the Paid Students section.');
+    } else {
+      showToast('Failed: ' + (data.error || 'Unknown error'), 'error');
+    }
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  }
 }
 
 /* ══════════════════════════════════════════════════════
@@ -1153,7 +1221,7 @@ function bookDemoFromReferral(referral) {
       grade:       referral.grade || '—',
       email:       referral.parent_email || '',
       whatsapp:    referral.parent_phone || '',
-      subject:     'Coding',
+      subject:     referral.subject || 'Coding',
       device:      'laptop',
       timezone:    'Europe/London',
       date:        today,

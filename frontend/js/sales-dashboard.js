@@ -686,18 +686,66 @@ document.addEventListener('DOMContentLoaded', () => {
 ══════════════════════════════════════════════════════ */
 function getLeads() {
   let all = window.SALES_DATA.leads || [];
-  if (all.length === 0) {
-      all = JSON.parse(localStorage.getItem('sn_sales_leads') || '[]');
-      window.SALES_DATA.leads = all;
+  // Build leads from completed demo bookings assigned to this sales person
+  const completedDemos = (window.SALES_DATA.bookings || []).filter(b =>
+    (b.status === 'completed' || b.status === 'incomplete') && b.isDemoClass
+  );
+  if (completedDemos.length > 0) {
+    // Merge with any existing lead status records
+    const leadMap = {};
+    all.forEach(l => { leadMap[l.bookingId || l.id] = l; });
+    completedDemos.forEach(b => {
+      if (!leadMap[b.id]) {
+        leadMap[b.id] = {
+          id:          b.id,
+          bookingId:   b.id,
+          studentName: b.studentName,
+          subject:     b.subject,
+          date:        b.date,
+          time:        b.time,
+          email:       b.email,
+          whatsapp:    b.whatsapp,
+          grade:       b.grade,
+          age:         b.age,
+          status:      'new',
+          interest:    3,
+          leadOwner:   SALES.name,
+          leadOwnerId: SALES.id,
+          createdAt:   b.completedAt || b.bookedAt,
+        };
+      }
+    });
+    all = Object.values(leadMap);
+    window.SALES_DATA.leads = all;
   }
-  // Show leads assigned to this sales person OR where leadOwnerId matches
   return all.filter(l => !l.assignedSalesId || l.assignedSalesId === SALES.id || l.leadOwnerId === SALES.id);
 }
 
 function saveLeads(list) {
   window.SALES_DATA.leads = list;
-  // Fallback save until backend wired
-  localStorage.setItem('sn_sales_leads', JSON.stringify(list));
+  // No localStorage — data lives in memory and DB
+}
+
+/* Push a lead status update to the backend pipeline table */
+async function _pushLeadStatus(lead) {
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    if (!token || !lead.bookingId) return;
+    await fetch('https://api.stemnestacademy.co.uk/api/sync/pipeline', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        bookingId:       lead.bookingId,
+        studentName:     lead.studentName,
+        subject:         lead.subject,
+        status:          lead.status,
+        interest:        lead.interest,
+        purchasingPower: lead.purchasingPower,
+        paymentAmount:   lead.paymentAmount,
+        notes:           lead.notes,
+      })
+    });
+  } catch(e) { console.warn('[Sales] Lead push failed:', e.message); }
 }
 
 function renderLeads() {
@@ -798,35 +846,49 @@ function updateLeadStatus(leadId, newStatus) {
     all[idx].status    = newStatus;
     all[idx].updatedAt = new Date().toISOString();
 
-    // If marked paid → also create a pipeline entry for post-sales
+    // If marked paid → create a pipeline entry (converted) so presales enrolments tab picks it up
     if (newStatus === 'paid') {
       const lead = all[idx];
       const pipeline = getMyPipeline();
       const existing = pipeline.findIndex(p => p.bookingId === lead.bookingId);
-      if (existing === -1) {
-        pipeline.unshift({
-          bookingId:       lead.bookingId,
-          studentName:     lead.studentName,
-          subject:         lead.subject,
-          date:            lead.date,
-          email:           lead.email,
-          whatsapp:        lead.whatsapp,
-          grade:           lead.grade,
-          age:             lead.age,
-          status:          'converted',
-          interest:        lead.interest || 3,
-          purchasingPower: lead.purchasingPower || 'medium',
-          notes:           lead.notes || '',
-          updatedAt:       new Date().toISOString(),
-        });
-        saveMyPipeline(pipeline);
+      const record = {
+        bookingId:       lead.bookingId,
+        studentName:     lead.studentName,
+        subject:         lead.subject,
+        date:            lead.date,
+        email:           lead.email,
+        whatsapp:        lead.whatsapp,
+        grade:           lead.grade,
+        age:             lead.age,
+        status:          'converted',
+        salesStatus:     'converted',
+        interest:        lead.interest || 3,
+        purchasingPower: lead.purchasingPower || 'medium',
+        notes:           lead.notes || '',
+        salesPersonName: SALES.name,
+        salesPersonId:   SALES.id,
+        updatedAt:       new Date().toISOString(),
+      };
+      if (existing === -1) pipeline.unshift(record);
+      else pipeline[existing] = record;
+      saveMyPipeline(pipeline);
+
+      /* Also update booking status in DB to 'converted' so postsales can see it */
+      const token = localStorage.getItem('sn_access_token');
+      if (token && lead.bookingId) {
+        fetch('https://api.stemnestacademy.co.uk/api/bookings/' + lead.bookingId + '/status', {
+          method: 'PUT',
+          headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'completed' })
+        }).catch(() => {});
       }
     }
 
     saveLeads(all);
+    _pushLeadStatus(all[idx]);
     updateStats();
     renderLeads();
-    showToast('✅ Lead status updated!');
+    showToast(newStatus === 'paid' ? '✅ Marked as paid! Student will appear in Presales Enrolments.' : '✅ Lead status updated!');
   }
 }
 

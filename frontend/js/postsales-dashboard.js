@@ -641,6 +641,7 @@ function renderPOSConverted() {
 /* ══════════════════════════════════════════════════════
    WEBSITE ENQUIRIES — Direct course enrolment requests
    from the public courses page "Enrol Now" button
+   Now reads from /api/enrollments/requests (source=website)
 ══════════════════════════════════════════════════════ */
 async function renderWebsiteEnquiries() {
   const el = document.getElementById('websiteEnquiriesList');
@@ -650,16 +651,11 @@ async function renderWebsiteEnquiries() {
 
   try {
     const token = localStorage.getItem('sn_access_token');
-    const res = await fetch('https://api.stemnestacademy.co.uk/api/payments?status=enquiry', {
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/enrollments/requests?status=pending', {
       headers: { 'Authorization': 'Bearer ' + token }
     });
     const data = await res.json();
-    const enquiries = (data.payments || []).filter(p => {
-      try {
-        const n = typeof p.notes === 'string' ? JSON.parse(p.notes) : p.notes;
-        return n && n.source === 'direct_website';
-      } catch { return false; }
-    });
+    const enquiries = (data.requests || []).filter(r => r.source === 'website' || !r.source);
 
     if (!enquiries.length) {
       el.innerHTML = '<div style="text-align:center;padding:48px;color:var(--light);font-weight:700;">No website enquiries yet.<br><span style="font-size:13px;">When parents click "Enrol Now" on the courses page, their details appear here.</span></div>';
@@ -681,31 +677,27 @@ async function renderWebsiteEnquiries() {
             </tr>
           </thead>
           <tbody>
-            ${enquiries.map((p, i) => {
-              let n = {};
-              try { n = typeof p.notes === 'string' ? JSON.parse(p.notes) : (p.notes || {}); } catch {}
-              return `
-                <tr style="border-bottom:1px solid #f0f2f8;${i%2===0?'':'background:#fafbff;'}">
-                  <td style="${tdStyle()}">
-                    <div style="font-weight:800;color:var(--dark);">${n.studentName || '—'}</div>
-                    <div style="font-size:11px;color:var(--light);">Age/Year: ${n.age || '—'}</div>
-                  </td>
-                  <td style="${tdStyle()};font-weight:700;color:var(--mid);">${n.courseName || '—'}</td>
-                  <td style="${tdStyle()}">
-                    <div style="font-size:12px;font-weight:700;color:var(--mid);">📧 ${n.email || '—'}</div>
-                    <div style="font-size:12px;font-weight:700;color:var(--mid);">📱 ${n.phone || '—'}</div>
-                  </td>
-                  <td style="${tdStyle()};font-size:12px;color:var(--mid);">${n.timezone || '—'}</td>
-                  <td style="${tdStyle()};font-weight:800;color:var(--green-dark);">£${parseFloat(p.amount||0).toFixed(0)}/mo</td>
-                  <td style="${tdStyle()};font-size:12px;color:var(--light);">${p.created_at ? new Date(p.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—'}</td>
-                  <td style="${tdStyle('center')}">
-                    <div style="display:flex;flex-direction:column;gap:6px;align-items:center;">
-                      ${n.phone ? `<a href="https://wa.me/${n.phone.replace(/[\s\-\(\)\+]/g,'')}" target="_blank" style="background:#25D366;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;text-decoration:none;white-space:nowrap;">💬 WhatsApp</a>` : ''}
-                      ${n.email ? `<a href="mailto:${n.email}" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;text-decoration:none;white-space:nowrap;">📧 Email</a>` : ''}
-                    </div>
-                  </td>
-                </tr>`;
-            }).join('')}
+            ${enquiries.map((r, i) => `
+              <tr style="border-bottom:1px solid #f0f2f8;${i%2===0?'':'background:#fafbff;'}">
+                <td style="${tdStyle()}">
+                  <div style="font-weight:800;color:var(--dark);">${r.student_name || '—'}</div>
+                  <div style="font-size:11px;color:var(--light);">Age: ${r.age || '—'}</div>
+                </td>
+                <td style="${tdStyle()};font-weight:700;color:var(--mid);">${r.course_name || r.course_name_db || '—'}</td>
+                <td style="${tdStyle()}">
+                  <div style="font-size:12px;font-weight:700;color:var(--mid);">📧 ${r.email || '—'}</div>
+                  <div style="font-size:12px;font-weight:700;color:var(--mid);">📱 ${r.phone || '—'}</div>
+                </td>
+                <td style="${tdStyle()};font-size:12px;color:var(--mid);">${r.timezone || '—'}</td>
+                <td style="${tdStyle()};font-weight:800;color:var(--green-dark);">£${parseFloat(r.course_price || r.course_price_db || 0).toFixed(0)}</td>
+                <td style="${tdStyle()};font-size:12px;color:var(--light);">${r.created_at ? new Date(r.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—'}</td>
+                <td style="${tdStyle('center')}">
+                  <div style="display:flex;flex-direction:column;gap:6px;align-items:center;">
+                    ${r.phone ? `<a href="https://wa.me/${r.phone.replace(/[\s\-\(\)\+]/g,'')}" target="_blank" style="background:#25D366;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;text-decoration:none;white-space:nowrap;">💬 WhatsApp</a>` : ''}
+                    ${r.email ? `<a href="mailto:${r.email}" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;text-decoration:none;white-space:nowrap;">📧 Email</a>` : ''}
+                  </div>
+                </td>
+              </tr>`).join('')}
           </tbody>
         </table>
       </div>
