@@ -54,6 +54,7 @@
       <a class="sidebar-link"        data-tab="payments"      onclick="showTab('payments')">     <span class="sl-icon">💳</span> Payment Records</a>
       <a class="sidebar-link"        data-tab="chat"          onclick="showTab('chat')">          <span class="sl-icon">💬</span> Chat with Tutor</a>
       <div class="sidebar-section-label">Account</div>
+      <a class="sidebar-link" data-tab="refer" onclick="showTab('refer')"><span class="sl-icon">🎁</span> Refer &amp; Earn</a>
       <a class="sidebar-link" onclick="openProfileModal()"><span class="sl-icon">👤</span> My Profile</a>
       <a class="sidebar-link" href="../index.html"><span class="sl-icon">🌐</span> Back to Website</a>
     </div>
@@ -310,6 +311,111 @@
         </div>
         <div style="font-size:11px;color:var(--light);font-weight:700;padding:6px 16px;">
           Your messages are sent with your name (<strong>${STUDENT?.name || 'Student'}</strong>) and ID so your tutor can identify you.
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         TAB: REFER & EARN
+    ══════════════════════════════════════ -->
+    <div id="tab-refer" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🎁 Refer &amp; Earn</div>
+        <span style="font-size:13px;font-weight:700;color:var(--light);">Refer a friend and earn credits when they enroll!</span>
+      </div>
+
+      <!-- How it works banner -->
+      <div style="background:linear-gradient(135deg,#1a56db,#0e9f6e);border-radius:20px;padding:28px 32px;margin-bottom:28px;color:#fff;">
+        <div style="font-family:'Fredoka One',cursive;font-size:24px;margin-bottom:8px;">🎁 Refer a Friend, Earn Credits!</div>
+        <div style="font-size:14px;opacity:.9;line-height:1.7;margin-bottom:16px;">
+          Know someone who would love StemNest? Refer them! When they enroll, you'll earn bonus class credits added to your account.
+        </div>
+        <div style="display:flex;gap:20px;flex-wrap:wrap;">
+          <div style="background:rgba(255,255,255,.15);border-radius:12px;padding:12px 18px;text-align:center;">
+            <div style="font-family:'Fredoka One',cursive;font-size:22px;">1️⃣</div>
+            <div style="font-size:12px;font-weight:800;margin-top:4px;">Fill the form below</div>
+          </div>
+          <div style="background:rgba(255,255,255,.15);border-radius:12px;padding:12px 18px;text-align:center;">
+            <div style="font-family:'Fredoka One',cursive;font-size:22px;">2️⃣</div>
+            <div style="font-size:12px;font-weight:800;margin-top:4px;">We contact them</div>
+          </div>
+          <div style="background:rgba(255,255,255,.15);border-radius:12px;padding:12px 18px;text-align:center;">
+            <div style="font-family:'Fredoka One',cursive;font-size:22px;">3️⃣</div>
+            <div style="font-size:12px;font-weight:800;margin-top:4px;">They enroll → you earn!</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Referral form -->
+      <div style="background:var(--white);border-radius:20px;border:1.5px solid #e8eaf0;padding:28px 32px;max-width:600px;">
+        <div style="font-family:'Fredoka One',cursive;font-size:18px;color:var(--dark);margin-bottom:20px;">📝 Refer Someone Now</div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+          <div>
+            <label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Student's Full Name <span style="color:#e53e3e;">*</span></label>
+            <input type="text" id="ref-name" placeholder="e.g. Amara Johnson"
+              style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Year Group / Grade</label>
+            <input type="text" id="ref-grade" placeholder="e.g. Year 8"
+              style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Age</label>
+            <input type="number" id="ref-age" placeholder="e.g. 13" min="5" max="18"
+              style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Parent Email <span style="color:#e53e3e;">*</span></label>
+            <input type="email" id="ref-email" placeholder="parent@email.com"
+              style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Parent WhatsApp <span style="color:#e53e3e;">*</span></label>
+            <input type="tel" id="ref-phone" placeholder="+44 7700 000000"
+              style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Your Relationship to Student</label>
+            <input type="text" id="ref-relationship" placeholder="e.g. Classmate, Friend, Sibling"
+              style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;box-sizing:border-box;">
+          </div>
+        </div>
+
+        <div style="margin-bottom:20px;">
+          <label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:8px;">Does this student need a free demo class first?</label>
+          <div style="display:flex;gap:12px;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:800;font-size:14px;color:var(--dark);">
+              <input type="radio" name="ref-demo" id="ref-demo-yes" value="yes" checked style="width:16px;height:16px;accent-color:var(--blue);">
+              📅 Yes, book a demo
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:800;font-size:14px;color:var(--dark);">
+              <input type="radio" name="ref-demo" id="ref-demo-no" value="no" style="width:16px;height:16px;accent-color:var(--blue);">
+              ✅ No, enroll directly
+            </label>
+          </div>
+        </div>
+
+        <button onclick="submitReferral()"
+          style="width:100%;background:linear-gradient(135deg,#1a56db,#0e9f6e);color:#fff;border:none;border-radius:14px;padding:14px 24px;font-family:'Fredoka One',cursive;font-size:18px;cursor:pointer;transition:.15s;"
+          onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'">
+          🎁 Send Referral
+        </button>
+
+        <div id="referralSuccessMsg" style="display:none;margin-top:16px;background:var(--green-light);border-radius:12px;padding:14px 18px;font-size:14px;font-weight:800;color:var(--green-dark);text-align:center;">
+          ✅ Referral sent! Our team will reach out to them soon. Credits will be added to your account when they enroll.
+        </div>
+      </div>
+
+      <!-- Past referrals -->
+      <div style="margin-top:32px;">
+        <div class="dash-section-header">
+          <div class="dash-section-title">📊 My Referrals</div>
+          <button class="btn btn-outline" style="font-size:12px;" onclick="loadMyReferrals()">🔄 Refresh</button>
+        </div>
+        <div id="myReferralsList">
+          <div style="text-align:center;padding:32px;color:var(--light);font-weight:700;">Your referrals will appear here.</div>
         </div>
       </div>
     </div>

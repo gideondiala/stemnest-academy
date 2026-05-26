@@ -4,7 +4,7 @@
    assigns teachers, writes directly to teacher calendar.
 ═══════════════════════════════════════════════════════ */
 
-const PS_TABS = ['incoming', 'scheduled', 'completed', 'incomplete', 'cancelled', 'reschedule', 'notes', 'enrolments'];
+const PS_TABS = ['incoming', 'scheduled', 'completed', 'incomplete', 'cancelled', 'reschedule', 'notes', 'enrolments', 'incoming-referrals'];
 let psScheduleBookingId = null; // booking being scheduled in modal
 
 /* ── STATE MANAGEMENT ── */
@@ -175,8 +175,9 @@ function showPSTab(tab) {
   if (tab === 'incomplete') renderIncomplete();
   if (tab === 'cancelled')  renderCancelled();
   if (tab === 'reschedule') renderReschedule();
-  if (tab === 'notes')      renderParentNotes();
-  if (tab === 'enrolments') renderEnrolments();
+  if (tab === 'notes')              renderParentNotes();
+  if (tab === 'enrolments')         renderEnrolments();
+  if (tab === 'incoming-referrals') renderIncomingReferrals();
 }
 
 /* ── STATS ── */
@@ -471,6 +472,10 @@ function renderScheduled() {
     return;
   }
 
+  /* Build a lookup map: sales UUID → name */
+  const salesMap = {};
+  getSales().forEach(s => { salesMap[s.id] = s.name; salesMap[s.staffId] = s.name; });
+
   el.innerHTML = `
     <div style="overflow-x:auto;border-radius:16px;border:1.5px solid #e8eaf0;background:var(--white);">
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -478,33 +483,58 @@ function renderScheduled() {
           <tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">
             <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;letter-spacing:.5px;">Student</th>
             <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;letter-spacing:.5px;">Subject</th>
-            <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;letter-spacing:.5px;">Teacher</th>
-            <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;letter-spacing:.5px;">Date & Time</th>
+            <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;letter-spacing:.5px;">Grade / Age</th>
             <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;letter-spacing:.5px;">Contact</th>
+            <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;letter-spacing:.5px;">Preferred Time</th>
+            <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;letter-spacing:.5px;">Booked</th>
+            <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;letter-spacing:.5px;">Teacher</th>
+            <th style="padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;letter-spacing:.5px;">Learning Advisor</th>
             <th style="padding:12px 16px;text-align:center;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;letter-spacing:.5px;">Action</th>
           </tr>
         </thead>
         <tbody>
-          ${bookings.map((b, i) => `
+          ${bookings.map((b, i) => {
+            const salesName = salesMap[b.assignedSalesId] || b.assignedSalesId || '—';
+            return `
             <tr style="border-bottom:1px solid #f0f2f8;${i % 2 === 0 ? '' : 'background:#fafbff;'}">
               <td style="padding:14px 16px;">
                 <div style="font-weight:800;color:var(--dark);">${b.studentName}</div>
                 <div style="font-size:11px;color:var(--light);font-weight:700;">${b.id}</div>
               </td>
-              <td style="padding:14px 16px;font-weight:700;color:var(--mid);">${b.subject}</td>
-              <td style="padding:14px 16px;font-weight:700;color:var(--mid);">${b.assignedTutor || '—'}</td>
+              <td style="padding:14px 16px;">
+                <span style="background:${b.subject==='Coding'?'var(--blue-light)':b.subject==='Maths'?'var(--green-light)':'#fff3e0'};color:${b.subject==='Coding'?'var(--blue)':b.subject==='Maths'?'var(--green-dark)':'#e65100'};font-size:12px;font-weight:900;padding:3px 10px;border-radius:50px;">
+                  ${b.subject==='Coding'?'💻':b.subject==='Maths'?'📐':'🔬'} ${b.subject}
+                </span>
+              </td>
+              <td style="padding:14px 16px;font-weight:700;color:var(--mid);">${b.grade || '—'} · Age ${b.age || '—'}</td>
+              <td style="padding:14px 16px;">
+                <div style="font-size:12px;font-weight:700;color:var(--mid);">📧 ${b.email}</div>
+                <div style="font-size:12px;font-weight:700;color:var(--mid);margin-top:2px;">
+                  ${b.whatsapp && b.whatsapp !== '—'
+                    ? `<a href="https://wa.me/${b.whatsapp.replace(/[\s\-\(\)\+]/g,'')}" target="_blank" style="color:#25D366;font-weight:800;text-decoration:none;">📱 ${b.whatsapp}</a>`
+                    : `📱 ${b.whatsapp || '—'}`}
+                </div>
+              </td>
               <td style="padding:14px 16px;font-weight:700;color:var(--mid);">${b.date || '—'}<br>
                 <span style="font-size:11px;color:var(--mid);">🕐 ${b.time || '—'} (local)</span>
                 ${b.timeWAT ? `<br><span style="font-size:11px;color:var(--blue);font-weight:800;">🇳🇬 ${b.timeWAT}</span>` : ''}
               </td>
-              <td style="padding:14px 16px;font-size:12px;color:var(--mid);">📧 ${b.email}<br>📱 ${b.whatsapp || '—'}</td>
+              <td style="padding:14px 16px;font-size:12px;color:var(--light);font-weight:700;">${b.bookedAt ? new Date(b.bookedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '—'}</td>
+              <td style="padding:14px 16px;">
+                <div style="font-weight:800;color:var(--dark);font-size:13px;">👩‍🏫 ${b.assignedTutor || '—'}</div>
+                ${b.assignedTutorId ? `<div style="font-size:11px;color:var(--light);">${b.assignedTutorId}</div>` : ''}
+              </td>
+              <td style="padding:14px 16px;">
+                <div style="font-weight:800;color:var(--blue);font-size:13px;">💼 ${salesName}</div>
+              </td>
               <td style="padding:14px 16px;text-align:center;">
                 <button onclick="addParentNote('${b.id}')"
                   style="background:var(--bg);color:var(--mid);border:1.5px solid #e8eaf0;border-radius:10px;padding:7px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;">
                   📝 Note
                 </button>
               </td>
-            </tr>`).join('')}
+            </tr>`;
+          }).join('')}
         </tbody>
       </table>
     </div>`;
@@ -998,4 +1028,182 @@ function renderEnrolments() {
         </tbody>
       </table>
     </div>`;
+}
+
+/* ══════════════════════════════════════════════════════
+   INCOMING REFERRALS TAB (presales)
+   Fetches from GET /api/enrollments/referrals?status=pending
+   Two actions: Book Demo (pre-fill schedule modal) or Enroll
+   (move to postsales incoming referrals)
+══════════════════════════════════════════════════════ */
+async function renderIncomingReferrals() {
+  const el = document.getElementById('incomingReferralsList');
+  if (!el) return;
+
+  el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--light);font-weight:700;">⏳ Loading referrals...</div>';
+
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    if (!token) { el.innerHTML = '<div style="padding:24px;color:var(--orange);font-weight:700;">Not logged in.</div>'; return; }
+
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/enrollments/referrals?status=pending', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    const referrals = data.referrals || [];
+
+    if (!referrals.length) {
+      el.innerHTML = `<div style="text-align:center;padding:60px 20px;">
+        <div style="font-size:48px;margin-bottom:12px;">🤝</div>
+        <div style="font-family:'Fredoka One',cursive;font-size:20px;color:var(--dark);">No referrals yet</div>
+        <div style="font-size:14px;color:var(--light);margin-top:6px;">When students refer friends, they appear here.</div>
+      </div>`;
+      return;
+    }
+
+    const thS = 'padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;letter-spacing:.5px;';
+    const tdS = 'padding:14px 16px;vertical-align:middle;';
+
+    el.innerHTML = `
+      <div style="overflow-x:auto;border-radius:16px;border:1.5px solid #e8eaf0;background:var(--white);">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">
+              <th style="${thS}">Referred Student</th>
+              <th style="${thS}">Grade / Age</th>
+              <th style="${thS}">Parent Contact</th>
+              <th style="${thS}">Referred By</th>
+              <th style="${thS}">Needs Demo?</th>
+              <th style="${thS}">Received</th>
+              <th style="${thS}">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${referrals.map((r, i) => `
+              <tr style="border-bottom:1px solid #f0f2f8;${i%2===0?'':'background:#fafbff;'}">
+                <td style="${tdS}">
+                  <div style="font-weight:800;color:var(--dark);">${r.student_name || '—'}</div>
+                  <div style="font-size:11px;color:var(--light);">Ref #${r.id}</div>
+                </td>
+                <td style="${tdS};font-weight:700;color:var(--mid);">${r.grade || '—'} · Age ${r.age || '—'}</td>
+                <td style="${tdS}">
+                  <div style="font-size:12px;font-weight:700;color:var(--mid);">📧 ${r.parent_email || '—'}</div>
+                  <div style="font-size:12px;font-weight:700;color:var(--mid);">
+                    ${r.parent_phone
+                      ? `<a href="https://wa.me/${r.parent_phone.replace(/[\s\-\(\)\+]/g,'')}" target="_blank" style="color:#25D366;font-weight:800;text-decoration:none;">📱 ${r.parent_phone}</a>`
+                      : '📱 —'}
+                  </div>
+                </td>
+                <td style="${tdS}">
+                  <div style="font-weight:800;color:var(--blue);">${r.referrer_name || '—'}</div>
+                  <div style="font-size:11px;color:var(--light);">${r.referrer_staff_id || ''}</div>
+                </td>
+                <td style="${tdS}">
+                  <span style="background:${r.needs_demo?'var(--blue-light)':'var(--green-light)'};color:${r.needs_demo?'var(--blue)':'var(--green-dark)'};font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">
+                    ${r.needs_demo ? '📅 Yes' : '✅ No'}
+                  </span>
+                </td>
+                <td style="${tdS};font-size:12px;color:var(--light);font-weight:700;">
+                  ${r.created_at ? new Date(r.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—'}
+                </td>
+                <td style="${tdS}">
+                  <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
+                    <button onclick="bookDemoFromReferral(${JSON.stringify(r).replace(/"/g,'&quot;')})"
+                      style="background:var(--blue);color:#fff;border:none;border-radius:10px;padding:7px 14px;font-family:'Nunito',sans-serif;font-weight:900;font-size:12px;cursor:pointer;white-space:nowrap;">
+                      📅 Book Demo
+                    </button>
+                    <button onclick="enrollFromReferral(${r.id})"
+                      style="background:var(--green);color:#fff;border:none;border-radius:10px;padding:7px 14px;font-family:'Nunito',sans-serif;font-weight:900;font-size:12px;cursor:pointer;white-space:nowrap;">
+                      🎓 Enroll
+                    </button>
+                  </div>
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:10px;font-size:12px;font-weight:700;color:var(--light);text-align:right;">${referrals.length} referral${referrals.length!==1?'s':''}</div>`;
+  } catch(e) {
+    el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--orange);font-weight:700;">Failed to load referrals. Please refresh.</div>';
+    console.error('[Presales] Referrals load error:', e);
+  }
+}
+
+/* Open schedule modal pre-filled with referral data */
+function bookDemoFromReferral(referral) {
+  /* We need a booking ID to schedule — create a temporary pending booking first */
+  const token = localStorage.getItem('sn_access_token');
+  if (!token) { showToast('Not logged in.', 'error'); return; }
+
+  /* Pre-fill the schedule modal manually */
+  const infoEl = document.getElementById('sm-student-info');
+  if (infoEl) infoEl.innerHTML =
+    `<strong>${referral.student_name}</strong> · ${referral.grade || '—'} · Age ${referral.age || '—'}<br>` +
+    `📧 ${referral.parent_email || '—'} &nbsp;·&nbsp; 📱 ${referral.parent_phone || '—'}<br>` +
+    `<span style="color:var(--blue);font-weight:800;">Referred by: ${referral.referrer_name || '—'}</span>`;
+
+  /* Create a real booking first so we have an ID to assign */
+  const today = new Date().toISOString().split('T')[0];
+  fetch('https://api.stemnestacademy.co.uk/api/bookings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      studentName: referral.student_name,
+      age:         String(referral.age || '—'),
+      grade:       referral.grade || '—',
+      email:       referral.parent_email || '',
+      whatsapp:    referral.parent_phone || '',
+      subject:     'Coding',
+      device:      'laptop',
+      timezone:    'Europe/London',
+      date:        today,
+      time:        '10:00',
+    })
+  }).then(r => r.json()).then(d => {
+    if (d.success && d.bookingId) {
+      psScheduleBookingId = d.bookingId;
+      /* Mark referral as booking_created */
+      fetch('https://api.stemnestacademy.co.uk/api/enrollments/referrals/' + referral.id, {
+        method: 'PUT',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'demo_booked', bookingId: d.bookingId })
+      }).catch(() => {});
+      /* Reload presales data so the new booking appears */
+      _loadPresalesFromAPI().then(() => {});
+    }
+  }).catch(() => {});
+
+  populateTeacherDropdown('Coding');
+  populateSalesDropdown();
+
+  const dateEl = document.getElementById('sm-date');
+  if (dateEl) dateEl.min = new Date().toISOString().split('T')[0];
+
+  ['sm-time','sm-link'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+
+  document.getElementById('scheduleModalOverlay').classList.add('open');
+}
+
+/* Move referral to postsales incoming referrals */
+async function enrollFromReferral(referralId) {
+  if (!confirm('Move this referral to Post-Sales for enrollment processing?')) return;
+  const token = localStorage.getItem('sn_access_token');
+  if (!token) { showToast('Not logged in.', 'error'); return; }
+
+  try {
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/enrollments/referrals/' + referralId, {
+      method: 'PUT',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'postsales' })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('✅ Referral moved to Post-Sales for enrollment.');
+      renderIncomingReferrals();
+    } else {
+      showToast('Failed: ' + (data.error || 'Unknown error'), 'error');
+    }
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  }
 }

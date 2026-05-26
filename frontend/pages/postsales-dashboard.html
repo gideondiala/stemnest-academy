@@ -37,6 +37,8 @@
       <a class="sidebar-link"        data-tab="paylinks"  onclick="showPOSTab('paylinks')"> <span class="sl-icon">🔗</span> Payment Links</a>
       <a class="sidebar-link"        data-tab="converted" onclick="showPOSTab('converted')"><span class="sl-icon">✅</span> Converted</a>
       <a class="sidebar-link"        data-tab="website-enquiries" onclick="showPOSTab('website-enquiries')"><span class="sl-icon">🌐</span> Website Enquiries</a>
+      <a class="sidebar-link"        data-tab="enrollment-requests" onclick="showPOSTab('enrollment-requests')"><span class="sl-icon">📋</span> Enrollment Requests <span class="sl-badge" id="enrollReqBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="incoming-referrals" onclick="showPOSTab('incoming-referrals')"><span class="sl-icon">🤝</span> Incoming Referrals <span class="sl-badge" id="posRefBadge">0</span></a>
     </div>
     <div class="sidebar-bottom">
       <button class="logout-btn" onclick="window.location.href='login.html'">🚪 Log Out</button>
@@ -151,6 +153,30 @@
         📋 These are parents who clicked "Enrol Now" on the courses page. Contact them to arrange payment and schedule their first class.
       </div>
       <div id="websiteEnquiriesList"></div>
+    </div>
+
+    <!-- ENROLLMENT REQUESTS -->
+    <div id="tab-enrollment-requests" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📋 Enrollment Requests</div>
+        <button class="btn btn-outline" style="font-size:12px;" onclick="renderEnrollmentRequests()">🔄 Refresh</button>
+      </div>
+      <div style="background:#f0f4ff;border-radius:12px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:#1e40af;font-weight:700;">
+        📋 Parents who completed the "Enrol Now" form on the website. Generate a payment link, paste it below, then mark as Received and click Proceed to move them to Paid Students.
+      </div>
+      <div id="enrollmentRequestsList"></div>
+    </div>
+
+    <!-- INCOMING REFERRALS (postsales) -->
+    <div id="tab-incoming-referrals" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🤝 Incoming Referrals</div>
+        <button class="btn btn-outline" style="font-size:12px;" onclick="renderIncomingReferrals()">🔄 Refresh</button>
+      </div>
+      <div style="background:#f0f4ff;border-radius:12px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:#1e40af;font-weight:700;">
+        🤝 Students referred by existing StemNest students and sent here by Pre-Sales. Generate a payment link, send it, mark as Received, then Proceed to enroll them.
+      </div>
+      <div id="posIncomingReferralsList"></div>
     </div>
 
   </div><!-- end dash-main -->

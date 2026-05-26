@@ -4,7 +4,7 @@
    paid classes, writes slots to teacher calendar.
 ═══════════════════════════════════════════════════════ */
 
-const POS_TABS = ['students', 'topup', 'scheduled', 'paylinks', 'converted', 'website-enquiries'];
+const POS_TABS = ['students', 'topup', 'scheduled', 'paylinks', 'converted', 'website-enquiries', 'enrollment-requests', 'incoming-referrals'];
 let generatedLink       = null;
 let posScheduleStudentId = null; // booking ID being scheduled
 
@@ -192,6 +192,8 @@ function showPOSTab(tab) {
   if (tab === 'scheduled')          renderScheduledPaid();
   if (tab === 'converted')          renderPOSConverted();
   if (tab === 'website-enquiries')  renderWebsiteEnquiries();
+  if (tab === 'enrollment-requests') renderEnrollmentRequests();
+  if (tab === 'incoming-referrals') renderIncomingReferrals();
 }
 
 /* ── STATS ── */
@@ -1348,4 +1350,380 @@ function saveTopUpLink(studentId, email, name, subject) {
   updatePOSStats();
   renderTopUpStudents();
   showToast('✅ Payment link saved! Student will see it on their dashboard.');
+}
+
+/* ══════════════════════════════════════════════════════
+   ENROLLMENT REQUESTS
+   From website "Enrol Now" button → POST /api/enrollments/request
+   Post-Sales generates payment link, marks received, proceeds
+══════════════════════════════════════════════════════ */
+async function renderEnrollmentRequests() {
+  const el = document.getElementById('enrollmentRequestsList');
+  if (!el) return;
+
+  el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--light);font-weight:700;">⏳ Loading enrollment requests...</div>';
+
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    if (!token) { el.innerHTML = '<div style="padding:24px;color:var(--orange);font-weight:700;">Not logged in.</div>'; return; }
+
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/enrollments/requests', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    const requests = (data.requests || []).filter(r => r.status !== 'processed');
+
+    if (!requests.length) {
+      el.innerHTML = `<div style="text-align:center;padding:60px 20px;">
+        <div style="font-size:48px;margin-bottom:12px;">📋</div>
+        <div style="font-family:'Fredoka One',cursive;font-size:20px;color:var(--dark);">No enrollment requests yet</div>
+        <div style="font-size:14px;color:var(--light);margin-top:6px;">When parents click "Enrol Now" on the courses page, their details appear here.</div>
+      </div>`;
+      return;
+    }
+
+    el.innerHTML = `
+      <div style="overflow-x:auto;border-radius:16px;border:1.5px solid #e8eaf0;background:var(--white);">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">
+              <th style="${thStyle()}">Student</th>
+              <th style="${thStyle()}">Course</th>
+              <th style="${thStyle()}">Contact</th>
+              <th style="${thStyle()}">Amount</th>
+              <th style="${thStyle()}">Payment Link</th>
+              <th style="${thStyle()}">Payment Status</th>
+              <th style="${thStyle('center')}">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${requests.map((r, i) => `
+              <tr style="border-bottom:1px solid #f0f2f8;${i%2===0?'':'background:#fafbff;'}">
+                <td style="${tdStyle()}">
+                  <div style="font-weight:800;color:var(--dark);">${r.student_name || '—'}</div>
+                  <div style="font-size:11px;color:var(--light);">Age: ${r.age || '—'} · #${r.id}</div>
+                </td>
+                <td style="${tdStyle()}">
+                  <div style="font-weight:800;color:var(--dark);">${r.course_name || r.course_name_db || '—'}</div>
+                  ${r.course_price || r.course_price_db ? `<div style="font-size:11px;color:var(--green-dark);font-weight:800;">£${parseFloat(r.course_price || r.course_price_db).toFixed(0)}</div>` : ''}
+                </td>
+                <td style="${tdStyle()}">
+                  <div style="font-size:12px;font-weight:700;color:var(--mid);">📧 ${r.email || '—'}</div>
+                  <div style="font-size:12px;font-weight:700;color:var(--mid);">
+                    ${r.phone ? `<a href="https://wa.me/${r.phone.replace(/[\s\-\(\)\+]/g,'')}" target="_blank" style="color:#25D366;font-weight:800;text-decoration:none;">📱 ${r.phone}</a>` : '📱 —'}
+                  </div>
+                </td>
+                <td style="${tdStyle()};font-weight:800;color:var(--green-dark);">
+                  ${r.course_price || r.course_price_db ? '£' + parseFloat(r.course_price || r.course_price_db).toFixed(0) : '—'}
+                </td>
+                <td style="${tdStyle()}">
+                  <div style="display:flex;flex-direction:column;gap:6px;">
+                    <input type="url" id="enrLink_${r.id}" placeholder="Paste payment link..."
+                      value="${r.payment_link || ''}"
+                      style="padding:8px 12px;border:2px solid #e8eaf0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:12px;outline:none;width:200px;">
+                    <button onclick="saveEnrollmentPaymentLink(${r.id})"
+                      style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;">
+                      💾 Save Link
+                    </button>
+                  </div>
+                </td>
+                <td style="${tdStyle()}">
+                  <select id="enrStatus_${r.id}" onchange="updateEnrollmentStatus(${r.id})"
+                    style="padding:8px 12px;border:2px solid #e8eaf0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;outline:none;background:#fff;">
+                    <option value="pending" ${(r.payment_status||'pending')==='pending'?'selected':''}>⏳ Pending</option>
+                    <option value="received" ${r.payment_status==='received'?'selected':''}>✅ Received</option>
+                  </select>
+                </td>
+                <td style="${tdStyle('center')}">
+                  <button onclick="proceedEnrollmentRequest(${r.id})"
+                    id="enrProceed_${r.id}"
+                    ${r.payment_status !== 'received' ? 'disabled' : ''}
+                    style="background:${r.payment_status==='received'?'var(--green)':'#e8eaf0'};color:${r.payment_status==='received'?'#fff':'var(--light)'};border:none;border-radius:10px;padding:9px 16px;font-family:'Nunito',sans-serif;font-weight:900;font-size:12px;cursor:${r.payment_status==='received'?'pointer':'not-allowed'};white-space:nowrap;transition:.15s;">
+                    🚀 Proceed
+                  </button>
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:10px;font-size:12px;font-weight:700;color:var(--light);text-align:right;">${requests.length} request${requests.length!==1?'s':''}</div>`;
+  } catch(e) {
+    el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--orange);font-weight:700;">Failed to load enrollment requests. Please refresh.</div>';
+    console.error('[PostSales] Enrollment requests error:', e);
+  }
+}
+
+async function saveEnrollmentPaymentLink(requestId) {
+  const linkEl = document.getElementById('enrLink_' + requestId);
+  const link = linkEl ? linkEl.value.trim() : '';
+  if (!link) { showToast('Please enter a payment link first.', 'error'); return; }
+
+  const token = localStorage.getItem('sn_access_token');
+  try {
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/enrollments/requests/' + requestId, {
+      method: 'PUT',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paymentLink: link })
+    });
+    const data = await res.json();
+    if (data.success) showToast('✅ Payment link saved!');
+    else showToast('Failed: ' + (data.error || 'Unknown'), 'error');
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+async function updateEnrollmentStatus(requestId) {
+  const sel = document.getElementById('enrStatus_' + requestId);
+  const status = sel ? sel.value : 'pending';
+  const token = localStorage.getItem('sn_access_token');
+
+  try {
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/enrollments/requests/' + requestId, {
+      method: 'PUT',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paymentStatus: status })
+    });
+    const data = await res.json();
+    if (data.success) {
+      /* Enable/disable Proceed button */
+      const btn = document.getElementById('enrProceed_' + requestId);
+      if (btn) {
+        btn.disabled = status !== 'received';
+        btn.style.background = status === 'received' ? 'var(--green)' : '#e8eaf0';
+        btn.style.color = status === 'received' ? '#fff' : 'var(--light)';
+        btn.style.cursor = status === 'received' ? 'pointer' : 'not-allowed';
+      }
+      showToast(status === 'received' ? '✅ Payment marked as received! You can now Proceed.' : '⏳ Status updated to Pending.');
+    } else {
+      showToast('Failed: ' + (data.error || 'Unknown'), 'error');
+    }
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+async function proceedEnrollmentRequest(requestId) {
+  const sel = document.getElementById('enrStatus_' + requestId);
+  if (!sel || sel.value !== 'received') {
+    showToast('Payment must be marked as Received before proceeding.', 'error');
+    return;
+  }
+
+  const token = localStorage.getItem('sn_access_token');
+  try {
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/enrollments/requests/' + requestId, {
+      method: 'PUT',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ proceed: true })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('✅ Student moved to Paid Students section!');
+      /* Reload the tab */
+      renderEnrollmentRequests();
+      /* Also refresh paid students */
+      await _loadPOSFromAPI();
+      renderPaidStudents();
+    } else {
+      showToast('Failed: ' + (data.error || 'Unknown'), 'error');
+    }
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+/* ══════════════════════════════════════════════════════
+   INCOMING REFERRALS (postsales)
+   Referrals sent from presales with status='postsales'
+   Post-Sales generates payment link, sends via email/WA,
+   marks received, proceeds to paid students
+══════════════════════════════════════════════════════ */
+async function renderIncomingReferrals() {
+  const el = document.getElementById('posIncomingReferralsList');
+  if (!el) return;
+
+  el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--light);font-weight:700;">⏳ Loading referrals...</div>';
+
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    if (!token) { el.innerHTML = '<div style="padding:24px;color:var(--orange);font-weight:700;">Not logged in.</div>'; return; }
+
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/enrollments/referrals?status=postsales', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    const referrals = (data.referrals || []).filter(r => r.status !== 'enrolled');
+
+    if (!referrals.length) {
+      el.innerHTML = `<div style="text-align:center;padding:60px 20px;">
+        <div style="font-size:48px;margin-bottom:12px;">🤝</div>
+        <div style="font-family:'Fredoka One',cursive;font-size:20px;color:var(--dark);">No referrals for enrollment yet</div>
+        <div style="font-size:14px;color:var(--light);margin-top:6px;">Referrals sent from Pre-Sales for enrollment will appear here.</div>
+      </div>`;
+      return;
+    }
+
+    el.innerHTML = `
+      <div style="overflow-x:auto;border-radius:16px;border:1.5px solid #e8eaf0;background:var(--white);">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">
+              <th style="${thStyle()}">Referred Student</th>
+              <th style="${thStyle()}">Grade / Age</th>
+              <th style="${thStyle()}">Parent Contact</th>
+              <th style="${thStyle()}">Referred By</th>
+              <th style="${thStyle()}">Payment Link</th>
+              <th style="${thStyle()}">Payment Status</th>
+              <th style="${thStyle('center')}">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${referrals.map((r, i) => `
+              <tr style="border-bottom:1px solid #f0f2f8;${i%2===0?'':'background:#fafbff;'}">
+                <td style="${tdStyle()}">
+                  <div style="font-weight:800;color:var(--dark);">${r.student_name || '—'}</div>
+                  <div style="font-size:11px;color:var(--light);">Ref #${r.id}</div>
+                </td>
+                <td style="${tdStyle()};font-weight:700;color:var(--mid);">${r.grade || '—'} · Age ${r.age || '—'}</td>
+                <td style="${tdStyle()}">
+                  <div style="font-size:12px;font-weight:700;color:var(--mid);">📧 ${r.parent_email || '—'}</div>
+                  <div style="font-size:12px;font-weight:700;color:var(--mid);">
+                    ${r.parent_phone
+                      ? `<a href="https://wa.me/${r.parent_phone.replace(/[\s\-\(\)\+]/g,'')}" target="_blank" style="color:#25D366;font-weight:800;text-decoration:none;">📱 ${r.parent_phone}</a>`
+                      : '📱 —'}
+                  </div>
+                </td>
+                <td style="${tdStyle()}">
+                  <div style="font-weight:800;color:var(--blue);">${r.referrer_name || '—'}</div>
+                  <div style="font-size:11px;color:var(--light);">${r.referrer_staff_id || ''}</div>
+                </td>
+                <td style="${tdStyle()}">
+                  <div style="display:flex;flex-direction:column;gap:6px;">
+                    <input type="url" id="refLink_${r.id}" placeholder="Paste payment link..."
+                      value="${r.payment_link || ''}"
+                      style="padding:8px 12px;border:2px solid #e8eaf0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:12px;outline:none;width:200px;">
+                    <div style="display:flex;gap:6px;">
+                      <button onclick="saveReferralPaymentLink(${r.id})"
+                        style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:6px 10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;">
+                        💾 Save
+                      </button>
+                      <button onclick="sendReferralPaymentLink(${r.id},'${(r.parent_email||'').replace(/'/g,'')}')"
+                        style="background:#25D366;color:#fff;border:none;border-radius:8px;padding:6px 10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;">
+                        📤 Send
+                      </button>
+                    </div>
+                  </div>
+                </td>
+                <td style="${tdStyle()}">
+                  <select id="refStatus_${r.id}" onchange="updateReferralStatus(${r.id})"
+                    style="padding:8px 12px;border:2px solid #e8eaf0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;outline:none;background:#fff;">
+                    <option value="pending" ${(r.payment_status||'pending')==='pending'?'selected':''}>⏳ Pending</option>
+                    <option value="received" ${r.payment_status==='received'?'selected':''}>✅ Received</option>
+                  </select>
+                </td>
+                <td style="${tdStyle('center')}">
+                  <button onclick="proceedReferralEnrollment(${r.id})"
+                    id="refProceed_${r.id}"
+                    ${r.payment_status !== 'received' ? 'disabled' : ''}
+                    style="background:${r.payment_status==='received'?'var(--green)':'#e8eaf0'};color:${r.payment_status==='received'?'#fff':'var(--light)'};border:none;border-radius:10px;padding:9px 16px;font-family:'Nunito',sans-serif;font-weight:900;font-size:12px;cursor:${r.payment_status==='received'?'pointer':'not-allowed'};white-space:nowrap;transition:.15s;">
+                    🚀 Proceed
+                  </button>
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:10px;font-size:12px;font-weight:700;color:var(--light);text-align:right;">${referrals.length} referral${referrals.length!==1?'s':''}</div>`;
+  } catch(e) {
+    el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--orange);font-weight:700;">Failed to load referrals. Please refresh.</div>';
+    console.error('[PostSales] Referrals error:', e);
+  }
+}
+
+async function saveReferralPaymentLink(referralId) {
+  const linkEl = document.getElementById('refLink_' + referralId);
+  const link = linkEl ? linkEl.value.trim() : '';
+  if (!link) { showToast('Please enter a payment link first.', 'error'); return; }
+
+  const token = localStorage.getItem('sn_access_token');
+  try {
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/enrollments/referrals/' + referralId, {
+      method: 'PUT',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paymentLink: link })
+    });
+    const data = await res.json();
+    if (data.success) showToast('✅ Payment link saved!');
+    else showToast('Failed: ' + (data.error || 'Unknown'), 'error');
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+function sendReferralPaymentLink(referralId, parentEmail) {
+  const linkEl = document.getElementById('refLink_' + referralId);
+  const link = linkEl ? linkEl.value.trim() : '';
+  if (!link) { showToast('Please save a payment link first.', 'error'); return; }
+
+  /* Open WhatsApp with the link */
+  const row = document.querySelector(`#refLink_${referralId}`)?.closest('tr');
+  const waLink = row ? row.querySelector('a[href^="https://wa.me"]')?.href : null;
+  if (waLink) {
+    const msg = encodeURIComponent('Hello! Here is your StemNest Academy payment link to complete enrollment:\n' + link + '\n\nPlease complete payment to confirm your child\'s place. Thank you!');
+    window.open(waLink.split('?')[0] + '?text=' + msg, '_blank');
+  }
+
+  /* Also log email */
+  if (parentEmail) {
+    console.log('[EMAIL] To:', parentEmail, '\nPayment link:', link);
+    showToast('📤 Payment link sent via WhatsApp! Email logged.');
+  } else {
+    showToast('📤 WhatsApp opened with payment link!');
+  }
+}
+
+async function updateReferralStatus(referralId) {
+  const sel = document.getElementById('refStatus_' + referralId);
+  const status = sel ? sel.value : 'pending';
+  const token = localStorage.getItem('sn_access_token');
+
+  try {
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/enrollments/referrals/' + referralId, {
+      method: 'PUT',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paymentStatus: status })
+    });
+    const data = await res.json();
+    if (data.success) {
+      const btn = document.getElementById('refProceed_' + referralId);
+      if (btn) {
+        btn.disabled = status !== 'received';
+        btn.style.background = status === 'received' ? 'var(--green)' : '#e8eaf0';
+        btn.style.color = status === 'received' ? '#fff' : 'var(--light)';
+        btn.style.cursor = status === 'received' ? 'pointer' : 'not-allowed';
+      }
+      showToast(status === 'received' ? '✅ Payment received! You can now Proceed.' : '⏳ Status updated.');
+    } else {
+      showToast('Failed: ' + (data.error || 'Unknown'), 'error');
+    }
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+async function proceedReferralEnrollment(referralId) {
+  const sel = document.getElementById('refStatus_' + referralId);
+  if (!sel || sel.value !== 'received') {
+    showToast('Payment must be marked as Received before proceeding.', 'error');
+    return;
+  }
+
+  const token = localStorage.getItem('sn_access_token');
+  try {
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/enrollments/referrals/' + referralId, {
+      method: 'PUT',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ proceed: true })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('✅ Referral student moved to Paid Students!');
+      renderIncomingReferrals();
+      await _loadPOSFromAPI();
+      renderPaidStudents();
+    } else {
+      showToast('Failed: ' + (data.error || 'Unknown'), 'error');
+    }
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
 }

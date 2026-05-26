@@ -186,7 +186,7 @@ function setGreeting() {
 }
 
 /* ── TAB SWITCHING ── */
-const ALL_TABS = ['overview','lessons','projects','quizzes','certificates','payments'];
+const ALL_TABS = ['overview','lessons','projects','quizzes','certificates','payments','nest','chat','refer'];
 function showTab(tab) {
   ALL_TABS.forEach(t => {
     const el = document.getElementById('tab-' + t);
@@ -195,6 +195,7 @@ function showTab(tab) {
   document.querySelectorAll('.sidebar-link[data-tab]').forEach(link => {
     link.classList.toggle('active', link.dataset.tab === tab);
   });
+  if (tab === 'refer') loadMyReferrals();
 }
 
 /* ── HELPER: bind overlay click to close ── */
@@ -845,7 +846,7 @@ function saveProfile() {
 /* ── Extend tab switching for new tabs ── */
 const _origShowTab = showTab;
 showTab = function(tab) {
-  const extraTabs = ['nest','chat'];
+  const extraTabs = ['nest','chat','refer'];
   extraTabs.forEach(t => { const el = document.getElementById('tab-' + t); if (el) el.style.display = 'none'; });
   _origShowTab(tab);
   if (extraTabs.includes(tab)) {
@@ -855,5 +856,118 @@ showTab = function(tab) {
     document.querySelectorAll('.sidebar-link[data-tab]').forEach(l => l.classList.toggle('active', l.dataset.tab === tab));
     if (tab === 'nest') renderLearningNest();
     if (tab === 'chat') { initChat(); loadChatMessages(); }
+    if (tab === 'refer') loadMyReferrals();
   }
 };
+
+/* ══════════════════════════════════════════════════════
+   REFER & EARN
+   Student submits referral → POST /api/enrollments/referral
+   Loads past referrals → GET /api/enrollments/referrals (own)
+══════════════════════════════════════════════════════ */
+async function submitReferral() {
+  const name         = document.getElementById('ref-name')?.value.trim();
+  const grade        = document.getElementById('ref-grade')?.value.trim();
+  const age          = document.getElementById('ref-age')?.value.trim();
+  const email        = document.getElementById('ref-email')?.value.trim();
+  const phone        = document.getElementById('ref-phone')?.value.trim();
+  const relationship = document.getElementById('ref-relationship')?.value.trim();
+  const needsDemo    = document.querySelector('input[name="ref-demo"]:checked')?.value !== 'no';
+
+  if (!name) { showToast('Please enter the student\'s name.', 'error'); return; }
+  if (!email && !phone) { showToast('Please enter parent email or WhatsApp number.', 'error'); return; }
+
+  const btn = document.querySelector('#tab-refer button[onclick="submitReferral()"]');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Sending...'; }
+
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    if (!token) throw new Error('Not logged in');
+
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/enrollments/referral', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studentName:  name,
+        grade:        grade || null,
+        age:          age ? parseInt(age) : null,
+        parentEmail:  email || null,
+        parentPhone:  phone || null,
+        relationship: relationship || null,
+        needsDemo:    needsDemo,
+      })
+    });
+    const data = await res.json();
+
+    if (btn) { btn.disabled = false; btn.textContent = '🎁 Send Referral'; }
+
+    if (data.success) {
+      /* Show success message */
+      const msg = document.getElementById('referralSuccessMsg');
+      if (msg) msg.style.display = 'block';
+      /* Clear form */
+      ['ref-name','ref-grade','ref-age','ref-email','ref-phone','ref-relationship'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.value = '';
+      });
+      const demoYes = document.getElementById('ref-demo-yes');
+      if (demoYes) demoYes.checked = true;
+      /* Reload referrals list */
+      loadMyReferrals();
+      showToast('✅ Referral sent! Credits will be added when they enroll.');
+    } else {
+      showToast('Failed: ' + (data.error || 'Unknown error'), 'error');
+    }
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = '🎁 Send Referral'; }
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+async function loadMyReferrals() {
+  const el = document.getElementById('myReferralsList');
+  if (!el) return;
+
+  el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--light);font-weight:700;">⏳ Loading...</div>';
+
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    if (!token) { el.innerHTML = '<div style="padding:16px;color:var(--light);font-weight:700;">Log in to see your referrals.</div>'; return; }
+
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/enrollments/referrals', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    /* Filter to only this student's referrals */
+    const profile = window.STUDENT_DATA?.profile;
+    const myId = profile?.id || profile?.user_id;
+    const referrals = (data.referrals || []).filter(r => !myId || r.referrer_id === myId);
+
+    if (!referrals.length) {
+      el.innerHTML = '<div style="text-align:center;padding:32px;color:var(--light);font-weight:700;">You haven\'t referred anyone yet. Use the form above to get started!</div>';
+      return;
+    }
+
+    const statusColor = { pending: '#e65100', demo_booked: '#1a56db', postsales: '#7c3aed', enrolled: '#0e9f6e' };
+    const statusLabel = { pending: '⏳ Pending', demo_booked: '📅 Demo Booked', postsales: '💼 In Enrollment', enrolled: '✅ Enrolled' };
+
+    el.innerHTML = `
+      <div style="display:grid;gap:12px;">
+        ${referrals.map(r => `
+          <div style="background:var(--white);border:1.5px solid #e8eaf0;border-radius:14px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+            <div>
+              <div style="font-weight:800;color:var(--dark);font-size:15px;">${r.student_name || '—'}</div>
+              <div style="font-size:12px;color:var(--light);font-weight:700;margin-top:2px;">
+                ${r.grade ? r.grade + ' · ' : ''}${r.age ? 'Age ' + r.age + ' · ' : ''}
+                Referred ${r.created_at ? new Date(r.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—'}
+              </div>
+            </div>
+            <span style="background:${statusColor[r.status]||'#e8eaf0'}22;color:${statusColor[r.status]||'var(--light)'};font-size:12px;font-weight:900;padding:4px 14px;border-radius:50px;border:1.5px solid ${statusColor[r.status]||'#e8eaf0'}44;">
+              ${statusLabel[r.status] || r.status || '⏳ Pending'}
+            </span>
+          </div>`).join('')}
+      </div>
+      <div style="margin-top:10px;font-size:12px;font-weight:700;color:var(--light);text-align:right;">${referrals.length} referral${referrals.length!==1?'s':''}</div>`;
+  } catch(e) {
+    el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--orange);font-weight:700;">Failed to load referrals.</div>';
+  }
+}
