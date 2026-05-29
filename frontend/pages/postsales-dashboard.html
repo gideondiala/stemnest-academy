@@ -256,6 +256,19 @@
 <script src="../js/utils.js"></script>
 <script src="../js/postsales-dashboard.js"></script>
 
+<!-- GREY PAYMENT MODAL -->
+<div class="modal-overlay" id="greyPaymentModalOverlay">
+  <div class="modal" style="max-width:560px;max-height:90vh;overflow-y:auto;">
+    <div class="modal-header">
+      <div class="modal-title">💳 Payment Details — Grey Finance</div>
+      <button class="modal-close" onclick="closeGreyPaymentModal()">✕</button>
+    </div>
+    <div class="modal-body" id="greyPaymentBody">
+      <div style="text-align:center;padding:32px;color:var(--light);font-weight:700;">⏳ Loading...</div>
+    </div>
+  </div>
+</div>
+
 <!-- MANUAL ONBOARD MODAL (walk-in / referral students) -->
 <div class="modal-overlay" id="manualOnboardOverlay">
   <div class="modal" style="max-width:540px;">

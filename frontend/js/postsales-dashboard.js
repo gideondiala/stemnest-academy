@@ -1427,12 +1427,18 @@ async function renderEnrollmentRequests() {
                   </select>
                 </td>
                 <td style="${tdStyle('center')}">
-                  <button onclick="proceedEnrollmentRequest(${r.id})"
-                    id="enrProceed_${r.id}"
-                    ${r.payment_status !== 'received' ? 'disabled' : ''}
-                    style="background:${r.payment_status==='received'?'var(--green)':'#e8eaf0'};color:${r.payment_status==='received'?'#fff':'var(--light)'};border:none;border-radius:10px;padding:9px 16px;font-family:'Nunito',sans-serif;font-weight:900;font-size:12px;cursor:${r.payment_status==='received'?'pointer':'not-allowed'};white-space:nowrap;transition:.15s;">
-                    🚀 Proceed
-                  </button>
+                  <div style="display:flex;flex-direction:column;gap:6px;align-items:center;">
+                    <button onclick="openGreyPaymentModal(${r.id}, ${JSON.stringify(r.student_name||'Student')}, ${parseFloat(r.course_price||r.course_price_db||0).toFixed(2)}, 'USD')"
+                      style="background:var(--blue);color:#fff;border:none;border-radius:10px;padding:8px 14px;font-family:'Nunito',sans-serif;font-weight:900;font-size:12px;cursor:pointer;white-space:nowrap;">
+                      💳 Get Payment Details
+                    </button>
+                    <button onclick="proceedEnrollmentRequest(${r.id})"
+                      id="enrProceed_${r.id}"
+                      ${r.payment_status !== 'received' ? 'disabled' : ''}
+                      style="background:${r.payment_status==='received'?'var(--green)':'#e8eaf0'};color:${r.payment_status==='received'?'#fff':'var(--light)'};border:none;border-radius:10px;padding:8px 14px;font-family:'Nunito',sans-serif;font-weight:900;font-size:12px;cursor:${r.payment_status==='received'?'pointer':'not-allowed'};white-space:nowrap;transition:.15s;">
+                      🚀 Proceed
+                    </button>
+                  </div>
                 </td>
               </tr>`).join('')}
           </tbody>
@@ -1719,3 +1725,148 @@ async function proceedReferralEnrollment(referralId) {
     }
   } catch(e) { showToast('Error: ' + e.message, 'error'); }
 }
+
+/* ══════════════════════════════════════════════════════
+   GREY FINANCE PAYMENT INTEGRATION
+   Shows USD bank details, generates SN-REF-XXXX references,
+   auto-confirms when Grey webhook fires
+══════════════════════════════════════════════════════ */
+
+/* Cache account details so we don't fetch every time */
+let _greyAccounts = null;
+
+async function loadGreyAccountDetails() {
+  if (_greyAccounts) return _greyAccounts;
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/grey/account-details', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    if (data.success) { _greyAccounts = data.accounts; return data.accounts; }
+  } catch(e) { console.warn('[Grey] Failed to load account details:', e.message); }
+  return [];
+}
+
+/* Build the bank details card HTML for a given currency */
+function buildGreyBankCard(account, reference) {
+  const fields = account.currency === 'USD' ? [
+    { label: 'Account Name',    value: account.accountName },
+    { label: 'Account Number',  value: account.accountNumber },
+    { label: 'Routing Number',  value: account.routingNumber },
+    { label: 'Account Type',    value: account.accountType },
+    { label: 'Bank Name',       value: account.bankName },
+    { label: 'Bank Address',    value: account.bankAddress },
+    { label: 'Payment Reference', value: reference, highlight: true },
+  ] : [
+    { label: 'Account Name',    value: account.accountName },
+    { label: 'Account Number',  value: account.accountNumber },
+    { label: 'Sort Code',       value: account.sortCode },
+    { label: 'Bank Name',       value: account.bankName },
+    { label: 'Payment Reference', value: reference, highlight: true },
+  ];
+
+  return `
+    <div style="background:var(--white);border:2px solid #e8eaf0;border-radius:16px;padding:20px 24px;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+        <span style="font-size:24px;">${account.flag}</span>
+        <div>
+          <div style="font-family:'Fredoka One',cursive;font-size:16px;color:var(--dark);">${account.label}</div>
+          <div style="font-size:12px;color:var(--light);font-weight:700;">Bank Transfer</div>
+        </div>
+      </div>
+      ${fields.map(f => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0f2f8;">
+          <span style="font-size:12px;font-weight:700;color:var(--light);text-transform:uppercase;letter-spacing:.3px;">${f.label}</span>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:13px;font-weight:${f.highlight?'900':'800'};color:${f.highlight?'var(--blue)':'var(--dark)'};">${f.value || '—'}</span>
+            <button onclick="copyToClipboard('${(f.value||'').replace(/'/g,"\\'")}','${f.label}')"
+              style="background:var(--bg);border:1px solid #e8eaf0;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:800;color:var(--mid);cursor:pointer;">
+              📋
+            </button>
+          </div>
+        </div>`).join('')}
+      <div style="margin-top:12px;background:#fff8e1;border-radius:8px;padding:10px 14px;font-size:12px;font-weight:700;color:#e65100;">
+        ⚠️ ${account.instructions}
+      </div>
+    </div>`;
+}
+
+function copyToClipboard(text, label) {
+  navigator.clipboard.writeText(text)
+    .then(() => showToast('✅ ' + label + ' copied!'))
+    .catch(() => {
+      /* Fallback for older browsers */
+      const el = document.createElement('textarea');
+      el.value = text;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+      showToast('✅ ' + label + ' copied!');
+    });
+}
+
+/* Open the Grey payment modal for an enrollment request */
+async function openGreyPaymentModal(enrollmentRequestId, studentName, amount, currency) {
+  const modal = document.getElementById('greyPaymentModalOverlay');
+  if (!modal) return;
+
+  /* Show loading state */
+  document.getElementById('greyPaymentBody').innerHTML =
+    '<div style="text-align:center;padding:32px;color:var(--light);font-weight:700;">⏳ Loading bank details...</div>';
+  modal.classList.add('open');
+
+  try {
+    const token = localStorage.getItem('sn_access_token');
+
+    /* Generate a unique payment reference */
+    const refRes = await fetch('https://api.stemnestacademy.co.uk/api/grey/payment-reference', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        enrollmentRequestId,
+        studentName,
+        amount: amount || 0,
+        currency: currency || 'USD',
+      })
+    });
+    const refData = await refRes.json();
+    const reference = refData.reference || 'SN-REF-ERROR';
+
+    /* Load account details */
+    const accounts = await loadGreyAccountDetails();
+
+    if (!accounts.length) {
+      document.getElementById('greyPaymentBody').innerHTML =
+        '<div style="padding:24px;color:var(--orange);font-weight:700;">Bank details not configured. Contact admin.</div>';
+      return;
+    }
+
+    document.getElementById('greyPaymentBody').innerHTML = `
+      <div style="background:var(--green-light);border-radius:12px;padding:14px 18px;margin-bottom:20px;font-size:13px;font-weight:700;color:var(--green-dark);">
+        ✅ Payment reference generated for <strong>${studentName}</strong>
+        ${amount ? ` — Amount: <strong>${currency || 'USD'} ${parseFloat(amount).toFixed(2)}</strong>` : ''}
+      </div>
+      <div style="font-size:13px;font-weight:700;color:var(--mid);margin-bottom:16px;">
+        Share these bank details with the parent. Ask them to include the <strong style="color:var(--blue);">Payment Reference</strong> in the transfer description.
+      </div>
+      ${accounts.map(a => buildGreyBankCard(a, reference)).join('')}
+      <div style="background:#f0f4ff;border-radius:12px;padding:14px 18px;font-size:13px;font-weight:700;color:#1e40af;">
+        📡 Payment will be <strong>automatically confirmed</strong> once received. The student will be moved to Paid Students and receive a welcome email.
+      </div>`;
+  } catch(e) {
+    document.getElementById('greyPaymentBody').innerHTML =
+      '<div style="padding:24px;color:var(--orange);font-weight:700;">Failed to load payment details. Please try again.</div>';
+  }
+}
+
+function closeGreyPaymentModal() {
+  document.getElementById('greyPaymentModalOverlay')?.classList.remove('open');
+}
+
+/* Bind modal close on overlay click */
+document.addEventListener('DOMContentLoaded', () => {
+  const overlay = document.getElementById('greyPaymentModalOverlay');
+  overlay?.addEventListener('click', e => { if (e.target === overlay) closeGreyPaymentModal(); });
+});
