@@ -159,8 +159,8 @@
 
 <!-- ═══ PATHWAY DETAIL PANEL ═══ -->
 <div id="pathwayPanelOverlay" style="display:none;position:fixed;inset:0;background:rgba(10,20,50,.6);z-index:9000;" onclick="closePathwayPanel()"></div>
-<div id="pathwayPanel" style="position:fixed;top:0;right:-100%;width:min(680px,100vw);height:100vh;background:#fff;z-index:9001;overflow-y:auto;transition:right .35s cubic-bezier(.4,0,.2,1);box-shadow:-8px 0 40px rgba(0,0,0,.18);">
-  <div style="position:sticky;top:0;background:#fff;z-index:10;display:flex;justify-content:space-between;align-items:center;padding:20px 28px;border-bottom:1.5px solid #e8eaf0;">
+<div id="pathwayPanel" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(720px,96vw);max-height:90vh;background:#fff;z-index:9001;overflow-y:auto;border-radius:24px;box-shadow:0 24px 80px rgba(0,0,0,.3);">
+  <div style="position:sticky;top:0;background:#fff;z-index:10;display:flex;justify-content:space-between;align-items:center;padding:20px 28px;border-bottom:1.5px solid #e8eaf0;border-radius:24px 24px 0 0;">
     <div style="font-family:'Fredoka One',cursive;font-size:20px;color:var(--dark);" id="panelTitle">Pathway Details</div>
     <button onclick="closePathwayPanel()" style="background:var(--bg);border:none;border-radius:50%;width:36px;height:36px;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--mid);">✕</button>
   </div>
@@ -168,30 +168,41 @@
 </div>
 
 <!-- ═══ ENROLMENT MODAL (Career Pathway) ═══ -->
-<div id="pathwayEnrolOverlay" style="display:none;position:fixed;inset:0;background:rgba(10,20,50,.7);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;overflow-y:auto;">
-  <div style="background:#fff;border-radius:24px;padding:36px 40px;max-width:540px;width:100%;box-shadow:0 24px 80px rgba(0,0,0,.3);position:relative;max-height:92vh;overflow-y:auto;">
+<div id="pathwayEnrolOverlay" style="display:none;position:fixed;inset:0;background:rgba(10,20,50,.7);z-index:9999;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;">
+  <div style="background:#fff;border-radius:24px;padding:36px 40px;max-width:540px;width:100%;box-shadow:0 24px 80px rgba(0,0,0,.3);position:relative;margin:auto;">
     <button onclick="closePathwayEnrol()" style="position:absolute;top:16px;right:20px;background:none;border:none;font-size:22px;cursor:pointer;color:#718096;">✕</button>
     <div style="font-family:'Fredoka One',cursive;font-size:24px;color:#1a202c;margin-bottom:4px;">Enrol in Career Pathway 🚀</div>
     <div style="font-size:14px;color:#718096;margin-bottom:20px;">Complete your details to secure your child's place.</div>
     <div id="pathwayEnrolSummary" style="background:#f0f4ff;border-radius:14px;padding:16px 20px;margin-bottom:24px;"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
-      <div>
-        <label style="font-size:12px;font-weight:900;color:#718096;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Student Name *</label>
+      <div style="display:flex;flex-direction:column;">
+        <label style="font-size:12px;font-weight:900;color:#718096;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Student Name *</label>
         <input id="pe-student" type="text" placeholder="e.g. James Okafor" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;box-sizing:border-box;">
       </div>
-      <div>
-        <label style="font-size:12px;font-weight:900;color:#718096;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Current Grade *</label>
+      <div style="display:flex;flex-direction:column;">
+        <label style="font-size:12px;font-weight:900;color:#718096;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Current Grade *</label>
         <select id="pe-grade" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;background:#fff;">
           <option value="">— Select Grade —</option>
-          ${Array.from({length:12},(_,i)=>`<option value="${i+1}">Grade ${i+1}</option>`).join('')}
+          <option value="1">Grade 1</option>
+          <option value="2">Grade 2</option>
+          <option value="3">Grade 3</option>
+          <option value="4">Grade 4</option>
+          <option value="5">Grade 5</option>
+          <option value="6">Grade 6</option>
+          <option value="7">Grade 7</option>
+          <option value="8">Grade 8</option>
+          <option value="9">Grade 9</option>
+          <option value="10">Grade 10</option>
+          <option value="11">Grade 11</option>
+          <option value="12">Grade 12</option>
         </select>
       </div>
-      <div>
-        <label style="font-size:12px;font-weight:900;color:#718096;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Parent Email</label>
+      <div style="display:flex;flex-direction:column;">
+        <label style="font-size:12px;font-weight:900;color:#718096;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Parent Email</label>
         <input id="pe-email" type="email" placeholder="parent@email.com" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;box-sizing:border-box;">
       </div>
-      <div>
-        <label style="font-size:12px;font-weight:900;color:#718096;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">WhatsApp Number</label>
+      <div style="display:flex;flex-direction:column;">
+        <label style="font-size:12px;font-weight:900;color:#718096;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">WhatsApp Number</label>
         <input id="pe-phone" type="tel" placeholder="+44 7700 000000" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;box-sizing:border-box;">
       </div>
     </div>
@@ -249,5 +260,3 @@
     </div>
   </div>
 </div>
-</body>
-</html>

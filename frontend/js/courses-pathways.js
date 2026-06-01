@@ -209,7 +209,7 @@ function openPathwayPanel(slug) {
         ${PATHWAY_INCLUDES.map(item => `<div style="font-size:13px;font-weight:700;color:var(--mid);">${item}</div>`).join('')}
       </div>
     </div>
-    <div style="display:flex;align-items:center;justify-content:space-between;background:${hex}11;border-radius:14px;padding:18px 22px;margin-bottom:24px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;background:${hex}11;border-radius:14px;padding:18px 22px;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
       <div>
         <div style="font-family:'Fredoka One',cursive;font-size:28px;color:${hex};">£${price.toFixed(0)}<span style="font-size:16px;color:var(--light);font-family:'Nunito',sans-serif;">/month</span></div>
         <div style="font-size:13px;font-weight:700;color:var(--light);">Grades 1–12 · 72 sessions per grade</div>
@@ -223,18 +223,15 @@ function openPathwayPanel(slug) {
   const overlay = document.getElementById('pathwayPanelOverlay');
   const panel   = document.getElementById('pathwayPanel');
   if (overlay) overlay.style.display = 'block';
-  if (panel)   { panel.style.display = 'block'; setTimeout(() => panel.style.right = '0', 10); }
+  if (panel)   panel.style.display = 'block';
   document.body.style.overflow = 'hidden';
 }
 
 function closePathwayPanel() {
   const overlay = document.getElementById('pathwayPanelOverlay');
   const panel   = document.getElementById('pathwayPanel');
-  if (panel)   panel.style.right = '-100%';
-  setTimeout(() => {
-    if (overlay) overlay.style.display = 'none';
-    if (panel)   panel.style.display = 'none';
-  }, 360);
+  if (overlay) overlay.style.display = 'none';
+  if (panel)   panel.style.display = 'none';
   document.body.style.overflow = '';
 }
 
