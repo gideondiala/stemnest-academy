@@ -614,3 +614,111 @@ async function saveLesson() {
     showToast('Error: ' + e.message, 'error');
   }
 }
+
+/* ══════════════════════════════════════════════════════
+   TEACHER CHANGE / RESCHEDULE
+   Admin picks a student enrolment, selects new teacher,
+   chooses starting lesson number.
+   Accessible from postsales paid students list.
+══════════════════════════════════════════════════════ */
+
+function openTeacherChangeModal(enrolmentId, studentName, currentTeacher, currentLesson) {
+  document.getElementById('teacherChangeOverlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'teacherChangeOverlay';
+  overlay.className = 'modal-overlay open';
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:500px;">
+      <div class="modal-header">
+        <div class="modal-title">🔄 Change Teacher</div>
+        <button class="modal-close" onclick="document.getElementById('teacherChangeOverlay').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="background:var(--bg);border-radius:12px;padding:14px 16px;margin-bottom:20px;font-size:13px;font-weight:700;color:var(--mid);">
+          <strong>${studentName}</strong><br>
+          Current Teacher: ${currentTeacher || '—'} · Lessons completed: ${currentLesson || 0}
+        </div>
+        <input type="hidden" id="tc-enrolment-id" value="${enrolmentId}">
+        <div class="pm-field">
+          <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">New Teacher *</label>
+          <select id="tc-teacher" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;background:#fff;">
+            <option value="">— Select new teacher —</option>
+          </select>
+        </div>
+        <div class="pm-field" style="margin-top:12px;">
+          <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Start from Lesson # *</label>
+          <input type="number" id="tc-lesson-start" min="1" max="72"
+            value="${(parseInt(currentLesson)||0) + 1}"
+            placeholder="e.g. 11"
+            style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
+          <div style="font-size:11px;color:var(--light);font-weight:700;margin-top:4px;">
+            Enter the lesson number to start with the new teacher. Lessons before this will remain with the previous teacher.
+          </div>
+        </div>
+        <div class="pm-field" style="margin-top:12px;">
+          <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Class Link (Meet/Zoom) *</label>
+          <input type="url" id="tc-class-link" placeholder="https://meet.google.com/xxx-xxxx-xxx"
+            style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
+        </div>
+        <div style="background:#fff8e1;border-radius:10px;padding:10px 14px;margin-top:12px;font-size:12px;font-weight:700;color:#e65100;">
+          ⚠️ All future bookings from the chosen lesson onwards will be reassigned to the new teacher.
+        </div>
+        <div style="display:flex;gap:12px;margin-top:20px;">
+          <button class="btn btn-outline" style="flex:1;" onclick="document.getElementById('teacherChangeOverlay').remove()">Cancel</button>
+          <button class="btn btn-primary" style="flex:2;" onclick="confirmTeacherChange()">🔄 Confirm Teacher Change</button>
+        </div>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+
+  /* Load teachers into dropdown */
+  _loadTeachersForChange();
+}
+
+async function _loadTeachersForChange() {
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/users?role=tutor', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    const sel = document.getElementById('tc-teacher');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">— Select new teacher —</option>' +
+      (data.users || []).map(t => `<option value="${t.id}">${t.name} (${t.staff_id || t.id})</option>`).join('');
+  } catch(e) { console.warn('[TeacherChange] Load teachers failed:', e.message); }
+}
+
+async function confirmTeacherChange() {
+  const enrolmentId  = document.getElementById('tc-enrolment-id')?.value;
+  const newTeacherId = document.getElementById('tc-teacher')?.value;
+  const lessonStart  = document.getElementById('tc-lesson-start')?.value;
+  const classLink    = document.getElementById('tc-class-link')?.value.trim();
+
+  if (!newTeacherId) { showToast('Please select a new teacher.', 'error'); return; }
+  if (!lessonStart)  { showToast('Please enter the starting lesson number.', 'error'); return; }
+  if (!classLink)    { showToast('Please enter a class link.', 'error'); return; }
+
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    /* Reassign all future bookings from lessonStart onwards */
+    const res = await fetch(`https://api.stemnestacademy.co.uk/api/pathways/teacher-change`, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        enrolmentId,
+        newTeacherId,
+        startFromLesson: parseInt(lessonStart),
+        classLink,
+      })
+    });
+    const data = await res.json();
+    document.getElementById('teacherChangeOverlay')?.remove();
+    if (data.success) {
+      showToast(`✅ Teacher changed! ${data.updated || 0} future lessons reassigned.`);
+    } else {
+      showToast('Failed: ' + (data.error || 'Unknown'), 'error');
+    }
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+}

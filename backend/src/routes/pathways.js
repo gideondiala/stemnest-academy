@@ -537,3 +537,50 @@ router.post('/promotions/:enrolmentId/promote', requireAuth, requireRole(...STAF
     res.json({ success: true, nextGrade, message: `Student promoted to Grade ${nextGrade}` });
   } catch (err) { next(err); }
 });
+
+/* ══════════════════════════════════════════════════════
+   TEACHER CHANGE
+   POST /api/pathways/teacher-change
+   Reassigns all future bookings from a given lesson number
+   to a new teacher
+══════════════════════════════════════════════════════ */
+router.post('/teacher-change', requireAuth, requireRole('admin','super_admin','postsales'), async (req, res, next) => {
+  try {
+    const { enrolmentId, newTeacherId, startFromLesson, classLink } = req.body;
+    if (!enrolmentId || !newTeacherId || !startFromLesson) {
+      return res.status(400).json({ success: false, error: 'enrolmentId, newTeacherId, startFromLesson required' });
+    }
+
+    /* Verify new teacher exists */
+    const tutorResult = await pool.query('SELECT id, name FROM users WHERE id = $1 AND role = $2', [newTeacherId, 'tutor']);
+    if (!tutorResult.rows.length) return res.status(404).json({ success: false, error: 'Teacher not found' });
+
+    /* Get enrolment */
+    const enrResult = await pool.query('SELECT * FROM enrolments WHERE id = $1', [enrolmentId]);
+    if (!enrResult.rows.length) return res.status(404).json({ success: false, error: 'Enrolment not found' });
+    const enr = enrResult.rows[0];
+
+    /* Update all future (not yet completed) bookings from startFromLesson onwards */
+    const updateResult = await pool.query(
+      `UPDATE bookings
+       SET tutor_id = $1,
+           class_link = COALESCE($2, class_link)
+       WHERE student_id = $3
+         AND status IN ('pending','scheduled')
+         AND lesson_number_in_grade >= $4
+       RETURNING id`,
+      [newTeacherId, classLink || null, enr.student_id, parseInt(startFromLesson)]
+    );
+
+    const updated = updateResult.rows.length;
+
+    /* Update enrolment tutor reference if it has one */
+    await pool.query(
+      `UPDATE enrolments SET tutor_id = $1 WHERE id = $2`,
+      [newTeacherId, enrolmentId]
+    ).catch(() => {});
+
+    logger.info(`[TEACHER CHANGE] Enrolment ${enrolmentId}: ${updated} bookings reassigned to ${tutorResult.rows[0].name} from lesson ${startFromLesson}`);
+    res.json({ success: true, updated, message: `${updated} lessons reassigned to ${tutorResult.rows[0].name}` });
+  } catch (err) { next(err); }
+});
