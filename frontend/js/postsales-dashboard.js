@@ -1869,7 +1869,16 @@ async function openGreyPaymentModal(enrollmentRequestId, studentName, amount, cu
         Share these bank details with the parent. Ask them to include the <strong style="color:var(--blue);">Payment Reference</strong> in the transfer description.
       </div>
       ${accounts.map(a => buildGreyBankCard(a, reference)).join('')}
-      <div style="background:#f0f4ff;border-radius:12px;padding:14px 18px;font-size:13px;font-weight:700;color:#1e40af;">
+      <div style="background:#fff8e1;border:2px solid #f59e0b;border-radius:12px;padding:14px 18px;margin-bottom:16px;font-size:13px;font-weight:800;color:#92400e;">
+        ⚠️ <strong>IMPORTANT:</strong> The parent MUST include the Payment Reference <strong style="color:#1a56db;">${reference}</strong> in the transfer description/memo field. This is how we match their payment automatically.
+      </div>
+      <button onclick="copyAllPaymentDetails('${reference}', ${JSON.stringify(accounts[0]||{}).replace(/'/g,"\\'")})"
+        style="width:100%;background:linear-gradient(135deg,#1a56db,#0e9f6e);color:#fff;border:none;border-radius:14px;padding:16px;font-family:'Fredoka One',cursive;font-size:18px;cursor:pointer;margin-bottom:8px;transition:.15s;"
+        onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
+        📋 Copy All Payment Details
+      </button>
+      <div style="text-align:center;font-size:12px;color:var(--light);font-weight:700;">Click once — paste directly into WhatsApp, email or any message</div>
+      <div style="background:#f0f4ff;border-radius:12px;padding:14px 18px;margin-top:16px;font-size:13px;font-weight:700;color:#1e40af;">
         📡 Payment will be <strong>automatically confirmed</strong> once received. The student will be moved to Paid Students and receive a welcome email.
       </div>`;
   } catch(e) {
@@ -1877,6 +1886,60 @@ async function openGreyPaymentModal(enrollmentRequestId, studentName, amount, cu
     document.getElementById('greyPaymentBody').innerHTML =
       `<div style="padding:24px;color:var(--orange);font-weight:700;">Error: ${e.message}. Please try again.</div>`;
   }
+}
+
+function copyAllPaymentDetails(reference, account) {
+  const a = typeof account === 'string' ? JSON.parse(account) : account;
+  const lines = [
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    '  STEMNEST ACADEMY — PAYMENT DETAILS',
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    '',
+    `  Bank Name:       ${a.bankName || 'Lead Bank'}`,
+    `  Account Name:    ${a.accountName || 'StemNest Academy Ltd'}`,
+    `  Account Number:  ${a.accountNumber || '218292502181'}`,
+    `  Routing Number:  ${a.routingNumber || '101019644'}`,
+    `  Account Type:    ${a.accountType || 'Checking'}`,
+    `  Bank Address:    ${a.bankAddress || '1801 Main St., Kansas City, MO 64108'}`,
+    '',
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    `  ⚠️  PAYMENT REFERENCE: ${reference}`,
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    '',
+    '  ‼️  IMPORTANT: You MUST include the',
+    `  Payment Reference (${reference})`,
+    '  in the Description / Memo field of',
+    '  your bank transfer. This is how we',
+    '  confirm your payment automatically.',
+    '',
+    '  Questions? WhatsApp or email us at:',
+    '  support@stemnestacademy.co.uk',
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+  ].join('\n');
+
+  navigator.clipboard.writeText(lines)
+    .then(() => {
+      showToast('✅ All payment details copied! Paste directly into WhatsApp or email.');
+      /* Visual feedback on the button */
+      const btn = document.querySelector('#greyPaymentBody button[onclick^="copyAll"]');
+      if (btn) {
+        const orig = btn.textContent;
+        btn.textContent = '✅ Copied!';
+        btn.style.background = 'var(--green)';
+        setTimeout(() => { btn.textContent = orig; btn.style.background = 'linear-gradient(135deg,#1a56db,#0e9f6e)'; }, 2500);
+      }
+    })
+    .catch(() => {
+      /* Fallback for browsers that block clipboard */
+      const ta = document.createElement('textarea');
+      ta.value = lines;
+      ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      showToast('✅ All payment details copied!');
+    });
 }
 
 function closeGreyPaymentModal() {
