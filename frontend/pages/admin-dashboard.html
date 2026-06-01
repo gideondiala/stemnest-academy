@@ -48,6 +48,9 @@
       <a class="sidebar-link"        data-tab="courses"     onclick="showAdminTab('courses')">     <span class="sl-icon">📚</span> All Courses <span class="sl-badge" id="courseBadge">0</span></a>
       <a class="sidebar-link"        data-tab="add-course"  onclick="showAdminTab('add-course')">  <span class="sl-icon">➕</span> Add Course</a>
       <a class="sidebar-link"        data-tab="companion-admin" onclick="showAdminTab('companion-admin')"><span class="sl-icon">📖</span> Companion Materials</a>
+      <div class="sidebar-section-label">Career Pathways</div>
+      <a class="sidebar-link"        data-tab="pathways"    onclick="showAdminTab('pathways')">    <span class="sl-icon">🚀</span> All Pathways <span class="sl-badge" id="pathwayBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="add-pathway" onclick="showAdminTab('add-pathway')"> <span class="sl-icon">➕</span> Add Pathway</a>
       <div class="sidebar-section-label">Sales Team</div>      <a class="sidebar-link"        data-tab="sales"       onclick="showAdminTab('sales')">       <span class="sl-icon">💼</span> Sales Persons <span class="sl-badge" id="salesBadge">0</span></a>
       <a class="sidebar-link"        data-tab="add-sales"   onclick="showAdminTab('add-sales')">   <span class="sl-icon">➕</span> Add Sales Person</a>
       <div class="sidebar-section-label">Reports</div>
@@ -463,6 +466,101 @@
           <tbody id="materialsTableBody"></tbody>
         </table>
       </div>
+    </div><!-- end tab-companion-admin -->
+
+    <!-- ── TAB: ALL PATHWAYS ── -->
+    <div id="tab-pathways" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🚀 Career Pathways</div>
+        <button class="btn btn-primary" style="font-size:13px;padding:9px 20px;" onclick="showAdminTab('add-pathway')">➕ Add Pathway</button>
+      </div>
+      <div style="background:#f0f4ff;border-radius:12px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:#1e40af;font-weight:700;">
+        🚀 Career Pathways are the Tech programmes (Data Science, Web Dev, etc.). Each pathway has 12 grades, each grade has 8 units, each unit has 8 lessons. Grade courses are internal — only visible to admin and post-sales.
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr>
+            <th>Pathway</th><th>Price</th><th>Grades</th><th>Status</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="pathwaysTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── TAB: ADD / EDIT PATHWAY ── -->
+    <div id="tab-add-pathway" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title" id="addPathwayTabTitle">➕ Add New Pathway</div>
+        <button class="btn btn-outline" style="font-size:13px;" onclick="showAdminTab('pathways')">← Back to Pathways</button>
+      </div>
+      <div class="add-teacher-form-wrap">
+        <form class="add-teacher-form" onsubmit="return false;">
+          <input type="hidden" id="pw-id">
+          <div class="atf-grid">
+            <div class="atf-field" style="grid-column:1/-1;">
+              <label>Pathway Name <span class="req">*</span></label>
+              <input type="text" id="pw-name" placeholder="e.g. Data Science & Analytics">
+            </div>
+            <div class="atf-field">
+              <label>Tagline <span class="req">*</span></label>
+              <input type="text" id="pw-tagline" placeholder="e.g. Become a Data Scientist and Analytics Expert">
+            </div>
+            <div class="atf-field">
+              <label>Price per Month (£) <span class="req">*</span></label>
+              <input type="number" id="pw-price" placeholder="80" min="0" step="0.01">
+            </div>
+            <div class="atf-field">
+              <label>Emoji</label>
+              <input type="text" id="pw-emoji" placeholder="🚀" maxlength="4">
+            </div>
+            <div class="atf-field">
+              <label>Colour</label>
+              <select id="pw-color">
+                <option value="blue">Blue</option>
+                <option value="green">Green</option>
+                <option value="orange">Orange</option>
+                <option value="purple">Purple</option>
+                <option value="teal">Teal</option>
+                <option value="pink">Pink</option>
+              </select>
+            </div>
+            <div class="atf-field" style="grid-column:1/-1;">
+              <label>Intro (one sentence)</label>
+              <input type="text" id="pw-intro" placeholder="e.g. Turn curiosity into insights through the power of data.">
+            </div>
+            <div class="atf-field" style="grid-column:1/-1;">
+              <label>Full Description</label>
+              <textarea id="pw-description" rows="4" placeholder="Full pathway description..."></textarea>
+            </div>
+            <div class="atf-field" style="grid-column:1/-1;">
+              <label>What Students Will Learn <span style="font-size:11px;color:var(--light);">(one item per line)</span></label>
+              <textarea id="pw-learn" rows="5" placeholder="Data Literacy and Digital Skills&#10;Python Programming&#10;Machine Learning Fundamentals"></textarea>
+            </div>
+            <div class="atf-field" style="grid-column:1/-1;">
+              <label>Career Outcomes <span style="font-size:11px;color:var(--light);">(one item per line)</span></label>
+              <textarea id="pw-outcomes" rows="4" placeholder="Data Scientist&#10;Data Analyst&#10;Machine Learning Engineer"></textarea>
+            </div>
+            <div class="atf-field" style="grid-column:1/-1;">
+              <label>Graduation Outcome</label>
+              <textarea id="pw-graduation" rows="3" placeholder="Students graduate with..."></textarea>
+            </div>
+          </div>
+          <div class="atf-divider"></div>
+          <div class="atf-actions">
+            <button type="button" class="btn btn-outline" onclick="resetPathwayForm()">Clear</button>
+            <button type="button" class="btn btn-primary" id="savePathwayBtn" onclick="savePathway()">✦ Save Pathway</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ── TAB: PATHWAY DETAIL (grades/units/lessons) ── -->
+    <div id="tab-pathway-detail" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title" id="pathwayDetailTitle">🚀 Pathway Detail</div>
+        <button class="btn btn-outline" style="font-size:13px;" onclick="showAdminTab('pathways')">← Back to Pathways</button>
+      </div>
+      <div id="pathwayDetailContent"></div>
     </div>
 
   </div><!-- end dash-main -->
@@ -590,6 +688,7 @@
 <script src="../js/admin-dashboard.js"></script>
 <script src="../js/admin-blog.js"></script>
 <script src="../js/mail-system.js"></script>
+<script src="../js/admin-pathways.js"></script>
 <script>
 // Wire bulk email tab into admin showAdminTab
 document.addEventListener('DOMContentLoaded', () => {
