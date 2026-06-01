@@ -341,35 +341,43 @@ async function getCourses() {
     if (res.ok) {
       const data = await res.json();
       if (data.courses && data.courses.length > 0) {
-        return data.courses.map(apiCourse => ({
-          id:       apiCourse.id,
-          name:     apiCourse.name,
-          desc:     apiCourse.description || '',
-          subject:  (apiCourse.subject || '').toLowerCase(),
-          age:      apiCourse.age_range || 'Ages 7–19',
-          price:    parseFloat(apiCourse.price) || 99,
-          classes:  apiCourse.num_classes || 20,
-          rating:   parseFloat(apiCourse.rating) || 5.0,
-          students: parseInt(apiCourse.students) || 0,
-          emoji:    apiCourse.emoji || '📚',
-          color:    apiCourse.color || 'blue',
-          badge:    apiCourse.badge || '',
-          level:    apiCourse.level || 'Beginner',
-          duration: apiCourse.duration || '',
-          lessons:  [],
-        }));
+        return data.courses
+          .filter(c => {
+            const subj = (c.subject || '').toLowerCase();
+            /* Exclude coding/tech — those are now Career Pathways */
+            return subj !== 'coding' && subj !== 'tech';
+          })
+          .map(apiCourse => ({
+            id:       apiCourse.id,
+            name:     apiCourse.name,
+            desc:     apiCourse.description || '',
+            subject:  (apiCourse.subject || '').toLowerCase(),
+            age:      apiCourse.age_range || 'Ages 7–19',
+            price:    parseFloat(apiCourse.price) || 99,
+            classes:  apiCourse.num_classes || 20,
+            rating:   parseFloat(apiCourse.rating) || 5.0,
+            students: parseInt(apiCourse.students) || 0,
+            emoji:    apiCourse.emoji || '📚',
+            color:    apiCourse.color || 'blue',
+            badge:    apiCourse.badge || '',
+            level:    apiCourse.level || 'Beginner',
+            duration: apiCourse.duration || '',
+            lessons:  [],
+          }));
       }
     }
   } catch(e) { console.warn('[Courses] API load failed:', e.message); }
-  return []; // Return empty — admin must create courses
+  return [];
 }
 
 let courses      = [];
 let activeFilter = 'all';
 let activeSort   = 'default';
 
-/* ── INIT ── */
+/* ── INIT — only runs if courses-pathways.js is NOT present ── */
 document.addEventListener('DOMContentLoaded', async () => {
+  /* If courses-pathways.js is loaded, it handles init via switchCategory() */
+  if (typeof switchCategory === 'function') return;
   courses = await getCourses();
   renderGrid();
   bindFilterTabs();
@@ -377,7 +385,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 /* ── RENDER ── */
-function renderGrid() {
+async function renderGrid() {
+  /* Load courses if not yet loaded */
+  if (!courses.length) {
+    courses = await getCourses();
+    bindFilterTabs();
+    bindSortSelect();
+  }
   const grid = document.getElementById('coursesGrid');
   if (!grid) return;
 
@@ -585,16 +599,15 @@ async function submitCheckout(courseId, courseName, coursePrice) {
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Submitting...'; }
 
   try {
-    // Submit to backend as a direct website payment enquiry
-    const res = await fetch('https://api.stemnestacademy.co.uk/api/payments/enquiry', {
+    // Submit to backend as a direct enrollment request
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/enrollments/request', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        courseId, courseName, coursePrice,
         studentName: student,
         age, email, phone, timezone, notes,
-        source: 'direct_website',
-        submittedAt: new Date().toISOString(),
+        courseId, courseName, coursePrice,
+        source: 'website',
       })
     });
 

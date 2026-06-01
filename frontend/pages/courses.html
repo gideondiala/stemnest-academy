@@ -49,9 +49,9 @@
 
 <!-- ═══ PAGE HERO ═══ -->
 <div class="page-hero">
-  <div class="breadcrumb"><a href="../index.html">Home</a> › Courses</div>
-  <h1>Our Courses 📚</h1>
-  <p>Expert 1-on-1 programmes in Coding, Maths and Sciences — crafted for every learner from age 7 to 19.</p>
+  <div class="breadcrumb"><a href="../index.html">Home</a> › Courses &amp; Pathways</div>
+  <h1>Our Programmes 🚀</h1>
+  <p>Expert 1-on-1 learning — from Career Pathways in Tech to targeted Maths and Sciences support. Every programme is live, personalised, and built for results.</p>
   <div class="hero-stats">
     <div class="hstat"><div class="hstat-icon hi-b">💻</div>Live 1-on-1 Sessions</div>
     <div class="hstat"><div class="hstat-icon hi-g">📊</div>Progress Tracked</div>
@@ -59,28 +59,42 @@
   </div>
 </div>
 
-<!-- ═══ FILTER BAR ═══ -->
-<div class="filter-bar">
-  <div class="filter-tabs" id="filterTabs">
-    <div class="filter-tab active" data-filter="all">All Courses</div>
-    <div class="filter-tab" data-filter="coding">💻 Coding</div>
-    <div class="filter-tab" data-filter="maths">📐 Maths</div>
-    <div class="filter-tab" data-filter="sciences">🔬 Sciences</div>
-  </div>
-  <div class="filter-right">
-    <span class="course-count">Showing <span class="count-num" id="countNum">0</span> courses</span>
-    <select class="sort-select" id="sortSelect">
-      <option value="default">Sort: Default</option>
-      <option value="price-low">Price: Low to High</option>
-      <option value="price-high">Price: High to Low</option>
-      <option value="rating">Highest Rated</option>
-      <option value="popular">Most Popular</option>
-    </select>
+<!-- ═══ MAIN CATEGORY TABS ═══ -->
+<div class="filter-bar" style="padding-bottom:0;">
+  <div class="filter-tabs" id="categoryTabs" style="gap:6px;">
+    <div class="filter-tab active" data-category="pathways" onclick="switchCategory('pathways')" style="font-size:15px;padding:12px 28px;">🚀 Tech Career Pathways</div>
+    <div class="filter-tab" data-category="courses" onclick="switchCategory('courses')" style="font-size:15px;padding:12px 28px;">📚 Courses</div>
   </div>
 </div>
 
-<!-- ═══ COURSES GRID ═══ -->
-<div class="courses-wrap">
+<!-- ═══ PATHWAYS SECTION ═══ -->
+<div id="section-pathways" class="courses-wrap">
+  <div style="text-align:center;padding:20px 20px 8px;max-width:700px;margin:0 auto;">
+    <div style="font-family:'Fredoka One',cursive;font-size:22px;color:var(--dark);margin-bottom:8px;">Choose Your Career Pathway</div>
+    <div style="font-size:15px;color:var(--light);font-weight:700;">If your child starts in Grade 1 and continues through Grade 12 — this is who they will become.</div>
+  </div>
+  <div class="courses-grid" id="pathwaysGrid"></div>
+</div>
+
+<!-- ═══ COURSES SECTION ═══ -->
+<div id="section-courses" class="courses-wrap" style="display:none;">
+  <div class="filter-bar" style="border-top:none;padding-top:0;">
+    <div class="filter-tabs" id="filterTabs">
+      <div class="filter-tab active" data-filter="all">All Courses</div>
+      <div class="filter-tab" data-filter="maths">📐 Maths</div>
+      <div class="filter-tab" data-filter="sciences">🔬 Sciences</div>
+    </div>
+    <div class="filter-right">
+      <span class="course-count">Showing <span class="count-num" id="countNum">0</span> courses</span>
+      <select class="sort-select" id="sortSelect">
+        <option value="default">Sort: Default</option>
+        <option value="price-low">Price: Low to High</option>
+        <option value="price-high">Price: High to Low</option>
+        <option value="rating">Highest Rated</option>
+        <option value="popular">Most Popular</option>
+      </select>
+    </div>
+  </div>
   <div class="courses-grid" id="coursesGrid"></div>
 </div>
 
@@ -141,5 +155,99 @@
 
 <script src="../js/utils.js"></script>
 <script src="../js/courses.js"></script>
+<script src="../js/courses-pathways.js"></script>
+
+<!-- ═══ PATHWAY DETAIL PANEL ═══ -->
+<div id="pathwayPanelOverlay" style="display:none;position:fixed;inset:0;background:rgba(10,20,50,.6);z-index:9000;" onclick="closePathwayPanel()"></div>
+<div id="pathwayPanel" style="position:fixed;top:0;right:-100%;width:min(680px,100vw);height:100vh;background:#fff;z-index:9001;overflow-y:auto;transition:right .35s cubic-bezier(.4,0,.2,1);box-shadow:-8px 0 40px rgba(0,0,0,.18);">
+  <div style="position:sticky;top:0;background:#fff;z-index:10;display:flex;justify-content:space-between;align-items:center;padding:20px 28px;border-bottom:1.5px solid #e8eaf0;">
+    <div style="font-family:'Fredoka One',cursive;font-size:20px;color:var(--dark);" id="panelTitle">Pathway Details</div>
+    <button onclick="closePathwayPanel()" style="background:var(--bg);border:none;border-radius:50%;width:36px;height:36px;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--mid);">✕</button>
+  </div>
+  <div id="panelBody" style="padding:28px;"></div>
+</div>
+
+<!-- ═══ ENROLMENT MODAL (Career Pathway) ═══ -->
+<div id="pathwayEnrolOverlay" style="display:none;position:fixed;inset:0;background:rgba(10,20,50,.7);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;overflow-y:auto;">
+  <div style="background:#fff;border-radius:24px;padding:36px 40px;max-width:540px;width:100%;box-shadow:0 24px 80px rgba(0,0,0,.3);position:relative;max-height:92vh;overflow-y:auto;">
+    <button onclick="closePathwayEnrol()" style="position:absolute;top:16px;right:20px;background:none;border:none;font-size:22px;cursor:pointer;color:#718096;">✕</button>
+    <div style="font-family:'Fredoka One',cursive;font-size:24px;color:#1a202c;margin-bottom:4px;">Enrol in Career Pathway 🚀</div>
+    <div style="font-size:14px;color:#718096;margin-bottom:20px;">Complete your details to secure your child's place.</div>
+    <div id="pathwayEnrolSummary" style="background:#f0f4ff;border-radius:14px;padding:16px 20px;margin-bottom:24px;"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+      <div>
+        <label style="font-size:12px;font-weight:900;color:#718096;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Student Name *</label>
+        <input id="pe-student" type="text" placeholder="e.g. James Okafor" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;box-sizing:border-box;">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:900;color:#718096;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Current Grade *</label>
+        <select id="pe-grade" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;background:#fff;">
+          <option value="">— Select Grade —</option>
+          ${Array.from({length:12},(_,i)=>`<option value="${i+1}">Grade ${i+1}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:900;color:#718096;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Parent Email</label>
+        <input id="pe-email" type="email" placeholder="parent@email.com" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;box-sizing:border-box;">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:900;color:#718096;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">WhatsApp Number</label>
+        <input id="pe-phone" type="tel" placeholder="+44 7700 000000" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;box-sizing:border-box;">
+      </div>
+    </div>
+    <div style="margin-bottom:14px;">
+      <label style="font-size:12px;font-weight:900;color:#718096;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Country / Timezone *</label>
+      <select id="pe-timezone" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;background:#fff;">
+        <option value="">— Select your country —</option>
+        <option value="Europe/London">🇬🇧 United Kingdom (GMT/BST)</option>
+        <option value="Africa/Lagos">🇳🇬 Nigeria (WAT)</option>
+        <option value="Africa/Accra">🇬🇭 Ghana (GMT)</option>
+        <option value="Africa/Nairobi">🇰🇪 Kenya (EAT)</option>
+        <option value="Africa/Johannesburg">🇿🇦 South Africa (SAST)</option>
+        <option value="America/New_York">🇺🇸 USA Eastern</option>
+        <option value="America/Los_Angeles">🇺🇸 USA Pacific</option>
+        <option value="America/Toronto">🇨🇦 Canada Eastern</option>
+        <option value="Asia/Dubai">🇦🇪 UAE (GST)</option>
+        <option value="Asia/Kolkata">🇮🇳 India (IST)</option>
+        <option value="Asia/Singapore">🇸🇬 Singapore (SGT)</option>
+        <option value="Australia/Sydney">🇦🇺 Australia Eastern</option>
+        <option value="Europe/Paris">🇪🇺 Europe Central (CET)</option>
+      </select>
+    </div>
+    <div style="margin-bottom:14px;">
+      <label style="font-size:12px;font-weight:900;color:#718096;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:8px;">Does your child have a laptop or desktop computer? *</label>
+      <div style="display:flex;gap:16px;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:800;font-size:14px;color:#1a202c;">
+          <input type="radio" name="pe-device" id="pe-device-yes" value="yes" style="width:16px;height:16px;accent-color:#1a56db;"> ✅ Yes
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:800;font-size:14px;color:#1a202c;">
+          <input type="radio" name="pe-device" id="pe-device-no" value="no" style="width:16px;height:16px;accent-color:#1a56db;"> ❌ No
+        </label>
+      </div>
+      <div id="pe-device-warning" style="display:none;margin-top:8px;background:#fff3e0;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:700;color:#e65100;">
+        ⚠️ A laptop or desktop is required for all StemNest classes. Please ensure your child has access to one before enrolling.
+      </div>
+    </div>
+    <div style="margin-bottom:14px;">
+      <label style="font-size:12px;font-weight:900;color:#718096;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Expected Start Date *</label>
+      <input id="pe-startdate" type="date" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;box-sizing:border-box;">
+    </div>
+    <div style="margin-bottom:20px;">
+      <label style="font-size:12px;font-weight:900;color:#718096;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Additional Notes (optional)</label>
+      <textarea id="pe-notes" placeholder="Any specific goals or learning needs..." style="width:100%;min-height:60px;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;resize:vertical;box-sizing:border-box;"></textarea>
+    </div>
+    <div style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:12px;padding:14px 16px;margin-bottom:20px;font-size:13px;color:#065f46;font-weight:700;">
+      💳 Our team will contact you within 24 hours to arrange payment and schedule your first class. No payment is taken now.
+    </div>
+    <button id="pe-submit-btn" onclick="submitPathwayEnrol()"
+      style="width:100%;background:#1a56db;color:#fff;border:none;border-radius:14px;padding:16px;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;cursor:pointer;transition:.2s;"
+      onmouseover="this.style.background='#1140b0'" onmouseout="this.style.background='#1a56db'">
+      ✅ Request Enrolment →
+    </button>
+    <div style="text-align:center;font-size:12px;color:#a0aec0;margin-top:12px;font-weight:700;">
+      🔒 Secure · No payment now · Our team will follow up within 24 hours
+    </div>
+  </div>
+</div>
 </body>
 </html>
