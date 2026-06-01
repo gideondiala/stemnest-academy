@@ -20,7 +20,7 @@ window.PATHWAY_DATA = {
     if (!ADMIN_TABS.includes('pathway-detail')) ADMIN_TABS.push('pathway-detail');
     _prev(tab);
     if (tab === 'pathways')       renderPathwaysTable();
-    if (tab === 'add-pathway')    resetPathwayForm();
+    if (tab === 'add-pathway')    { /* do NOT reset — editPathway sets the form before calling showAdminTab */ }
     if (tab === 'pathway-detail') { /* rendered on demand */ }
   };
 })();
