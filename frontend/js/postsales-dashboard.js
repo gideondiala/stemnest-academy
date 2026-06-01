@@ -1429,7 +1429,7 @@ async function renderEnrollmentRequests() {
                 </td>
                 <td style="${tdStyle('center')}">
                   <div style="display:flex;flex-direction:column;gap:6px;align-items:center;">
-                    <button onclick="openGreyPaymentModal(${r.id}, this.dataset.name, ${parseFloat(r.course_price||r.course_price_db||0).toFixed(2)}, 'USD')"
+                    <button onclick="openGreyPaymentModal('${r.id}', this.dataset.name, ${parseFloat(r.course_price||r.course_price_db||0).toFixed(2)}, 'USD')"
                       data-name="${(r.student_name||'Student').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}"
                       style="background:var(--blue);color:#fff;border:none;border-radius:10px;padding:8px 14px;font-family:'Nunito',sans-serif;font-weight:900;font-size:12px;cursor:pointer;white-space:nowrap;">
                       💳 Get Payment Details
