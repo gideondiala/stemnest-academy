@@ -367,17 +367,27 @@ router.get('/dashboard/:role', requireAuth, async (req, res, next) => {
     }
 
     if (role === 'student') {
-      const [bookings, topups, courses, students, projects] = await Promise.all([
-        pool.query(`SELECT b.*, u_t.name AS tutor_name, u_t.photo_url AS tutor_photo
+      const [bookings, topups, courses, students, projects, enrolments] = await Promise.all([
+        pool.query(`SELECT b.*,
+                           u_t.name AS tutor_name, u_t.photo_url AS tutor_photo,
+                           pl.title AS pathway_lesson_title,
+                           pl.task1_link, pl.task2_link,
+                           pl.homework1, pl.homework2,
+                           pl.learning_objectives, pl.concept_discovery,
+                           pl.task1_description, pl.task2_description,
+                           pl.debrief, pl.what_comes_next,
+                           pl.lesson_number AS pathway_lesson_number,
+                           pl.session_type
                     FROM bookings b
                     LEFT JOIN users u_t ON u_t.id = b.tutor_id
+                    LEFT JOIN pathway_lessons pl ON pl.id = b.pathway_lesson_id
                     WHERE b.student_id = $1
-                    ORDER BY b.date DESC LIMIT 100`, [userId]),
+                    ORDER BY b.date ASC LIMIT 200`, [userId]),
         pool.query(`SELECT * FROM payments WHERE student_id = $1 ORDER BY created_at DESC LIMIT 100`, [userId]),
         pool.query(`SELECT c.* FROM courses c
                     JOIN enrolments e ON e.course_id = c.id
                     WHERE e.student_id = $1`, [userId]),
-        pool.query(`SELECT u.id, u.name, u.email, u.phone, u.whatsapp, u.staff_id, 
+        pool.query(`SELECT u.id, u.name, u.email, u.phone, u.whatsapp, u.staff_id,
                            sp.grade, sp.age, sp.credits, sp.enrolled_at, sp.parent_name, sp.parent_email
                     FROM users u
                     LEFT JOIN student_profiles sp ON sp.user_id = u.id
@@ -389,13 +399,24 @@ router.get('/dashboard/:role', requireAuth, async (req, res, next) => {
                     LEFT JOIN courses c ON c.id = p.course_id
                     WHERE p.student_id = $1
                     ORDER BY p.created_at DESC LIMIT 100`, [userId]).catch(() => ({ rows: [] })),
+        pool.query(`SELECT e.*,
+                           p.name AS pathway_name, p.emoji AS pathway_emoji,
+                           pg.grade_number AS current_grade_number,
+                           pg.name AS current_grade_name
+                    FROM enrolments e
+                    LEFT JOIN pathways p ON p.id = e.pathway_id
+                    LEFT JOIN pathway_grades pg ON pg.pathway_id = e.pathway_id
+                                                AND pg.grade_number = e.current_grade
+                    WHERE e.student_id = $1
+                    ORDER BY e.created_at DESC`, [userId]).catch(() => ({ rows: [] })),
       ]);
-      result.bookings = bookings.rows;
-      result.payments = topups.rows;
-      result.topups   = topups.rows;
-      result.courses  = courses.rows;
-      result.students = students.rows;
-      result.projects = projects.rows;
+      result.bookings   = bookings.rows;
+      result.payments   = topups.rows;
+      result.topups     = topups.rows;
+      result.courses    = courses.rows;
+      result.students   = students.rows;
+      result.projects   = projects.rows;
+      result.enrolments = enrolments.rows;
     }
 
     res.json({ success: true, ...result });
