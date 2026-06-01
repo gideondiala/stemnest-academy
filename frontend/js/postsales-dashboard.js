@@ -1870,3 +1870,76 @@ document.addEventListener('DOMContentLoaded', () => {
   const overlay = document.getElementById('greyPaymentModalOverlay');
   overlay?.addEventListener('click', e => { if (e.target === overlay) closeGreyPaymentModal(); });
 });
+
+/* ══════════════════════════════════════════════════════
+   PATHWAY SELECTOR FOR ONBOARDING
+   Loads pathways + grades into onboard modal dropdowns
+══════════════════════════════════════════════════════ */
+
+let _posPathways = [];
+let _posGrades   = {};  // keyed by pathwayId → array of grades
+
+async function loadPathwaysForOnboarding() {
+  if (_posPathways.length) return; // already loaded
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/pathways/for-onboarding', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    if (data.success) {
+      _posPathways = data.pathways || [];
+      /* Group grades by pathway_id */
+      (data.grades || []).forEach(g => {
+        if (!_posGrades[g.pathway_id]) _posGrades[g.pathway_id] = [];
+        _posGrades[g.pathway_id].push(g);
+      });
+    }
+  } catch(e) { console.warn('[PostSales] Pathways load failed:', e.message); }
+}
+
+function populatePathwayDropdown(selectId) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— Select Pathway (optional) —</option>' +
+    _posPathways.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+}
+
+function onPathwayChange(pathwaySelectId, gradeSelectId) {
+  const pathwayId = document.getElementById(pathwaySelectId)?.value;
+  const gradeSel  = document.getElementById(gradeSelectId);
+  if (!gradeSel) return;
+  if (!pathwayId) {
+    gradeSel.innerHTML = '<option value="">— Select Grade —</option>';
+    return;
+  }
+  const grades = _posGrades[pathwayId] || [];
+  gradeSel.innerHTML = '<option value="">— Select Grade —</option>' +
+    grades.map(g => `<option value="${g.grade_number}">Grade ${g.grade_number}${g.name ? ' — ' + g.name : ''} (${g.lesson_count || 0} lessons)</option>`).join('');
+}
+
+/* Override openOnboardModal to also load pathways */
+const _origOpenOnboardModal = window.openOnboardModal;
+window.openOnboardModal = async function(bookingId) {
+  await loadPathwaysForOnboarding();
+  _origOpenOnboardModal(bookingId);
+  populatePathwayDropdown('ob-pathway');
+  /* Pre-select pathway if enrollment request had one */
+  const booking = (window.POS_DATA.bookings || []).find(b => b.id === bookingId);
+  if (booking && booking.pathway_id) {
+    const sel = document.getElementById('ob-pathway');
+    if (sel) { sel.value = booking.pathway_id; onPathwayChange('ob-pathway','ob-pathway-grade'); }
+    if (booking.grade_number) {
+      const gradeSel = document.getElementById('ob-pathway-grade');
+      if (gradeSel) gradeSel.value = booking.grade_number;
+    }
+  }
+};
+
+/* Override openManualOnboardModal to also load pathways */
+const _origOpenManualOnboardModal = window.openManualOnboardModal;
+window.openManualOnboardModal = async function() {
+  await loadPathwaysForOnboarding();
+  _origOpenManualOnboardModal();
+  populatePathwayDropdown('mob-pathway');
+};
