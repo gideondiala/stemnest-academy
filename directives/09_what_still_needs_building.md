@@ -106,6 +106,103 @@ See `10_quizzes_and_assignments.md` for the full design.
 
 ---
 
+## ✅ Completed — Career Pathways Implementation (June 2026)
+
+### Phase 1 — Database
+- Tables created: `pathways`, `pathway_grades`, `pathway_units`, `pathway_lessons`, `pathway_quizzes`, `pathway_quiz_questions`
+- Columns added to: `enrollment_requests` (pathway_id, grade_number, has_device, expected_start), `enrolments` (pathway_id, current_grade, current_unit, lessons_completed, frequency_per_week), `bookings` (pathway_lesson_id, lesson_number_in_grade, content_released)
+
+### Phase 2 — Backend API (`/api/pathways`)
+- Full CRUD: Pathway → Grade → Unit → Lesson (12 fields) → Quiz (optional, 20 questions)
+- `GET /api/pathways/public` — public endpoint for courses page
+- `GET /api/pathways/for-onboarding` — postsales/admin selector
+- `GET /api/pathways/promotions/pending` — students ready for grade promotion
+- `POST /api/pathways/promotions/:id/promote` — promote student to next grade
+- `POST /api/pathways/teacher-change` — reassign future bookings to new teacher from chosen lesson
+
+### Phase 3 — Admin Dashboard
+- Career Pathways section in sidebar
+- Create/edit/delete pathways (all fields editable)
+- Drill-down: Pathway → Grades → Units → Lessons → Quiz
+- Teacher change modal with lesson number picker
+
+### Phase 4 — Public Courses Page
+- Two tabs: Tech Career Pathways + Courses (Maths/Sciences)
+- Pathway cards with "Learn More" slide-in panel (full content per pathway)
+- Enrolment form: grade dropdown, device check (Yes/No), start date picker
+- Submits to Post-Sales Enrollment Requests
+
+### Phase 5 — Post-Sales Onboarding
+- Pathway → Grade selector in both onboard modals (from demo + manual)
+- Loads live from API, pre-fills from enrollment request data
+
+### Phase 6 — Student Dashboard
+- Pathway progress banner on overview (pathway name, grade, unit, % complete)
+- Progress bar shows grade completion
+- Lessons list shows "View Details" button on completed lessons
+- Lesson content modal: learning objectives, concept discovery, Task 1 link, Task 2 link, debrief, what comes next
+- Homework 1 & 2 auto-appear in Pending Projects after class completion
+
+### Phase 7 — Tutor Dashboard
+- Projects tab replaced with real API-driven list
+- Pending Projects / Reviewed Projects filter buttons
+- Review modal: feedback + score → notifies student
+
+### Phase 8 — Auto-Promotion
+- Grade Promotions tab in Post-Sales dashboard
+- Shows students who completed all 72 lessons
+- One-click "Promote to Grade X" button
+
+### Phase 9 — Teacher Change
+- Admin can open teacher change modal from student records
+- Select new teacher + starting lesson number
+- All future bookings reassigned automatically
+
+### Key Rules (add to gotchas)
+- Lesson content is HIDDEN from student until `content_released = TRUE` or `status = 'completed'`
+- Task 1 and Task 2 links (not generic class links) are shown to student after completion
+- Homework 1 & 2 auto-create project cards — student can resubmit until teacher reviews
+- Quiz is optional at creation — admin can add later
+- Grade courses are NEVER shown on the public courses page
+
+### Presales Dashboard
+- **Scheduled tab** now shows Teacher name AND Learning Advisor (sales person) name on every record
+- **Incoming Referrals tab** added — fetches from `GET /api/enrollments/referrals?status=pending`
+  - "Book Demo" button pre-fills schedule modal with referral data, creates a real booking
+  - "Enroll" button moves referral to postsales (`PUT /api/enrollments/referrals/:id` with `status: postsales`)
+- **Enrolments tab** rebuilt — now shows students marked paid by Learning Advisor (from pipeline), with "Enroll" button that moves them to postsales paid students
+
+### Post-Sales Dashboard
+- **Enrollment Requests tab** added — fetches from `GET /api/enrollments/requests`
+  - Post-Sales pastes payment link, saves it, sets Payment Status dropdown (Pending/Received)
+  - Proceed button activates only when status = Received; moves student to Paid Students
+- **Incoming Referrals tab** added — fetches from `GET /api/enrollments/referrals?status=postsales`
+  - Same payment link + status + Proceed flow as enrollment requests
+  - "Send" button opens WhatsApp with payment link
+- **Website Enquiries tab** now reads from `/api/enrollments/requests` (not old payments endpoint)
+
+### Student Dashboard
+- **Refer & Earn tab** added to sidebar and main content
+  - Form: student name, grade, age, parent email, parent WhatsApp, relationship, needs demo?
+  - Submits to `POST /api/enrollments/referral` (authenticated)
+  - Shows past referrals with status badges (Pending / Demo Booked / In Enrollment / Enrolled)
+
+### Sales Dashboard
+- `renderLeads()` now builds leads from completed demo bookings fetched from API (no localStorage)
+- When Learning Advisor marks a lead as "paid" → saves converted pipeline record to DB → appears in presales Enrolments tab
+
+### Backend — Deployed to Production
+- `backend/src/routes/enrollments.js` — live on server at `/api/enrollments`
+- `backend/src/index.js` — route registered
+- DB tables created: `enrollment_requests`, `referrals`
+- `GET /api/enrollments/referrals` — students see only their own referrals; staff see all
+- **Bug fixed**: Student role was getting 403 on GET referrals — now returns own records only
+
+### Copyright
+- All 15 public pages updated from © 2025 → © 2026 (company registered 2026)
+
+---
+
 ## ✅ Completed Since Last Update (May 2026)
 
 - Auto-refresh on all dashboards (60s interval) — no cache clearing needed
