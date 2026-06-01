@@ -49,12 +49,12 @@ pm2 reload stemnest-api --update-env
 
 ---
 
-## Current Status (May 2026)
+## Current Status (June 2026)
 
 | Feature                          | Status        |
 |----------------------------------|---------------|
 | Homepage                         | ✅ Live        |
-| Courses page                     | ✅ Live        |
+| Courses page                     | ✅ Live (being refactored to Career Pathways) |
 | Login page (JWT auth)            | ✅ Live        |
 | Free Trial booking form          | ✅ Live        |
 | Join Class page (public lookup)  | ✅ Live        |
@@ -68,8 +68,12 @@ pm2 reload stemnest-api --update-env
 | Tutor Dashboard                  | ✅ Live        |
 | Student Dashboard                | ✅ Live        |
 | Blog system                      | ✅ Live        |
-| Email notifications              | ✅ Live        |
+| Email notifications (Resend.com) | ✅ Live        |
+| Grey Finance payment integration | ✅ Live        |
+| Enrollment Requests flow         | ✅ Live        |
+| Referrals / Refer & Earn         | ✅ Live        |
 | Real customer bookings           | ✅ Active      |
+| **Career Pathways (new)**        | 🔄 In Progress |
 
 ---
 

@@ -22,6 +22,9 @@ const paymentRoutes      = require('./routes/payments');
 const applicationRoutes  = require('./routes/applications');
 const syncRoutes         = require('./routes/sync');
 const blogRoutes         = require('./routes/blogs');
+const enrollmentRoutes   = require('./routes/enrollments');
+const greyRoutes         = require('./routes/grey');
+const pathwayRoutes      = require('./routes/pathways');
 const errorHandler       = require('./middleware/errorHandler');
 const logger         = require('./utils/logger');
 
@@ -119,6 +122,9 @@ app.use('/api/payments',     paymentRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/sync',         syncRoutes);
 app.use('/api/blogs',        blogRoutes);
+app.use('/api/enrollments',  enrollmentRoutes);
+app.use('/api/grey',         greyRoutes);
+app.use('/api/pathways',     pathwayRoutes);
 
 /* ══════════════════════════════════════════════
    404 + GLOBAL ERROR HANDLER
