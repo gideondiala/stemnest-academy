@@ -39,6 +39,7 @@
       <a class="sidebar-link"        data-tab="website-enquiries" onclick="showPOSTab('website-enquiries')"><span class="sl-icon">🌐</span> Website Enquiries</a>
       <a class="sidebar-link"        data-tab="enrollment-requests" onclick="showPOSTab('enrollment-requests')"><span class="sl-icon">📋</span> Enrollment Requests <span class="sl-badge" id="enrollReqBadge">0</span></a>
       <a class="sidebar-link"        data-tab="incoming-referrals" onclick="showPOSTab('incoming-referrals')"><span class="sl-icon">🤝</span> Incoming Referrals <span class="sl-badge" id="posRefBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="promotions" onclick="showPOSTab('promotions')"><span class="sl-icon">🎓</span> Grade Promotions <span class="sl-badge" id="promotionsBadge">0</span></a>
     </div>
     <div class="sidebar-bottom">
       <button class="logout-btn" onclick="window.location.href='login.html'">🚪 Log Out</button>
@@ -177,6 +178,18 @@
         🤝 Students referred by existing StemNest students and sent here by Pre-Sales. Generate a payment link, send it, mark as Received, then Proceed to enroll them.
       </div>
       <div id="posIncomingReferralsList"></div>
+    </div>
+
+    <!-- GRADE PROMOTIONS -->
+    <div id="tab-promotions" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🎓 Grade Promotions</div>
+        <button class="btn btn-outline" style="font-size:12px;" onclick="renderPromotions()">🔄 Refresh</button>
+      </div>
+      <div style="background:#f0fdf4;border-radius:12px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:#065f46;font-weight:700;">
+        🎓 Students who have completed all 72 lessons in their current grade are listed here. Click "Promote" to move them to the next grade.
+      </div>
+      <div id="promotionsList"></div>
     </div>
 
   </div><!-- end dash-main -->

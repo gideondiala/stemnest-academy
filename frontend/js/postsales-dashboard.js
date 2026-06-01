@@ -4,7 +4,7 @@
    paid classes, writes slots to teacher calendar.
 ═══════════════════════════════════════════════════════ */
 
-const POS_TABS = ['students', 'topup', 'scheduled', 'paylinks', 'converted', 'website-enquiries', 'enrollment-requests', 'incoming-referrals'];
+const POS_TABS = ['students', 'topup', 'scheduled', 'paylinks', 'converted', 'website-enquiries', 'enrollment-requests', 'incoming-referrals', 'promotions'];
 let generatedLink       = null;
 let posScheduleStudentId = null; // booking ID being scheduled
 
@@ -194,6 +194,7 @@ function showPOSTab(tab) {
   if (tab === 'website-enquiries')  renderWebsiteEnquiries();
   if (tab === 'enrollment-requests') renderEnrollmentRequests();
   if (tab === 'incoming-referrals') renderIncomingReferrals();
+  if (tab === 'promotions')        renderPromotions();
 }
 
 /* ── STATS ── */
@@ -1943,3 +1944,78 @@ window.openManualOnboardModal = async function() {
   _origOpenManualOnboardModal();
   populatePathwayDropdown('mob-pathway');
 };
+
+/* ══════════════════════════════════════════════════════
+   GRADE PROMOTIONS
+   Shows students who completed all 72 lessons in their grade
+   Post-Sales clicks "Promote" to move them to next grade
+══════════════════════════════════════════════════════ */
+async function renderPromotions() {
+  const el = document.getElementById('promotionsList');
+  if (!el) return;
+  el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--light);font-weight:700;">⏳ Loading...</div>';
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/pathways/promotions/pending', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    const promotions = data.promotions || [];
+
+    /* Update badge */
+    const badge = document.getElementById('promotionsBadge');
+    if (badge) badge.textContent = promotions.length;
+
+    if (!promotions.length) {
+      el.innerHTML = `<div style="text-align:center;padding:60px 20px;">
+        <div style="font-size:48px;margin-bottom:12px;">🎓</div>
+        <div style="font-family:'Fredoka One',cursive;font-size:20px;color:var(--dark);">No promotions pending</div>
+        <div style="font-size:14px;color:var(--light);margin-top:6px;">Students who complete all 72 lessons in their grade will appear here.</div>
+      </div>`;
+      return;
+    }
+
+    el.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        ${promotions.map(p => `
+          <div style="background:var(--white);border:1.5px solid #e8eaf0;border-radius:16px;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;">
+            <div>
+              <div style="font-weight:900;color:var(--dark);font-size:16px;">${p.student_name || '—'}</div>
+              <div style="font-size:13px;font-weight:700;color:var(--mid);margin-top:4px;">
+                ${p.pathway_emoji || '🚀'} ${p.pathway_name || '—'}
+              </div>
+              <div style="font-size:13px;font-weight:700;color:var(--blue);margin-top:4px;">
+                Grade ${p.current_grade_number || p.current_grade} → Grade ${(p.current_grade_number || p.current_grade) + 1}
+              </div>
+              <div style="font-size:12px;color:var(--light);margin-top:4px;">
+                📧 ${p.student_email || '—'} · ✅ 72/72 lessons completed
+              </div>
+            </div>
+            <button onclick="promoteStudent('${p.id}','${(p.student_name||'').replace(/'/g,'')}',${(p.current_grade_number||p.current_grade)+1})"
+              style="background:var(--green);color:#fff;border:none;border-radius:12px;padding:12px 24px;font-family:'Nunito',sans-serif;font-weight:900;font-size:14px;cursor:pointer;white-space:nowrap;">
+              🎓 Promote to Grade ${(p.current_grade_number || p.current_grade) + 1}
+            </button>
+          </div>`).join('')}
+      </div>`;
+  } catch(e) {
+    el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--orange);font-weight:700;">Failed to load promotions. Please refresh.</div>';
+  }
+}
+
+async function promoteStudent(enrolmentId, studentName, nextGrade) {
+  if (!confirm(`Promote ${studentName} to Grade ${nextGrade}? This will reset their lesson progress for the new grade.`)) return;
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res = await fetch(`https://api.stemnestacademy.co.uk/api/pathways/promotions/${enrolmentId}/promote`, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`✅ ${studentName} promoted to Grade ${nextGrade}!`);
+      renderPromotions();
+    } else {
+      showToast('Failed: ' + (data.error || 'Unknown'), 'error');
+    }
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+}

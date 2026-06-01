@@ -481,3 +481,59 @@ router.delete('/:id/grades/:gradeId/units/:unitId/quiz', requireAuth, requireRol
 });
 
 module.exports = router;
+
+/* ══════════════════════════════════════════════════════
+   AUTO-PROMOTION
+   GET  /api/pathways/promotions/pending  — students ready for grade promotion
+   POST /api/pathways/promotions/:enrolmentId/promote — promote to next grade
+══════════════════════════════════════════════════════ */
+
+/* GET /api/pathways/promotions/pending */
+router.get('/promotions/pending', requireAuth, requireRole(...STAFF_ROLES), async (req, res, next) => {
+  try {
+    /* Find enrolments where lessons_completed >= 72 (full grade done) */
+    const result = await pool.query(
+      `SELECT e.*,
+              u.name AS student_name, u.email AS student_email,
+              p.name AS pathway_name, p.emoji AS pathway_emoji,
+              pg.grade_number AS current_grade_number
+       FROM enrolments e
+       JOIN users u ON u.id = e.student_id
+       LEFT JOIN pathways p ON p.id = e.pathway_id
+       LEFT JOIN pathway_grades pg ON pg.pathway_id = e.pathway_id
+                                   AND pg.grade_number = e.current_grade
+       WHERE e.pathway_id IS NOT NULL
+         AND e.lessons_completed >= 72
+         AND e.current_grade < 12
+         AND e.status = 'active'
+       ORDER BY e.created_at DESC`
+    );
+    res.json({ success: true, promotions: result.rows });
+  } catch (err) { next(err); }
+});
+
+/* POST /api/pathways/promotions/:enrolmentId/promote */
+router.post('/promotions/:enrolmentId/promote', requireAuth, requireRole(...STAFF_ROLES), async (req, res, next) => {
+  try {
+    const { enrolmentId } = req.params;
+
+    /* Get current enrolment */
+    const enrResult = await pool.query('SELECT * FROM enrolments WHERE id = $1', [enrolmentId]);
+    if (!enrResult.rows.length) return res.status(404).json({ success: false, error: 'Enrolment not found' });
+    const enr = enrResult.rows[0];
+
+    const nextGrade = (enr.current_grade || 1) + 1;
+    if (nextGrade > 12) return res.status(400).json({ success: false, error: 'Student is already at Grade 12' });
+
+    /* Update enrolment to next grade */
+    await pool.query(
+      `UPDATE enrolments
+       SET current_grade = $1, current_unit = 1, lessons_completed = 0, updated_at = NOW()
+       WHERE id = $2`,
+      [nextGrade, enrolmentId]
+    );
+
+    logger.info(`[PROMOTION] Enrolment ${enrolmentId} promoted to Grade ${nextGrade}`);
+    res.json({ success: true, nextGrade, message: `Student promoted to Grade ${nextGrade}` });
+  } catch (err) { next(err); }
+});
