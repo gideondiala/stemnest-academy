@@ -352,7 +352,7 @@ router.post('/:id/grades/:gradeId/units/:unitId/lessons', requireAuth, requireRo
       lesson_number, lesson_number_in_unit, session_type, title,
       learning_objectives, warm_up, project_briefing, concept_discovery,
       task1_description, task1_link, task2_description, task2_link,
-      debrief, homework1, homework2, what_comes_next, teacher_notes
+      debrief, homework1, homework2, portfolio_save, what_comes_next, teacher_notes
     } = req.body;
 
     if (!title) return res.status(400).json({ success: false, error: 'title required' });
@@ -363,15 +363,16 @@ router.post('/:id/grades/:gradeId/units/:unitId/lessons', requireAuth, requireRo
          (unit_id, grade_id, lesson_number, lesson_number_in_unit, session_type, title,
           learning_objectives, warm_up, project_briefing, concept_discovery,
           task1_description, task1_link, task2_description, task2_link,
-          debrief, homework1, homework2, what_comes_next, teacher_notes)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+          debrief, homework1, homework2, portfolio_save, what_comes_next, teacher_notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
        RETURNING *`,
       [req.params.unitId, req.params.gradeId,
        parseInt(lesson_number), lesson_number_in_unit ? parseInt(lesson_number_in_unit) : null,
        session_type||'lesson', title,
        learning_objectives||null, warm_up||null, project_briefing||null, concept_discovery||null,
        task1_description||null, task1_link||null, task2_description||null, task2_link||null,
-       debrief||null, homework1||null, homework2||null, what_comes_next||null, teacher_notes||null]
+       debrief||null, homework1||null, homework2||null, portfolio_save||null,
+       what_comes_next||null, teacher_notes||null]
     );
     res.status(201).json({ success: true, lesson: result.rows[0] });
   } catch (err) {
@@ -387,7 +388,7 @@ router.put('/:id/grades/:gradeId/units/:unitId/lessons/:lessonId', requireAuth, 
     const updatable = [
       'title','learning_objectives','warm_up','project_briefing','concept_discovery',
       'task1_description','task1_link','task2_description','task2_link',
-      'debrief','homework1','homework2','what_comes_next','teacher_notes',
+      'debrief','homework1','homework2','portfolio_save','what_comes_next','teacher_notes',
       'session_type','lesson_number','lesson_number_in_unit','is_active'
     ];
     updatable.forEach(key => {

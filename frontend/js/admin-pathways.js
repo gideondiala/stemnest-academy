@@ -472,6 +472,15 @@ async function deleteLesson(pathwayId, gradeId, unitId, lessonId, lessonNumber) 
 async function openLessonForm(pathwayId, gradeId, unitId, lessonId) {
   document.getElementById('lessonFormOverlay')?.remove();
   let lesson = null;
+
+  /* Detect grade number from page title to control Grade 1-3 specific fields */
+  const titleText = document.getElementById('pathwayDetailTitle')?.textContent || '';
+  const gradeMatch = titleText.match(/Grade (\d+)/);
+  const gradeNumber = gradeMatch ? parseInt(gradeMatch[1]) : 99;
+  const isGrade1to3 = gradeNumber >= 1 && gradeNumber <= 3;
+
+  /* Label for warm_up field */
+  const warmUpLabel = isGrade1to3 ? 'NOVA Moment - The Story Beat' : 'Warm Up';
   if (lessonId) {
     try {
       const token = localStorage.getItem('sn_access_token');
@@ -517,7 +526,7 @@ async function openLessonForm(pathwayId, gradeId, unitId, lessonId) {
         </div>
         ${[
           ['lf-objectives','Learning Objectives','learning_objectives','What will students learn in this lesson?'],
-          ['lf-warmup','Warm Up','warm_up','Opening activity or question...'],
+          ['lf-warmup', warmUpLabel,'warm_up','Opening activity or question...'],
           ['lf-briefing','Project Briefing','project_briefing','Brief description of the class project...'],
           ['lf-concept','Concept Discovery','concept_discovery','Main concept being taught...'],
         ].map(([id,label,field,ph]) => `
@@ -547,6 +556,7 @@ async function openLessonForm(pathwayId, gradeId, unitId, lessonId) {
           ['lf-debrief','DeBrief','debrief','Closing discussion or reflection...'],
           ['lf-hw1','Homework 1','homework1','First homework assignment...'],
           ['lf-hw2','Homework 2','homework2','Second homework assignment...'],
+          ...(isGrade1to3 ? [['lf-portfolio','Portfolio Save','portfolio_save','']] : []),
           ['lf-next','What Comes Next','what_comes_next','Preview of the next lesson...'],
           ['lf-notes','Additional Notes for Teachers','teacher_notes','Internal notes for the teacher...'],
         ].map(([id,label,field,ph]) => `
@@ -590,6 +600,7 @@ async function saveLesson() {
     homework2:           document.getElementById('lf-hw2')?.value.trim() || null,
     what_comes_next:     document.getElementById('lf-next')?.value.trim() || null,
     teacher_notes:       document.getElementById('lf-notes')?.value.trim() || null,
+    portfolio_save:      document.getElementById('lf-portfolio')?.value.trim() || null,
   };
   const btn = document.getElementById('saveLessonBtn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Saving…'; }
