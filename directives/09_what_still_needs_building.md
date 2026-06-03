@@ -220,3 +220,59 @@ See `10_quizzes_and_assignments.md` for the full design.
 - **Completed classes tab**: now loads from API, shows all completed/incomplete/partial with recording link
 - **Paysheet download**: reads from API data, generates CSV with correct earnings
 - **Teacher regions**: DB column added, admin form has region checkboxes, stored in tutor_profiles.regions
+
+---
+
+## ✅ Completed — Additional Fixes & Features (June 2026)
+
+### Career Pathways — Bug Fixes & Enhancements
+- **Pathway Edit bug fixed**: `editPathway()` now correctly updates existing pathway (was creating new ones). Root cause: `showAdminTab` was calling `resetPathwayForm()` which cleared the hidden `pw-id` field before save.
+- **"Add Pathway" explicitly resets form** before tab switch; "Edit Pathway" does not.
+- **Courses page modal**: "Learn More" panel changed from side-panel to centered modal (desktop fix).
+- **Grade dropdown**: Fixed broken template literal `${Array.from(...)}` — replaced with plain HTML `<option>` tags.
+- **Enrolment form layout**: Fixed grid alignment with `flex-direction:column` on each cell.
+- **Grey payment modal UUID fix**: `r.id` is a UUID — onclick now quotes it as `'${r.id}'` to prevent JS math eval error.
+- **Grey DB column type**: `grey_payment_references.enrollment_request_id` changed INTEGER → TEXT.
+- **"Copy All Payment Details" button**: Uses `window._greyPaymentCopyData` global (not inline JSON params). Dual clipboard fallback. Visual "✅ Copied!" feedback on button.
+
+### Grade 1-3 Lesson Form Modifications
+- **"Warm Up" renamed to "NOVA Moment - The Story Beat"** for Grade 1-3 lessons only
+- **"Portfolio Save" field added** between Homework 2 and What Comes Next, Grade 1-3 only
+- Grade 4-12 lesson forms unchanged
+- `portfolio_save` TEXT column added to `pathway_lessons` table (safe `ADD COLUMN IF NOT EXISTS`)
+- Backend POST and PUT endpoints updated to accept and save `portfolio_save`
+
+### Email Service (Resend.com) — LIVE
+- DNS records added to Route 53 for `stemnestacademy.co.uk`
+- Resend domain verified, API key in server .env
+- All transactional emails now delivered to real inboxes
+
+### Grey Finance Payment Integration — LIVE
+- Lead Bank USD: Account 218292502181, Routing 101019644
+- Webhook endpoint: `POST /api/payments/grey-webhook`
+- Payment reference format: `SN-YYYY-XXXXX`
+- "Copy All Payment Details" generates formatted text block for WhatsApp/email
+
+### Audit Status (June 2026)
+- **52/52 checks passing** across syntax, API, and structural checks
+- No broken files, no missing route registrations, no localStorage business data
+
+---
+
+## 🔄 What Still Needs Building (Priority Order)
+
+### High Priority
+1. **Student profile modal** — currently placeholder (hardcoded "James Okafor"). Need to load real data from API and save changes. Password change UI also missing.
+2. **Onboarding creates enrolment record** — `confirmOnboard()` creates the user but doesn't insert into `enrolments` table. Students see zero courses on dashboard until fixed.
+3. **Course progress tracking** — `progress` and `done` are hardcoded to 0. Need `lesson_completions` table and tracking when tutor submits class report.
+4. **Student quizzes** — `pendingQuizzes` always empty. No `quizzes` table yet.
+5. **Student certificates** — `CERTIFICATES` always empty. No `certificates` table yet.
+
+### Medium Priority
+6. **Sales dashboard completed demos tab** — completed demos surface in Demo Leads but no clean dedicated view
+7. **Grey webhook live test** — built and deployed but not yet tested with a real payment
+8. **Nigerian subsidiary / Paystack** — when CAC registration done, integrate Paystack for card payments
+
+### Low Priority
+9. **Mobile responsiveness** — dashboards are desktop-only
+10. **Password change UI** — backend endpoint exists, no frontend form
