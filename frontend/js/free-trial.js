@@ -314,6 +314,11 @@ See you soon! 🚀 — StemNest Academy
 
 /* ── Success screen ── */
 function showSuccessScreen(b) {
+  /* Fire Meta Pixel Lead event */
+  if (typeof fbq === 'function') {
+    fbq('track', 'Lead', { content_name: 'Free Demo Booking', content_category: b.subject || 'Demo' });
+  }
+
   const overlay = document.getElementById('successOverlay');
   const details = document.getElementById('successDetails');
 

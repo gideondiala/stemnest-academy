@@ -290,6 +290,10 @@ async function submitPathwayEnrol() {
 
   try {
     const p = _pathways.find(x => x.id === _currentPathwayId || x.slug === _currentPathwaySlug);
+    /* Fire Meta Pixel Lead event */
+    if (typeof fbq === 'function') {
+      fbq('track', 'Lead', { content_name: 'Pathway Enrolment Request', content_category: p ? p.name : 'Pathway' });
+    }
     const res = await fetch('https://api.stemnestacademy.co.uk/api/enrollments/request', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
