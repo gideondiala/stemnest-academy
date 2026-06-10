@@ -158,25 +158,47 @@ router.post('/', async (req, res, next) => {
   try {
     const data = bookingSchema.parse(req.body);
 
-    /* Convert student's local time to WAT (UTC+1) for display in presales */
+    /* Convert student's local time to WAT (UTC+1) for display in presales
+       Logic: treat the input time as occurring at the given date in the student's
+       timezone. Calculate UTC, then add 1 hour for WAT (UTC+1).
+    */
     let watTime = data.time;
     try {
       if (data.timezone && data.date && data.time) {
-        // Parse the time in student's timezone and convert to WAT
         const [h, m] = data.time.split(':').map(Number);
-        const studentDt = new Date(`${data.date}T${String(h).padStart(2,'0')}:${String(m||0).padStart(2,'0')}:00`);
-        // Get WAT offset: Africa/Lagos = UTC+1
-        const watOffset = 60; // minutes
-        const studentOffset = -new Date().toLocaleString('en', { timeZone: data.timezone, timeZoneName: 'short' })
-          .match(/GMT([+-]\d+)/)?.[1] * 60 || 0;
-        const diffMins = watOffset - studentOffset;
-        const watDt = new Date(studentDt.getTime() + diffMins * 60000);
-        const wh = watDt.getHours(), wm = watDt.getMinutes();
-        const period = wh >= 12 ? 'PM' : 'AM';
-        const wh12 = wh % 12 === 0 ? 12 : wh % 12;
-        watTime = `${wh12}:${String(wm).padStart(2,'0')} ${period} WAT`;
+
+        /* Treat the booking time as a UTC timestamp temporarily,
+           then compare what the student's timezone clock shows vs UTC.
+           The difference is the offset. */
+        const refUtc = new Date(`${data.date}T${String(h).padStart(2,'0')}:${String(m||0).padStart(2,'0')}:00Z`);
+
+        const utcStr = refUtc.toLocaleString('en-US', { timeZone: 'UTC',        hour12: false, hour: '2-digit', minute: '2-digit' });
+        const tzStr  = refUtc.toLocaleString('en-US', { timeZone: data.timezone, hour12: false, hour: '2-digit', minute: '2-digit' });
+
+        const [utcHh, utcMm] = utcStr.replace('24:', '00:').split(':').map(Number);
+        const [tzHh,  tzMm]  = tzStr.replace('24:', '00:').split(':').map(Number);
+
+        /* offset = (TZ clock) - (UTC clock) when using the same reference point */
+        let offsetMins = (tzHh * 60 + tzMm) - (utcHh * 60 + utcMm);
+        if (offsetMins > 720)  offsetMins -= 1440;  // handle day boundary wrap
+        if (offsetMins < -720) offsetMins += 1440;
+
+        /* Student's local time → UTC → WAT */
+        const studentMins  = h * 60 + (m || 0);
+        const utcMins      = studentMins - offsetMins;
+        const watMins      = ((utcMins + 60) % 1440 + 1440) % 1440;
+
+        const watH   = Math.floor(watMins / 60);
+        const watM   = watMins % 60;
+        const period = watH >= 12 ? 'PM' : 'AM';
+        const wh12   = watH % 12 === 0 ? 12 : watH % 12;
+        watTime = `${wh12}:${String(watM).padStart(2,'0')} ${period} WAT`;
+
+        logger.info(`[TZ] ${data.timezone} ${data.time} (offset ${offsetMins}min) → WAT ${watTime}`);
       }
-    } catch(e) { /* keep original time if conversion fails */ }
+    } catch(e) {
+      logger.warn('[BOOKING] WAT conversion failed:', e.message);
+    }
 
     /* Insert booking */
     const result = await pool.query(
@@ -217,6 +239,37 @@ router.post('/', async (req, res, next) => {
       time:        data.time,
       bookingId,
     });
+
+    /* Notify operations team */
+    const emailService = require('../services/emailService');
+    emailService.sendEmail({
+      to: 'operations@stemnestacademy.co.uk',
+      subject: `🎓 New Demo Booked — ${data.studentName} (${data.subject})`,
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;padding:24px;">
+          <h2 style="color:#1a56db;">New Demo Class Booking 🎓</h2>
+          <table style="width:100%;border-collapse:collapse;font-size:14px;">
+            <tr><td style="padding:8px 0;font-weight:700;color:#718096;width:140px;">Student</td><td style="padding:8px 0;font-weight:800;">${data.studentName}</td></tr>
+            <tr><td style="padding:8px 0;font-weight:700;color:#718096;">Subject</td><td style="padding:8px 0;">${data.subject}</td></tr>
+            <tr><td style="padding:8px 0;font-weight:700;color:#718096;">Grade/Age</td><td style="padding:8px 0;">${data.grade} · Age ${data.age}</td></tr>
+            <tr><td style="padding:8px 0;font-weight:700;color:#718096;">Date</td><td style="padding:8px 0;">${data.date}</td></tr>
+            <tr><td style="padding:8px 0;font-weight:700;color:#718096;">Time (Local)</td><td style="padding:8px 0;">${data.time} (${data.timezone})</td></tr>
+            <tr><td style="padding:8px 0;font-weight:700;color:#718096;">Time (WAT)</td><td style="padding:8px 0;color:#1a56db;font-weight:800;">${watTime}</td></tr>
+            <tr><td style="padding:8px 0;font-weight:700;color:#718096;">Email</td><td style="padding:8px 0;">${data.email || '—'}</td></tr>
+            <tr><td style="padding:8px 0;font-weight:700;color:#718096;">WhatsApp</td><td style="padding:8px 0;">${data.whatsapp || '—'}</td></tr>
+            <tr><td style="padding:8px 0;font-weight:700;color:#718096;">Booking ID</td><td style="padding:8px 0;font-family:monospace;">${bookingId}</td></tr>
+          </table>
+          <div style="margin-top:20px;background:#f0f4ff;border-radius:10px;padding:14px;font-size:13px;color:#1e40af;font-weight:700;">
+            ⚡ Action needed: Assign a teacher and schedule this demo class in the Pre-Sales dashboard.
+          </div>
+          <a href="https://stemnestacademy.co.uk/pages/presales-dashboard.html" 
+             style="display:inline-block;margin-top:16px;background:#1a56db;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:700;">
+            Open Pre-Sales Dashboard →
+          </a>
+        </div>
+      `,
+      template: 'booking_notification',
+    }).catch(e => logger.warn('[BOOKING NOTIFICATION] Email failed:', e.message));
 
     logger.info(`[BOOKING CREATED] ${data.studentName} · ${data.subject} · ${data.date}`);
     res.status(201).json({ success: true, bookingId });
@@ -535,3 +588,16 @@ router.post('/:id/reschedule', async (req, res, next) => {
 });
 
 module.exports = router;
+
+/* ══════════════════════════════════════════════
+   DELETE /api/bookings/:id  (admin/presales)
+   Hard-delete a booking record — used to remove test data
+══════════════════════════════════════════════ */
+router.delete('/:id', requireAuth, requireRole('admin','super_admin','presales'), async (req, res, next) => {
+  try {
+    const result = await pool.query('DELETE FROM bookings WHERE id = $1 RETURNING id', [req.params.id]);
+    if (!result.rows.length) return res.status(404).json({ success: false, error: 'Booking not found' });
+    logger.info(`[DELETE] Booking ${req.params.id} deleted by ${req.user.email}`);
+    res.json({ success: true, message: 'Booking deleted' });
+  } catch (err) { next(err); }
+});

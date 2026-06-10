@@ -4,20 +4,97 @@
    simulated email/WhatsApp confirmation.
 ═══════════════════════════════════════════════════════ */
 
-const TIME_SLOTS = [
-  '12:00 AM','12:30 AM',
-  '1:00 AM','1:30 AM','2:00 AM','2:30 AM','3:00 AM','3:30 AM',
-  '4:00 AM','4:30 AM','5:00 AM','5:30 AM','6:00 AM','6:30 AM',
-  '7:00 AM','7:30 AM','8:00 AM','8:30 AM','9:00 AM','9:30 AM',
-  '10:00 AM','10:30 AM','11:00 AM','11:30 AM',
-  '12:00 PM','12:30 PM',
-  '1:00 PM','1:30 PM','2:00 PM','2:30 PM','3:00 PM','3:30 PM',
-  '4:00 PM','4:30 PM','5:00 PM','5:30 PM','6:00 PM','6:30 PM',
-  '7:00 PM','7:30 PM','8:00 PM','8:30 PM','9:00 PM','9:30 PM',
-  '10:00 PM','10:30 PM','11:00 PM','11:30 PM',
-];
+const TIME_SLOTS = []; // Legacy — replaced by dropdown
 
 let selectedTime = '';
+
+/* ── Generate 15-minute time slots (06:00 – 22:45) ── */
+function _generateTimeSlots() {
+  const slots = [];
+  for (let h = 6; h <= 22; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      if (h === 22 && m > 45) break;
+      const hh = String(h).padStart(2,'0');
+      const mm = String(m).padStart(2,'0');
+      const period = h >= 12 ? 'PM' : 'AM';
+      const h12    = h % 12 === 0 ? 12 : h % 12;
+      const label  = `${h12}:${mm} ${period}`;
+      slots.push({ value: `${hh}:${mm}`, label });
+    }
+  }
+  return slots;
+}
+
+/* ── Build time dropdown and refresh available slots based on selected date ── */
+function buildTimeGrid() {
+  const container = document.getElementById('timeGrid');
+  if (!container) return;
+
+  /* Replace the old click-grid with a <select> dropdown */
+  container.innerHTML = `
+    <select id="f-time-select"
+      onchange="selectTime(null, this.value)"
+      style="width:100%;padding:14px 16px;border:2px solid #e8eaf0;border-radius:14px;
+             font-family:'Nunito',sans-serif;font-size:15px;font-weight:700;color:#1a202c;
+             outline:none;background:#fff;cursor:pointer;">
+      <option value="">— Select a time —</option>
+    </select>`;
+
+  refreshTimeDropdown();
+
+  /* When date changes, refresh available slots */
+  const dateInput = document.getElementById('f-date');
+  if (dateInput) {
+    dateInput.addEventListener('change', refreshTimeDropdown);
+  }
+}
+
+function refreshTimeDropdown() {
+  const sel = document.getElementById('f-time-select');
+  if (!sel) return;
+
+  const dateInput = document.getElementById('f-date');
+  const selectedDate = dateInput ? dateInput.value : '';
+  const today = new Date().toISOString().split('T')[0];
+  const isToday = selectedDate === today;
+
+  /* Current time in minutes from midnight */
+  const now = new Date();
+  const currentMins = now.getHours() * 60 + now.getMinutes();
+  /* Add 30-min buffer so parent has time to prepare */
+  const minMins = currentMins + 30;
+
+  const allSlots = _generateTimeSlots();
+  const available = isToday
+    ? allSlots.filter(s => {
+        const [sh, sm] = s.value.split(':').map(Number);
+        return (sh * 60 + sm) > minMins;
+      })
+    : allSlots;
+
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— Select a time —</option>' +
+    available.map(s =>
+      `<option value="${s.value}" ${s.value === prev ? 'selected' : ''}>${s.label}</option>`
+    ).join('');
+
+  /* If previously selected time is no longer available, clear it */
+  if (prev && !available.find(s => s.value === prev)) {
+    selectedTime = '';
+    sel.value = '';
+  }
+}
+
+function selectTime(el, time) {
+  selectedTime = time;
+  /* Convert HH:MM value to 12-hour label for display consistency */
+  if (time) {
+    const [h, m] = time.split(':').map(Number);
+    const period = h >= 12 ? 'PM' : 'AM';
+    const h12    = h % 12 === 0 ? 12 : h % 12;
+    selectedTime = `${h12}:${String(m).padStart(2,'0')} ${period}`;
+  }
+}
 
 /* ── INIT ── */
 document.addEventListener('DOMContentLoaded', () => {
@@ -34,25 +111,8 @@ function setMinDate() {
   if (!dateInput) return;
   const today = new Date().toISOString().split('T')[0];
   dateInput.min = today;
-  dateInput.value = today; // Default to TODAY, not tomorrow
+  dateInput.value = today;
 }
-
-/* ── Build time slot grid ── */
-function buildTimeGrid() {
-  const grid = document.getElementById('timeGrid');
-  if (!grid) return;
-  grid.innerHTML = TIME_SLOTS.map(t => `
-    <div class="lp-time-slot" onclick="selectTime(this, '${t}')">${t}</div>
-  `).join('');
-}
-
-function selectTime(el, time) {
-  document.querySelectorAll('.lp-time-slot').forEach(s => s.classList.remove('selected'));
-  el.classList.add('selected');
-  selectedTime = time;
-}
-
-/* ── Timezone label update ── */
 function bindTimezoneChange() {
   const sel = document.getElementById('f-timezone');
   if (!sel) return;

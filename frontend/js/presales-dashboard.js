@@ -313,6 +313,10 @@ function renderIncoming() {
                     style="background:#25D366;color:#fff;border:none;border-radius:10px;padding:6px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap;">
                     💬 WhatsApp Parent
                   </button>` : ''}
+                  <button onclick="deleteBooking('${b.id}')"
+                    style="background:#fde8e8;color:#c53030;border:1.5px solid #fca5a5;border-radius:10px;padding:6px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap;">
+                    🗑️ Delete
+                  </button>
                 </div>
               </td>
             </tr>`).join('')}
@@ -1268,6 +1272,38 @@ async function enrollFromReferral(referralId) {
     if (data.success) {
       showToast('✅ Referral moved to Post-Sales for enrollment.');
       renderIncomingReferrals();
+    } else {
+      showToast('Failed: ' + (data.error || 'Unknown error'), 'error');
+    }
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   DELETE BOOKING
+   Allows presales to remove test/incorrect bookings
+══════════════════════════════════════════════════════ */
+async function deleteBooking(bookingId, studentName) {
+  const name = typeof studentName === 'string' ? studentName : (document.querySelector(`[data-id="${bookingId}"]`)?.dataset?.name || 'this student');
+  const confirmed = confirm(
+    `Delete booking for "${name}"?\n\nThis will permanently remove the record. This cannot be undone.`
+  );
+  if (!confirmed) return;
+
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/bookings/' + bookingId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('✅ Booking deleted.');
+      /* Refresh presales data */
+      await _loadPresalesFromAPI();
+      updatePSStats();
+      renderIncoming();
     } else {
       showToast('Failed: ' + (data.error || 'Unknown error'), 'error');
     }
