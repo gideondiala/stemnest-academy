@@ -577,7 +577,7 @@ function renderScheduled() {
                   style="background:var(--bg);color:var(--mid);border:1.5px solid #e8eaf0;border-radius:10px;padding:7px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;">
                   📝 Note
                 </button>
-                <button onclick="generatePaymentForScheduled('${b.id}','${(b.studentName||'Student').replace(/"/g,'')}',${b.subject ? '"' + b.subject + '"' : '"Demo Class"'})"
+                <button onclick="generatePaymentForScheduled('${b.id}')"
                   style="background:var(--blue);color:#fff;border:none;border-radius:10px;padding:7px 14px;font-family:'Nunito',sans-serif;font-weight:900;font-size:12px;cursor:pointer;white-space:nowrap;">
                   💳 Payment Request
                 </button>
@@ -1325,7 +1325,11 @@ async function deleteBooking(bookingId, studentName) {
 /* Store payment data for copy button */
 window._psPaymentCopyData = null;
 
-async function generatePaymentForScheduled(bookingId, studentName, subject) {
+async function generatePaymentForScheduled(bookingId) {
+  /* Look up booking details from loaded data */
+  const b = (window.PS_DATA.bookings || []).find(x => x.id === bookingId) || {};
+  const studentName = b.studentName || 'Student';
+  const subject     = b.subject     || 'Demo Class';
   /* Open modal with loading state */
   let modal = document.getElementById('psPaymentModalOverlay');
   if (!modal) {
