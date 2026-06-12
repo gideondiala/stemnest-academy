@@ -577,6 +577,10 @@ function renderScheduled() {
                   style="background:var(--bg);color:var(--mid);border:1.5px solid #e8eaf0;border-radius:10px;padding:7px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;">
                   📝 Note
                 </button>
+                <button onclick="generatePaymentForScheduled('${b.id}','${(b.studentName||'Student').replace(/"/g,'')}',${b.subject ? '"' + b.subject + '"' : '"Demo Class"'})"
+                  style="background:var(--blue);color:#fff;border:none;border-radius:10px;padding:7px 14px;font-family:'Nunito',sans-serif;font-weight:900;font-size:12px;cursor:pointer;white-space:nowrap;">
+                  💳 Payment Request
+                </button>
               </td>
             </tr>`;
           }).join('')}
@@ -1310,4 +1314,158 @@ async function deleteBooking(bookingId, studentName) {
   } catch(e) {
     showToast('Error: ' + e.message, 'error');
   }
+}
+
+/* ══════════════════════════════════════════════════════
+   PAYMENT REQUEST FROM SCHEDULED DEMO
+   Generates Grey bank details for a scheduled student
+   so presales can share payment info immediately
+══════════════════════════════════════════════════════ */
+
+/* Store payment data for copy button */
+window._psPaymentCopyData = null;
+
+async function generatePaymentForScheduled(bookingId, studentName, subject) {
+  /* Open modal with loading state */
+  let modal = document.getElementById('psPaymentModalOverlay');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'psPaymentModalOverlay';
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal" style="max-width:560px;max-height:90vh;overflow-y:auto;">
+        <div class="modal-header">
+          <div class="modal-title">💳 Payment Request</div>
+          <button class="modal-close" onclick="document.getElementById('psPaymentModalOverlay').classList.remove('open')">✕</button>
+        </div>
+        <div class="modal-body" id="psPaymentBody">
+          <div style="text-align:center;padding:32px;color:var(--light);font-weight:700;">⏳ Generating...</div>
+        </div>
+      </div>`;
+    modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
+    document.body.appendChild(modal);
+  }
+
+  document.getElementById('psPaymentBody').innerHTML =
+    '<div style="text-align:center;padding:32px;color:var(--light);font-weight:700;">⏳ Generating payment reference...</div>';
+  modal.classList.add('open');
+
+  try {
+    const token = localStorage.getItem('sn_access_token');
+
+    /* Generate a unique reference via Grey API */
+    const refRes = await fetch('https://api.stemnestacademy.co.uk/api/grey/payment-reference', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studentName,
+        amount: 0,
+        currency: 'USD',
+        notes: `Demo class booking — ${subject || 'Demo'}`,
+      })
+    });
+    const refData = await refRes.json();
+    const reference = (refData.success && refData.reference) ? refData.reference
+      : ('SN-' + new Date().getFullYear() + '-' + Math.random().toString(36).slice(2,7).toUpperCase());
+
+    /* USD bank details */
+    const account = {
+      currency:      'USD',
+      accountName:   'StemNest Academy Ltd',
+      accountNumber: '218292502181',
+      routingNumber: '101019644',
+      accountType:   'Checking',
+      bankName:      'Lead Bank',
+      bankAddress:   '1801 Main St., Kansas City, MO 64108',
+    };
+
+    window._psPaymentCopyData = { reference, account };
+
+    const fields = [
+      { label: 'Account Name',    value: account.accountName },
+      { label: 'Account Number',  value: account.accountNumber },
+      { label: 'Routing Number',  value: account.routingNumber },
+      { label: 'Account Type',    value: account.accountType },
+      { label: 'Bank Name',       value: account.bankName },
+      { label: 'Bank Address',    value: account.bankAddress },
+      { label: 'Payment Reference', value: reference, highlight: true },
+    ];
+
+    document.getElementById('psPaymentBody').innerHTML = `
+      <div style="background:var(--green-light);border-radius:12px;padding:14px 18px;margin-bottom:16px;font-size:13px;font-weight:700;color:var(--green-dark);">
+        ✅ Payment reference generated for <strong>${studentName}</strong>
+      </div>
+      <div style="font-size:13px;font-weight:700;color:var(--mid);margin-bottom:16px;">
+        Share these bank details with the parent. Ask them to include the <strong style="color:var(--blue);">Payment Reference</strong> in the transfer description.
+      </div>
+      <div style="background:var(--white);border:2px solid #e8eaf0;border-radius:14px;padding:18px 20px;margin-bottom:14px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+          <span style="font-size:22px;">🇺🇸</span>
+          <div style="font-family:'Fredoka One',cursive;font-size:15px;color:var(--dark);">US Dollar (USD) — Lead Bank</div>
+        </div>
+        ${fields.map(f => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #f0f2f8;">
+            <span style="font-size:12px;font-weight:700;color:var(--light);text-transform:uppercase;letter-spacing:.3px;">${f.label}</span>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:13px;font-weight:${f.highlight?'900':'800'};color:${f.highlight?'var(--blue)':'var(--dark)'};">${f.value}</span>
+              <button onclick="navigator.clipboard.writeText('${f.value}').then(()=>showToast('✅ ${f.label} copied!'))"
+                style="background:var(--bg);border:1px solid #e8eaf0;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:800;color:var(--mid);cursor:pointer;">📋</button>
+            </div>
+          </div>`).join('')}
+      </div>
+      <div style="background:#fff8e1;border:2px solid #f59e0b;border-radius:12px;padding:12px 16px;margin-bottom:14px;font-size:13px;font-weight:800;color:#92400e;">
+        ⚠️ <strong>IMPORTANT:</strong> Parent MUST include <strong style="color:#1a56db;">${reference}</strong> in the transfer memo/description.
+      </div>
+      <button id="psCopyAllBtn" onclick="copyAllPSPaymentDetails()"
+        style="width:100%;background:linear-gradient(135deg,#1a56db,#0e9f6e);color:#fff;border:none;border-radius:14px;padding:14px;font-family:'Fredoka One',cursive;font-size:17px;cursor:pointer;margin-bottom:6px;">
+        📋 Copy All Payment Details
+      </button>
+      <div style="text-align:center;font-size:12px;color:var(--light);font-weight:700;">Paste directly into WhatsApp or email</div>`;
+
+  } catch(e) {
+    document.getElementById('psPaymentBody').innerHTML =
+      `<div style="padding:24px;color:var(--orange);font-weight:700;">Error: ${e.message}. Please try again.</div>`;
+  }
+}
+
+function copyAllPSPaymentDetails() {
+  const data = window._psPaymentCopyData;
+  if (!data) { showToast('No payment data. Please reopen the modal.', 'error'); return; }
+
+  const ref = data.reference;
+  const a   = data.account;
+
+  const text = [
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    '  STEMNEST ACADEMY — PAYMENT DETAILS',
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    '',
+    '  Bank Name:       ' + a.bankName,
+    '  Account Name:    ' + a.accountName,
+    '  Account Number:  ' + a.accountNumber,
+    '  Routing Number:  ' + a.routingNumber,
+    '  Account Type:    ' + a.accountType,
+    '  Bank Address:    ' + a.bankAddress,
+    '',
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    '  PAYMENT REFERENCE: ' + ref,
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    '',
+    '  IMPORTANT: Include the Payment Reference',
+    '  (' + ref + ') in the transfer memo/description.',
+    '',
+    '  Questions? support@stemnestacademy.co.uk',
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+  ].join('\n');
+
+  const btn = document.getElementById('psCopyAllBtn');
+  const markCopied = () => {
+    if (btn) { btn.textContent = '✅ Copied! Paste into WhatsApp or Email'; btn.style.background = '#0e9f6e';
+      setTimeout(() => { btn.textContent = '📋 Copy All Payment Details'; btn.style.background = 'linear-gradient(135deg,#1a56db,#0e9f6e)'; }, 3000); }
+    showToast('✅ Payment details copied!');
+  };
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(markCopied).catch(() => { _fallbackCopy(text); markCopied(); });
+  } else { _fallbackCopy(text); markCopied(); }
 }
