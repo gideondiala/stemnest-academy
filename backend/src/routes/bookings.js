@@ -158,43 +158,81 @@ router.post('/', async (req, res, next) => {
   try {
     const data = bookingSchema.parse(req.body);
 
-    /* Convert student's local time to WAT (UTC+1) for display in presales
-       Logic: treat the input time as occurring at the given date in the student's
-       timezone. Calculate UTC, then add 1 hour for WAT (UTC+1).
+    /* Convert student's local time to WAT (UTC+1) for display in presales.
+       Works for any timezone worldwide.
+       
+       Method: Build the actual UTC timestamp for the booking, then display it as WAT.
+       - Take the booking date+time as given in the student's timezone
+       - Find the UTC equivalent by asking: "if a clock in [timezone] shows [date] [time],
+         what is the UTC timestamp at that moment?"
+       - Then format that UTC timestamp as WAT (Africa/Lagos = UTC+1)
     */
     let watTime = data.time;
+    let tzAbbr  = '';
     try {
       if (data.timezone && data.date && data.time) {
         const [h, m] = data.time.split(':').map(Number);
+        const hh = String(h).padStart(2,'0');
+        const mm = String(m || 0).padStart(2,'0');
 
-        /* Treat the booking time as a UTC timestamp temporarily,
-           then compare what the student's timezone clock shows vs UTC.
-           The difference is the offset. */
-        const refUtc = new Date(`${data.date}T${String(h).padStart(2,'0')}:${String(m||0).padStart(2,'0')}:00Z`);
+        /* Step 1: Get the UTC offset of the student's timezone at the booking date/time.
+           We use a reference UTC timestamp and compare what each timezone shows.
+           Key insight: create reference at the booking date midnight UTC, then
+           measure the offset from both sides. */
 
-        const utcStr = refUtc.toLocaleString('en-US', { timeZone: 'UTC',        hour12: false, hour: '2-digit', minute: '2-digit' });
-        const tzStr  = refUtc.toLocaleString('en-US', { timeZone: data.timezone, hour12: false, hour: '2-digit', minute: '2-digit' });
+        /* Create an approximate UTC timestamp by assuming the time is local */
+        /* Use the actual correct method: Temporal-style offset detection */
+        /* Format the booking date/time as an ISO string, then use Intl to detect offset */
 
-        const [utcHh, utcMm] = utcStr.replace('24:', '00:').split(':').map(Number);
-        const [tzHh,  tzMm]  = tzStr.replace('24:', '00:').split(':').map(Number);
+        /* Find offset: format midnight on the booking date in the student's TZ */
+        const midnightUTC = new Date(`${data.date}T00:00:00Z`);
 
-        /* offset = (TZ clock) - (UTC clock) when using the same reference point */
-        let offsetMins = (tzHh * 60 + tzMm) - (utcHh * 60 + utcMm);
-        if (offsetMins > 720)  offsetMins -= 1440;  // handle day boundary wrap
-        if (offsetMins < -720) offsetMins += 1440;
+        /* What does the student's clock show at midnight UTC? */
+        const fmt = new Intl.DateTimeFormat('en-US', {
+          timeZone: data.timezone,
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit', second: '2-digit',
+          hour12: false
+        });
 
-        /* Student's local time → UTC → WAT */
-        const studentMins  = h * 60 + (m || 0);
-        const utcMins      = studentMins - offsetMins;
-        const watMins      = ((utcMins + 60) % 1440 + 1440) % 1440;
+        /* Parse the formatted result to get the local time components */
+        const parts = fmt.formatToParts(midnightUTC);
+        const p = {};
+        parts.forEach(part => { p[part.type] = part.value; });
 
-        const watH   = Math.floor(watMins / 60);
-        const watM   = watMins % 60;
+        /* Local time at midnight UTC in student's timezone */
+        const localH = parseInt(p.hour === '24' ? '0' : p.hour, 10);
+        const localM = parseInt(p.minute, 10);
+        const localD = parseInt(p.day, 10);
+
+        /* Offset in minutes: if student's clock shows 01:00 when UTC is 00:00,
+           offset = +60 (UTC+1). If it shows 23:00 when UTC is 00:00, offset = -60 (UTC-1). */
+        let tzOffsetMins = localH * 60 + localM;
+        if (localD > 1) tzOffsetMins -= 1440; // student's TZ is behind UTC (went to previous day)
+
+        /* Convert student local time to UTC */
+        const studentTotalMins = h * 60 + (m || 0);
+        const utcTotalMins     = studentTotalMins - tzOffsetMins;
+
+        /* Convert UTC to WAT (Africa/Lagos = UTC+1 = +60 mins) */
+        const watTotalMins = ((utcTotalMins + 60) % 1440 + 1440) % 1440;
+        const watH   = Math.floor(watTotalMins / 60);
+        const watM   = watTotalMins % 60;
         const period = watH >= 12 ? 'PM' : 'AM';
         const wh12   = watH % 12 === 0 ? 12 : watH % 12;
         watTime = `${wh12}:${String(watM).padStart(2,'0')} ${period} WAT`;
 
-        logger.info(`[TZ] ${data.timezone} ${data.time} (offset ${offsetMins}min) → WAT ${watTime}`);
+        /* Get timezone abbreviation for display in presales */
+        try {
+          const abbrParts = new Intl.DateTimeFormat('en-US', {
+            timeZone: data.timezone,
+            timeZoneName: 'short'
+          }).formatToParts(new Date(`${data.date}T${hh}:${mm}:00Z`));
+          const abbrPart = abbrParts.find(p => p.type === 'timeZoneName');
+          tzAbbr = abbrPart ? abbrPart.value : '';
+        } catch(e2) { /* silent */ }
+
+        logger.info(`[TZ] ${data.timezone} ${hh}:${mm} (offset ${tzOffsetMins}min) → ${watTime} | abbr: ${tzAbbr}`);
       }
     } catch(e) {
       logger.warn('[BOOKING] WAT conversion failed:', e.message);
@@ -215,7 +253,8 @@ router.post('/', async (req, res, next) => {
          parentName:  data.parentName,
          device:      data.device,
          timezone:    data.timezone,
-         timeLocal:   data.time,       // student's local time
+         tzAbbr:      tzAbbr,
+         timeLocal:   data.time,       // student's local time (HH:MM)
          timeWAT:     watTime,         // WAT equivalent
        })]
     );
