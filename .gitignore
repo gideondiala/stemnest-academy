@@ -38,3 +38,26 @@ venv/
 # Logs
 *.log
 logs/
+
+# Debug scripts
+backend/check-*.js
+backend/test-*.js
+backend/run-*.js
+backend/restore-*.js
+backend/fix-*.js
+backend/patch-*.js
+backend/src/db/add-*.sql
+test_smtp2.js
+add-clarity.py
+add-tiktok.py
+add_enrollment_tables.js
+audit.ps1
+openapi.json
+Conversation.txt
+STEMNEST_SYSTEM_BREAKDOWN.md
+STUDENT_JOURNEY.md
+LESSON_SCHEDULING_SPEC.md
+ads-guide.md
+Task.txt
+Task2.txt
+TEST_CREDENTIALS.txt
