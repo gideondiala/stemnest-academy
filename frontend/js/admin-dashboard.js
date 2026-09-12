@@ -1443,3 +1443,160 @@ document.addEventListener('DOMContentLoaded', () => {
   const overlay = document.getElementById('addMaterialOverlay');
   overlay?.addEventListener('click', e => { if (e.target === overlay) closeAddMaterialModal(); });
 });
+
+/* ══════════════════════════════════════════════════════
+   ALL STUDENTS TAB
+   Loads all students from API, filterable by status,
+   searchable by name/email/student ID.
+   "View Dashboard" button impersonates the student.
+══════════════════════════════════════════════════════ */
+
+let _allStudents = [];
+let _studentFilter = '';
+let _studentSearch = '';
+
+async function _loadStudents() {
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    if (!token) return;
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/users?role=student', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    _allStudents = (data.users || []).map(u => {
+      /* Determine student status */
+      let status = 'demo';
+      if (!u.is_active) {
+        status = 'discontinued';
+      } else if (u.credits > 0 || u.credits === 0) {
+        /* Has a student_profiles record with credits — they are a paid student */
+        status = 'paid';
+      }
+      /* If credits are null they've only done a demo */
+      if (u.credits === null || u.credits === undefined) status = 'demo';
+      /* If suspended treat as discontinued for display */
+      if (u.credits !== null && u.credits <= -2) status = 'discontinued';
+
+      return {
+        id:        u.id,
+        staffId:   u.staff_id || '—',
+        name:      u.name,
+        email:     u.email,
+        grade:     u.grade || '—',
+        credits:   u.credits !== null && u.credits !== undefined ? u.credits : null,
+        status:    status,
+        isActive:  u.is_active,
+        createdAt: u.created_at,
+      };
+    });
+
+    /* Update badge count */
+    const badgeEl = document.getElementById('studentBadge');
+    if (badgeEl) badgeEl.textContent = _allStudents.length;
+
+    filterStudents();
+  } catch(e) {
+    console.warn('[Admin] Failed to load students:', e.message);
+  }
+}
+
+function filterStudents() {
+  _studentFilter = document.getElementById('studentFilterStatus')?.value || '';
+  _studentSearch = (document.getElementById('studentSearchInput')?.value || '').toLowerCase().trim();
+
+  let list = _allStudents;
+
+  if (_studentFilter) {
+    list = list.filter(s => s.status === _studentFilter);
+  }
+
+  if (_studentSearch) {
+    list = list.filter(s =>
+      s.name?.toLowerCase().includes(_studentSearch) ||
+      s.email?.toLowerCase().includes(_studentSearch) ||
+      s.staffId?.toLowerCase().includes(_studentSearch)
+    );
+  }
+
+  renderStudentsTable(list);
+}
+
+function renderStudentsTable(list) {
+  const tbody = document.getElementById('studentsTableBody');
+  if (!tbody) return;
+
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--light);font-weight:700;">No students found.</td></tr>';
+    return;
+  }
+
+  const statusBadge = {
+    paid:         '<span style="background:#d1fae5;color:#065f46;font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">💚 Active</span>',
+    demo:         '<span style="background:#fff3e0;color:#e65100;font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">🎓 Demo</span>',
+    discontinued: '<span style="background:#fde8e8;color:#c53030;font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">🔴 Discontinued</span>',
+  };
+
+  tbody.innerHTML = list.map(s => {
+    const creditsDisplay = s.credits !== null ? s.credits : '—';
+    const creditsColor   = s.credits !== null && s.credits <= 0 ? 'color:#c53030;font-weight:900;' : '';
+    const enrolledDate   = s.createdAt ? new Date(s.createdAt).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }) : '—';
+
+    /* View Dashboard button — only for paid and discontinued (not demo — no student dashboard) */
+    const viewBtn = (s.status === 'paid' || s.status === 'discontinued')
+      ? `<button class="ab-btn ab-btn-view" onclick="impersonateStudent('${s.id}')" title="Open this student's dashboard as them">👁 View Dashboard</button>`
+      : '<span style="font-size:12px;color:var(--light);font-weight:700;">Demo only</span>';
+
+    return `<tr>
+      <td><span style="font-family:'Fredoka One',cursive;font-size:12px;color:var(--blue);">${s.staffId}</span></td>
+      <td><strong>${s.name}</strong></td>
+      <td style="font-size:12px;">${s.email}</td>
+      <td style="font-size:13px;">${s.grade}</td>
+      <td style="font-size:13px;${creditsColor}">${creditsDisplay}</td>
+      <td>${statusBadge[s.status] || s.status}</td>
+      <td style="font-size:12px;">${enrolledDate}</td>
+      <td style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">${viewBtn}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function impersonateStudent(studentId) {
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    if (!token) { showToast('Session expired. Please log in again.', 'error'); return; }
+
+    const btn = event.target;
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Opening…'; }
+
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/auth/impersonate/' + studentId, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+
+    const data = await res.json();
+    if (btn) { btn.disabled = false; btn.textContent = '👁 View Dashboard'; }
+
+    if (!data.success) {
+      showToast(data.error || 'Failed to open student dashboard', 'error');
+      return;
+    }
+
+    /* Open student dashboard in new tab with impersonation token */
+    const url = '/pages/student-dashboard.html?impersonate=1&token=' + encodeURIComponent(data.token) + '&studentId=' + encodeURIComponent(studentId);
+    window.open(url, '_blank');
+
+  } catch(e) {
+    showToast('Network error — could not open student dashboard.', 'error');
+    console.error('[Impersonate]', e);
+  }
+}
+
+/* Hook All Students into showAdminTab */
+(function() {
+  var _prev = window.showAdminTab;
+  window.showAdminTab = function(tab) {
+    if (!ADMIN_TABS.includes('students')) ADMIN_TABS.push('students');
+    if (typeof _prev === 'function') _prev(tab);
+    if (tab === 'students') _loadStudents();
+  };
+})();

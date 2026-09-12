@@ -413,4 +413,58 @@ router.post('/impersonate/:userId', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+/* ══════════════════════════════════════════════════════
+   POST /api/auth/impersonate/:studentId
+   Admin/super_admin only — generates a short-lived token
+   for a student so admin can view their dashboard.
+══════════════════════════════════════════════════════ */
+router.post('/impersonate/:studentId', requireAuth, async (req, res, next) => {
+  try {
+    /* Only admin and super_admin can impersonate */
+    if (!['admin', 'super_admin'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, error: 'Access denied — admin only' });
+    }
+
+    const { studentId } = req.params;
+
+    /* Look up the student */
+    const result = await pool.query(
+      `SELECT u.id, u.name, u.email, u.role, u.staff_id, u.is_active
+       FROM users u
+       WHERE u.id = $1 AND u.role = 'student'`,
+      [studentId]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, error: 'Student not found' });
+    }
+
+    const student = result.rows[0];
+
+    /* Generate a short-lived token (15 minutes) */
+    const impersonationToken = jwt.sign(
+      {
+        id:            student.id,
+        email:         student.email,
+        role:          student.role,
+        staffId:       student.staff_id,
+        impersonated:  true,
+        impersonatedBy: req.user.id,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+
+    logger.info(`[IMPERSONATE] Admin ${req.user.email} opened dashboard for student ${student.email} (${student.id})`);
+
+    res.json({
+      success:     true,
+      token:       impersonationToken,
+      studentName: student.name,
+      expiresIn:   '15 minutes',
+    });
+
+  } catch (err) { next(err); }
+});
+
 module.exports = router;

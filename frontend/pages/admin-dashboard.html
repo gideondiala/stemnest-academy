@@ -78,6 +78,8 @@
       <a class="sidebar-link active" data-tab="bookings"   onclick="showAdminTab('bookings')">  <span class="sl-icon">📋</span> All Bookings <span class="sl-badge" id="newBadge">0</span></a>
       <a class="sidebar-link"        data-tab="scheduled"  onclick="showAdminTab('scheduled')"> <span class="sl-icon">📅</span> Scheduled</a>
       <a class="sidebar-link"        data-tab="completed"  onclick="showAdminTab('completed')"> <span class="sl-icon">✅</span> Completed</a>
+      <div class="sidebar-section-label">Students</div>
+      <a class="sidebar-link" data-tab="students" onclick="showAdminTab('students')"><span class="sl-icon">🎓</span> All Students <span class="sl-badge" id="studentBadge">0</span></a>
       <div class="sidebar-section-label">Teachers</div>
       <a class="sidebar-link"        data-tab="tutors"      onclick="showAdminTab('tutors')">      <span class="sl-icon">👩‍🏫</span> All Teachers <span class="sl-badge" id="teacherBadge">0</span></a>
       <a class="sidebar-link"        data-tab="add-teacher" onclick="showAdminTab('add-teacher')"> <span class="sl-icon">➕</span> Add Teacher</a>
@@ -702,6 +704,39 @@ The &quot;answer&quot; field is the index (0-3) of the correct option. Generate 
         <button class="btn btn-outline" style="font-size:13px;" onclick="showAdminTab('pathways')">← Back to Pathways</button>
       </div>
       <div id="pathwayDetailContent"></div>
+    </div>
+
+    <!-- ── TAB: ALL STUDENTS ── -->
+    <div id="tab-students" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🎓 All Students</div>
+        <div class="admin-filters">
+          <input type="text" id="studentSearchInput" placeholder="🔍 Search name, email, student ID..." class="admin-search" oninput="filterStudents()">
+          <select id="studentFilterStatus" class="admin-filter-sel" onchange="filterStudents()">
+            <option value="">All Students</option>
+            <option value="paid">💚 Paid / Active</option>
+            <option value="demo">🎓 Demo Only</option>
+            <option value="discontinued">🔴 Discontinued</option>
+          </select>
+        </div>
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr>
+            <th>Student ID</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Grade</th>
+            <th>Credits</th>
+            <th>Status</th>
+            <th>Enrolled</th>
+            <th>Actions</th>
+          </tr></thead>
+          <tbody id="studentsTableBody">
+            <tr><td colspan="8" style="text-align:center;padding:32px;color:var(--light);">Loading students…</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
   </div><!-- end dash-main -->
