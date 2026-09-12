@@ -703,9 +703,11 @@ function joinClass(classLink) {
    LESSONS TAB — Upcoming + Completed with unit grouping
 ══════════════════════════════════════════════════════ */
 let _lessonsActiveTab = 'upcoming';
+let _upcomingLessonsShown = 8; // number currently visible
 
 function renderLessons(tab) {
   if (tab) _lessonsActiveTab = tab;
+  if (tab === 'upcoming') _upcomingLessonsShown = 8;
   const el = document.getElementById('lessonsList');
   if (!el) return;
 
@@ -735,7 +737,9 @@ function renderLessons(tab) {
       el.innerHTML = headerHtml + '<div class="empty-state">No upcoming lessons scheduled yet.</div>';
       return;
     }
-    el.innerHTML = headerHtml + upcoming.map(function(l, i) {
+    /* Show _upcomingLessonsShown lessons, with See More button */
+    var visibleUpcoming = upcoming.slice(0, _upcomingLessonsShown);
+    var cardsHtml = visibleUpcoming.map(function(l, i) {
       var isLive      = l.status === 'live';
       var isSuspended = window._studentCreditsSuspended === true;
       var lessonLabel = l.lessonNumber ? 'Lesson ' + l.lessonNumber + (l.totalLessons ? ' of ' + l.totalLessons : '') : '';
@@ -758,6 +762,19 @@ function renderLessons(tab) {
         '</div>' +
       '</div>';
     }).join('');
+    /* See More button if there are more lessons */
+    var seeMoreBtn = '';
+    if (upcoming.length > _upcomingLessonsShown) {
+      var remaining = upcoming.length - _upcomingLessonsShown;
+      seeMoreBtn = '<div style="text-align:center;margin-top:8px;">' +
+        '<button onclick="_upcomingLessonsShown += 8; renderLessons();" ' +
+          'style="background:#fff;border:2px solid #e8eaf0;border-radius:12px;padding:11px 28px;' +
+          'font-family:\"Nunito\",sans-serif;font-weight:900;font-size:14px;cursor:pointer;color:var(--blue);width:100%;">' +
+          '⬇ See ' + Math.min(remaining, 8) + ' More Lessons' +
+        '</button>' +
+      '</div>';
+    }
+    el.innerHTML = headerHtml + cardsHtml + seeMoreBtn;
 
   } else {
     /* ── COMPLETED LESSONS — grouped by unit ── */
