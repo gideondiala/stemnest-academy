@@ -251,7 +251,7 @@ function renderUpcomingCards() {
 
   /* Filter to scheduled only, sort by date+time ascending, take first 3 */
   var upcoming = allBookings
-    .filter(function(b) { return b.status === 'scheduled'; })
+    .filter(function(b) { return b.status === 'scheduled' && b.creditsSuspended !== true; })
     .sort(function(a, b) {
       /* Normalise date: strip T... suffix if present */
       var da = (a.date || '').split('T')[0];
@@ -291,7 +291,7 @@ function renderUpcomingCards() {
     /* Normalise date and time from API format */
     var dateStr  = (b.date || '').split('T')[0];  /* "2026-05-22T00:00:00.000Z" → "2026-05-22" */
     var timeStr  = (b.time || '').replace(/^(\d{1,2}:\d{2}):\d{2}$/, '$1');  /* "23:11:00" → "23:11" */
-    var isDemo   = b.isDemoClass || !b.paymentAmount;
+    var isDemo   = b.isDemoClass;
     var accent   = isDemo ? '#ff6b35' : colors[idx];
     var typeBadge = isDemo
       ? '<span style="background:#fff3e0;color:#e65100;font-size:10px;font-weight:900;padding:2px 8px;border-radius:50px;">🎓 DEMO</span>'
@@ -314,30 +314,64 @@ function renderUpcomingCards() {
       timeDisplay = h12 + ':' + mm + ' ' + period;
     } catch(e) {}
 
-    /* Check if teacher has joined (in-memory) */
-    var hasJoined = typeof joinedSessions !== 'undefined' && joinedSessions.has(b.id);
+    /* 15-minute enforcement: End button only active 15 mins after Join.
+       Use localStorage as the source of truth — survives page refresh and
+       60-second auto-reload. The in-memory joinedSessions Set is NOT reliable
+       because it resets on every page refresh. */
+    var endReady = false;
+    var endTooltip = 'Join class first, then End becomes active';
+    try {
+      var startTimes = JSON.parse(localStorage.getItem('sn_session_start_times') || '{}');
+      var joinTime = startTimes[b.id];
+      if (joinTime) {
+        /* Teacher has a join timestamp — sync it back to the in-memory Set */
+        if (typeof joinedSessions !== 'undefined') joinedSessions.add(b.id);
+        var elapsedMins = (now - new Date(joinTime)) / 60000;
+        if (elapsedMins >= 15) {
+          endReady = true;
+        } else {
+          var minsLeft = Math.ceil(15 - elapsedMins);
+          endTooltip = 'Available in ' + minsLeft + ' min' + (minsLeft !== 1 ? 's' : '');
+        }
+      }
+    } catch(e) { /* silent */ }
 
-    /* End button: active only after joining */
-    var endStyle = hasJoined
+    /* Check if student is suspended */
+    var isSuspended = b.creditsSuspended === true;
+
+    /* End button: active only after 15 mins post-join */
+    var endStyle = endReady
       ? 'background:#c53030;color:#fff;border:none;border-radius:12px;padding:10px 14px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:12px;cursor:pointer;flex:1;'
       : 'background:#c53030;color:rgba(255,255,255,.4);border:none;border-radius:12px;padding:10px 14px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:12px;cursor:not-allowed;flex:1;opacity:.5;';
-    var endAttr = hasJoined
+    var endAttr = endReady
       ? 'onclick="openEndClassDialogV2(\'' + b.id + '\')"'
-      : 'disabled title="Join class first, then End becomes active"';
+      : 'disabled title="' + endTooltip + '"';
 
-    card.style.borderTopColor = accent;
+    /* Join button — disabled + warning if student is suspended */
+    var joinBtn = isSuspended
+      ? '<button style="background:#7c3aed;color:#fff;border:none;border-radius:12px;padding:10px 14px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:11px;cursor:pointer;flex:1;" ' +
+        'onclick="showSuspendedSlotWarning(\'' + b.id + '\')">🔒 Paused</button>'
+      : '<button style="background:#0e9f6e;color:#fff;border:none;border-radius:12px;padding:10px 14px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:12px;cursor:pointer;flex:1;" ' +
+        'onclick="teacherJoinClass(\'' + b.id + '\',\'' + (b.classLink || '') + '\')">🚀 Join</button>';
+
+    card.style.borderTopColor = isSuspended ? '#7c3aed' : accent;
     card.innerHTML =
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">' +
-        '<div style="font-family:\'Fredoka One\',cursive;font-size:12px;color:' + accent + ';text-transform:uppercase;letter-spacing:.5px;">' + titles[idx] + '</div>' +
-        typeBadge +
+        '<div style="font-family:\'Fredoka One\',cursive;font-size:12px;color:' + (isSuspended ? '#7c3aed' : accent) + ';text-transform:uppercase;letter-spacing:.5px;">' + titles[idx] + '</div>' +
+        (isSuspended ? '<span style="background:#f5f3ff;color:#7c3aed;font-size:10px;font-weight:900;padding:2px 8px;border-radius:50px;">🔒 PAUSED</span>' : typeBadge) +
       '</div>' +
-      '<div style="font-family:\'Fredoka One\',cursive;font-size:18px;color:#1a202c;line-height:1.2;margin-bottom:4px;">' + (b.studentName || '—') + '</div>' +
-      '<div style="font-size:13px;font-weight:700;color:#4a5568;margin-bottom:2px;">🕐 ' + timeDisplay + ' · ' + dateDisplay + '</div>' +
-      '<div style="font-size:13px;font-weight:700;color:#4a5568;margin-bottom:2px;">📚 ' + (b.subject || '—') + (b.grade ? ' · ' + b.grade : '') + '</div>' +
-      (b.classLink ? '<div style="font-size:11px;color:#1a56db;font-weight:700;">🔗 Class link ready</div>' : '<div style="font-size:11px;color:#a0aec0;font-weight:700;">⏳ No class link yet</div>') +
+      /* TIME first */
+      '<div style="font-family:\'Fredoka One\',cursive;font-size:20px;color:#1a202c;line-height:1.2;margin-bottom:2px;">🕐 ' + timeDisplay + '</div>' +
+      /* LESSON TOPIC / SUBJECT */
+      '<div style="font-size:13px;font-weight:800;color:#4a5568;margin-bottom:2px;">' + (b.lessonName || b.courseName || b.subject || '—') + (b.lessonNumber ? ' · Lesson ' + b.lessonNumber : '') + '</div>' +
+      /* STUDENT NAME */
+      '<div style="font-size:13px;font-weight:700;color:#718096;margin-bottom:2px;">👤 ' + (b.studentName || '—') + (b.grade ? ' · ' + b.grade : '') + '</div>' +
+      '<div style="font-size:12px;font-weight:700;color:#718096;margin-bottom:4px;">📅 ' + dateDisplay + '</div>' +
+      (isSuspended
+        ? '<div style="font-size:11px;color:#7c3aed;font-weight:700;">⚠️ Credits paused — contact parent to top up</div>'
+        : (b.classLink ? '<div style="font-size:11px;color:#1a56db;font-weight:700;">🔗 Class link ready</div>' : '<div style="font-size:11px;color:#a0aec0;font-weight:700;">⏳ No class link yet</div>')) +
       '<div style="display:flex;gap:8px;margin-top:auto;padding-top:10px;">' +
-        '<button style="background:#0e9f6e;color:#fff;border:none;border-radius:12px;padding:10px 14px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:12px;cursor:pointer;flex:1;" ' +
-        'onclick="teacherJoinClass(\'' + b.id + '\',\'' + (b.classLink || '') + '\')">🚀 Join</button>' +
+        joinBtn +
         '<button style="' + endStyle + '" ' + endAttr + '>🔴 End</button>' +
       '</div>';
   }
@@ -489,23 +523,23 @@ function _handleOutcome(bookingId, booking, isDemo, outcome) {
 /* ── PAID CLASS OUTCOMES ── */
 function _handlePaidOutcome(bookingId, booking, outcome, rates) {
   if (outcome === 'completed') {
-    // Full pay, deduct 1 credit, mark completed
-    _addEarnings(rates.paid);
-    _deductStudentCredit(booking);
-    _updateBookingStatus(bookingId, 'completed', { completedAt: new Date().toISOString() });
-    recordClassSession(booking, 'completed', '', rates.paid, true);
-    /* Push to real API */
-    if (typeof pushClassReport === 'function') {
-      pushClassReport(bookingId, { outcome: 'completed', payAmount: rates.paid, creditDeducted: true });
-    }
-    if (typeof pushCreditsUpdate === 'function' && booking.email) {
-      var students = JSON.parse(_getLocalStr('sn_students') || '[]');
-      var s = students.find(function(st) { return st.email === booking.email || st.id === booking.studentId; });
-      if (s) pushCreditsUpdate(booking.email, s.credits, 'class_deduction', 'Class completed', bookingId);
-    }
-    _refreshOverviewCards();
-    showToast('\u2705 Class completed! \u00a3' + rates.paid.toFixed(2) + ' added to earnings.', 'success');
-    renderUpcomingCards();
+    /* Open the full end-class report modal (Quality, Interest, Purchasing Power, Notes, Recording)
+       That modal calls submitEndClassReport() which saves to the DB API properly */
+    var modalOverlay = document.getElementById('endClassModalOverlay');
+    var titleEl = document.getElementById('endClassModalTitle');
+    var infoEl  = document.getElementById('endClassBookingInfo');
+    if (titleEl) titleEl.textContent = '📋 End Class Report';
+    if (infoEl)  infoEl.innerHTML =
+      '\uD83C\uDF93 <strong>' + (booking.studentName || '—') + '</strong>' +
+      ' &nbsp;\u00b7&nbsp; \uD83D\uDCDA <strong>' + (booking.subject || '—') + '</strong>' +
+      ' &nbsp;\u00b7&nbsp; \uD83D\uDCC5 ' + (booking.date || '—') + ' at ' + (booking.time || '—');
+    /* Pre-select "completed" in the modal */
+    var completedRadio = document.querySelector('input[name="classOutcome"][value="completed"]');
+    if (completedRadio) { completedRadio.checked = true; if (typeof toggleOutcomeFields === 'function') toggleOutcomeFields(); }
+    /* Store the booking ID so submitEndClassReport knows which booking */
+    window.activeEndClassId = bookingId;
+    if (modalOverlay) modalOverlay.classList.add('open');
+    return;
 
   } else if (outcome === 'partially_completed') {
     _showPartiallyCompletedDialog(bookingId, booking, rates);
@@ -672,59 +706,23 @@ function _handleDemoOutcome(bookingId, booking, outcome, rates) {
   var tutor = getCurrentTutor();
 
   if (outcome === 'completed') {
-    // Add demo pay, mark completed, send lead to sn_sales_leads
-    _addEarnings(rates.demo);
-    _updateBookingStatus(bookingId, 'completed', { completedAt: new Date().toISOString() });
-    recordClassSession(booking, 'completed', '', rates.demo, false);
-
-    // Send to sales leads
-    try {
-      var leads = JSON.parse(_getLocalStr('sn_sales_leads') || '[]');
-      leads.unshift({
-        id:             'LEAD-' + Date.now().toString(36).toUpperCase(),
-        bookingId:      bookingId,
-        studentName:    booking.studentName,
-        grade:          booking.grade,
-        age:            booking.age,
-        subject:        booking.subject,
-        email:          booking.email,
-        whatsapp:       booking.whatsapp,
-        date:           booking.date,
-        time:           booking.time,
-        leadOwner:      tutor.name,
-        leadOwnerId:    tutor.id,
-        leadOwnerType:  'teacher',
-        status:         'new',
-        source:         'demo_completed_v2',
-        createdAt:      new Date().toISOString()
-      });
-      _setLocalStr('sn_sales_leads', JSON.stringify(leads));
-    // Save to sn_completed_demos for Pre-Sales Completed tab
-    try {
-      var completed = JSON.parse(_getLocalStr('sn_completed_demos') || '[]');
-      completed.unshift({
-        id:          'COMP-' + Date.now().toString(36).toUpperCase(),
-        bookingId:   bookingId,
-        studentName: booking.studentName,
-        grade:       booking.grade,
-        age:         booking.age,
-        subject:     booking.subject,
-        email:       booking.email,
-        whatsapp:    booking.whatsapp,
-        date:        booking.date,
-        time:        booking.time,
-        tutorName:   tutor.name,
-        tutorId:     tutor.id,
-        completedAt: new Date().toISOString()
-      });
-      _setLocalStr('sn_completed_demos', JSON.stringify(completed));
-    } catch (e) { /* silent */ }
-
-    } catch (e) { /* silent */ }
-
-    _refreshOverviewCards();
-    showToast('\u2705 Demo complete! \u00a3' + rates.demo.toFixed(2) + ' added. Lead sent to Sales.', 'success');
-    renderUpcomingCards();
+    /* Open the full end-class report modal — same as paid class.
+       This ensures Quality, Interest, Purchasing Power, Notes fields are always filled.
+       The modal's submitEndClassReport() handles all backend calls. */
+    var modalOverlay = document.getElementById('endClassModalOverlay');
+    var titleEl = document.getElementById('endClassModalTitle');
+    var infoEl  = document.getElementById('endClassBookingInfo');
+    if (titleEl) titleEl.textContent = '🎓 End Demo Class Report';
+    if (infoEl)  infoEl.innerHTML =
+      '\uD83C\uDF93 <strong>' + (booking.studentName || '—') + '</strong>' +
+      ' &nbsp;\u00b7&nbsp; \uD83D\uDCDA <strong>' + (booking.subject || '—') + '</strong>' +
+      ' &nbsp;\u00b7&nbsp; \uD83D\uDCC5 ' + (booking.date || '—') + ' at ' + (booking.time || '—');
+    /* Pre-select "completed" in the modal */
+    var completedRadio = document.querySelector('input[name="classOutcome"][value="completed"]');
+    if (completedRadio) { completedRadio.checked = true; if (typeof toggleOutcomeFields === 'function') toggleOutcomeFields(); }
+    window.activeEndClassId = bookingId;
+    if (modalOverlay) modalOverlay.classList.add('open');
+    return;
 
   } else if (outcome === 'partially_completed') {
     _showPartiallyCompletedDialog(bookingId, booking, rates);
@@ -760,8 +758,22 @@ function _refreshOverviewCards() {
         if (earningsEl) earningsEl.textContent = '£' + total;
         var liveEl = document.getElementById('liveEarnings');
         if (liveEl) liveEl.textContent = '£' + total;
+
+        var pEl = document.getElementById('overviewPoints');
+        if (pEl) pEl.textContent = d.user.points || 0;
+        var tpEl = document.getElementById('totalPoints');
+        if (tpEl) tpEl.textContent = d.user.points || 0;
       }
     }).catch(function() { /* silent */ });
+
+    /* ── Class counts from bookings data ── */
+    var allBk = (window.TUTOR_DATA && window.TUTOR_DATA.bookings) ? window.TUTOR_DATA.bookings : [];
+    var completedDemos = allBk.filter(function(b) { return b.status === 'completed' && (b.isDemoClass === true || b.isDemoClass === 'true'); }).length;
+    var completedPaid  = allBk.filter(function(b) { return b.status === 'completed' && b.isDemoClass !== true && b.isDemoClass !== 'true'; }).length;
+    var demoEl = document.getElementById('statCompletedDemo');
+    if (demoEl) demoEl.textContent = completedDemos;
+    var paidEl = document.getElementById('statCompletedPaid');
+    if (paidEl) paidEl.textContent = completedPaid;
   }
 }
 

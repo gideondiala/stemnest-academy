@@ -241,12 +241,12 @@ async function _loadTutorFromAPI() {
         return {
           id:              b.id,
           dbId:            b.id,
-          studentName:     b.lesson_name || notes.studentName || '—',
+          studentName:     b.student_name || notes.studentName || b.lesson_name || '—',
           studentId:       b.student_id || '',
           age:             notes.age || b.grade || '—',
           grade:           b.grade || notes.grade || '—',
           email:           b.student_email || notes.email || '—',
-          whatsapp:        notes.whatsapp || '—',
+          whatsapp:        notes.whatsapp || notes.phone || b.student_phone || b.whatsapp || '—',
           subject:         b.subject || '—',
           date:            b.date ? b.date.split('T')[0] : '—',
           time:            notes.time || b.time || '—',
@@ -256,19 +256,24 @@ async function _loadTutorFromAPI() {
           classLink:       b.class_link || '',
           paidScheduled:   notes.paidScheduled || false,
           isRecurring:     b.is_recurring,
-          isDemoClass:     b.is_demo || !b.payment_amount,
+          isDemoClass:     b.is_demo === true,
           paymentAmount:   b.payment_amount,
-          lessonName:      b.lesson_name_full || b.lesson_name || '',
-          lessonNumber:    b.lesson_number,
-          totalLessons:    b.total_lessons,
+          lessonName:      b.lesson_title_full || b.lesson_name_full || b.pathway_lesson_title || '',
+          lessonNumber:    b.lesson_number_in_grade || b.lesson_number || null,
+          totalLessons:    b.total_lessons || null,
           activityLink:    b.lesson_activity || b.activity_link || '',
           slidesLink:      b.lesson_slides   || b.slides_link || '',
+          pathwayLessonId: b.pathway_lesson_id || b.pathway_lesson_id_joined || null,
           courseName:      b.course_name || '',
           bookedAt:        b.booked_at || b.created_at,
           scheduledAt:     b.scheduled_at,
+          creditsSuspended: b.student_credits_suspended === true || b.student_credits_suspended === 'true',
         };
       });
     }
+
+    /* ── Render overview stats from real API data ── */
+    _renderOverviewStats();
 
   } catch (e) {
     console.warn('[Dashboard] API load failed:', e.message);
@@ -588,8 +593,29 @@ function renderWeeklyCalendar() {
       if (bookedEntry) {
         /* ── BOOKED SLOT ── */
         const b       = bookedEntry.booking;
-        const isDemo  = b.status === 'demo' || !b.paymentAmount || b.isDemoStudent;
+        const isDemo  = b.isDemoClass === true;
         const isFirst = slot.mins === bookedEntry.timeMins;
+        const isSuspended = b.creditsSuspended === true;
+
+        /* Suspended student — grey slot with warning */
+        if (isSuspended) {
+          if (isFirst) {
+            html += `<td class="wcal-slot wcal-paid-booked"
+              style="background:#f5f3ff;border:2px solid #7c3aed;opacity:.85;cursor:pointer;"
+              onclick="showSuspendedSlotWarning('${b.id}')"
+              title="⚠️ Classes paused — ${b.studentName}">
+              <div class="wcal-booked-inner" style="background:transparent;">
+                <div class="wcal-booked-label" style="color:#5b21b6;">⚠️ ${b.studentName}</div>
+                <div class="wcal-booked-sub" style="color:#7c3aed;">Classes Paused</div>
+              </div>
+            </td>`;
+          } else {
+            html += `<td class="wcal-slot wcal-paid-booked wcal-booked-cont"
+              style="background:#f5f3ff;border:2px solid #7c3aed;opacity:.85;"
+              onclick="showSuspendedSlotWarning('${b.id}')"></td>`;
+          }
+        } else {
+
         const cls     = isDemo ? 'wcal-slot wcal-demo-booked' : 'wcal-slot wcal-paid-booked';
         const isRecurring = b.isRecurring;
 
@@ -619,6 +645,8 @@ function renderWeeklyCalendar() {
         } else {
           html += `<td class="${cls} wcal-booked-cont" onclick="showBookingPopup('${b.id}')"></td>`;
         }
+
+        } /* end non-suspended else */
 
       } else if (isPastSlot) {
         /* ── PAST SLOT — not clickable ── */
@@ -666,7 +694,7 @@ function showBookingPopup(bookingId) {
   const b   = all.find(x => x.id === bookingId);
   if (!b) return;
 
-  const isDemo = b.isDemoClass || !b.paymentAmount;
+  const isDemo = b.isDemoClass === true;
   const phone  = b.whatsapp || b.phone || '—';
   // Strip seconds from time
   const timeDisplay = (b.time || '—').replace(/^(\d{1,2}:\d{2}):\d{2}$/, '$1');
@@ -709,13 +737,15 @@ function showBookingPopup(bookingId) {
           ${b.classLink
             ? `<a href="${b.classLink}" target="_blank" onclick="teacherJoinClass('${b.id}','${b.classLink}')" style="display:block;background:var(--blue);color:#fff;text-align:center;padding:12px;border-radius:12px;font-weight:900;font-size:13px;text-decoration:none;">🚀 Join Class</a>`
             : `<button onclick="showToast('No class link set yet. Contact admin.','error')" style="background:var(--blue);color:#fff;border:none;border-radius:12px;padding:12px;font-weight:900;font-size:13px;cursor:pointer;width:100%;">🚀 Join Class</button>`}
-          <button onclick="document.getElementById('calBookingPopup').remove();openEndSessionModal('${b.id}')" style="background:var(--orange);color:#fff;border:none;border-radius:12px;padding:12px;font-family:'Nunito',sans-serif;font-weight:900;font-size:13px;cursor:pointer;">🔴 End Demo</button>
+          <button onclick="document.getElementById('calBookingPopup').remove();openEndClassModal('${b.id}')" style="background:var(--orange);color:#fff;border:none;border-radius:12px;padding:12px;font-family:'Nunito',sans-serif;font-weight:900;font-size:13px;cursor:pointer;">🔴 End Demo</button>
         </div>
         <button onclick="document.getElementById('calBookingPopup').remove()" style="width:100%;background:var(--bg);border:1.5px solid #e8eaf0;border-radius:12px;padding:10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;cursor:pointer;color:var(--mid);">Close</button>
       </div>`;
   } else {
     // PAID popup: topic, date, time, student phone, join, end, reschedule, close
-    const topic = b.lessonName || b.courseName || b.subject || '—';
+    // If lessonName equals studentName (no pathway linked), fall back to courseName/subject
+    const lessonTitle = (b.lessonName && b.lessonName !== b.studentName) ? b.lessonName : null;
+    const topic = lessonTitle || b.courseName || b.subject || '—';
     popup.innerHTML = `
       <div style="background:var(--white);border-radius:20px;padding:28px 32px;max-width:440px;width:100%;box-shadow:0 16px 60px rgba(0,0,0,.25);">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
@@ -733,9 +763,10 @@ function showBookingPopup(bookingId) {
             ⏱ Duration: <strong>${b.duration || '60 mins'}</strong>
           </div>
         </div>
-        ${(b.activityLink || b.slidesLink) ? `
+        ${(b.activityLink || b.slidesLink || b.pathwayLessonId) ? `
         <div style="background:var(--bg);border-radius:12px;padding:14px;margin-bottom:14px;">
           <div style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:var(--light);margin-bottom:8px;">📎 Class Resources</div>
+          ${b.pathwayLessonId ? `<a href="/pages/lesson-materials.html?lessonId=${b.pathwayLessonId}&bookingId=${b.id}" target="_blank" style="display:flex;align-items:center;gap:8px;background:#dbeafe;border:1.5px solid var(--blue);border-radius:10px;padding:10px 14px;text-decoration:none;color:var(--blue);font-weight:900;font-size:13px;margin-bottom:8px;">📖 View Lesson Materials <span style="margin-left:auto;font-size:11px;">Open ↗</span></a>` : ''}
           ${b.activityLink ? `<a href="${b.activityLink}" target="_blank" style="display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid #e8eaf0;border-radius:10px;padding:10px 14px;text-decoration:none;color:var(--dark);font-weight:800;font-size:13px;margin-bottom:8px;">🔗 Activity / Class Material <span style="margin-left:auto;color:var(--blue);font-size:11px;">Open ↗</span></a>` : ''}
           ${b.slidesLink ? `<a href="${b.slidesLink}" target="_blank" style="display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid #e8eaf0;border-radius:10px;padding:10px 14px;text-decoration:none;color:var(--dark);font-weight:800;font-size:13px;">📊 Slides <span style="margin-left:auto;color:var(--blue);font-size:11px;">Open ↗</span></a>` : ''}
         </div>` : ''}
@@ -750,7 +781,7 @@ function showBookingPopup(bookingId) {
           ${b.classLink
             ? `<a href="${b.classLink}" target="_blank" onclick="teacherJoinClass('${b.id}','${b.classLink}')" style="display:block;background:var(--blue);color:#fff;text-align:center;padding:12px;border-radius:12px;font-weight:900;font-size:13px;text-decoration:none;">🚀 Join Class</a>`
             : `<button onclick="showToast('No class link set yet. Contact admin.','error')" style="background:var(--blue);color:#fff;border:none;border-radius:12px;padding:12px;font-weight:900;font-size:13px;cursor:pointer;width:100%;">🚀 Join Class</button>`}
-          <button onclick="document.getElementById('calBookingPopup').remove();openEndSessionModal('${b.id}')" style="background:var(--green);color:#fff;border:none;border-radius:12px;padding:12px;font-family:'Nunito',sans-serif;font-weight:900;font-size:13px;cursor:pointer;">✅ End Class</button>
+          <button onclick="document.getElementById('calBookingPopup').remove();openEndClassModal('${b.id}')" style="background:var(--green);color:#fff;border:none;border-radius:12px;padding:12px;font-family:'Nunito',sans-serif;font-weight:900;font-size:13px;cursor:pointer;">✅ End Class</button>
         </div>
         <button onclick="document.getElementById('calBookingPopup').remove();openRescheduleModal && openRescheduleModal('${b.id}')" style="width:100%;background:var(--bg);border:1.5px solid var(--blue);border-radius:12px;padding:10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;color:var(--blue);margin-bottom:10px;">🔄 Reschedule Class</button>
         <button onclick="document.getElementById('calBookingPopup').remove()" style="width:100%;background:var(--bg);border:1.5px solid #e8eaf0;border-radius:12px;padding:10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;cursor:pointer;color:var(--mid);">Close</button>
@@ -773,6 +804,34 @@ function copyPhone(phone) {
       document.body.removeChild(el);
       showToast('📋 Phone number copied!');
     });
+}
+
+/* ── Suspended student slot warning popup (tutor calendar) ── */
+function showSuspendedSlotWarning(bookingId) {
+  const all = window.TUTOR_DATA?.bookings || [];
+  const b   = all.find(x => x.id === bookingId);
+  const name = b ? b.studentName : 'This student';
+
+  document.getElementById('suspendedSlotPopup')?.remove();
+  const popup = document.createElement('div');
+  popup.id = 'suspendedSlotPopup';
+  popup.style.cssText = 'position:fixed;inset:0;background:rgba(10,20,50,.6);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;';
+  popup.innerHTML = `
+    <div style="background:#fff;border-radius:20px;padding:32px;max-width:400px;width:100%;box-shadow:0 16px 60px rgba(0,0,0,.25);text-align:center;">
+      <div style="font-size:48px;margin-bottom:12px;">🔒</div>
+      <div style="font-family:'Fredoka One',cursive;font-size:22px;color:#5b21b6;margin-bottom:10px;">Classes Paused</div>
+      <div style="font-size:14px;color:#4a5568;font-weight:700;line-height:1.7;margin-bottom:20px;">
+        <strong>${name}</strong>'s live class access is currently paused due to insufficient credits.<br><br>
+        Please advise the parent to top up their credits to resume classes.<br><br>
+        <span style="background:#f5f3ff;color:#7c3aed;padding:6px 14px;border-radius:50px;font-size:12px;font-weight:900;">The class slot remains visible but is not joinable</span>
+      </div>
+      <button onclick="document.getElementById('suspendedSlotPopup').remove()"
+        style="background:#7c3aed;color:#fff;border:none;border-radius:12px;padding:12px 32px;font-family:'Nunito',sans-serif;font-weight:900;font-size:14px;cursor:pointer;width:100%;">
+        OK, Got It
+      </button>
+    </div>`;
+  popup.addEventListener('click', e => { if (e.target === popup) popup.remove(); });
+  document.body.appendChild(popup);
 }
 
 function changeWeek(dir) { weekOffset += dir; renderWeeklyCalendar(); }
@@ -868,7 +927,7 @@ function closeProfileModal() {
   document.getElementById('profileModalOverlay')?.classList.remove('open');
 }
 
-function saveProfile() {
+async function saveProfile() {
   const name      = document.getElementById('pmFieldName')?.value.trim();
   const email     = document.getElementById('pmFieldEmail')?.value.trim();
   const phone     = document.getElementById('pmFieldPhone')?.value.trim();
@@ -876,39 +935,93 @@ function saveProfile() {
   const ageGroups = document.getElementById('pmFieldAgeGroups')?.value.trim();
   const bio       = document.getElementById('pmFieldBio')?.value.trim();
   const newPw     = document.getElementById('pmFieldPassword')?.value;
+  const dob       = document.getElementById('pmFieldDob')?.value;
 
   if (!name || !email) { showToast('Name and email are required.', 'error'); return; }
 
-  TUTOR.name      = name;
-  TUTOR.email     = email;
-  TUTOR.phone     = phone;
-  TUTOR.bio       = bio;
-  TUTOR.initials  = name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+  const token = localStorage.getItem('sn_access_token');
+  if (!token || !TUTOR.dbId) { showToast('Session expired. Please log in again.', 'error'); return; }
 
-  // Persist to registry
-  const registry = JSON.parse(localStorage.getItem('sn_teachers') || '[]');
-  const idx = registry.findIndex(t => t.id === TUTOR.id);
-  if (idx !== -1) {
-    registry[idx] = { ...registry[idx], name, email, phone, bio,
-      initials: TUTOR.initials,
-      courses: subjects.split(',').map(s => s.trim()).filter(Boolean),
-      gradeGroups: ageGroups.split(',').map(s => s.trim()).filter(Boolean),
-      ...(newPw ? { password: newPw } : {}),
-    };
-    localStorage.setItem('sn_teachers', JSON.stringify(registry));
-    TUTOR = registry[idx];
-  }
+  /* Disable save button */
+  const saveBtn = document.querySelector('#profileModalOverlay .btn-primary');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ Saving…'; }
 
-  renderSidebarProfile();
-  closeProfileModal();
-  showToast('✅ Profile updated successfully!');
-  // Save DOB (Phase 6)
-  const dobEl = document.getElementById('pmFieldDob');
-  if (dobEl && dobEl.value) {
-    localStorage.setItem('sn_dob_' + TUTOR.id, dobEl.value);
+  try {
+    /* Build update payload — only include fields that have values */
+    const payload = { name };
+    if (phone)  payload.phone = phone;
+    if (bio)    payload.bio   = bio;
+    if (dob)    payload.date_of_birth = dob;
+
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/users/' + TUTOR.dbId, {
+      method: 'PUT',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    if (!data.success) {
+      showToast('Failed to save: ' + (data.error || 'unknown error'), 'error');
+      return;
+    }
+
+    /* Change password if provided */
+    if (newPw && newPw.length >= 8) {
+      const currentPw = document.getElementById('pmFieldCurrentPassword')?.value || '';
+      if (!currentPw) {
+        showToast('Enter your current password to change it.', 'error');
+        return;
+      }
+      const pwRes = await fetch('https://api.stemnestacademy.co.uk/api/users/' + TUTOR.dbId + '/password', {
+        method: 'PUT',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword: currentPw, newPassword: newPw }),
+      });
+      const pwData = await pwRes.json();
+      if (!pwData.success) {
+        showToast('Password change failed: ' + (pwData.error || 'unknown error'), 'error');
+        return;
+      }
+    }
+
+    /* Update local TUTOR object with saved values */
+    TUTOR.name     = name;
+    TUTOR.email    = email;
+    TUTOR.phone    = phone;
+    TUTOR.bio      = bio;
+    TUTOR.initials = name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+
+    /* Persist updated profile to localStorage so other tabs read it */
+    const stored = JSON.parse(localStorage.getItem('sn_current_tutor') || '{}');
+    stored.name     = name;
+    stored.email    = email;
+    stored.phone    = phone;
+    stored.bio      = bio;
+    stored.initials = TUTOR.initials;
+    localStorage.setItem('sn_current_tutor', JSON.stringify(stored));
+
+    /* Also update sn_api_user so nav shows correct name */
+    const apiUser = JSON.parse(localStorage.getItem('sn_api_user') || '{}');
+    apiUser.name = name;
+    localStorage.setItem('sn_api_user', JSON.stringify(apiUser));
+
+    /* Save DOB locally for birthday check */
+    if (dob) localStorage.setItem('sn_dob_' + TUTOR.id, dob);
+
+    renderSidebarProfile();
+    setGreeting();
+    closeProfileModal();
+    showToast('✅ Profile saved successfully!');
+
+    /* Run birthday check after saving */
+    checkBirthdayForUser(TUTOR.id, TUTOR.name.split(' ')[0]);
+
+  } catch (err) {
+    showToast('Network error — please check your connection.', 'error');
+    console.error('[saveProfile]', err);
+  } finally {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save Changes ✦'; }
   }
-  // Run birthday check after saving
-  checkBirthdayForUser(TUTOR.id, TUTOR.name.split(' ')[0]);
 }
 
 function triggerPhotoUpload() {
@@ -971,74 +1084,92 @@ function submitEndClassReport() {
     if (!reason) { showToast('Please describe why the class was incomplete.', 'error'); return; }
   }
 
-  const report = {
-    bookingId:       activeEndClassId,
-    tutorId:         TUTOR.id,
-    tutorName:       TUTOR.name,
+  /* activeEndClassId is set by openEndClassModal() for calendar popup flow.
+     window.activeEndClassId is set by the V2 dialog flow (tutor-sessions-v2.js).
+     Use whichever is available — both point to the same booking UUID. */
+  const bookingId = activeEndClassId || window.activeEndClassId || null;
+  const payload = {
     outcome,
-    incompleteReason: outcome === 'incomplete' ? document.getElementById('incompleteReason')?.value.trim() : '',
-    classQuality:    outcome === 'completed'   ? document.getElementById('classQuality')?.value : '',
-    studentInterest: outcome === 'completed'   ? document.getElementById('studentInterest')?.value : '',
-    purchasingPower: outcome === 'completed'   ? document.getElementById('purchasingPower')?.value : '',
-    notes:           outcome === 'completed'   ? document.getElementById('classNotes')?.value.trim() : '',
-    reportedAt:      new Date().toISOString(),
+    incompleteReason: outcome === 'incomplete' ? (document.getElementById('incompleteReason')?.value.trim() || '') : '',
+    classQuality:     outcome === 'completed'  ? (document.getElementById('classQuality')?.value || '') : '',
+    studentInterest:  outcome === 'completed'  ? (document.getElementById('studentInterest')?.value || '') : '',
+    purchasingPower:  outcome === 'completed'  ? (document.getElementById('purchasingPower')?.value || '') : '',
+    notes:            outcome === 'completed'  ? (document.getElementById('classNotes')?.value.trim() || '') : '',
+    recordingLink:    document.getElementById('recordingLink')?.value.trim() || '',
   };
 
-  // Save report
-  const reports = JSON.parse(localStorage.getItem('sn_class_reports') || '[]');
-  const idx = reports.findIndex(r => r.bookingId === activeEndClassId);
-  if (idx !== -1) reports[idx] = report;
-  else reports.unshift(report);
-  localStorage.setItem('sn_class_reports', JSON.stringify(reports));
-
-  // Update booking status
-  const all = window.TUTOR_DATA?.bookings || JSON.parse(localStorage.getItem('sn_bookings') || '[]');
-  const bi  = all.findIndex(b => b.id === activeEndClassId);
-  if (bi !== -1) {
-    all[bi].status        = outcome === 'completed' ? 'completed' : 'incomplete';
-    all[bi].classReport   = report;
-    all[bi].tutorNotified = true;
-    window.TUTOR_DATA.bookings = all;
-    localStorage.setItem('sn_bookings', JSON.stringify(all));
+  if (!bookingId || bookingId === 'null') {
+    showToast('⚠️ Unable to identify the booking. Please close and try again.', 'error');
+    return;
   }
 
-  closeEndClassModal();
-  showToast(outcome === 'completed'
-    ? '✅ Class marked complete! Report saved.'
-    : '📋 Incomplete report submitted to admin.');
+  const token = localStorage.getItem('sn_access_token');
+
+  /* Disable submit button to prevent double-submit */
+  const submitBtn = document.querySelector('#endClassModalOverlay .btn-primary');
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = '⏳ Submitting...'; }
+
+  /* POST to backend API — all data persists to DB, never localStorage */
+  fetch('https://api.stemnestacademy.co.uk/api/bookings/' + bookingId + '/report', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit Report ✦'; }
+    if (!data.success) {
+      showToast('⚠️ Failed to save report: ' + (data.error || 'unknown error'), 'error');
+      return;
+    }
+
+    /* Update in-memory TUTOR_DATA so the session card reflects completed status immediately */
+    if (window.TUTOR_DATA && window.TUTOR_DATA.bookings) {
+      const bi = window.TUTOR_DATA.bookings.findIndex(b => b.id === bookingId);
+      if (bi !== -1) {
+        window.TUTOR_DATA.bookings[bi].status = outcome;
+        window.TUTOR_DATA.bookings[bi].classReport = payload;
+      }
+    }
+
+    closeEndClassModal();
+    showToast(outcome === 'completed'
+      ? '✅ Class marked complete! Report saved.'
+      : '📋 Incomplete report submitted.');
+
+    /* Trigger earnings recording if completed */
+    if (outcome === 'completed' && typeof addSessionEarning === 'function') {
+      const b = window.TUTOR_DATA?.bookings?.find(x => x.id === bookingId);
+      addSessionEarning(b?.isDemoClass ? 'demo' : 'paid');
+      syncOverviewStats();
+    }
+
+    /* Re-render sessions to show updated status */
+    if (typeof renderSessionsTab === 'function')     renderSessionsTab();
+    if (typeof renderOverviewSessions === 'function') renderOverviewSessions();
+    if (typeof renderUpcomingCards === 'function')    renderUpcomingCards();
+  })
+  .catch(err => {
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit Report ✦'; }
+    showToast('⚠️ Network error — please check your connection and try again.', 'error');
+    console.error('[EndClass] API call failed:', err);
+  });
 }
 
-// Bind end class modal overlay close
-document.addEventListener('DOMContentLoaded', () => {
-  const overlay = document.getElementById('endClassModalOverlay');
-  overlay?.addEventListener('click', e => { if (e.target === overlay) closeEndClassModal(); });
-});
-
-/* ── Sync overview earnings badges (called by tutor-companion.js) ── */
+/* ── Sync overview earnings badges (called after end class report) ── */
 function syncOverviewStats() {
   try {
-    const data = JSON.parse(localStorage.getItem('sn_earnings_' + TUTOR.id) || '{}');
     const el1 = document.getElementById('overviewEarnings');
     const el2 = document.getElementById('overviewPoints');
-    if (el1) el1.textContent = '$' + (data.earnings || 0).toFixed(0);
-    if (el2) el2.textContent = data.points || 0;
+    if (el1 && window.TUTOR_DATA?.earnings !== undefined)
+      el1.textContent = '£' + (parseFloat(window.TUTOR_DATA.earnings) || 0).toFixed(0);
+    if (el2 && window.TUTOR_DATA?.points !== undefined)
+      el2.textContent = window.TUTOR_DATA.points || 0;
   } catch(e) {}
 }
-
-/* ── Wire earnings into end class report ── */
-const _origSubmitEndClassReport = submitEndClassReport;
-submitEndClassReport = function() {
-  const outcome = document.querySelector('input[name="classOutcome"]:checked')?.value;
-  _origSubmitEndClassReport();
-  // Add earnings if completed (tutor-companion.js must be loaded)
-  if (outcome === 'completed' && typeof addSessionEarning === 'function') {
-    const all = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
-    const b   = all.find(x => x.id === activeEndClassId);
-    const sessionType = b?.status === 'demo' ? 'demo' : 'paid';
-    addSessionEarning(sessionType);
-    syncOverviewStats();
-  }
-};
 
 /* ══════════════════════════════════════════════════════
    PHASE 6 — BIRTHDAY CHECK (shared utility)
@@ -1077,3 +1208,77 @@ document.addEventListener('DOMContentLoaded', () => {
     checkBirthdayForUser(TUTOR.id, TUTOR.name.split(' ')[0]);
   }, 1500);
 });
+
+/* ══════════════════════════════════════════════════════
+   OVERVIEW STATS — computed from real API bookings data
+   Called after _loadTutorFromAPI() populates TUTOR_DATA
+══════════════════════════════════════════════════════ */
+function _renderOverviewStats() {
+  try {
+    const bookings = window.TUTOR_DATA?.bookings || [];
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    /* Sessions today: scheduled bookings whose date is today */
+    const todayBookings = bookings.filter(b => {
+      const d = (b.date || '').split('T')[0];
+      return d === todayStr && (b.status === 'scheduled' || b.status === 'completed');
+    });
+    const el = document.getElementById('statSessionsToday');
+    if (el) el.textContent = todayBookings.length;
+    const trendEl = document.getElementById('statSessionsTrend');
+    if (trendEl) trendEl.textContent = todayBookings.length === 0 ? 'No classes today' : todayBookings.length + ' class' + (todayBookings.length !== 1 ? 'es' : '') + ' today';
+
+    /* Live earnings — load from tutor_profiles.earnings via API */
+    const token = localStorage.getItem('sn_access_token');
+    if (token && TUTOR.dbId) {
+      fetch('https://api.stemnestacademy.co.uk/api/users/' + TUTOR.dbId, {
+        headers: { 'Authorization': 'Bearer ' + token }
+      }).then(r => r.json()).then(d => {
+        if (d.user) {
+          const earnings = parseFloat(d.user.earnings || 0).toFixed(2);
+          const points   = d.user.points   || 0;
+
+          const earningsEl = document.getElementById('overviewEarnings');
+          if (earningsEl) earningsEl.textContent = '£' + earnings;
+          const liveEl = document.getElementById('liveEarnings');
+          if (liveEl) liveEl.textContent = '£' + earnings;
+
+          const pointsEl = document.getElementById('overviewPoints');
+          if (pointsEl) pointsEl.textContent = points;
+          const totalPointsEl = document.getElementById('totalPoints');
+          if (totalPointsEl) totalPointsEl.textContent = points;
+
+          /* Store in TUTOR_DATA for other functions */
+          window.TUTOR_DATA.earnings = earnings;
+          window.TUTOR_DATA.points   = points;
+        }
+      }).catch(() => {});
+    }
+
+    /* Projects pending count — from tutor-projects API */
+    if (token && TUTOR.dbId) {
+      fetch('https://api.stemnestacademy.co.uk/api/projects?tutorId=' + TUTOR.dbId + '&status=pending', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      }).then(r => r.json()).then(d => {
+        const count = (d.projects || []).length;
+        const projEl = document.getElementById('statProjectsPending');
+        if (projEl) projEl.textContent = count;
+        const projBadgeEl = document.getElementById('projectsTabBadge');
+        if (projBadgeEl) projBadgeEl.textContent = count + ' pending review';
+        const qaSubEl = document.getElementById('qaProjectsSub');
+        if (qaSubEl) qaSubEl.textContent = count === 0 ? 'No submissions waiting' : count + ' submission' + (count !== 1 ? 's' : '') + ' waiting';
+      }).catch(() => {
+        /* If projects API doesn't support this filter yet, show 0 */
+        const projEl = document.getElementById('statProjectsPending');
+        if (projEl) projEl.textContent = '0';
+        const projBadgeEl = document.getElementById('projectsTabBadge');
+        if (projBadgeEl) projBadgeEl.textContent = '—';
+        const qaSubEl = document.getElementById('qaProjectsSub');
+        if (qaSubEl) qaSubEl.textContent = 'Check projects tab';
+      });
+    }
+
+  } catch(e) {
+    console.warn('[Stats] Failed to render overview stats:', e.message);
+  }
+}
