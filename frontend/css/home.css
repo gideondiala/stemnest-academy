@@ -55,9 +55,9 @@
 .card-stat  { top:20px; right:20px; text-align:center; min-width:120px; background:var(--blue); color:#fff; border:none; }
 .card-stat .stat-num   { font-family:'Fredoka One',cursive; font-size:32px; line-height:1; }
 .card-stat .stat-label { font-size:12px; font-weight:600; opacity:.85; }
-.card-course1 { bottom:120px; left:10px; min-width:150px; }
-.card-course2 { top:40px; left:20px; min-width:150px; }
-.card-rating  { bottom:30px; right:10px; }
+.card-course1  { bottom:120px; left:10px; min-width:150px; }
+.card-course2  { top:40px; left:20px; min-width:150px; }
+.card-pathway  { bottom:30px; right:10px; min-width:130px; text-align:center; }
 .fc-top       { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
 .fc-label     { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; }
 .fc-title     { font-size:15px; font-weight:800; color:var(--dark); }
@@ -84,7 +84,7 @@ section { padding: 80px 5%; }
 
 /* ── HOME COURSE PREVIEW ── */
 .courses-section    { background: var(--bg); }
-.courses-grid-home  { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
+.courses-grid-home  { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; }
 .course-card-home {
   background: var(--white); border-radius: 20px; overflow: hidden;
   box-shadow: 0 4px 20px rgba(0,0,0,.06);
@@ -117,18 +117,63 @@ section { padding: 80px 5%; }
 .link-green   { color: var(--green); }
 .link-orange  { color: var(--orange); }
 
-/* ── HOW IT WORKS ── */
+/* ── HOW IT WORKS / ROADMAP ── */
 .how-section   { background: var(--white); }
-.steps-grid    { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 32px; }
-.step-card     { text-align: center; padding: 32px 24px; border-radius: 20px; background: var(--white); border: 2px solid var(--blue-light); transition: border-color .2s, transform .2s; }
-.step-card:hover { border-color: var(--blue); transform: translateY(-4px); }
-.step-num      { width: 52px; height: 52px; border-radius: 14px; font-family: 'Fredoka One', cursive; font-size: 24px; display: flex; align-items: center; justify-content: center; margin: 0 auto 18px; color: #fff; }
-.num-blue      { background: var(--blue); }
-.num-green     { background: var(--green); }
-.num-orange    { background: var(--orange); }
-.step-emoji    { font-size: 40px; margin-bottom: 14px; }
-.step-title    { font-family: 'Fredoka One', cursive; font-size: 20px; color: var(--dark); margin-bottom: 10px; }
-.step-desc     { font-size: 14px; color: var(--light); line-height: 1.6; }
+.roadmap-grid  {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 0;
+  margin-top: 48px;
+  flex-wrap: wrap;
+}
+.roadmap-card {
+  background: var(--white);
+  border: 2px solid var(--blue-light);
+  border-radius: 20px;
+  padding: 32px 20px;
+  text-align: center;
+  flex: 1;
+  min-width: 160px;
+  max-width: 200px;
+  transition: border-color .2s, transform .2s, box-shadow .2s;
+  position: relative;
+}
+.roadmap-card:hover {
+  border-color: var(--blue);
+  transform: translateY(-5px);
+  box-shadow: 0 12px 32px rgba(26,86,219,.12);
+}
+.roadmap-num {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  font-family: 'Fredoka One', cursive;
+  font-size: 22px;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 14px;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0,0,0,.15);
+}
+.roadmap-emoji  { font-size: 36px; margin-bottom: 12px; }
+.roadmap-title  { font-family: 'Fredoka One', cursive; font-size: 16px; color: var(--dark); margin-bottom: 10px; line-height: 1.3; }
+.roadmap-desc   { font-size: 13px; color: var(--light); line-height: 1.6; }
+.roadmap-arrow  {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  color: var(--blue);
+  padding: 0 6px;
+  flex-shrink: 0;
+  align-self: center;
+  font-weight: 900;
+  opacity: 0.5;
+}
+@media (max-width: 900px) {
+  .roadmap-grid    { flex-direction: column; align-items: center; gap: 0; }
+  .roadmap-card    { max-width: 340px; width: 100%; }
+  .roadmap-arrow   { transform: rotate(90deg); padding: 6px 0; }
+}
 
 /* ── WHY STEMNEST ── */
 .why-section {

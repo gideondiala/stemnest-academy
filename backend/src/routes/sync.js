@@ -264,7 +264,7 @@ router.get('/dashboard/:role', requireAuth, async (req, res, next) => {
     }
 
     if (role === 'sales') {
-      const [pipeline, bookings] = await Promise.all([
+      const [pipeline, bookings, classReports] = await Promise.all([
         pool.query(`SELECT p.*, b.date, b.time, b.subject,
                            u_s.name AS student_name, u_s.email AS student_email
                     FROM pipeline p
@@ -279,23 +279,49 @@ router.get('/dashboard/:role', requireAuth, async (req, res, next) => {
                     LEFT JOIN users u_t ON u_t.id = b.tutor_id
                     WHERE b.sales_id = $1 AND b.status = 'scheduled'
                     ORDER BY b.date ASC`, [userId]),
+        /* Class reports for all completed demos assigned to this sales person */
+        pool.query(`SELECT cr.booking_id, cr.outcome, cr.class_quality,
+                           cr.student_interest, cr.purchasing_power, cr.notes, cr.recording_link
+                    FROM class_reports cr
+                    JOIN bookings b ON b.id = cr.booking_id
+                    WHERE b.sales_id = $1
+                    ORDER BY cr.created_at DESC`, [userId]),
       ]);
-      result.pipeline = pipeline.rows;
-      result.bookings = bookings.rows;
+      result.pipeline     = pipeline.rows;
+      result.bookings     = bookings.rows;
+      result.classReports = classReports.rows;
     }
 
     if (role === 'presales') {
-      const bookings = await pool.query(
-        `SELECT b.*, u_s.name AS student_name, u_s.email AS student_email,
-                u_t.name AS tutor_name, u_sp.name AS sales_name
-         FROM bookings b
-         LEFT JOIN users u_s  ON u_s.id  = b.student_id
-         LEFT JOIN users u_t  ON u_t.id  = b.tutor_id
-         LEFT JOIN users u_sp ON u_sp.id = b.sales_id
-         WHERE b.is_demo = TRUE
-         ORDER BY b.booked_at DESC LIMIT 500`
-      );
-      result.bookings = bookings.rows;
+      const [bookingsResult, availability] = await Promise.all([
+        pool.query(
+          `SELECT b.*, u_s.name AS student_name, u_s.email AS student_email,
+                  u_t.name AS tutor_name, u_t.staff_id AS tutor_staff_id,
+                  u_sp.name AS sales_name,
+                  cr.outcome, cr.class_quality, cr.student_interest,
+                  cr.purchasing_power, cr.notes AS report_notes, cr.recording_link
+           FROM bookings b
+           LEFT JOIN users u_s  ON u_s.id  = b.student_id
+           LEFT JOIN users u_t  ON u_t.id  = b.tutor_id
+           LEFT JOIN users u_sp ON u_sp.id = b.sales_id
+           LEFT JOIN class_reports cr ON cr.booking_id = b.id
+           WHERE b.is_demo = TRUE
+           ORDER BY b.booked_at DESC LIMIT 500`
+        ),
+        pool.query(
+          `SELECT ta.tutor_id, ta.date, ta.time_slot, ta.is_booked,
+                  u.name AS tutor_name, u.staff_id AS tutor_staff_id
+           FROM tutor_availability ta
+           JOIN users u ON u.id = ta.tutor_id
+           WHERE ta.date >= CURRENT_DATE
+             AND ta.date <= CURRENT_DATE + INTERVAL '14 days'
+             AND ta.is_booked = FALSE
+           ORDER BY ta.tutor_id, ta.date, ta.time_slot`
+        ),
+      ]);
+
+      result.bookings     = bookingsResult.rows;
+      result.availability = availability.rows;
     }
 
     if (role === 'postsales') {
@@ -367,10 +393,11 @@ router.get('/dashboard/:role', requireAuth, async (req, res, next) => {
     }
 
     if (role === 'student') {
-      const [bookings, topups, courses, students, projects, enrolments] = await Promise.all([
+      const [bookings, topups, courses, students, projects, enrolments, quizAttempts, certificates] = await Promise.all([
         pool.query(`SELECT b.*,
                            u_t.name AS tutor_name, u_t.photo_url AS tutor_photo,
                            pl.title AS pathway_lesson_title,
+                           pl.unit_id AS unit_id,
                            pl.task1_link, pl.task2_link,
                            pl.homework1, pl.homework2,
                            pl.learning_objectives, pl.concept_discovery,
@@ -388,7 +415,7 @@ router.get('/dashboard/:role', requireAuth, async (req, res, next) => {
                     JOIN enrolments e ON e.course_id = c.id
                     WHERE e.student_id = $1`, [userId]),
         pool.query(`SELECT u.id, u.name, u.email, u.phone, u.whatsapp, u.staff_id,
-                           sp.grade, sp.age, sp.credits, sp.enrolled_at, sp.parent_name, sp.parent_email
+                           sp.grade, sp.age, sp.credits, sp.credits_suspended, sp.class_paused, sp.enrolled_at, sp.parent_name, sp.parent_email
                     FROM users u
                     LEFT JOIN student_profiles sp ON sp.user_id = u.id
                     WHERE u.id = $1`, [userId]),
@@ -402,21 +429,78 @@ router.get('/dashboard/:role', requireAuth, async (req, res, next) => {
         pool.query(`SELECT e.*,
                            p.name AS pathway_name, p.emoji AS pathway_emoji,
                            pg.grade_number AS current_grade_number,
-                           pg.name AS current_grade_name
+                           pg.name AS current_grade_name,
+                           pg.total_lessons
                     FROM enrolments e
                     LEFT JOIN pathways p ON p.id = e.pathway_id
                     LEFT JOIN pathway_grades pg ON pg.pathway_id = e.pathway_id
                                                 AND pg.grade_number = e.current_grade
                     WHERE e.student_id = $1
                     ORDER BY e.created_at DESC`, [userId]).catch(() => ({ rows: [] })),
+        /* Quiz attempts — for the student's quizzes tab */
+        pool.query(`SELECT qa.id, qa.score, qa.total, qa.percentage, qa.passed,
+                           qa.submitted_at, qa.quiz_id,
+                           uq.unit_name, uq.grade_number, uq.unit_number, uq.pass_score,
+                           p.name AS pathway_name
+                    FROM quiz_attempts qa
+                    JOIN unit_quizzes uq ON uq.id = qa.quiz_id
+                    LEFT JOIN pathways p ON p.id = uq.pathway_id
+                    WHERE qa.student_id = $1
+                    ORDER BY qa.submitted_at DESC`, [userId]).catch(() => ({ rows: [] })),
+        /* Certificates earned */
+        pool.query(`SELECT c.id, c.pathway_name, c.grade_number, c.grade_name,
+                           c.issued_at, c.certificate_url
+                    FROM certificates c
+                    WHERE c.student_id = $1
+                    ORDER BY c.issued_at DESC`, [userId]).catch(() => ({ rows: [] })),
       ]);
-      result.bookings   = bookings.rows;
-      result.payments   = topups.rows;
-      result.topups     = topups.rows;
-      result.courses    = courses.rows;
-      result.students   = students.rows;
-      result.projects   = projects.rows;
-      result.enrolments = enrolments.rows;
+      result.bookings      = bookings.rows;
+      result.payments      = topups.rows;
+      result.topups        = topups.rows;
+      result.courses       = courses.rows;
+      result.students      = students.rows;
+      result.projects      = projects.rows;
+      result.enrolments    = enrolments.rows;
+      result.quizAttempts  = quizAttempts.rows;
+      result.certificates  = certificates.rows;
+    }
+
+    if (role === 'retention') {
+      /* Return students assigned to this sales person with ≤ 2 credits */
+      const retentionResult = await pool.query(
+        `SELECT DISTINCT ON (u_s.id)
+                u_s.id AS student_id,
+                u_s.name AS student_name,
+                sp.parent_email AS email,
+                sp.parent_name,
+                sp.credits,
+                sp.credits_suspended AS suspended,
+                b.subject,
+                b.notes
+         FROM bookings b
+         JOIN users u_s ON u_s.id = b.student_id
+         JOIN student_profiles sp ON sp.user_id = b.student_id
+         WHERE b.sales_id = $1
+           AND b.student_id IS NOT NULL
+           AND sp.credits <= 2
+           AND u_s.is_active = TRUE
+         ORDER BY u_s.id, sp.credits ASC
+         LIMIT 100`,
+        [userId]
+      );
+
+      /* Add whatsapp from booking notes */
+      const alerts = retentionResult.rows.map(r => {
+        let whatsapp = '—';
+        try {
+          const notes = typeof r.notes === 'string' ? JSON.parse(r.notes || '{}') : (r.notes || {});
+          whatsapp = notes.whatsapp || '—';
+          if (!r.email) r.email = notes.email || '';
+        } catch {}
+        return { ...r, whatsapp };
+      });
+
+      result.retentionAlerts = alerts;
     }
 
     res.json({ success: true, ...result });

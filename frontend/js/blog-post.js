@@ -1,4 +1,4 @@
-/* ═══════════════════════════════════════════════════════
+﻿/* ═══════════════════════════════════════════════════════
    STEMNEST ACADEMY — SINGLE BLOG POST PAGE (blog-post.js)
    Reads ?id= from URL, renders full post + sidebar.
 ═══════════════════════════════════════════════════════ */
@@ -106,7 +106,7 @@ function renderPost(post) {
         '<h3>🎓 New to StemNest Academy?</h3>' +
         '<p>Book a completely free demo class and learn with the best tutors — no commitment, no card required.</p>' +
       '</div>' +
-      '<a href="free-trial.html" class="post-cta-btn">Book a Free Trial →</a>' +
+      '<a href="free-trial.html" class="post-cta-btn">Book a Demo →</a>' +
     '</div>' +
 
     '<div id="relatedPostsSection" style="margin-top:40px;">' +

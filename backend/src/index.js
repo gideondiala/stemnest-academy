@@ -25,8 +25,14 @@ const blogRoutes         = require('./routes/blogs');
 const enrollmentRoutes   = require('./routes/enrollments');
 const greyRoutes         = require('./routes/grey');
 const pathwayRoutes      = require('./routes/pathways');
+const quizRoutes         = require('./routes/quizzes');
+const certificateRoutes  = require('./routes/certificates');
+const batchRoutes        = require('./routes/batches');
 const errorHandler       = require('./middleware/errorHandler');
-const logger         = require('./utils/logger');
+const logger             = require('./utils/logger');
+const { startReminderJob }          = require('./jobs/reminders');
+const { startRetentionJob }         = require('./jobs/retention');
+const { startBookingExtensionJob }  = require('./jobs/bookingExtension');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -124,7 +130,10 @@ app.use('/api/sync',         syncRoutes);
 app.use('/api/blogs',        blogRoutes);
 app.use('/api/enrollments',  enrollmentRoutes);
 app.use('/api/grey',         greyRoutes);
-app.use('/api/pathways',     pathwayRoutes);
+app.use('/api/pathways',      pathwayRoutes);
+app.use('/api/quizzes',       quizRoutes);
+app.use('/api/certificates',  certificateRoutes);
+app.use('/api/batches',       batchRoutes);
 
 /* ══════════════════════════════════════════════
    404 + GLOBAL ERROR HANDLER
@@ -140,6 +149,10 @@ app.use(errorHandler);
 ══════════════════════════════════════════════ */
 const server = app.listen(PORT, () => {
   logger.info(`✅ StemNest API running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
+  /* Start background jobs */
+  startReminderJob();
+  startRetentionJob();
+  startBookingExtensionJob();
 });
 
 /* Graceful shutdown */

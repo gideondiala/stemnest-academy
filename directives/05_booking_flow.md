@@ -1,21 +1,139 @@
 # Directive: Booking Flow — End to End
 
-## Status: ✅ COMPLETE — fully real-time
+## Status: ✅ COMPLETE — fully real-time, two-step form
 
 This document describes the complete lifecycle of a booking from a parent booking a free trial to the student being onboarded.
 
 ---
 
-## Step 1: Parent Books a Free Trial
+## Step 1: Parent Books a Free Trial — TWO-STEP FORM
 
 **Page:** `https://stemnestacademy.co.uk/pages/free-trial.html`
 
-- Parent fills in: student name, age, year group, subject, preferred date/time, email, WhatsApp, device
-- Form submits to `POST /api/bookings` (no auth required)
-- Backend saves to `bookings` table with `status: 'pending'`, `is_demo: true`
-- Student info stored in `notes` JSON column (no student account yet)
-- Confirmation email sent to parent via `notifyDemoConfirmed()`
-- Booking appears immediately in Pre-Sales dashboard
+### Step 1 of 2 — Quick Start (3 fields)
+Parent fills in:
+- Student Name
+- Grade (1–12)
+- Country (auto-fills calling code + timezone)
+- WhatsApp number (with country code prefix)
+
+On clicking **Next**:
+- Calls `POST /api/bookings/partial` (public, no auth)
+- Creates a booking with `status: 'pending'`, `is_demo: true`, `notes.partial: true`
+- Returns `bookingId` stored in browser memory as `_partialBookingId`
+- Booking appears **immediately** in Presales Incoming tab (partial fields blank)
+- Presales can see and call the parent even if Step 2 is never completed
+
+### Step 2 of 2 — Complete Booking
+Parent fills in:
+- Email (required)
+- Preferred date + time (required)
+- Device — Laptop or Desktop (required)
+- Parent name (optional)
+
+On clicking **Book My FREE Demo Class**:
+- If `_partialBookingId` exists: calls `PUT /api/bookings/:id/complete`
+- If partial save had failed: falls back to `POST /api/bookings` (full submission)
+- WAT conversion runs on the backend
+- Parent receives confirmation email
+- Operations team notified
+- Booking fully visible in Presales with all details
+
+### Partial Booking Display in Presales
+- Partial bookings appear in Incoming with blank email/date/time fields
+- Each booking row has an **✏️ Edit Details** button
+- Clicking opens a modal to fill any missing fields
+- Calls `PUT /api/bookings/:id/edit-fields` (presales auth required)
+
+---
+
+## Step 2: Pre-Sales Schedules the Demo
+
+**Dashboard:** `https://stemnestacademy.co.uk/pages/presales-dashboard.html`
+**Login:** `presales@stemnestacademy.co.uk` / `StemNest2024!`
+
+- Pre-Sales sees booking in "Incoming" tab
+- Clicks "Schedule Class" → modal opens
+- Selects teacher (dropdown populated from `GET /api/users?role=tutor`)
+- Sets date, time, Google Meet link
+- Clicks "Confirm & Schedule"
+- Calls `PUT /api/bookings/:id/assign` with:
+  ```json
+  {
+    "tutorId": "<UUID>",
+    "classLink": "https://meet.google.com/...",
+    "date": "2026-05-20",
+    "time": "14:00"
+  }
+  ```
+- Backend updates booking: `status → 'scheduled'`, sets `tutor_id`, `class_link`, `date`, `time`
+- Booking moves from "Incoming" to "Scheduled" tab
+- Tutor receives email notification
+- Parent receives congratulatory email with join link
+
+**Critical:** The `tutorId` sent to the assign endpoint must be the tutor's **UUID** (from `u.id`), not their staff_id (CT004).
+
+---
+
+## Step 3: Teacher Sees the Booking
+
+**Dashboard:** `https://stemnestacademy.co.uk/pages/tutor-dashboard.html`
+
+- Teacher logs in → `_loadTutorFromAPI()` fetches `GET /api/bookings?limit=500`
+- Bookings filtered by `tutor_id` on the backend (role-based)
+- Booking appears in:
+  - **Overview tab:** "Upcoming Sessions" cards with Join button
+  - **Sessions tab:** Full session list
+  - **Calendar tab:** Coloured block at the correct date/time slot
+
+---
+
+## Step 4: Student Finds Their Class
+
+**Page:** `https://stemnestacademy.co.uk/pages/join-class.html`
+
+- Student/parent enters email or WhatsApp number
+- Calls `GET /api/bookings/lookup?q=<email or phone>` (public endpoint)
+- If booking has `class_link` and `status === 'scheduled'` → shows "Join Class Now" button
+
+---
+
+## Step 5–8: Teacher Class, Sales Pitch, Onboarding
+
+See previous stages — unchanged from original flow.
+
+---
+
+## Booking Status Flow
+
+```
+pending (partial) → pending (complete) → scheduled → completed
+                                                   ↘ incomplete
+                                                   ↘ teacher_absent
+                                      ↘ cancelled
+```
+
+---
+
+## Key API Endpoints
+
+| Method | Endpoint | Auth | Purpose |
+|--------|----------|------|---------|
+| POST | `/api/bookings/partial` | None | Save Step 1 immediately |
+| PUT | `/api/bookings/:id/complete` | None | Append Step 2 data |
+| PUT | `/api/bookings/:id/edit-fields` | Presales | Edit any field manually |
+| PUT | `/api/bookings/:id/assign` | Presales | Assign teacher + schedule |
+| POST | `/api/bookings/:id/report` | Tutor | End-of-class report |
+
+---
+
+## Key Constraints
+
+- A booking's `tutorId` in the assign call must be a **UUID**
+- `salesId` is optional in the assign call
+- The `notes` column stores a JSON object with all student contact info
+- `notes.partial: true` flags Step 1-only bookings for presales visibility
+- WAT conversion uses the noon-UTC reference method (stable across all timezones including India UTC+5:30 and Australia UTC+10)
 
 ---
 

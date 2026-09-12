@@ -4,7 +4,7 @@
    paid classes, writes slots to teacher calendar.
 ═══════════════════════════════════════════════════════ */
 
-const POS_TABS = ['students', 'topup', 'scheduled', 'paylinks', 'converted', 'website-enquiries', 'enrollment-requests', 'incoming-referrals', 'promotions'];
+const POS_TABS = ['students', 'topup', 'scheduled', 'paylinks', 'converted', 'website-enquiries', 'enrollment-requests', 'incoming-referrals', 'promotions', 'pause-resume', 'batches'];
 let generatedLink       = null;
 let posScheduleStudentId = null; // booking ID being scheduled
 
@@ -22,7 +22,16 @@ window.POS_DATA = {
 document.addEventListener('DOMContentLoaded', () => {
   const dateEl = document.getElementById('posDate');
   if (dateEl) dateEl.textContent = new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  
+
+  /* Restore any manually onboarded synthetic payment records from sessionStorage
+     so they survive 60s auto-refresh cycles */
+  try {
+    const stored = sessionStorage.getItem('pos_manual_payments');
+    if (stored) {
+      window.POS_DATA.payments = JSON.parse(stored);
+    }
+  } catch (e) { /* silent */ }
+
   _loadPOSFromAPI().then(() => {
     loadCourseDropdown();
     loadCourseDropdownSchedule();
@@ -114,6 +123,54 @@ async function _loadPOSFromAPI() {
       }
     } catch {}
 
+    // Confirmed payments — for Paid Students tab
+    try {
+      const pRes = await fetch('https://api.stemnestacademy.co.uk/api/payments?status=confirmed', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      if (pRes.ok) {
+        const pData = await pRes.json();
+        const apiPayments = pData.payments || [];
+
+        /* Preserve synthetic manual-onboard records — they have no real payment in DB.
+           Merge: keep synthetics from memory AND sessionStorage that aren't in API response */
+        let existingSynthetic = (window.POS_DATA.payments || []).filter(p => p._manualOnboard);
+        try {
+          const stored = sessionStorage.getItem('pos_manual_payments');
+          if (stored) {
+            const storedSynthetics = JSON.parse(stored);
+            const inMemoryIds = new Set(existingSynthetic.map(p => p.id));
+            storedSynthetics.forEach(p => {
+              if (!inMemoryIds.has(p.id)) existingSynthetic.push(p);
+            });
+          }
+        } catch (e) { /* silent */ }
+        const apiStudentIds = new Set(apiPayments.map(p => p.student_id).filter(Boolean));
+        const syntheticToKeep = existingSynthetic.filter(p => !apiStudentIds.has(p.student_id));
+        window.POS_DATA.payments = [...apiPayments, ...syntheticToKeep];
+
+        /* Mark manual students for display */
+        const paidIds = new Set(window.POS_DATA.payments.map(p => p.student_id).filter(Boolean));
+        if (window.POS_DATA.students) {
+          window.POS_DATA.students = window.POS_DATA.students.map(s => ({
+            ...s,
+            isManualOnboard: !paidIds.has(s.id),
+          }));
+        }
+      }
+    } catch {}
+
+    // Pathways for schedule dropdown
+    try {
+      const pwRes = await fetch('https://api.stemnestacademy.co.uk/api/pathways', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      if (pwRes.ok) {
+        const pwData = await pwRes.json();
+        window.POS_DATA.pathways = pwData.pathways || [];
+      }
+    } catch {}
+
     window.POS_DATA.paymentLinks = JSON.parse(localStorage.getItem('sn_payment_links') || '[]');
 
   } catch (e) {
@@ -190,6 +247,8 @@ function showPOSTab(tab) {
   if (tab === 'students')           renderPaidStudents();
   if (tab === 'topup')              renderTopUpStudents();
   if (tab === 'scheduled')          renderScheduledPaid();
+  if (tab === 'pause-resume')       renderPauseResume();
+  if (tab === 'batches')            renderBatchesTab();
   if (tab === 'converted')          renderPOSConverted();
   if (tab === 'website-enquiries')  renderWebsiteEnquiries();
   if (tab === 'enrollment-requests') renderEnrollmentRequests();
@@ -231,9 +290,40 @@ function openPOSScheduleModal(bookingId) {
   posScheduleStudentId = bookingId;
   _posScheduleRows = [];
 
-  const booking = getBookings().find(b => b.id === bookingId);
+  /* Try to find student in bookings, pipeline, then manual onboards */
+  const booking  = getBookings().find(b => b.id === bookingId);
   const pipeline = getAllPipeline().find(p => p.bookingId === bookingId);
-  const s = booking || pipeline || {};
+
+  /* For manually onboarded students: bookingId is the student's DB UUID */
+  const manualStudent = (window.POS_DATA.students || []).find(s =>
+    s.dbId === bookingId || s.id === bookingId
+  );
+
+  /* Also check confirmed payments for name/contact fallback */
+  const paymentRecord = (window.POS_DATA.payments || []).find(p =>
+    p.student_id === bookingId || p.id === bookingId
+  );
+
+  const s = booking || pipeline || (manualStudent ? {
+    studentName:   manualStudent.name,
+    grade:         manualStudent.grade || '—',
+    subject:       manualStudent.subject || '—',
+    course:        manualStudent.course  || '—',
+    email:         manualStudent.email   || '—',
+    whatsapp:      manualStudent.phone   || '—',
+    dbId:          manualStudent.dbId,
+    studentId:     manualStudent.dbId,
+    paymentAmount: manualStudent.paymentAmount || 0,
+  } : null) || (paymentRecord ? {
+    studentName: paymentRecord.student_name  || '—',
+    grade:       '—',
+    subject:     paymentRecord.subject       || '—',
+    course:      paymentRecord.course_name   || '—',
+    email:       paymentRecord.student_email || '—',
+    whatsapp:    paymentRecord.whatsapp      || '—',
+    dbId:        paymentRecord.student_id,
+    studentId:   paymentRecord.student_id,
+  } : null) || {};
 
   const infoEl = document.getElementById('pos-sm-info');
   if (infoEl) infoEl.innerHTML = `
@@ -241,7 +331,29 @@ function openPOSScheduleModal(bookingId) {
     📚 ${s.subject || s.course || '—'} &nbsp;·&nbsp; 📧 ${s.email || '—'} &nbsp;·&nbsp; 📱 ${s.whatsapp || '—'}`;
 
   loadCourseDropdownSchedule(s.subject);
-  populatePOSTeacherDropdown(s.subject);
+  populatePOSTeacherDropdown(s.subject); /* async — fills dropdown from API */
+  populatePOSPathwayDropdown();           /* async — fills pathway selector */
+
+  /* Pre-select the course/pathway that the LA pitched */
+  const pitchedCourse = pipeline?.course || pipeline?.course_pitched || s.course || '';
+  if (pitchedCourse) {
+    setTimeout(() => {
+      const sel = document.getElementById('pos-sm-course');
+      if (sel) {
+        /* Try exact match first */
+        const opt = Array.from(sel.options).find(o => o.value === pitchedCourse || o.text.includes(pitchedCourse));
+        if (opt) sel.value = opt.value;
+        else {
+          /* Add it as an option if not found */
+          const newOpt = document.createElement('option');
+          newOpt.value = pitchedCourse;
+          newOpt.textContent = pitchedCourse;
+          newOpt.selected = true;
+          sel.appendChild(newOpt);
+        }
+      }
+    }, 100);
+  }
 
   const dateEl = document.getElementById('pos-sm-start');
   if (dateEl) dateEl.min = new Date().toISOString().split('T')[0];
@@ -304,27 +416,134 @@ function _getPOSSchedule() {
   return schedule;
 }
 
-function populatePOSTeacherDropdown(subject) {
+async function populatePOSPathwayDropdown() {
+  const sel = document.getElementById('pos-sm-pathway');
+  if (!sel) return;
+
+  sel.innerHTML = '<option value="">— Select pathway —</option>';
+
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res   = await fetch('https://api.stemnestacademy.co.uk/api/pathways/for-onboarding', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const pathways = data.pathways || [];
+      /* Cache grades for the onchange handler */
+      window._posPathwayGrades = data.grades || [];
+      pathways.forEach(function(p) {
+        var opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.name;
+        sel.appendChild(opt);
+      });
+    }
+  } catch (e) { console.warn('[PostSales] Pathway dropdown failed:', e.message); }
+}
+
+async function onPOSPathwayChange() {
+  const pathwaySel = document.getElementById('pos-sm-pathway');
+  const gradeSel   = document.getElementById('pos-sm-grade');
+  if (!pathwaySel || !gradeSel) return;
+
+  const pathwayId = pathwaySel.value;
+  gradeSel.innerHTML = '<option value="">— Select grade —</option>';
+  if (!pathwayId) return;
+
+  /* Use cached grades from for-onboarding (avoids extra API call) */
+  const allGrades = window._posPathwayGrades || [];
+  const grades    = allGrades
+    .filter(function(g) { return g.pathway_id === pathwayId; })
+    .sort(function(a, b) { return (a.grade_number || 0) - (b.grade_number || 0); });
+
+  if (grades.length) {
+    grades.forEach(function(g) {
+      var opt = document.createElement('option');
+      opt.value = g.grade_number;
+      opt.textContent = 'Grade ' + g.grade_number + (g.name && g.name !== 'Grade ' + g.grade_number ? ' — ' + g.name : '');
+      gradeSel.appendChild(opt);
+    });
+  } else {
+    /* Fallback: fetch from API */
+    try {
+      const token = localStorage.getItem('sn_access_token');
+      const r = await fetch('https://api.stemnestacademy.co.uk/api/pathways/' + pathwayId + '/grades', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      if (r.ok) {
+        const d = await r.json();
+        (d.grades || []).sort(function(a, b) { return (a.grade_number||0) - (b.grade_number||0); })
+          .forEach(function(g) {
+            var opt = document.createElement('option');
+            opt.value = g.grade_number;
+            opt.textContent = 'Grade ' + g.grade_number;
+            gradeSel.appendChild(opt);
+          });
+      }
+    } catch (e) { console.warn('[PostSales] Grade dropdown fallback failed:', e.message); }
+  }
+}
+
+async function populatePOSTeacherDropdown(subject) {
   const sel = document.getElementById('pos-sm-teacher');
   if (!sel) return;
-  let teachers = getTeachers();
-  if (subject) teachers = teachers.filter(t => t.subject === subject);
+
+  sel.innerHTML = '<option value="">⏳ Loading teachers…</option>';
+
+  /* Always fetch fresh from API to guarantee up-to-date list */
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res   = await fetch('https://api.stemnestacademy.co.uk/api/users?role=tutor', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      window.POS_DATA.teachers = (data.users || []).map(u => ({
+        id:      u.id,
+        staffId: u.staff_id,
+        name:    u.name,
+        subject: u.subject || 'Coding',
+      }));
+    }
+  } catch (e) { console.warn('[PostSales] Teacher reload failed:', e.message); }
+
+  let teachers = window.POS_DATA.teachers || [];
+  if (subject && teachers.length > 0) {
+    const filtered = teachers.filter(t => t.subject === subject);
+    if (filtered.length > 0) teachers = filtered;
+  }
+
+  if (teachers.length === 0) {
+    sel.innerHTML = '<option value="">⚠️ No teachers found — check admin</option>';
+    return;
+  }
+
   sel.innerHTML = '<option value="">— Select a teacher —</option>' +
-    teachers.map(t => `<option value="${t.id}">${t.name} (${t.id}) · ${t.subject}</option>`).join('');
+    teachers.map(t =>
+      `<option value="${t.id}">${t.name} (${t.staffId || t.id.slice(0,8)}) · ${t.subject}</option>`
+    ).join('');
 }
 
 function loadCourseDropdownSchedule(subject) {
   const sel = document.getElementById('pos-sm-course');
   if (!sel) return;
-  const courses = window.POS_DATA.courses || [];
-  let filtered = courses;
-  if (subject) filtered = courses.filter(c =>
-    c.category?.toLowerCase().includes(subject.toLowerCase()) ||
-    c.name?.toLowerCase().includes(subject.toLowerCase())
-  );
-  sel.innerHTML = '<option value="">Select course</option>' +
-    (filtered.length ? filtered : courses)
-      .map(c => `<option value="${c.name}">${c.name}${c.price ? ' — £'+c.price : ''}</option>`).join('');
+
+  /* Combine pathways + courses */
+  const pathways = (window.POS_DATA.pathways || []).map(p => ({ name: p.name, type: 'pathway' }));
+  const courses  = (window.POS_DATA.courses  || []).map(c => ({ name: c.name, type: 'course' }));
+  const all      = [...pathways, ...courses];
+
+  let filtered = all;
+  if (subject && all.length > 0) {
+    const sub = subject.toLowerCase();
+    const f   = all.filter(c => c.name && c.name.toLowerCase().includes(sub));
+    if (f.length > 0) filtered = f;
+  }
+
+  sel.innerHTML = '<option value="">Select course / pathway</option>' +
+    (filtered.length ? filtered : all)
+      .map(c => `<option value="${c.name}">${c.name}${c.type === 'pathway' ? ' 📚' : ''}</option>`).join('');
 }
 
 async function confirmPOSSchedule() {
@@ -334,6 +553,8 @@ async function confirmPOSSchedule() {
   const weeks     = parseInt(document.getElementById('pos-sm-weeks')?.value || '0');
   const link      = document.getElementById('pos-sm-link')?.value.trim();
   const schedule  = _getPOSSchedule();
+  const pathwayId  = document.getElementById('pos-sm-pathway')?.value  || null;
+  const gradeNumber = document.getElementById('pos-sm-grade')?.value    || null;
 
   if (!teacherId)         { showToast('Please select a teacher.', 'error'); return; }
   if (!startDate)         { showToast('Please select a start date.', 'error'); return; }
@@ -345,8 +566,27 @@ async function confirmPOSSchedule() {
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Scheduling…'; }
 
   const teacher = getTeachers().find(t => t.id === teacherId);
+
+  /* For manually onboarded students, look them up in POS_DATA.students */
+  const manualStudent = (window.POS_DATA.students || []).find(s =>
+    (s.dbId || s.id) === posScheduleStudentId || s.id === posScheduleStudentId
+  );
+
   const localBooking = getBookings().find(b => b.id === posScheduleStudentId) ||
-                       getAllPipeline().find(p => p.bookingId === posScheduleStudentId) || {};
+                       getAllPipeline().find(p => p.bookingId === posScheduleStudentId) ||
+                       (manualStudent ? {
+                         id:          manualStudent.dbId || manualStudent.id,
+                         dbId:        manualStudent.dbId,
+                         studentName: manualStudent.name,
+                         studentId:   manualStudent.dbId,
+                         email:       manualStudent.email,
+                         whatsapp:    manualStudent.phone,
+                         grade:       manualStudent.grade,
+                         age:         manualStudent.age,
+                         subject:     manualStudent.subject,
+                         course:      manualStudent.course,
+                         paymentAmount: manualStudent.paymentAmount,
+                       } : {});
 
   /* Generate all session dates for each day */
   const allSessions = [];
@@ -360,74 +600,117 @@ async function confirmPOSSchedule() {
   });
   allSessions.sort((a, b) => a.date.localeCompare(b.date));
 
-  /* Write to teacher calendar + create booking entries */
+  /* Create booking sessions in real DB using bulk-schedule endpoint
+     (no per-session emails — ONE summary email sent at the end) */
+  const token = localStorage.getItem('sn_access_token');
+
+  /* Look up DB tutor UUID */
+  let dbTutorId   = null;
+  let dbTutorName = teacher?.name || '—';
+  try {
+    const uRes  = await fetch('https://api.stemnestacademy.co.uk/api/users?role=tutor', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const uData = await uRes.json();
+    const dbTeacher = (uData.users || []).find(u => u.staff_id === teacherId || u.id === teacherId);
+    dbTutorId   = dbTeacher?.id   || null;
+    dbTutorName = dbTeacher?.name || dbTutorName;
+  } catch (e) { console.warn('[PostSales] Tutor lookup failed:', e.message); }
+
+  /* Call the dedicated bulk-schedule endpoint — creates sessions, assigns tutor, sends ONE email */
+  let dbSessionsCreated = 0;
+  let bulkScheduleError = null;
+  try {
+    if (!dbTutorId) {
+      bulkScheduleError = 'Could not find the selected teacher in the database. Please try again.';
+    } else {
+      const bulkRes = await fetch('https://api.stemnestacademy.co.uk/api/bookings/bulk-schedule', {
+        method:  'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          studentId:    localBooking.dbId || localBooking.studentId || null,
+          studentName:  localBooking.studentName || '—',
+          studentEmail: localBooking.email || '',
+          tutorId:      dbTutorId,
+          tutorName:    dbTutorName,
+          course:       course || localBooking.course || '—',
+          classLink:    link,
+          grade:        localBooking.grade || 'Grade 1',
+          pathwayId:    pathwayId || null,
+          gradeNumber:  gradeNumber ? parseInt(gradeNumber) : null,
+          sessions:     allSessions.map(s => ({ date: s.date, time: s.time })),
+        }),
+      });
+      const bulkData = await bulkRes.json();
+      if (bulkData.success) {
+        dbSessionsCreated = bulkData.count || 0;
+      } else {
+        bulkScheduleError = bulkData.error || 'Scheduling failed on the server';
+      }
+    }
+  } catch (e) {
+    bulkScheduleError = 'Network error: ' + e.message;
+  }
+
+  if (bulkScheduleError) {
+    if (btn) { btn.disabled = false; btn.textContent = '✅ Schedule All Classes'; }
+    showToast('❌ Scheduling failed: ' + bulkScheduleError, 'error');
+    return;
+  }
+
+  /* Write in-memory records for immediate UI display */
   allSessions.forEach(session => {
     const bId = 'POS-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2,5);
     writeTeacherCalendarSlot(teacherId, session.date, session.time, bId);
-
-    const newBooking = {
-      id:              bId,
-      studentName:     localBooking.studentName || '—',
-      studentId:       localBooking.studentId || '',
-      email:           localBooking.email || '',
-      whatsapp:        localBooking.whatsapp || '',
-      grade:           localBooking.grade || '',
-      age:             localBooking.age || '',
-      subject:         localBooking.subject || '',
-      course:          course || localBooking.course || '',
-      assignedTutor:   teacher?.name || '—',
-      assignedTutorId: teacherId,
-      classLink:       link,
-      date:            session.date,
-      time:            to12h(session.time),
-      timeRaw:         session.time,
-      status:          'scheduled',
-      isDemoClass:     false,
-      paymentAmount:   localBooking.paymentAmount || 0,
-      isRecurring:     true,
-      paidScheduled:   true,
-      bookedAt:        new Date().toISOString(),
-      scheduledAt:     new Date().toISOString(),
-    };
     const allBk = getBookings();
-    allBk.unshift(newBooking);
+    allBk.unshift({
+      id: bId, studentName: localBooking.studentName || '—',
+      studentId: localBooking.studentId || '', email: localBooking.email || '',
+      whatsapp: localBooking.whatsapp || '', grade: localBooking.grade || '',
+      age: localBooking.age || '', subject: localBooking.subject || '',
+      course: course || localBooking.course || '',
+      assignedTutor: dbTutorName, assignedTutorId: teacherId,
+      classLink: link, date: session.date, time: to12h(session.time),
+      timeRaw: session.time, status: 'scheduled', isDemoClass: false,
+      paymentAmount: localBooking.paymentAmount || 0,
+      isRecurring: true, paidScheduled: true,
+      bookedAt: new Date().toISOString(), scheduledAt: new Date().toISOString(),
+    });
     saveBookings(allBk);
   });
 
-  /* Mark original booking as scheduled */
-  const all = getBookings();
-  const idx = all.findIndex(b => b.id === posScheduleStudentId);
-  if (idx !== -1) {
-    all[idx].paidScheduled   = true;
-    all[idx].assignedTutor   = teacher?.name;
-    all[idx].assignedTutorId = teacherId;
-    all[idx].course          = course;
-    all[idx].classLink       = link;
-    all[idx].schedule        = schedule;
-    all[idx].totalWeeks      = weeks;
-    all[idx].scheduledAt     = new Date().toISOString();
-    saveBookings(all);
+  /* Mark the student as scheduled so they move out of the Schedule button view */
+  const payIdx = (window.POS_DATA.payments || []).findIndex(p =>
+    p.student_id === posScheduleStudentId || p.id === posScheduleStudentId
+  );
+  if (payIdx !== -1) {
+    window.POS_DATA.payments[payIdx].paidScheduled   = true;
+    window.POS_DATA.payments[payIdx].assignedTutor   = dbTutorName;
+    window.POS_DATA.payments[payIdx].course          = course || localBooking.course;
+    window.POS_DATA.payments[payIdx].classLink       = link;
+    window.POS_DATA.payments[payIdx].totalWeeks      = weeks;
+    window.POS_DATA.payments[payIdx].schedule        = schedule;
+    window.POS_DATA.payments[payIdx].firstDate       = allSessions[0]?.date || '';
   }
 
-  /* Also assign in real DB */
+  const stuIdx = (window.POS_DATA.students || []).findIndex(s =>
+    s.dbId === posScheduleStudentId || s.id === posScheduleStudentId
+  );
+  if (stuIdx !== -1) {
+    window.POS_DATA.students[stuIdx].paidScheduled   = true;
+    window.POS_DATA.students[stuIdx].assignedTutor   = dbTutorName;
+    window.POS_DATA.students[stuIdx].course          = course || window.POS_DATA.students[stuIdx].course;
+    window.POS_DATA.students[stuIdx].classLink       = link;
+    window.POS_DATA.students[stuIdx].totalWeeks      = weeks;
+    window.POS_DATA.students[stuIdx].schedule        = schedule;
+    window.POS_DATA.students[stuIdx].firstDate       = allSessions[0]?.date || '';
+  }
+
+  /* Persist scheduled flags to sessionStorage */
   try {
-    const token = localStorage.getItem('sn_access_token');
-    if (token) {
-      const uRes = await fetch('https://api.stemnestacademy.co.uk/api/users?role=tutor', {
-        headers: { 'Authorization': 'Bearer ' + token },
-      });
-      const uData = await uRes.json();
-      const dbTeacher = (uData.users || []).find(u => u.staff_id === teacherId || u.id === teacherId);
-      const dbBookingId = localBooking.dbId || posScheduleStudentId;
-      if (dbTeacher && dbBookingId && dbBookingId.length > 20) {
-        await fetch('https://api.stemnestacademy.co.uk/api/bookings/' + dbBookingId + '/assign', {
-          method:  'PUT',
-          headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ tutorId: dbTeacher.id, classLink: link }),
-        });
-      }
-    }
-  } catch (e) { console.warn('[PostSales] DB assign error:', e.message); }
+    const allSynthetics = window.POS_DATA.payments.filter(p => p._manualOnboard);
+    sessionStorage.setItem('pos_manual_payments', JSON.stringify(allSynthetics));
+  } catch (e) { /* silent */ }
 
   if (btn) { btn.disabled = false; btn.textContent = '✅ Schedule All Classes'; }
   closePOSScheduleModal();
@@ -446,50 +729,71 @@ function closePOSScheduleModal() {
 /* ══════════════════════════════════════════════════════
    SCHEDULED PAID CLASSES TABLE
 ══════════════════════════════════════════════════════ */
-function renderScheduledPaid() {
+async function renderScheduledPaid() {
   const el = document.getElementById('scheduledPaidList');
   if (!el) return;
-  const bookings = getBookings().filter(b => b.paidScheduled);
 
-  if (!bookings.length) {
-    el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--light);font-weight:700;">No paid classes scheduled yet.</div>';
-    return;
+  el.innerHTML = '<div style="text-align:center;padding:32px;color:var(--light);font-weight:700;">⏳ Loading scheduled classes...</div>';
+
+  try {
+    /* Load directly from DB — all students with future scheduled paid bookings */
+    const token = localStorage.getItem('sn_access_token');
+    const res   = await fetch('https://api.stemnestacademy.co.uk/api/bookings/scheduled-students', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data  = await res.json();
+    const scheduledStudents = data.students || [];
+
+    if (!scheduledStudents.length) {
+      el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--light);font-weight:700;">No paid classes scheduled yet.</div>';
+      return;
+    }
+
+    el.innerHTML =
+      '<div style="overflow-x:auto;border-radius:16px;border:1.5px solid #e8eaf0;background:var(--white);">' +
+      '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+      '<thead><tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">' +
+        '<th style="' + thStyle() + '">Student</th>' +
+        '<th style="' + thStyle() + '">Course</th>' +
+        '<th style="' + thStyle() + '">Teacher</th>' +
+        '<th style="' + thStyle() + '">Next Class</th>' +
+        '<th style="' + thStyle() + '">Remaining</th>' +
+        '<th style="' + thStyle() + '">Class Link</th>' +
+        '<th style="' + thStyle('center') + '">Actions</th>' +
+      '</tr></thead>' +
+      '<tbody>' +
+      scheduledStudents.map(function(s, i) {
+        return '<tr style="border-bottom:1px solid #f0f2f8;' + (i%2===0?'':'background:#fafbff;') + '">' +
+          '<td style="' + tdStyle() + '">' +
+            '<div style="font-weight:800;color:var(--dark);">' + (s.studentName || '—') + '</div>' +
+            '<div style="font-size:11px;color:var(--light);">📧 ' + (s.email || '—') + '</div>' +
+          '</td>' +
+          '<td style="' + tdStyle() + ';font-weight:700;color:var(--mid);">' + (s.course || '—') + '</td>' +
+          '<td style="' + tdStyle() + ';font-weight:700;color:var(--mid);">' + (s.tutorName || '—') + '</td>' +
+          '<td style="' + tdStyle() + ';font-size:12px;font-weight:700;color:var(--mid);">' +
+            (s.nextDate ? new Date(s.nextDate + 'T12:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}) + ' ' + s.nextTime : '—') +
+          '</td>' +
+          '<td style="' + tdStyle() + ';font-weight:800;color:var(--blue);">' + (s.remainingCount || 0) + ' classes</td>' +
+          '<td style="' + tdStyle() + '">' +
+            (s.classLink ? '<a href="' + s.classLink + '" target="_blank" style="color:var(--blue);font-weight:800;font-size:12px;">🔗 Open</a>' : '—') +
+          '</td>' +
+          '<td style="' + tdStyle('center') + '">' +
+            '<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">' +
+              '<button onclick="openRescheduleStudentModal(\'' + s.studentId + '\',\'' + (s.studentName||'').replace(/'/g,'') + '\',\'' + (s.tutorId||'') + '\',\'' + (s.classLink||'').replace(/'/g,'&#39;') + '\')" ' +
+                'style="background:#1a56db;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:11px;cursor:pointer;white-space:nowrap;">' +
+                '🔄 Reschedule</button>' +
+              '<button onclick="openChangeTutorModal(\'' + s.studentId + '\',\'' + (s.studentName||'').replace(/'/g,'') + '\')" ' +
+                'style="background:#0e9f6e;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:11px;cursor:pointer;white-space:nowrap;">' +
+                '👩‍🏫 Change Tutor</button>' +
+            '</div>' +
+          '</td>' +
+        '</tr>';
+      }).join('') +
+      '</tbody></table></div>';
+
+  } catch(e) {
+    el.innerHTML = '<div style="padding:24px;color:#c53030;font-weight:700;">Failed to load: ' + e.message + '</div>';
   }
-
-  el.innerHTML = `
-    <div style="overflow-x:auto;border-radius:16px;border:1.5px solid #e8eaf0;background:var(--white);">
-      <table style="width:100%;border-collapse:collapse;font-size:13px;">
-        <thead>
-          <tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">
-            <th style="${thStyle()}">Student</th>
-            <th style="${thStyle()}">Course</th>
-            <th style="${thStyle()}">Teacher</th>
-            <th style="${thStyle()}">Schedule</th>
-            <th style="${thStyle()}">Sessions</th>
-            <th style="${thStyle()}">Class Link</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${bookings.map((b, i) => `
-            <tr style="border-bottom:1px solid #f0f2f8;${i % 2 === 0 ? '' : 'background:#fafbff;'}">
-              <td style="${tdStyle()}">
-                <div style="font-weight:800;color:var(--dark);">${b.studentName}</div>
-                <div style="font-size:11px;color:var(--light);">${b.id}</div>
-              </td>
-              <td style="${tdStyle()};font-weight:700;color:var(--mid);">${b.course || b.subject || '—'}</td>
-              <td style="${tdStyle()};font-weight:700;color:var(--mid);">${b.assignedTutor || '—'}</td>
-              <td style="${tdStyle()}">
-                <div style="font-weight:700;color:var(--mid);">Every ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][b.classDayOfWeek] || '—'}</div>
-                <div style="font-size:12px;color:var(--light);">${b.classTime || '—'}</div>
-              </td>
-              <td style="${tdStyle()};font-weight:800;color:var(--blue);">${b.totalWeeks || '—'} weeks</td>
-              <td style="${tdStyle()}">
-                ${b.classLink ? `<a href="${b.classLink}" target="_blank" style="color:var(--blue);font-weight:800;font-size:12px;">🔗 Open Link</a>` : '—'}
-              </td>
-            </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>`;
 }
 
 /* ══════════════════════════════════════════════════════
@@ -715,6 +1019,250 @@ function bindPOSModals() {
 }
 
 /* ══════════════════════════════════════════════════════
+   RESCHEDULE STUDENT CLASSES
+══════════════════════════════════════════════════════ */
+let _rescheduleStudentId = null;
+let _rescheduleTutorId   = null;
+
+function _buildRSRow(idx, prefillDay, prefillTime) {
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  return `<div class="enrol-schedule-row" id="rs-row-${idx}" style="display:flex;gap:12px;align-items:center;margin-bottom:12px;">
+    <select id="rs-day-${idx}" style="flex:1;padding:10px 12px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;outline:none;background:#fff;">
+      <option value="">— Day —</option>
+      ${days.map((d,i) => `<option value="${i}"${prefillDay !== undefined && prefillDay !== null && parseInt(prefillDay) === i ? ' selected' : ''}>${d}</option>`).join('')}
+    </select>
+    <input type="time" id="rs-time-${idx}" value="${prefillTime || ''}" style="flex:1;padding:10px 12px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;outline:none;">
+    ${idx > 0 ? `<button type="button" onclick="document.getElementById('rs-row-${idx}').remove()" style="background:#fde8e8;color:#c53030;border:none;border-radius:10px;padding:8px 12px;font-size:18px;cursor:pointer;font-weight:900;line-height:1;">×</button>` : '<div style="width:40px;"></div>'}
+  </div>`;
+}
+
+function addRSScheduleRow() {
+  const container = document.getElementById('rs-schedule-rows');
+  if (!container) return;
+  const existing = container.querySelectorAll('.enrol-schedule-row').length;
+  if (existing >= 5) { showToast('Maximum 5 days per week.', 'error'); return; }
+  const div = document.createElement('div');
+  div.innerHTML = _buildRSRow(existing);
+  container.appendChild(div.firstChild);
+}
+
+function _getRSSchedule() {
+  const schedule = [];
+  const container = document.getElementById('rs-schedule-rows');
+  if (!container) return schedule;
+  container.querySelectorAll('.enrol-schedule-row').forEach(row => {
+    const dayEl  = row.querySelector('select[id^="rs-day-"]');
+    const timeEl = row.querySelector('input[type="time"]');
+    if (dayEl && timeEl && dayEl.value !== '' && timeEl.value) {
+      schedule.push({ weekday: parseInt(dayEl.value), time: timeEl.value });
+    }
+  });
+  return schedule;
+}
+
+async function openRescheduleStudentModal(studentId, studentName, tutorId, classLink) {
+  _rescheduleStudentId = studentId;
+  _rescheduleTutorId   = tutorId || null;
+
+  const infoEl = document.getElementById('reschedule-student-info');
+  if (infoEl) infoEl.textContent = `📋 Rescheduling classes for: ${studentName}`;
+
+  /* Default start date = tomorrow */
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const startEl = document.getElementById('rs-start-date');
+  if (startEl) {
+    startEl.min   = tomorrow.toISOString().split('T')[0];
+    startEl.value = tomorrow.toISOString().split('T')[0];
+  }
+
+  /* Pre-fill class link if known */
+  const linkEl = document.getElementById('rs-class-link');
+  if (linkEl) linkEl.value = classLink || '';
+
+  /* Show spinner while loading current schedule */
+  const container = document.getElementById('rs-schedule-rows');
+  if (container) container.innerHTML = '<div style="text-align:center;padding:16px;color:#888;font-weight:700;">⏳ Loading current schedule…</div>';
+  document.getElementById('rescheduleStudentOverlay').classList.add('open');
+
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const resp  = await fetch(`https://api.stemnestacademy.co.uk/api/bookings/student-schedule/${studentId}`, {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await resp.json();
+
+    if (data.success && data.schedule && data.schedule.length) {
+      /* Store tutor from schedule if not passed in */
+      if (!_rescheduleTutorId && data.schedule[0].tutor_id) {
+        _rescheduleTutorId = data.schedule[0].tutor_id;
+      }
+      /* Pre-fill class link from schedule if not already set */
+      if (linkEl && !linkEl.value && data.schedule[0].class_link) {
+        linkEl.value = data.schedule[0].class_link;
+      }
+      /* Build rows from existing schedule (top slots by frequency) */
+      const slots = data.schedule.slice(0, 5);
+      container.innerHTML = slots.map((sl, i) => _buildRSRow(i, parseInt(sl.weekday), sl.time)).join('');
+    } else {
+      /* No existing schedule found — show 2 blank rows */
+      container.innerHTML = _buildRSRow(0) + _buildRSRow(1);
+    }
+  } catch(e) {
+    container.innerHTML = _buildRSRow(0) + _buildRSRow(1);
+  }
+}
+
+function closeRescheduleStudentModal() {
+  document.getElementById('rescheduleStudentOverlay')?.classList.remove('open');
+  _rescheduleStudentId = null;
+  _rescheduleTutorId   = null;
+}
+
+async function confirmRescheduleStudent() {
+  const startDate = document.getElementById('rs-start-date')?.value;
+  const schedule  = _getRSSchedule();
+  const classLink = document.getElementById('rs-class-link')?.value.trim();
+
+  if (!startDate)           { showToast('Please select a start date.', 'error'); return; }
+  if (!schedule.length)     { showToast('Please set at least one day and time.', 'error'); return; }
+  if (!_rescheduleStudentId){ showToast('No student selected.', 'error'); return; }
+
+  const btn = document.querySelector('#rescheduleStudentOverlay .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Checking for clashes…'; }
+
+  const token = localStorage.getItem('sn_access_token');
+
+  /* ── Step 1: Clash detection ─────────────────────────────────────── */
+  if (_rescheduleTutorId) {
+    try {
+      const clashRes = await fetch('https://api.stemnestacademy.co.uk/api/bookings/check-clashes', {
+        method:  'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tutorId:   _rescheduleTutorId,
+          studentId: _rescheduleStudentId,
+          startDate,
+          schedule,
+        }),
+      });
+      const clashData = await clashRes.json();
+      if (clashData.success && clashData.clashes && clashData.clashes.length) {
+        const c = clashData.clashes[0];
+        showToast(
+          `⛔ Schedule clash! ${c.dateFormatted} at ${c.time} is already taken by ${c.studentName} with this tutor. Please choose a different time.`,
+          'error',
+          8000
+        );
+        if (btn) { btn.disabled = false; btn.textContent = '🔄 Apply New Schedule'; }
+        return;
+      }
+    } catch(e) {
+      console.warn('Clash check failed:', e.message);
+    }
+  }
+
+  /* ── Step 2: Apply reschedule ────────────────────────────────────── */
+  if (btn) btn.textContent = '⏳ Rescheduling…';
+  try {
+    const res  = await fetch('https://api.stemnestacademy.co.uk/api/bookings/reschedule-student', {
+      method:  'PUT',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studentId: _rescheduleStudentId,
+        startDate,
+        schedule,
+        classLink: classLink || undefined,
+      }),
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Reschedule failed');
+
+    showToast(`✅ Rescheduled! ${data.cancelled} old classes cancelled, ${data.created} new classes created.`, 'success');
+    closeRescheduleStudentModal();
+    renderScheduledPaid();
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Apply New Schedule'; }
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   CHANGE TUTOR
+══════════════════════════════════════════════════════ */
+let _changeTutorStudentId = null;
+
+async function openChangeTutorModal(studentId, studentName) {
+  _changeTutorStudentId = studentId;
+
+  const infoEl = document.getElementById('change-tutor-student-info');
+  if (infoEl) infoEl.textContent = `📋 Changing tutor for: ${studentName}`;
+
+  /* Default start date = today */
+  const todayStr = new Date().toISOString().split('T')[0];
+  const dateEl   = document.getElementById('ct-start-date');
+  if (dateEl) { dateEl.min = todayStr; dateEl.value = todayStr; }
+
+  /* Populate tutor dropdown */
+  const sel = document.getElementById('ct-new-tutor');
+  if (sel) {
+    sel.innerHTML = '<option value="">⏳ Loading tutors…</option>';
+    try {
+      const token = localStorage.getItem('sn_access_token');
+      const res   = await fetch('https://api.stemnestacademy.co.uk/api/users?role=tutor', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const tutors = data.users || [];
+        sel.innerHTML = '<option value="">— Select new tutor —</option>' +
+          tutors.map(t => `<option value="${t.id}">${t.name} (${t.staff_id || t.id.slice(0,8)})</option>`).join('');
+      }
+    } catch(e) { sel.innerHTML = '<option value="">⚠️ Failed to load tutors</option>'; }
+  }
+
+  document.getElementById('changeTutorOverlay').classList.add('open');
+}
+
+function closeChangeTutorModal() {
+  document.getElementById('changeTutorOverlay')?.classList.remove('open');
+  _changeTutorStudentId = null;
+}
+
+async function confirmChangeTutor() {
+  const newTutorId = document.getElementById('ct-new-tutor')?.value;
+  const startDate  = document.getElementById('ct-start-date')?.value;
+
+  if (!newTutorId) { showToast('Please select a new tutor.', 'error'); return; }
+  if (!_changeTutorStudentId) { showToast('No student selected.', 'error'); return; }
+
+  const btn = document.querySelector('#changeTutorOverlay .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Transferring…'; }
+
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res   = await fetch('https://api.stemnestacademy.co.uk/api/bookings/change-tutor', {
+      method:  'PUT',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studentId:  _changeTutorStudentId,
+        newTutorId,
+        startDate:  startDate || new Date().toISOString().split('T')[0],
+      }),
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Tutor change failed');
+
+    showToast(`✅ Done! ${data.updated} classes transferred to ${data.newTutorName}.`, 'success');
+    closeChangeTutorModal();
+    renderScheduledPaid();
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '👩‍🏫 Transfer Student'; }
+  }
+}
+
+/* ══════════════════════════════════════════════════════
    PHASE 6 — BIRTHDAY CHECK
 ══════════════════════════════════════════════════════ */
 function checkBirthdayForUser(userId, firstName) {
@@ -794,47 +1342,68 @@ async function confirmOnboard() {
   const course   = document.getElementById('ob-course')?.value.trim();
   const credits  = parseInt(document.getElementById('ob-credits')?.value || '0');
   const password = document.getElementById('ob-password')?.value.trim();
+  const pathwayId    = document.getElementById('ob-pathway')?.value || '';
+  const pathwayGrade = parseInt(document.getElementById('ob-pathway-grade')?.value || '1') || 1;
 
   if (!name || !email || !password) {
     showToast('Name, email and password are required.', 'error');
     return;
   }
 
-  /* Try real API first — creates user in PostgreSQL */
-  const online = typeof isApiAvailable === 'function' && await isApiAvailable();
-  let studentId = null;
+  const token = localStorage.getItem('sn_access_token');
+  if (!token) { showToast('Not logged in.', 'error'); return; }
 
-  if (online) {
-    try {
-      const token = localStorage.getItem('sn_access_token');
-      if (!token) throw new Error('Not logged in');
+  let studentId    = null;
+  let studentDbId  = null;
 
-      const res = await fetch('https://api.stemnestacademy.co.uk/api/users', {
-        method:  'POST',
-        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
-          name, email, password, role: 'student',
-          phone, whatsapp: phone,
-          grade, age, credits, course
-        }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        studentId = data.user?.staff_id || data.user?.id;
-        console.log('[Onboard] Student created in DB:', studentId);
-      } else {
-        console.warn('[Onboard] API create failed:', data.error);
-      }
-    } catch (e) {
-      console.warn('[API] Create student failed:', e.message);
+  try {
+    /* Step 1 — Create user account */
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/users', {
+      method:  'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        name, email, password, role: 'student',
+        phone, whatsapp: phone,
+        grade, age, credits, course
+      }),
+    });
+    const data = await res.json();
+    if (!data.success) {
+      showToast('Failed to create account: ' + (data.error || 'Unknown error'), 'error');
+      return;
     }
+    studentId   = data.user?.staff_id || data.user?.id;
+    studentDbId = data.user?.dbId     || data.user?.id;
+
+    /* Step 2 — Create enrolment record if a pathway was selected */
+    if (pathwayId && studentDbId) {
+      try {
+        await fetch('https://api.stemnestacademy.co.uk/api/enrollments', {
+          method:  'POST',
+          headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            student_id:     studentDbId,
+            pathway_id:     pathwayId,
+            current_grade:  pathwayGrade,
+            start_date:     new Date().toISOString().split('T')[0],
+            status:         'active',
+          }),
+        });
+      } catch (enrolErr) {
+        console.warn('[Onboard] Enrolment record creation failed (non-fatal):', enrolErr.message);
+      }
+    }
+
+    console.log('[Onboard] Student created in DB:', studentId);
+  } catch (e) {
+    showToast('Network error: ' + e.message, 'error');
+    return;
   }
 
-  /* Generate student ID in S-0001 format if not from API */
-  const existing = window.POS_DATA.students || [];
+  /* Generate fallback student ID if API didn't return one */
   if (!studentId) {
-    const seqNum   = existing.length + 1;
-    studentId = 'S-' + String(seqNum).padStart(4, '0');
+    const existing = window.POS_DATA.students || [];
+    studentId = 'S-' + String(existing.length + 1).padStart(4, '0');
   }
 
   const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
@@ -847,33 +1416,16 @@ async function confirmOnboard() {
     status:      'active',
   };
 
-  /* Save to in-memory students registry */
+  /* Update in-memory students registry */
+  const existing = window.POS_DATA.students || [];
   const existIdx = existing.findIndex(s => s.email === email);
   if (existIdx !== -1) existing[existIdx] = { ...existing[existIdx], ...student };
   else existing.push(student);
   window.POS_DATA.students = existing;
-  // Data is in the DB — no localStorage write needed
-
-  /* Mark booking as onboarded */
-  const all = getBookings();
-  const idx = all.findIndex(b => b.id === onboardingStudentId);
-  if (idx !== -1) {
-    all[idx].studentOnboarded = true;
-    all[idx].studentId        = studentId;
-    all[idx].studentCredits   = credits;
-    saveBookings(all);
-  }
-
-  if (typeof updatePasswordRegistry === 'function') {
-    updatePasswordRegistry({ id: studentId, name, email, role: 'student', password });
-  }
 
   const credText = typeof generateCredentialText === 'function' ? generateCredentialText(student) : '';
   if (credText && typeof downloadCredentialFile === 'function') {
     downloadCredentialFile(student, credText);
-  }
-  if (credText && typeof logEmail === 'function') {
-    logEmail(email, 'Welcome to StemNest Academy — Your Child\'s Login Details', credText);
   }
 
   closeOnboardModal();
@@ -948,34 +1500,116 @@ function renderPaidStudents() {
   const el = document.getElementById('paidStudentsList');
   if (!el) return;
 
-  const pipeline = getAllPipeline().filter(p => p.status === 'converted');
-  const bookings = getBookings().filter(b => b.salesStatus === 'converted');
+  /* PAID STUDENTS = students who have a confirmed Fincra payment
+     NOT students whose classes are completed.
+     Source 1: POS_DATA.payments with status='confirmed'
+     Source 2: pipeline with status='converted'
+     Source 3: POS_DATA.students (manually onboarded via the Manual Onboard button) */
+  const confirmedPayments = (window.POS_DATA.payments || []).filter(p =>
+    p.status === 'confirmed' || p.status === 'paid'
+  );
+
+  /* Also include pipeline converted records where the student has paid (via presales Enroll button) */
+  const pipelineConverted = getAllPipeline().filter(p => p.status === 'converted');
+
+  /* Also include students who were manually onboarded (no payment record) */
+  const manualStudents = (window.POS_DATA.students || []).filter(s => s.isManualOnboard);
 
   const seen = new Set();
   const students = [];
-  bookings.forEach(b => { seen.add(b.id); students.push({ ...b, _source: 'booking' }); });
-  pipeline.forEach(p => {
-    if (!seen.has(p.bookingId)) students.push({ ...p, id: p.bookingId, _source: 'pipeline' });
+
+  /* Confirmed payments first (most reliable source) */
+  confirmedPayments.forEach(p => {
+    const key = p.student_id || p.studentEmail || p.student_email || '';
+    if (key && !seen.has(key)) {
+      seen.add(key);
+      students.push({
+        id:             p.student_id || p.id,
+        dbId:           p.student_id,
+        studentName:    p.student_name || p.studentName || '—',
+        email:          p.student_email || p.studentEmail || '—',
+        whatsapp:       p.whatsapp || '—',
+        subject:        p.subject || '—',
+        course:         p.course_name || p.course || '—',
+        paymentAmount:  p.amount,
+        paymentCurrency: p.currency || 'GBP',
+        studentCredits: p.credits_purchased || 0,
+        confirmedAt:    p.confirmed_at,
+        studentOnboarded: !!(p.student_id),  // if student_id is linked, they're onboarded
+        paidScheduled:  false,
+        _source:        'payment',
+        _paymentId:     p.id,
+      });
+    }
+  });
+
+  /* Pipeline converted as fallback for students who paid manually */
+  pipelineConverted.forEach(p => {
+    const key = p.email || p.bookingId || '';
+    if (key && !seen.has(key)) {
+      seen.add(key);
+      const booking = getBookings().find(b => b.id === p.bookingId) || {};
+      students.push({
+        id:             p.bookingId,
+        studentName:    p.studentName || '—',
+        email:          p.email || booking.email || '—',
+        whatsapp:       p.whatsapp || booking.whatsapp || '—',
+        subject:        p.subject || '—',
+        course:         p.course || '—',
+        paymentAmount:  p.paymentAmount,
+        paymentCurrency: 'GBP',
+        studentCredits: '—',
+        studentOnboarded: booking.studentOnboarded || false,
+        paidScheduled:  booking.paidScheduled || false,
+        _source:        'pipeline',
+      });
+    }
+  });
+
+  /* Manually onboarded students (no Fincra payment, added via Manual Onboard button) */
+  manualStudents.forEach(s => {
+    const key = s.email || s.id || '';
+    if (key && !seen.has(key)) {
+      seen.add(key);
+      students.push({
+        id:              s.dbId || s.id,
+        studentName:     s.name || '—',
+        email:           s.email || '—',
+        whatsapp:        s.phone || '—',
+        subject:         s.subject || '—',
+        course:          s.course || '—',
+        paymentAmount:   s.paymentAmount || 0,
+        paymentCurrency: 'GBP',
+        studentCredits:  s.credits || 0,
+        studentOnboarded: true,
+        paidScheduled:   false,
+        confirmedAt:     s.enrolledAt,
+        _source:         'manual',
+      });
+    }
   });
 
   if (!students.length) {
     el.innerHTML = `<div style="text-align:center;padding:60px 20px;">
-      <div style="font-size:48px;margin-bottom:12px;">💼</div>
+      <div style="font-size:48px;margin-bottom:12px;">💳</div>
       <div style="font-family:'Fredoka One',cursive;font-size:20px;color:var(--dark);">No paid students yet</div>
-      <div style="font-size:14px;color:var(--light);margin-top:6px;">Converted students from the sales pipeline will appear here.</div>
+      <div style="font-size:14px;color:var(--light);margin-top:6px;">Students who pay via Fincra will appear here automatically.</div>
     </div>`;
     return;
   }
 
   el.innerHTML = `
+    <div style="background:#f0fdf4;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13px;font-weight:700;color:#065f46;">
+      💳 Showing only students who have <strong>confirmed their payment</strong> via Fincra. Completed demo classes are in the Presales dashboard.
+    </div>
     <div style="overflow-x:auto;border-radius:16px;border:1.5px solid #e8eaf0;background:var(--white);">
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
         <thead>
           <tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">
             <th style="${thStyle()}">Student</th>
-            <th style="${thStyle()}">Subject</th>
+            <th style="${thStyle()}">Subject / Course</th>
             <th style="${thStyle()}">Contact</th>
-            <th style="${thStyle()}">Amount</th>
+            <th style="${thStyle()}">Amount Paid</th>
             <th style="${thStyle()}">Credits</th>
             <th style="${thStyle()}">Onboarded</th>
             <th style="${thStyle('center')}">Actions</th>
@@ -987,17 +1621,18 @@ function renderPaidStudents() {
               <td style="${tdStyle()}">
                 <div style="font-weight:800;color:var(--dark);">${s.studentName||'—'}</div>
                 <div style="font-size:11px;color:var(--light);">${s.id||'—'}</div>
+                ${s.confirmedAt ? `<div style="font-size:10px;color:var(--light);">Paid: ${new Date(s.confirmedAt).toLocaleDateString('en-GB')}</div>` : ''}
               </td>
-              <td style="${tdStyle()};font-weight:700;color:var(--mid);">${s.subject||'—'}${s.course?'<div style="font-size:11px;color:var(--light);">'+s.course+'</div>':''}</td>
+              <td style="${tdStyle()};font-weight:700;color:var(--mid);">${s.subject||'—'}${s.course && s.course !== '—' ? '<div style="font-size:11px;color:var(--light);">'+s.course+'</div>' : ''}</td>
               <td style="${tdStyle()}">
                 <div style="font-size:12px;font-weight:700;color:var(--mid);">📧 ${s.email||'—'}</div>
                 <div style="font-size:12px;font-weight:700;color:var(--mid);">📱 ${s.whatsapp||'—'}</div>
               </td>
-              <td style="${tdStyle()};font-weight:800;color:var(--green-dark);">${s.paymentAmount?'£'+s.paymentAmount:'—'}</td>
-              <td style="${tdStyle()};font-weight:800;color:var(--blue);">${s.studentCredits||s.credits||'—'}</td>
+              <td style="${tdStyle()};font-weight:800;color:var(--green-dark);">${s.paymentAmount ? (s.paymentCurrency === 'NGN' ? '₦' : s.paymentCurrency === 'USD' ? '$' : '£') + parseFloat(s.paymentAmount).toLocaleString() : '—'}</td>
+              <td style="${tdStyle()};font-weight:800;color:var(--blue);">${s.studentCredits||'—'}</td>
               <td style="${tdStyle()}">
                 ${s.studentOnboarded
-                  ? `<span style="background:var(--green-light);color:var(--green-dark);font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">✅ Done · ${s.studentId||''}</span>`
+                  ? `<span style="background:var(--green-light);color:var(--green-dark);font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">✅ Done</span>`
                   : `<span style="background:#fff3e0;color:#e65100;font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">⏳ Pending</span>`}
               </td>
               <td style="${tdStyle('center')}">
@@ -1052,6 +1687,8 @@ function openManualOnboardModal() {
   ['mob-name','mob-email','mob-phone','mob-age','mob-grade','mob-course','mob-credits','mob-amount'].forEach(id => {
     const f = document.getElementById(id); if (f) f.value = '';
   });
+  const currSel = document.getElementById('mob-currency');
+  if (currSel) currSel.value = 'GBP';
   document.getElementById('manualOnboardOverlay').classList.add('open');
 }
 
@@ -1069,124 +1706,112 @@ async function confirmManualOnboard() {
   const course   = document.getElementById('mob-course')?.value.trim();
   const credits  = parseInt(document.getElementById('mob-credits')?.value || '0');
   const amount   = document.getElementById('mob-amount')?.value.trim();
+  const currency = document.getElementById('mob-currency')?.value || 'GBP';
   const password = document.getElementById('mob-password')?.value.trim();
+
+  /* Read pathway name — if a pathway is selected, use it as the course for the email */
+  const pathwayId   = document.getElementById('mob-pathway')?.value || '';
+  const pathwayGrade = parseInt(document.getElementById('mob-pathway-grade')?.value || '1') || 1;
+  const pathwaySelect = document.getElementById('mob-pathway');
+  const pathwayName  = pathwayId
+    ? (pathwaySelect?.options[pathwaySelect.selectedIndex]?.text || course || 'STEMNest Programme')
+    : (course || 'STEMNest Programme');
+
+  /* The course field sent to the backend is the pathway name so it appears in the email */
+  const courseForEmail = pathwayName || course || 'STEMNest Programme';
 
   if (!name || !email || !password) {
     showToast('Name, email and password are required.', 'error');
     return;
   }
 
-  /* Create student in real DB first */
+  /* Disable submit button during API call */
+  const submitBtn = document.querySelector('#manualOnboardOverlay .btn-primary');
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = '⏳ Creating account…'; }
+
+  const token = localStorage.getItem('sn_access_token');
+  if (!token) { showToast('Not logged in.', 'error'); return; }
+
+  /* Create student account in DB — backend sends onboarding email automatically */
   let dbStudentId = null;
+  let dbStaffId   = null;
+
   try {
-    const token = localStorage.getItem('sn_access_token');
-    if (token) {
-      const res = await fetch('https://api.stemnestacademy.co.uk/api/users', {
-        method:  'POST',
-        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ 
-          name, email, password, role: 'student', phone, whatsapp: phone,
-          grade, age, credits, course
-        }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        dbStudentId = data.user?.id;
-        console.log('[ManualOnboard] Student created in DB:', dbStudentId);
-      } else {
-        console.warn('[ManualOnboard] DB create failed:', data.error);
-      }
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/users', {
+      method:  'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        name, email, password, role: 'student',
+        phone, whatsapp: phone,
+        grade, age, credits,
+        course:   subject || 'Coding',       /* subject shown as Course in email */
+        pathway:  pathwayId ? pathwayName : undefined,  /* pathway shown separately */
+      }),
+    });
+    const data = await res.json();
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '🎓 Onboard Student'; }
+
+    if (!data.success) {
+      showToast('Could not create account: ' + (data.error || 'please try again'), 'error');
+      return;
     }
-  } catch (e) { console.warn('[ManualOnboard] API error:', e.message); }
 
-  // Generate student ID in S-0001 format
-  const existing  = window.POS_DATA.students || [];
-  const seqNum    = existing.length + 1;
-  const studentId = dbStudentId || ('S-' + String(seqNum).padStart(4, '0'));
-  const initials  = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+    dbStudentId = data.user?.id;
+    dbStaffId   = data.user?.staff_id || dbStudentId;
+  } catch (e) {
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '🎓 Onboard Student'; }
+    showToast('Network error. Please check your connection and try again.', 'error');
+    return;
+  }
 
-  const student = {
-    id: studentId, name, initials, email, phone, age, grade,
-    subject, course, password, credits, paymentAmount: amount,
-    enrolledAt: new Date().toISOString(),
-    status: 'active',
-    isManualOnboard: true,
-  };
-
-  existing.push(student);
-  window.POS_DATA.students = existing;
-  // Data is in the DB — no localStorage write needed
-  // (Pre-Sales style — status 'converted', salesStatus 'converted')
-  const bookingId = 'MOB-' + Date.now().toString(36).toUpperCase();
-  const booking = {
-    id:               bookingId,
-    studentName:      name,
-    studentId:        studentId,
-    email,
+  /* Inject a synthetic "confirmed payment" record so this student appears
+     in renderPaidStudents immediately without a real Fincra payment */
+  const syntheticPayment = {
+    id:               'MANUAL-' + Date.now().toString(36).toUpperCase(),
+    student_id:       dbStudentId,
+    student_name:     name,
+    student_email:    email,
     whatsapp:         phone,
-    age,
-    grade,
-    subject,
-    course,
-    paymentAmount:    amount,
-    studentCredits:   credits,
-    status:           'scheduled',
-    salesStatus:      'converted',
-    studentOnboarded: true,
-    isManualOnboard:  true,
-    isDemoClass:      false,
-    bookedAt:         new Date().toISOString(),
-    scheduledAt:      new Date().toISOString(),
+    course_name:      courseForEmail || subject || '—',
+    subject:          subject || '—',
+    amount:           parseFloat(amount) || 0,
+    currency:         currency || 'GBP',
+    credits_purchased: credits,
+    status:           'confirmed',
+    confirmed_at:     new Date().toISOString(),
+    _manualOnboard:   true,
   };
-  const allBookings = getBookings();
-  allBookings.unshift(booking);
-  saveBookings(allBookings);
 
-  /* Also create in real DB so it syncs to teacher dashboard */
+  if (!window.POS_DATA.payments) window.POS_DATA.payments = [];
+  window.POS_DATA.payments.unshift(syntheticPayment);
+
+  /* Persist synthetic records to sessionStorage so 60s auto-refresh doesn't wipe them */
   try {
-    const token = localStorage.getItem('sn_access_token');
-    if (token) {
-      const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      await fetch('https://api.stemnestacademy.co.uk/api/bookings', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
-          studentName: name, age: age || '—', grade: grade || '—',
-          email, whatsapp: phone || '+000000000',
-          subject: subject || 'Coding',
-          device: 'laptop', timezone: 'Europe/London',
-          date: futureDate, time: '10:00 AM',
-        }),
-      });
-    }
+    const allSynthetics = window.POS_DATA.payments.filter(p => p._manualOnboard);
+    sessionStorage.setItem('pos_manual_payments', JSON.stringify(allSynthetics));
   } catch (e) { /* silent */ }
 
-  // Update student record with bookingId
-  const sIdx = existing.findIndex(s => s.id === studentId);
-  if (sIdx !== -1) { 
-    existing[sIdx].bookingId = bookingId; 
-    window.POS_DATA.students = existing;
-    // Data is in the DB — no localStorage write needed
-  }
-
-  // Update password registry
-  if (typeof updatePasswordRegistry === 'function') {
-    updatePasswordRegistry({ id: studentId, name, email, role: 'student', password });
-  }
-
-  // Generate and download credential file
-  if (typeof generateCredentialText === 'function' && typeof downloadCredentialFile === 'function') {
-    const text = generateCredentialText(student);
-    downloadCredentialFile(student, text);
-    if (typeof logEmail === 'function') {
-      logEmail(email, 'Welcome to StemNest Academy — Your Login Details', text);
-    }
-  }
+  /* Also keep in POS_DATA.students for re-download */
+  const existing = window.POS_DATA.students || [];
+  existing.push({
+    id:              dbStaffId,
+    dbId:            dbStudentId,
+    name, email, phone, age, grade, subject, course,
+    password, credits,
+    paymentAmount:   amount,
+    enrolledAt:      new Date().toISOString(),
+    status:          'active',
+    isManualOnboard: true,
+  });
+  window.POS_DATA.students = existing;
 
   closeManualOnboardModal();
   updatePOSStats();
   renderPaidStudents();
-  showToast('✅ ' + name + ' onboarded! ID: ' + studentId + '. Booking created & credentials downloaded.');
+
+  /* Show student immediately in Paid Students tab */
+  showPOSTab('students');
+  showToast('✅ ' + name + ' onboarded successfully! Login details sent to ' + email + '. They can now log in at stemnestacademy.co.uk');
 }
 
 // Bind manual onboard modal overlay close
@@ -1197,8 +1822,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 /* ══════════════════════════════════════════════════════
    STUDENTS NEEDING TOP-UP
-   Shows students with ≤ 2 credits. Post-Sales can
-   generate and paste a payment link per student.
+   Shows students with ≤ 2 credits. Post-Sales staff
+   manually confirm payment and credits are added instantly to DB.
 ══════════════════════════════════════════════════════ */
 function renderTopUpStudents() {
   const el = document.getElementById('topupStudentsList');
@@ -1207,7 +1832,7 @@ function renderTopUpStudents() {
   const students = window.POS_DATA.students || [];
   const bookings = getBookings();
 
-  // Merge students from both sources
+  // Merge students from both sources, deduplicated by email
   const seen = new Set();
   const list = [];
 
@@ -1221,13 +1846,13 @@ function renderTopUpStudents() {
   bookings.forEach(b => {
     if (!seen.has(b.email) && (parseInt(b.studentCredits) || 0) <= 2 && b.studentOnboarded) {
       list.push({
-        id:       b.studentId || b.id,
-        name:     b.studentName,
-        email:    b.email,
-        phone:    b.whatsapp,
-        subject:  b.subject,
-        credits:  parseInt(b.studentCredits) || 0,
-        _source:  'booking',
+        id:      b.studentId || b.id,
+        name:    b.studentName,
+        email:   b.email,
+        phone:   b.whatsapp,
+        subject: b.subject,
+        credits: parseInt(b.studentCredits) || 0,
+        _source: 'booking',
       });
     }
   });
@@ -1244,105 +1869,124 @@ function renderTopUpStudents() {
   const thS = 'padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;letter-spacing:.5px;';
   const tdS = 'padding:14px 16px;vertical-align:middle;';
 
-  el.innerHTML = `
-    <div style="overflow-x:auto;border-radius:16px;border:1.5px solid #e8eaf0;background:var(--white);">
-      <table style="width:100%;border-collapse:collapse;font-size:13px;">
-        <thead>
-          <tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">
-            <th style="${thS}">Student</th>
-            <th style="${thS}">Subject</th>
-            <th style="${thS}">Credits Left</th>
-            <th style="${thS}">Contact</th>
-            <th style="${thS}">Payment Link</th>
-            <th style="${thS}">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${list.map((s, i) => {
-            const credits = parseInt(s.credits) || 0;
-            const creditColor = credits <= 0 ? '#c53030' : '#e65100';
-            const creditBg    = credits <= 0 ? '#fde8e8' : '#fff3e0';
+  el.innerHTML =
+    '<div style="background:#fff3e0;border-radius:12px;padding:14px 18px;margin-bottom:18px;border-left:4px solid #e65100;">' +
+      '<strong style="color:#e65100;">How to top up:</strong> ' +
+      '<span style="font-size:13px;color:#92400e;">When a parent confirms payment by any method (bank transfer, Grey Finance, cash, etc.), ' +
+      'fill in the amount, currency and number of credits below, then click <strong>Confirm Payment Received</strong>. ' +
+      'Credits are added to the student\'s account instantly.</span>' +
+    '</div>' +
+    '<div style="overflow-x:auto;border-radius:16px;border:1.5px solid #e8eaf0;background:var(--white);">' +
+    '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+    '<thead><tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">' +
+      '<th style="' + thS + '">Student</th>' +
+      '<th style="' + thS + '">Credits Left</th>' +
+      '<th style="' + thS + '">Contact</th>' +
+      '<th style="' + thS + '">Confirm Payment</th>' +
+    '</tr></thead>' +
+    '<tbody>' +
+    list.map(function(s, i) {
+      var credits     = parseInt(s.credits) || 0;
+      var creditColor = credits <= 0 ? '#c53030' : '#e65100';
+      var creditBg    = credits <= 0 ? '#fde8e8' : '#fff3e0';
+      var rowBg       = i % 2 === 0 ? '' : 'background:#fafbff;';
 
-            // Check if a payment link already exists for this student
-            const allLinks = window.POS_DATA.paymentLinks || [];
-            const existingLink = allLinks.find(l =>
-              (l.email === s.email || l.student === s.name) && l.status === 'pending'
-            );
-
-            const linkStatus = existingLink && existingLink.url
-              ? `<span style="background:var(--green-light);color:var(--green-dark);font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">✅ Link Sent</span>`
-              : existingLink
-                ? `<span style="background:#fff3e0;color:#e65100;font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">⏳ Link Pending</span>`
-                : `<span style="background:#fde8e8;color:#c53030;font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">❌ No Link Yet</span>`;
-
-            return `<tr style="border-bottom:1px solid #f0f2f8;${i%2===0?'':'background:#fafbff;'}">
-              <td style="${tdS}">
-                <div style="font-weight:800;color:var(--dark);">${s.name || s.studentName || '—'}</div>
-                <div style="font-size:11px;color:var(--light);">${s.id || '—'}</div>
-              </td>
-              <td style="${tdS};font-weight:700;color:var(--mid);">${s.subject || '—'}</td>
-              <td style="${tdS}">
-                <span style="background:${creditBg};color:${creditColor};font-family:'Fredoka One',cursive;font-size:20px;padding:4px 14px;border-radius:10px;">${credits}</span>
-              </td>
-              <td style="${tdS}">
-                <div style="font-size:12px;font-weight:700;color:var(--mid);">📧 ${s.email || '—'}</div>
-                <div style="font-size:12px;font-weight:700;color:var(--mid);">📱 ${s.phone || s.whatsapp || '—'}</div>
-              </td>
-              <td style="${tdS}">
-                <div style="display:flex;flex-direction:column;gap:6px;">
-                  <input type="url" id="topupLink_${s.id}" placeholder="Paste payment link here..."
-                    value="${existingLink && existingLink.url ? existingLink.url : ''}"
-                    style="padding:8px 12px;border:2px solid #e8eaf0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:12px;outline:none;width:220px;">
-                  <button onclick="saveTopUpLink('${s.id}','${s.email}','${s.name || s.studentName || ''}','${s.subject || ''}')"
-                    style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;">
-                    💾 Save & Send
-                  </button>
-                </div>
-              </td>
-              <td style="${tdS}">${linkStatus}</td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
-    </div>`;
+      return '<tr style="border-bottom:1px solid #f0f2f8;' + rowBg + '">' +
+        '<td style="' + tdS + '">' +
+          '<div style="font-weight:800;color:var(--dark);">' + (s.name || s.studentName || '—') + '</div>' +
+          '<div style="font-size:11px;color:var(--light);">' + (s.id || '—') + '</div>' +
+          '<div style="font-size:11px;color:var(--light);">' + (s.subject || '—') + '</div>' +
+        '</td>' +
+        '<td style="' + tdS + '">' +
+          '<span style="background:' + creditBg + ';color:' + creditColor + ';font-family:\'Fredoka One\',cursive;font-size:22px;padding:4px 14px;border-radius:10px;">' + credits + '</span>' +
+        '</td>' +
+        '<td style="' + tdS + '">' +
+          '<div style="font-size:12px;font-weight:700;color:var(--mid);">📧 ' + (s.email || '—') + '</div>' +
+          '<div style="font-size:12px;font-weight:700;color:var(--mid);">📱 ' + (s.phone || s.whatsapp || '—') + '</div>' +
+        '</td>' +
+        '<td style="' + tdS + '">' +
+          '<div style="display:flex;flex-direction:column;gap:6px;min-width:260px;">' +
+            '<div style="display:flex;gap:6px;">' +
+              '<input type="number" id="tuAmount_' + s.id + '" placeholder="Amount" min="1" ' +
+                'style="width:90px;padding:7px 10px;border:2px solid #e8eaf0;border-radius:8px;font-family:\'Nunito\',sans-serif;font-size:12px;outline:none;">' +
+              '<select id="tuCurrency_' + s.id + '" ' +
+                'style="padding:7px 8px;border:2px solid #e8eaf0;border-radius:8px;font-family:\'Nunito\',sans-serif;font-size:12px;outline:none;">' +
+                '<option value="GBP">GBP £</option>' +
+                '<option value="NGN">NGN ₦</option>' +
+                '<option value="USD">USD $</option>' +
+                '<option value="EUR">EUR €</option>' +
+              '</select>' +
+              '<input type="number" id="tuCredits_' + s.id + '" placeholder="Credits" min="1" ' +
+                'style="width:70px;padding:7px 10px;border:2px solid #e8eaf0;border-radius:8px;font-family:\'Nunito\',sans-serif;font-size:12px;outline:none;">' +
+            '</div>' +
+            '<input type="text" id="tuNotes_' + s.id + '" placeholder="Notes (optional) e.g. Bank transfer 08/07" ' +
+              'style="padding:7px 10px;border:2px solid #e8eaf0;border-radius:8px;font-family:\'Nunito\',sans-serif;font-size:12px;outline:none;">' +
+            '<button id="tuBtn_' + s.id + '" onclick="confirmManualTopUp(\'' + s.id + '\')" ' +
+              'style="background:#0e9f6e;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-family:\'Nunito\',sans-serif;font-weight:900;font-size:12px;cursor:pointer;">' +
+              '✅ Confirm Payment Received' +
+            '</button>' +
+            '<div id="tuResult_' + s.id + '" style="font-size:11px;font-weight:700;display:none;"></div>' +
+          '</div>' +
+        '</td>' +
+      '</tr>';
+    }).join('') +
+    '</tbody></table></div>';
 }
 
-function saveTopUpLink(studentId, email, name, subject) {
-  const input = document.getElementById('topupLink_' + studentId);
-  const url   = input ? input.value.trim() : '';
-  if (!url) { showToast('Please paste a payment link first.', 'error'); return; }
+async function confirmManualTopUp(studentId) {
+  var amountEl   = document.getElementById('tuAmount_' + studentId);
+  var currencyEl = document.getElementById('tuCurrency_' + studentId);
+  var creditsEl  = document.getElementById('tuCredits_' + studentId);
+  var notesEl    = document.getElementById('tuNotes_' + studentId);
+  var btn        = document.getElementById('tuBtn_' + studentId);
+  var resultEl   = document.getElementById('tuResult_' + studentId);
 
-  // Save to sn_payment_links
-  const all = window.POS_DATA.paymentLinks || [];
+  var amount   = amountEl  ? parseFloat(amountEl.value)  : 0;
+  var currency = currencyEl ? currencyEl.value : 'GBP';
+  var credits  = creditsEl ? parseInt(creditsEl.value)   : 0;
+  var notes    = notesEl   ? notesEl.value.trim() : '';
 
-  // Update existing or add new
-  const existing = all.findIndex(l => (l.email === email || l.student === name) && l.status === 'pending');
-  const record = {
-    id:        existing !== -1 ? all[existing].id : 'PL-' + Date.now().toString(36).toUpperCase(),
-    student:   name,
-    email,
-    subject,
-    url,
-    amount:    '',
-    currency:  'GBP',
-    credits:   '',
-    status:    'pending',
-    type:      'topup',
-    createdAt: existing !== -1 ? all[existing].createdAt : new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
+  if (!amount || amount <= 0)  { showToast('Please enter the amount received.', 'error'); return; }
+  if (!credits || credits <= 0){ showToast('Please enter the number of credits to add.', 'error'); return; }
 
-  if (existing !== -1) {
-    all[existing] = record;
-  } else {
-    all.unshift(record);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Processing…'; }
+
+  try {
+    var token = localStorage.getItem('sn_access_token');
+    if (!token) throw new Error('Not logged in');
+
+    var res  = await fetch('https://api.stemnestacademy.co.uk/api/payments/manual-topup', {
+      method:  'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studentId, credits, amount, currency, notes }),
+    });
+
+    var data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Top-up failed');
+
+    /* Update POS_DATA in-memory so the badge count drops immediately */
+    if (window.POS_DATA && window.POS_DATA.students) {
+      var idx = window.POS_DATA.students.findIndex(function(s) { return s.id === studentId; });
+      if (idx !== -1) window.POS_DATA.students[idx].credits = data.newCredits;
+    }
+
+    if (resultEl) {
+      resultEl.style.display = 'block';
+      resultEl.style.color   = '#065f46';
+      resultEl.textContent   = '✅ Done! New balance: ' + data.newCredits + ' credit' + (data.newCredits !== 1 ? 's' : '') + '. Receipt emailed to parent.';
+    }
+    if (btn) { btn.textContent = '✅ Confirmed'; btn.style.background = '#d1fae5'; btn.style.color = '#065f46'; }
+
+    updatePOSStats();
+    showToast('✅ ' + credits + ' credit' + (credits !== 1 ? 's' : '') + ' added to student account.', 'success');
+
+    /* Refresh the top-up list after 2 seconds so resolved students drop off */
+    setTimeout(renderTopUpStudents, 2000);
+
+  } catch (err) {
+    showToast('Error: ' + err.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '✅ Confirm Payment Received'; }
   }
-
-  window.POS_DATA.paymentLinks = all;
-  localStorage.setItem('sn_payment_links', JSON.stringify(all));
-  updatePOSStats();
-  renderTopUpStudents();
-  showToast('✅ Payment link saved! Student will see it on their dashboard.');
 }
 
 /* ══════════════════════════════════════════════════════
@@ -2120,4 +2764,761 @@ async function promoteStudent(enrolmentId, studentName, nextGrade) {
       showToast('Failed: ' + (data.error || 'Unknown'), 'error');
     }
   } catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+/* ══════════════════════════════════════════════════════
+   PAUSE & RESUME TAB
+══════════════════════════════════════════════════════ */
+
+async function renderPauseResume() {
+  const token = localStorage.getItem('sn_access_token');
+
+  /* Load active students */
+  const activeEl = document.getElementById('activeStudentsList');
+  const pausedEl = document.getElementById('pausedStudentsList');
+  if (!activeEl || !pausedEl) return;
+
+  activeEl.innerHTML = '<div style="text-align:center;padding:24px;color:var(--light);font-weight:700;">⏳ Loading...</div>';
+  pausedEl.innerHTML = '<div style="text-align:center;padding:24px;color:var(--light);font-weight:700;">⏳ Loading...</div>';
+
+  try {
+    const [activeRes, pausedRes] = await Promise.all([
+      fetch('https://api.stemnestacademy.co.uk/api/enrollments/students/active', { headers: { Authorization: 'Bearer ' + token } }),
+      fetch('https://api.stemnestacademy.co.uk/api/enrollments/students/paused', { headers: { Authorization: 'Bearer ' + token } }),
+    ]);
+    const activeData = await activeRes.json();
+    const pausedData = await pausedRes.json();
+
+    const active = activeData.students || [];
+    const paused = pausedData.students || [];
+
+    /* Update badge */
+    const badge = document.getElementById('pauseBadge');
+    if (badge) badge.textContent = paused.length;
+
+    /* Render active list */
+    if (!active.length) {
+      activeEl.innerHTML = '<div style="text-align:center;padding:32px;color:var(--light);font-weight:700;">No active enrolled students found.</div>';
+    } else {
+      activeEl.innerHTML = active.map(s => `
+        <div style="background:#fff;border:1.5px solid #e8eaf0;border-radius:14px;padding:16px;margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+            <div style="flex:1;">
+              <div style="font-weight:900;font-size:14px;color:var(--dark);">${s.studentName}</div>
+              <div style="font-size:12px;color:var(--light);margin-top:2px;">📧 ${s.email || '—'}</div>
+              <div style="font-size:12px;color:var(--mid);margin-top:4px;font-weight:700;">
+                📚 ${s.pathwayName || '—'} · Grade ${s.currentGrade || '—'}
+                &nbsp;·&nbsp; 👩‍🏫 ${s.tutorName || '—'}
+                &nbsp;·&nbsp; 💳 ${s.credits || 0} credits
+              </div>
+              <div style="font-size:11px;color:var(--light);margin-top:2px;">Lesson ${s.lessonsCompleted || 0} of 72 completed</div>
+            </div>
+            <button onclick="openPauseModal('${s.studentId}','${(s.studentName||'').replace(/'/g,'')}')"
+              style="background:#f59e0b;color:#fff;border:none;border-radius:10px;padding:8px 16px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;">
+              ⏸️ Pause
+            </button>
+          </div>
+        </div>`).join('');
+    }
+
+    /* Render paused list */
+    if (!paused.length) {
+      pausedEl.innerHTML = '<div style="text-align:center;padding:32px;color:var(--light);font-weight:700;">No paused students at the moment.</div>';
+    } else {
+      pausedEl.innerHTML = paused.map(s => {
+        const pausedDate = s.pausedAt ? new Date(s.pausedAt).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }) : '—';
+        return `
+        <div style="background:#fff8f0;border:1.5px solid #fed7aa;border-radius:14px;padding:16px;margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+            <div style="flex:1;">
+              <div style="font-weight:900;font-size:14px;color:var(--dark);">${s.studentName}</div>
+              <div style="font-size:12px;color:var(--light);margin-top:2px;">📧 ${s.email || '—'}</div>
+              <div style="font-size:12px;color:var(--mid);margin-top:4px;font-weight:700;">
+                📚 ${s.pathwayName || '—'} · Grade ${s.currentGrade || '—'}
+                &nbsp;·&nbsp; 💳 ${s.credits || 0} credits preserved
+              </div>
+              <div style="font-size:11px;color:var(--light);margin-top:2px;">Will resume from Lesson ${(s.lastLesson || 0) + 1} · Paused ${pausedDate}</div>
+              <div style="font-size:11px;color:#92400e;margin-top:4px;font-style:italic;">Reason: ${s.pausedReason || '—'}</div>
+            </div>
+            <button onclick="openResumeModal('${s.studentId}','${(s.studentName||'').replace(/'/g,'')}','${s.lastTutorId||''}','${(s.lastTutorName||'').replace(/'/g,'')}','${(s.classLink||'').replace(/'/g,'&#39;')}')"
+              style="background:#0e9f6e;color:#fff;border:none;border-radius:10px;padding:8px 16px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;">
+              ▶️ Resume
+            </button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+  } catch(e) {
+    activeEl.innerHTML = '<div style="padding:16px;color:#c53030;font-weight:700;">Failed to load. ' + e.message + '</div>';
+    pausedEl.innerHTML = '';
+  }
+}
+
+/* ── Pause Modal ── */
+let _pauseStudentId = null;
+
+function openPauseModal(studentId, studentName) {
+  _pauseStudentId = studentId;
+  document.getElementById('pauseStudentName').textContent = studentName;
+  document.getElementById('pauseReason').value = '';
+  document.getElementById('pauseConfirmBtn').disabled = false;
+  document.getElementById('pauseConfirmBtn').textContent = '⏸️ Confirm Pause';
+  document.getElementById('pauseModalOverlay').classList.add('open');
+}
+
+function closePauseModal() {
+  document.getElementById('pauseModalOverlay')?.classList.remove('open');
+  _pauseStudentId = null;
+}
+
+async function confirmPause() {
+  const reason = document.getElementById('pauseReason')?.value.trim();
+  if (!reason) { showToast('Please enter a reason for pausing.', 'error'); return; }
+  if (!_pauseStudentId) { showToast('No student selected.', 'error'); return; }
+
+  const btn = document.getElementById('pauseConfirmBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Pausing…'; }
+
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res = await fetch(`https://api.stemnestacademy.co.uk/api/enrollments/students/${_pauseStudentId}/pause`, {
+      method: 'PUT',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Pause failed');
+
+    showToast(`⏸️ ${data.studentName}'s classes paused. ${data.bookingsCancelled} future classes cancelled. Credits preserved.`, 'success', 6000);
+    closePauseModal();
+    renderPauseResume();
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '⏸️ Confirm Pause'; }
+  }
+}
+
+/* ── Resume Modal ── */
+let _resumeStudentId   = null;
+let _resumeLastTutorId = null;
+
+function openResumeModal(studentId, studentName, lastTutorId, lastTutorName, classLink) {
+  _resumeStudentId   = studentId;
+  _resumeLastTutorId = lastTutorId;
+
+  document.getElementById('resumeStudentName').textContent = studentName;
+
+  /* Default start date = tomorrow */
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const startEl = document.getElementById('resume-start-date');
+  if (startEl) {
+    startEl.min   = tomorrow.toISOString().split('T')[0];
+    startEl.value = tomorrow.toISOString().split('T')[0];
+  }
+
+  /* Pre-fill class link */
+  const linkEl = document.getElementById('resume-class-link');
+  if (linkEl) linkEl.value = classLink || '';
+
+  /* Pre-fill tutor selector hint */
+  const tutorHint = document.getElementById('resumeTutorHint');
+  if (tutorHint) tutorHint.textContent = lastTutorName ? `Previous tutor: ${lastTutorName}` : '';
+
+  /* Load tutors into dropdown */
+  _loadResumeTutors(lastTutorId);
+
+  /* Reset schedule rows */
+  const container = document.getElementById('resume-schedule-rows');
+  if (container) container.innerHTML = _buildRSRow(0) + _buildRSRow(1);
+
+  document.getElementById('resumeConfirmBtn').disabled = false;
+  document.getElementById('resumeConfirmBtn').textContent = '▶️ Resume Classes';
+  document.getElementById('resumeModalOverlay').classList.add('open');
+}
+
+async function _loadResumeTutors(preselectedId) {
+  const sel = document.getElementById('resume-tutor-select');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">⏳ Loading tutors…</option>';
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/users?role=tutor&limit=100', { headers: { Authorization: 'Bearer ' + token } });
+    const data = await res.json();
+    const tutors = (data.users || []).filter(t => t.is_active !== false);
+    sel.innerHTML = '<option value="">— Select tutor —</option>' +
+      tutors.map(t => `<option value="${t.id}" ${t.id === preselectedId ? 'selected' : ''}>${t.name}</option>`).join('');
+  } catch(e) {
+    sel.innerHTML = '<option value="">Failed to load tutors</option>';
+  }
+}
+
+function closeResumeModal() {
+  document.getElementById('resumeModalOverlay')?.classList.remove('open');
+  _resumeStudentId = null;
+  _resumeLastTutorId = null;
+}
+
+async function confirmResume() {
+  const startDate = document.getElementById('resume-start-date')?.value;
+  const tutorId   = document.getElementById('resume-tutor-select')?.value;
+  const classLink = document.getElementById('resume-class-link')?.value.trim();
+  const schedule  = _getRSSchedule();
+
+  if (!startDate)   { showToast('Please select a start date.', 'error'); return; }
+  if (!tutorId)     { showToast('Please select a tutor.', 'error'); return; }
+  if (!schedule.length) { showToast('Please set at least one day and time.', 'error'); return; }
+
+  const btn = document.getElementById('resumeConfirmBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Checking for clashes…'; }
+
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res = await fetch(`https://api.stemnestacademy.co.uk/api/enrollments/students/${_resumeStudentId}/resume`, {
+      method: 'PUT',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tutorId, schedule, startDate, classLink: classLink || undefined }),
+    });
+    const data = await res.json();
+
+    if (!data.success) {
+      /* Show clash error clearly */
+      if (res.status === 409) {
+        showToast('⛔ ' + data.error, 'error', 8000);
+      } else {
+        showToast('Error: ' + (data.error || 'Resume failed'), 'error');
+      }
+      if (btn) { btn.disabled = false; btn.textContent = '▶️ Resume Classes'; }
+      return;
+    }
+
+    showToast(`▶️ ${data.studentName}'s classes resumed! ${data.bookingsCreated} classes created from Lesson ${data.resumedFromLesson} with ${data.tutorName}.`, 'success', 7000);
+    closeResumeModal();
+    renderPauseResume();
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '▶️ Resume Classes'; }
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   BATCHES TAB — Group Classes Management
+   Students learn together in groups of 2–3.
+   Credits remain individual per student.
+══════════════════════════════════════════════════════ */
+
+let _batchDetailId = null;
+
+async function renderBatchesTab() {
+  const el = document.getElementById('batchesList');
+  if (!el) return;
+  el.innerHTML = '<div style="text-align:center;padding:32px;color:var(--light);font-weight:700;">⏳ Loading batches...</div>';
+
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res   = await fetch('https://api.stemnestacademy.co.uk/api/batches', {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    const data  = await res.json();
+    const batches = data.batches || [];
+
+    const badge = document.getElementById('batchesBadge');
+    if (badge) badge.textContent = batches.filter(b => b.status === 'active').length;
+
+    if (!batches.length) {
+      el.innerHTML = `<div style="text-align:center;padding:60px 20px;">
+        <div style="font-size:48px;margin-bottom:12px;">👥</div>
+        <div style="font-family:'Fredoka One',cursive;font-size:22px;color:var(--dark);">No batches yet</div>
+        <div style="font-size:14px;color:var(--light);margin-top:8px;">Create your first group batch to get students learning together.</div>
+        <button onclick="openCreateBatchModal()" style="margin-top:20px;background:var(--blue);color:#fff;border:none;border-radius:14px;padding:13px 28px;font-family:'Nunito',sans-serif;font-weight:900;font-size:14px;cursor:pointer;">
+          ➕ Create First Batch
+        </button>
+      </div>`;
+      return;
+    }
+
+    const thS = 'padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;letter-spacing:.5px;';
+    const tdS = 'padding:14px 16px;vertical-align:middle;';
+
+    el.innerHTML = `
+      <div style="overflow-x:auto;border-radius:16px;border:1.5px solid #e8eaf0;background:var(--white);">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">
+              <th style="${thS}">Batch ID</th>
+              <th style="${thS}">Teacher</th>
+              <th style="${thS}">Pathway / Grade</th>
+              <th style="${thS}">Schedule</th>
+              <th style="${thS}">Students</th>
+              <th style="${thS}">Next Class</th>
+              <th style="${thS}">Status</th>
+              <th style="${thS}">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${batches.map((b, i) => {
+              const sched = Array.isArray(b.schedule) ? b.schedule : (JSON.parse(b.schedule || '[]'));
+              const days  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+              const schedStr = sched.map(s => days[s.weekday] + ' ' + s.time).join(' + ');
+              const nextDate = b.nextClassDate ? new Date(b.nextClassDate).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}) : '—';
+              const statusColor = b.status === 'active' ? '#0e9f6e' : b.status === 'paused' ? '#f59e0b' : '#9ca3af';
+              return `<tr style="border-bottom:1px solid #f0f2f8;${i%2===0?'':'background:#fafbff;'}">
+                <td style="${tdS}"><span style="font-family:'Fredoka One',cursive;font-size:14px;color:var(--blue);">${b.batchRef}</span></td>
+                <td style="${tdS};font-weight:700;color:var(--dark);">${b.tutorName || '—'}</td>
+                <td style="${tdS};font-size:12px;color:var(--mid);font-weight:700;">${b.pathwayName || '—'}${b.gradeNumber ? ' · Grade ' + b.gradeNumber : ''}</td>
+                <td style="${tdS};font-size:12px;color:var(--mid);font-weight:700;">${schedStr || '—'}</td>
+                <td style="${tdS};">
+                  <span style="background:var(--blue-light);color:var(--blue);font-size:12px;font-weight:900;padding:4px 10px;border-radius:50px;">${b.memberCount || 0}/3 students</span>
+                </td>
+                <td style="${tdS};font-size:12px;color:var(--mid);font-weight:700;">${nextDate}</td>
+                <td style="${tdS};">
+                  <span style="background:${statusColor}20;color:${statusColor};font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;text-transform:uppercase;">${b.status}</span>
+                </td>
+                <td style="${tdS};">
+                  <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                    <button onclick="openBatchDetail('${b.id}')"
+                      style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;">
+                      👁️ View
+                    </button>
+                    ${b.status === 'active' ? `
+                    <button onclick="closeBatch('${b.id}','${b.batchRef}')"
+                      style="background:#fde8e8;color:#c53030;border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;">
+                      🔒 Close
+                    </button>` : ''}
+                  </div>
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:10px;font-size:12px;font-weight:700;color:var(--light);text-align:right;">${batches.length} batch${batches.length!==1?'es':''}</div>`;
+  } catch(e) {
+    el.innerHTML = '<div style="padding:20px;color:#c53030;font-weight:700;">Failed to load batches: ' + e.message + '</div>';
+  }
+}
+
+/* ── Open batch detail modal ── */
+async function openBatchDetail(batchId) {
+  _batchDetailId = batchId;
+  const token = localStorage.getItem('sn_access_token');
+  const overlay = document.getElementById('batchDetailOverlay');
+  const body    = document.getElementById('batchDetailBody');
+  if (!overlay || !body) return;
+
+  body.innerHTML = '<div style="text-align:center;padding:32px;color:var(--light);font-weight:700;">⏳ Loading...</div>';
+  overlay.classList.add('open');
+
+  try {
+    const res  = await fetch('https://api.stemnestacademy.co.uk/api/batches/' + batchId, {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error);
+    const b       = data.batch;
+    const members = data.members || [];
+    const sched   = Array.isArray(b.schedule) ? b.schedule : (JSON.parse(b.schedule || '[]'));
+    const days    = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const schedStr = sched.map(s => days[s.weekday] + ' at ' + s.time).join(' · ');
+
+    body.innerHTML = `
+      <!-- Batch info banner -->
+      <div style="background:var(--blue-light);border-radius:14px;padding:16px 18px;margin-bottom:20px;">
+        <div style="font-family:'Fredoka One',cursive;font-size:20px;color:var(--blue);">${b.batch_ref}</div>
+        <div style="font-size:13px;color:var(--mid);font-weight:700;line-height:1.9;margin-top:4px;">
+          👩‍🏫 Teacher: <strong>${b.tutorName || '—'}</strong><br>
+          📚 ${b.pathwayName || '—'}${b.grade_number ? ' · Grade ' + b.grade_number : ''}<br>
+          🗓️ ${schedStr || '—'}<br>
+          🔗 <a href="${b.class_link}" target="_blank" style="color:var(--blue);">Class Link</a><br>
+          📊 ${data.remainingClasses} classes remaining
+        </div>
+      </div>
+
+      <!-- Members list -->
+      <div style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Students in this batch</div>
+      ${members.filter(m => m.status === 'active').map(m => `
+        <div style="background:#fff;border:1.5px solid #e8eaf0;border-radius:12px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          <div style="flex:1;">
+            <div style="font-weight:900;font-size:14px;color:var(--dark);">${m.studentName}</div>
+            <div style="font-size:12px;color:var(--light);margin-top:2px;">
+              📧 ${m.email || '—'} &nbsp;·&nbsp;
+              💳 <strong style="color:${m.credits <= 3 ? '#c53030' : 'var(--green)'};">${m.credits || 0} credits</strong>
+              ${m.creditsSuspended ? ' &nbsp;<span style="background:#fde8e8;color:#c53030;font-size:10px;font-weight:900;padding:2px 8px;border-radius:50px;">🔒 PAUSED</span>' : ''}
+            </div>
+          </div>
+          <button onclick="removeFromBatch('${batchId}','${m.studentId}','${m.studentName.replace(/'/g,'')}')"
+            style="background:#fde8e8;color:#c53030;border:none;border-radius:8px;padding:7px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;">
+            ✕ Remove
+          </button>
+        </div>`).join('')}
+
+      ${members.filter(m => m.status === 'active').length < 3 ? `
+      <button onclick="openAddMemberModal('${batchId}')"
+        style="width:100%;background:var(--bg);border:2px dashed var(--blue);border-radius:12px;padding:12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;color:var(--blue);cursor:pointer;margin-top:8px;">
+        ➕ Add Another Student
+      </button>` : ''}
+
+      <!-- Reschedule button -->
+      <div style="border-top:1.5px solid #e8eaf0;margin-top:16px;padding-top:16px;">
+        <button onclick="closeBatchDetailModal();openBatchRescheduleModal('${batchId}','${b.batch_ref}')"
+          style="width:100%;background:#fff3e0;color:#e65100;border:1.5px solid #f59e0b;border-radius:12px;padding:12px;font-family:'Nunito',sans-serif;font-weight:900;font-size:13px;cursor:pointer;">
+          🔄 Reschedule This Batch
+        </button>
+        <div style="font-size:11px;color:var(--light);font-weight:700;margin-top:6px;text-align:center;">Changes day/time from a chosen date. Lesson sequence is preserved.</div>
+      </div>`;
+  } catch(e) {
+    body.innerHTML = '<div style="padding:20px;color:#c53030;font-weight:700;">Failed to load: ' + e.message + '</div>';
+  }
+}
+
+function closeBatchDetailModal() {
+  document.getElementById('batchDetailOverlay')?.classList.remove('open');
+  _batchDetailId = null;
+}
+
+/* ── Remove a student from batch ── */
+async function removeFromBatch(batchId, studentId, studentName) {
+  const reason = prompt('Reason for removing ' + studentName + ' from this batch? (required)');
+  if (!reason || !reason.trim()) { showToast('Removal reason is required.', 'error'); return; }
+
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/batches/' + batchId + '/members/' + studentId, {
+      method:  'DELETE',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ reason }),
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error);
+    showToast('✅ ' + studentName + ' removed from batch.', 'success');
+    openBatchDetail(batchId);
+    renderBatchesTab();
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+/* ── Add student to existing batch ── */
+async function openAddMemberModal(batchId) {
+  const token = localStorage.getItem('sn_access_token');
+  const stuRes = await fetch('https://api.stemnestacademy.co.uk/api/users?role=student&limit=200', {
+    headers: { Authorization: 'Bearer ' + token }
+  }).then(r => r.json()).catch(() => ({ users: [] }));
+
+  const students = stuRes.users || [];
+  if (!students.length) { showToast('No students found.', 'error'); return; }
+
+  document.getElementById('batchDetailOverlay')?.classList.remove('open');
+
+  /* Simple select prompt */
+  const names = students.map(s => s.name + ' (' + (s.staff_id || s.id.slice(0,8)) + ')');
+  const sel = prompt('Select student to add:\n' + names.map((n, i) => (i+1) + '. ' + n).join('\n') + '\n\nEnter number:');
+  if (!sel) { openBatchDetail(batchId); return; }
+  const idx = parseInt(sel) - 1;
+  if (idx < 0 || idx >= students.length) { showToast('Invalid selection.', 'error'); openBatchDetail(batchId); return; }
+
+  const student = students[idx];
+  try {
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/batches/' + batchId + '/members', {
+      method:  'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ studentId: student.id }),
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error);
+    showToast('✅ ' + student.name + ' added to batch!', 'success');
+    renderBatchesTab();
+    openBatchDetail(batchId);
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+    openBatchDetail(batchId);
+  }
+}
+
+/* ── Close a batch ── */
+async function closeBatch(batchId, batchRef) {
+  if (!confirm('Close batch ' + batchRef + '? This will cancel all future classes for this batch.')) return;
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/batches/' + batchId + '/status', {
+      method:  'PUT',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ status: 'closed' }),
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error);
+    showToast('✅ Batch ' + batchRef + ' closed. Future classes cancelled.', 'success');
+    renderBatchesTab();
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+/* ── Open Create Batch Modal ── */
+async function openCreateBatchModal() {
+  const overlay = document.getElementById('createBatchOverlay');
+  if (!overlay) return;
+  const token = localStorage.getItem('sn_access_token');
+
+  /* Reset form */
+  ['cb-class-link','cb-start-date','cb-grade','cb-notes'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+  const dateEl = document.getElementById('cb-start-date');
+  if (dateEl) { dateEl.min = tomorrow.toISOString().split('T')[0]; dateEl.value = tomorrow.toISOString().split('T')[0]; }
+
+  const schedContainer = document.getElementById('cb-schedule-rows');
+  if (schedContainer) schedContainer.innerHTML = _buildBatchSchedRow(0) + _buildBatchSchedRow(1);
+
+  /* Load tutors */
+  const tutorSel = document.getElementById('cb-tutor');
+  if (tutorSel) {
+    tutorSel.innerHTML = '<option value="">⏳ Loading tutors…</option>';
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/users?role=tutor&limit=100', { headers: { Authorization: 'Bearer ' + token } }).then(r => r.json()).catch(() => ({ users: [] }));
+    tutorSel.innerHTML = '<option value="">— Select tutor —</option>' + (res.users || []).map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+  }
+
+  /* Load pathways */
+  const pathwaySel = document.getElementById('cb-pathway');
+  if (pathwaySel) {
+    pathwaySel.innerHTML = '<option value="">⏳ Loading pathways…</option>';
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/pathways', { headers: { Authorization: 'Bearer ' + token } }).then(r => r.json()).catch(() => ({ pathways: [] }));
+    pathwaySel.innerHTML = '<option value="">— Select pathway (optional) —</option>' + (res.pathways || []).map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  }
+
+  /* Load students for checkboxes */
+  await _loadBatchStudentCheckboxes();
+
+  overlay.classList.add('open');
+}
+
+function closeCreateBatchModal() {
+  document.getElementById('createBatchOverlay')?.classList.remove('open');
+}
+
+function _buildBatchSchedRow(idx) {
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  return `<div class="enrol-schedule-row" id="cb-row-${idx}" style="display:flex;gap:10px;align-items:center;margin-bottom:10px;">
+    <select id="cb-day-${idx}" style="flex:1;padding:10px 12px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;outline:none;background:#fff;">
+      <option value="">— Day —</option>
+      ${days.map((d,i) => `<option value="${i}">${d}</option>`).join('')}
+    </select>
+    <input type="time" id="cb-time-${idx}" style="flex:1;padding:10px 12px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;outline:none;">
+    ${idx > 0 ? `<button type="button" onclick="document.getElementById('cb-row-${idx}').remove()" style="background:#fde8e8;color:#c53030;border:none;border-radius:10px;padding:8px 12px;font-size:18px;cursor:pointer;font-weight:900;line-height:1;">×</button>` : '<div style="width:40px;"></div>'}
+  </div>`;
+}
+
+function addBatchSchedRow() {
+  const container = document.getElementById('cb-schedule-rows');
+  if (!container) return;
+  const existing = container.querySelectorAll('.enrol-schedule-row').length;
+  if (existing >= 5) { showToast('Maximum 5 days per week.', 'error'); return; }
+  const div = document.createElement('div');
+  div.innerHTML = _buildBatchSchedRow(existing);
+  container.appendChild(div.firstChild);
+}
+
+async function _loadBatchStudentCheckboxes() {
+  const container = document.getElementById('cb-students-list');
+  if (!container) return;
+  container.innerHTML = '<div style="color:var(--light);font-size:13px;font-weight:700;">⏳ Loading students…</div>';
+  const token = localStorage.getItem('sn_access_token');
+  try {
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/users?role=student&limit=200', { headers: { Authorization: 'Bearer ' + token } });
+    const data = await res.json();
+    const students = data.users || [];
+    if (!students.length) { container.innerHTML = '<div style="color:var(--light);font-size:13px;font-weight:700;">No students found.</div>'; return; }
+    container.innerHTML = students.map(s => `
+      <label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1.5px solid #e8eaf0;border-radius:10px;cursor:pointer;margin-bottom:6px;font-size:13px;font-weight:700;color:var(--dark);">
+        <input type="checkbox" name="cb-student" value="${s.id}" style="width:16px;height:16px;cursor:pointer;">
+        <span>${s.name}</span>
+        <span style="font-size:11px;color:var(--light);margin-left:auto;">${s.staff_id || ''}</span>
+      </label>`).join('');
+  } catch(e) {
+    container.innerHTML = '<div style="color:#c53030;font-size:13px;font-weight:700;">Failed to load students.</div>';
+  }
+}
+
+async function confirmCreateBatch() {
+  const tutorId   = document.getElementById('cb-tutor')?.value;
+  const pathwayId = document.getElementById('cb-pathway')?.value || null;
+  const gradeNumber = document.getElementById('cb-grade')?.value || null;
+  const classLink = document.getElementById('cb-class-link')?.value.trim();
+  const startDate = document.getElementById('cb-start-date')?.value;
+  const notes     = document.getElementById('cb-notes')?.value.trim() || null;
+
+  /* Read schedule */
+  const schedule = [];
+  document.querySelectorAll('#cb-schedule-rows .enrol-schedule-row').forEach(row => {
+    const dayEl  = row.querySelector('select[id^="cb-day-"]');
+    const timeEl = row.querySelector('input[type="time"]');
+    if (dayEl && timeEl && dayEl.value !== '' && timeEl.value) {
+      schedule.push({ weekday: parseInt(dayEl.value), time: timeEl.value });
+    }
+  });
+
+  /* Read selected students */
+  const studentIds = Array.from(document.querySelectorAll('input[name="cb-student"]:checked')).map(c => c.value);
+
+  if (!tutorId)          { showToast('Please select a teacher.', 'error'); return; }
+  if (!classLink)        { showToast('Please enter the Google Meet class link.', 'error'); return; }
+  if (!startDate)        { showToast('Please select a start date.', 'error'); return; }
+  if (!schedule.length)  { showToast('Please set at least one class day and time.', 'error'); return; }
+  if (studentIds.length < 2) { showToast('Please select at least 2 students.', 'error'); return; }
+  if (studentIds.length > 3) { showToast('Maximum 3 students per batch.', 'error'); return; }
+
+  const btn = document.querySelector('#createBatchOverlay .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Creating batch…'; }
+
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/batches', {
+      method:  'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ tutorId, pathwayId, gradeNumber: gradeNumber ? parseInt(gradeNumber) : null, classLink, schedule, startDate, studentIds, notes }),
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error);
+
+    showToast('✅ Batch ' + data.batchRef + ' created! ' + data.bookingsCreated + ' classes scheduled.', 'success', 7000);
+    closeCreateBatchModal();
+    renderBatchesTab();
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '👥 Create Batch'; }
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   BATCH RESCHEDULE MODAL
+══════════════════════════════════════════════════════ */
+
+let _batchRescheduleId  = null;
+let _batchRescheduleRef = null;
+
+function openBatchRescheduleModal(batchId, batchRef) {
+  _batchRescheduleId  = batchId;
+  _batchRescheduleRef = batchRef;
+
+  const overlay = document.getElementById('batchRescheduleOverlay');
+  if (!overlay) return;
+
+  /* Set title */
+  const titleEl = document.getElementById('batchRescheduleTitle');
+  if (titleEl) titleEl.textContent = `🔄 Reschedule ${batchRef}`;
+
+  /* Default start date = today (today is allowed) */
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+  const dateEl = document.getElementById('br-start-date');
+  if (dateEl) {
+    dateEl.min   = todayStr;
+    dateEl.value = todayStr;
+  }
+
+  /* Clear class link */
+  const linkEl = document.getElementById('br-class-link');
+  if (linkEl) linkEl.value = '';
+
+  /* Build 2 schedule rows */
+  const container = document.getElementById('br-schedule-rows');
+  if (container) container.innerHTML = _buildBRRow(0) + _buildBRRow(1);
+
+  /* Reset button */
+  const btn = document.getElementById('brConfirmBtn');
+  if (btn) { btn.disabled = false; btn.textContent = '🔄 Apply New Schedule'; }
+
+  overlay.classList.add('open');
+}
+
+function closeBatchRescheduleModal() {
+  document.getElementById('batchRescheduleOverlay')?.classList.remove('open');
+  _batchRescheduleId  = null;
+  _batchRescheduleRef = null;
+}
+
+function _buildBRRow(idx) {
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  return `<div class="enrol-schedule-row" id="br-row-${idx}" style="display:flex;gap:10px;align-items:center;margin-bottom:10px;">
+    <select id="br-day-${idx}" style="flex:1;padding:10px 12px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;outline:none;background:#fff;">
+      <option value="">— Day —</option>
+      ${days.map((d,i) => `<option value="${i}">${d}</option>`).join('')}
+    </select>
+    <input type="time" id="br-time-${idx}" style="flex:1;padding:10px 12px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;outline:none;">
+    ${idx > 0
+      ? `<button type="button" onclick="document.getElementById('br-row-${idx}').remove()" style="background:#fde8e8;color:#c53030;border:none;border-radius:10px;padding:8px 12px;font-size:18px;cursor:pointer;font-weight:900;line-height:1;">×</button>`
+      : '<div style="width:40px;"></div>'}
+  </div>`;
+}
+
+function addBRScheduleRow() {
+  const container = document.getElementById('br-schedule-rows');
+  if (!container) return;
+  const existing = container.querySelectorAll('.enrol-schedule-row').length;
+  if (existing >= 5) { showToast('Maximum 5 days per week.', 'error'); return; }
+  const div = document.createElement('div');
+  div.innerHTML = _buildBRRow(existing);
+  container.appendChild(div.firstChild);
+}
+
+function _getBRSchedule() {
+  const schedule = [];
+  const container = document.getElementById('br-schedule-rows');
+  if (!container) return schedule;
+  container.querySelectorAll('.enrol-schedule-row').forEach(row => {
+    const dayEl  = row.querySelector('select[id^="br-day-"]');
+    const timeEl = row.querySelector('input[type="time"]');
+    if (dayEl && timeEl && dayEl.value !== '' && timeEl.value) {
+      schedule.push({ weekday: parseInt(dayEl.value), time: timeEl.value });
+    }
+  });
+  return schedule;
+}
+
+async function confirmBatchReschedule() {
+  if (!_batchRescheduleId) { showToast('No batch selected.', 'error'); return; }
+
+  const startDate = document.getElementById('br-start-date')?.value;
+  const classLink = document.getElementById('br-class-link')?.value.trim() || undefined;
+  const schedule  = _getBRSchedule();
+
+  if (!startDate)       { showToast('Please select a start date.', 'error'); return; }
+  if (!schedule.length) { showToast('Please set at least one day and time.', 'error'); return; }
+
+  const btn = document.getElementById('brConfirmBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Checking for clashes…'; }
+
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res = await fetch(`https://api.stemnestacademy.co.uk/api/batches/${_batchRescheduleId}/reschedule`, {
+      method:  'PUT',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ startDate, schedule, classLink }),
+    });
+    const data = await res.json();
+
+    if (!data.success) {
+      if (res.status === 409) {
+        showToast('⛔ ' + data.error, 'error', 8000);
+      } else {
+        showToast('Error: ' + (data.error || 'Reschedule failed'), 'error');
+      }
+      if (btn) { btn.disabled = false; btn.textContent = '🔄 Apply New Schedule'; }
+      return;
+    }
+
+    showToast(
+      `✅ ${data.batchRef} rescheduled! ${data.cancelled} old classes cancelled, ${data.created} new classes created.`,
+      'success',
+      7000
+    );
+    closeBatchRescheduleModal();
+    renderBatchesTab();
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Apply New Schedule'; }
+  }
 }

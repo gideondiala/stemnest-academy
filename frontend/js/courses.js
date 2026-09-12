@@ -457,8 +457,7 @@ function buildCard(c) {
       </div>
       <div class="card-footer">
         <div>
-          <div class="course-price">£${c.price}<span style="font-size:14px;color:var(--light);font-family:'Nunito',sans-serif;">/mo</span></div>
-          <div class="price-note">1-on-1 live sessions</div>
+          <div class="price-note">1-on-1 live sessions · Personalised to your child</div>
         </div>
         <a href="free-trial.html" class="btn btn-outline" style="font-size:13px;padding:8px 18px;">Try Free Demo →</a>
         <button class="enroll-btn" onclick="openCheckout('${c.id}','${c.name.replace(/'/g,"\\'")}',${c.price})">Enrol Now →</button>
@@ -514,7 +513,6 @@ function openCheckout(courseId, courseName, coursePrice) {
       <div style="background:#f0f4ff;border-radius:14px;padding:16px 20px;margin-bottom:24px;">
         <div style="font-weight:900;font-size:16px;color:#1a202c;">${courseName}</div>
         <div style="font-size:13px;color:#4a5568;margin-top:4px;">1-on-1 live sessions · UK-certified tutor</div>
-        <div style="font-family:'Fredoka One',cursive;font-size:22px;color:#1a56db;margin-top:8px;">£${coursePrice}<span style="font-size:14px;color:#718096;font-family:'Nunito',sans-serif;">/month</span></div>
       </div>
 
       <!-- Form -->

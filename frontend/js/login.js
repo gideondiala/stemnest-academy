@@ -18,22 +18,22 @@ const loginConfig = {
     studentActive:'',
     panelClass:   'panel-tutor',
     panelIcon:    '🎓',
-    panelTitle:   'Your students<br>are waiting!',
-    panelSub:     "Head into your dashboard, review today's schedule and start your next live 1-on-1 session.",
+    panelTitle:   'Welcome back,<br>Tutor! 👋',
+    panelSub:     "Log in to access your full teaching dashboard.",
     ctaText:      '👩‍🏫 Join Us as a Tutor',
     ctaAction:    () => navigate('home'),
     cards: `
       <div class="pcard">
         <div class="pcard-icon">📅</div>
-        <div><div class="pcard-title">Next session in 20 mins</div><div class="pcard-sub">James O. · Year 9 Maths</div></div>
+        <div><div class="pcard-title">View your class schedule</div><div class="pcard-sub">See all upcoming sessions at a glance</div></div>
       </div>
       <div class="pcard">
-        <div class="pcard-icon">📊</div>
-        <div><div class="pcard-title">4 sessions scheduled today</div><div class="pcard-sub">Coding · Maths · Sciences</div></div>
+        <div class="pcard-icon">🚀</div>
+        <div><div class="pcard-title">Join live sessions</div><div class="pcard-sub">One click to open your class link</div></div>
       </div>
       <div class="pcard">
-        <div class="pcard-icon">⭐</div>
-        <div><div class="pcard-title">Your rating: 4.9 / 5</div><div class="pcard-sub">Based on 48 student reviews</div></div>
+        <div class="pcard-icon">📁</div>
+        <div><div class="pcard-title">Review student projects</div><div class="pcard-sub">Give feedback and track student progress</div></div>
       </div>`,
   },
   student: {
@@ -48,22 +48,22 @@ const loginConfig = {
     studentActive:'active-student',
     panelClass:   'panel-student',
     panelIcon:    '🧑‍💻',
-    panelTitle:   'Your class is<br>live & waiting!',
-    panelSub:     "Jump in, your tutor is online and ready to help you learn something amazing today.",
-    ctaText:      '🎓 Book a Free Trial Class — No commitment needed',
+    panelTitle:   'Your learning<br>awaits you! 🚀',
+    panelSub:     "Log in to access your personal learning dashboard.",
+    ctaText:      '🎓 Book a Demo — No commitment needed',
     ctaAction:    () => navigate('home'),
     cards: `
       <div class="pcard">
-        <div class="pcard-icon">📡</div>
-        <div><div class="pcard-title"><span class="live-dot"></span>Live Now — Python Class</div><div class="pcard-sub">Tutor: Sarah R. · 10:00 AM</div></div>
+        <div class="pcard-icon">📚</div>
+        <div><div class="pcard-title">View your upcoming lessons</div><div class="pcard-sub">See your full class schedule and lesson topics</div></div>
+      </div>
+      <div class="pcard">
+        <div class="pcard-icon">🧠</div>
+        <div><div class="pcard-title">Take quizzes & submit projects</div><div class="pcard-sub">Test your knowledge and track your progress</div></div>
       </div>
       <div class="pcard">
         <div class="pcard-icon">🏆</div>
-        <div><div class="pcard-title">You've completed 12 classes</div><div class="pcard-sub">Keep going — you're on a roll!</div></div>
-      </div>
-      <div class="pcard">
-        <div class="pcard-icon">📝</div>
-        <div><div class="pcard-title">1 homework task due</div><div class="pcard-sub">Python: Variables & Loops</div></div>
+        <div><div class="pcard-title">Earn certificates</div><div class="pcard-sub">Complete your pathway and unlock achievements</div></div>
       </div>`,
   },
 };
@@ -74,6 +74,16 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('keydown', e => {
     if (e.key === 'Enter') handleLogin();
   });
+
+  /* Show message if redirected here due to auth failure */
+  const params = new URLSearchParams(window.location.search);
+  const error  = params.get('error');
+  const redirect = params.get('redirect');
+  if (error === 'unauthorized') {
+    showToast('⚠️ You do not have permission to access that page. Please log in with the correct account.', 'error');
+  } else if (redirect) {
+    showToast('Please log in to continue.', 'info');
+  }
 });
 
 /* ── SEED DEFAULT REGISTRIES — REMOVED
@@ -196,7 +206,7 @@ async function handleLogin() {
         }
         if (user.role === 'sales')   localStorage.setItem('sn_logged_in_sales',   user.staffId || user.id);
         if (user.role === 'student') localStorage.setItem('sn_logged_in_student', user.email);
-        setTimeout(() => navigate(dest), 700);
+        setTimeout(() => navigateAfterLogin(dest), 700);
       } else {
         throw new Error('Unknown role: ' + user.role);
       }
@@ -266,10 +276,18 @@ async function handleLogin() {
         }, 1500);
       }
     } else {
-      // Student login
-      document.getElementById('btnIcon').textContent = '✅';
-      document.getElementById('btnText').textContent = 'Joining your class…';
-      setTimeout(() => navigate('student-dashboard'), 700);
+      // Student login — no offline fallback. API must be available.
+      document.getElementById('btnIcon').textContent = '❌';
+      document.getElementById('btnText').textContent = 'Cannot connect — check your internet';
+      btn.style.animation = 'none';
+      btn.offsetHeight;
+      btn.style.animation = 'shake .4s ease';
+      setTimeout(() => {
+        document.getElementById('btnIcon').textContent = loginConfig[currentRole].btnIcon;
+        document.getElementById('btnText').textContent = loginConfig[currentRole].btnText;
+        btn.style.opacity       = '1';
+        btn.style.pointerEvents = '';
+      }, 2000);
     }
   }, 1200);
 }

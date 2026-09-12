@@ -1,6 +1,43 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
+  <!-- Microsoft Clarity -->
+  <script type="text/javascript">
+    (function(c,l,a,r,i,t,y){
+      c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+      t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+      y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    })(window, document, "clarity", "script", "xer20hj8fr");
+  </script>
+  <!-- End Microsoft Clarity -->
+  <!-- TikTok Pixel Code -->
+  <script>
+    !function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var r="https://analytics.tiktok.com/i18n/pixel/events.js",o=n&&n.partner;ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=r,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};n=document.createElement("script");n.type="text/javascript",n.async=!0,n.src=r+"?sdkid="+e+"&lib="+t;e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(n,e)};ttq.load('D8V60AJC77U45FANPDG0');ttq.load('D91PAORC77U4QRO9NQ0G');ttq.page()}(window,document,'ttq');
+  </script>
+  <!-- End TikTok Pixel Code -->
+  <!-- Google Analytics 4 -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-WB62B0P5KG"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-WB62B0P5KG');
+  </script>
+  <!-- End Google Analytics 4 -->
+  <!-- Auth Guard — must be first script in head -->
+  <script>
+    (function(){
+      var t=localStorage.getItem('sn_access_token');
+      var u=null;try{u=JSON.parse(localStorage.getItem('sn_api_user')||'null');}catch(e){}
+      var roles='presales,admin,super_admin';
+      var allowed=roles?roles.split(',').map(function(r){return r.trim();}):[];
+      var redir='/pages/login.html?redirect='+encodeURIComponent(window.location.pathname+window.location.search);
+      if(!t){document.documentElement.style.visibility='hidden';window.location.replace(redir);return;}
+      try{var p=t.split('.');if(p.length===3){var pl=JSON.parse(atob(p[1].replace(/-/g,'+').replace(/_/g,'/')));if(pl.exp&&pl.exp*1000<Date.now()){localStorage.removeItem('sn_access_token');localStorage.removeItem('sn_api_user');document.documentElement.style.visibility='hidden';window.location.replace(redir);return;}}}catch(e){}
+      if(allowed.length){var role=u&&u.role?u.role:'';if(!role||allowed.indexOf(role)===-1){document.documentElement.style.visibility='hidden';window.location.replace('/pages/login.html?error=unauthorized');return;}}
+      document.documentElement.style.visibility='';
+    })();
+  </script>
   <meta charset="UTF-8">
   <link rel="icon" type="image/png" sizes="32x32" href="../assets/icons/icon.png">
   <link rel="icon" type="image/png" sizes="16x16" href="../assets/icons/icon.png">
@@ -26,7 +63,7 @@
     <div class="sidebar-profile">
       <div class="sidebar-avatar" style="background:linear-gradient(135deg,#1a56db,#0e9f6e);" id="psAvatar">PS</div>
       <div class="sidebar-name" id="psSidebarName">Pre-Sales</div>
-      <div class="sidebar-role">Academic Counselor</div>
+      <div class="sidebar-role">Learning Advisor</div>
       <div class="sidebar-status"><span class="live-dot"></span> Online</div>
     </div>
     <div class="sidebar-nav">
@@ -172,7 +209,7 @@
 
       <!-- Sales Person dropdown -->
       <div class="pm-field">
-        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">💼 Assign Sales Person (Academic Counselor) <span style="color:#e53e3e;">*</span></label>
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">💼 Assign Sales Person (Learning Advisor) <span style="color:#e53e3e;">*</span></label>
         <select id="sm-sales" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;background:var(--white);">
           <option value="">— Select a sales person —</option>
         </select>

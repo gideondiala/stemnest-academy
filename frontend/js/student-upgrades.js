@@ -668,7 +668,7 @@ function renderPostDemoFee(booking) {
         <div style="font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:1px;background:rgba(255,255,255,.2);display:inline-block;padding:4px 14px;border-radius:50px;margin-bottom:12px;">🎉 Demo Complete!</div>
         <div style="font-family:'Fredoka One',cursive;font-size:24px;margin-bottom:8px;">Ready to continue learning?</div>
         <div style="font-size:15px;color:rgba(255,255,255,.85);margin-bottom:20px;">
-          Your tutor and academic counselor have agreed on the following package for you:
+          Your tutor and Learning Advisor have agreed on the following package for you:
         </div>
         ${fee ? `
           <div style="background:rgba(255,255,255,.15);border:2px solid rgba(255,255,255,.3);border-radius:16px;padding:20px;margin-bottom:20px;text-align:center;">
@@ -677,7 +677,7 @@ function renderPostDemoFee(booking) {
             <div style="font-size:13px;color:rgba(255,255,255,.7);margin-top:4px;">${course} Programme</div>
           </div>` : `
           <div style="background:rgba(255,255,255,.15);border:2px dashed rgba(255,255,255,.4);border-radius:16px;padding:20px;margin-bottom:20px;text-align:center;">
-            <div style="font-size:14px;font-weight:700;color:rgba(255,255,255,.8);">Your personalised fee will appear here once confirmed by your academic counselor.</div>
+            <div style="font-size:14px;font-weight:700;color:rgba(255,255,255,.8);">Your personalised fee will appear here once confirmed by your Learning Advisor.</div>
           </div>`}
         ${payLink ? `
           <a href="${payLink}" target="_blank" style="display:block;background:#fff;color:var(--orange);text-align:center;padding:14px 24px;border-radius:50px;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;text-decoration:none;box-shadow:0 6px 20px rgba(0,0,0,.15);">
@@ -798,7 +798,7 @@ function showCancelStep() {
       <div style="background:var(--white);border-radius:20px;padding:32px;max-width:400px;width:100%;text-align:center;box-shadow:0 16px 60px rgba(0,0,0,.25);">
         <div style="font-size:48px;margin-bottom:12px;">⚠️</div>
         <div style="font-family:'Fredoka One',cursive;font-size:22px;color:var(--dark);margin-bottom:8px;">Really sure?</div>
-        <div style="font-size:14px;color:var(--mid);margin-bottom:24px;line-height:1.6;">This will cancel your class and notify our team. You can always rebook a new demo class.</div>
+        <div style="font-size:14px;color:var(--mid);margin-bottom:24px;line-height:1.6;">This will cancel your class and notify our team. You can always reBook a New Demo.</div>
         <div style="display:flex;gap:12px;">
           <button onclick="document.getElementById('cancelClassModal').remove()" style="flex:1;background:var(--bg);border:1.5px solid #e8eaf0;border-radius:12px;padding:12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;cursor:pointer;color:var(--mid);">Keep My Class</button>
           <button onclick="cancelStep=3;showCancelStep()" style="flex:1;background:#fde8e8;border:none;border-radius:12px;padding:12px;font-family:'Nunito',sans-serif;font-weight:900;font-size:14px;cursor:pointer;color:#c53030;">Yes, I'm Sure</button>

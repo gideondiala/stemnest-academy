@@ -726,7 +726,9 @@ window.saveSettings = function(key, val) {
 };
 
 /* ══════════════════════════════════════════════════════
-   PRIORITY 7 — USER CREDENTIALS CHART (Founder Only)
+   PRIORITY 7 — USER CREDENTIALS + LOGIN AS (Founder Only)
+   Loads all users from API. Three tabs: Staff | Tutors | Students
+   Login As: impersonates user by getting a temp token from backend
 ══════════════════════════════════════════════════════ */
 
 /* Add credentials tab to SA_TABS */
@@ -739,114 +741,204 @@ window.showSATab = function(tab) {
   if (tab === 'credentials') renderCredentialsChart();
 };
 
-function renderCredentialsChart() {
+let _credActiveGroup = 'staff'; // 'staff' | 'tutors' | 'students'
+let _credAllUsers    = null;    // cached after first load
+
+async function renderCredentialsChart() {
   const el = document.getElementById('credentialsChart');
   if (!el) return;
 
-  const q = (document.getElementById('credSearch')?.value || '').toLowerCase();
+  el.innerHTML = '<div style="text-align:center;padding:32px;color:var(--light);font-weight:700;">⏳ Loading users...</div>';
 
-  // Collect all users from all registries
-  const allUsers = [];
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    if (!token) { el.innerHTML = '<div style="padding:24px;color:#c53030;font-weight:700;">Not logged in.</div>'; return; }
 
-  // Teachers
-  JSON.parse(localStorage.getItem('sn_teachers') || '[]').forEach(t => {
-    allUsers.push({ id: t.id, name: t.name, email: t.email, role: t.subject + ' Teacher', password: t.password || '—' });
-  });
+    /* Load all users from API */
+    const res  = await fetch('https://api.stemnestacademy.co.uk/api/users?limit=500', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    _credAllUsers = data.users || [];
 
-  // Sales persons
-  JSON.parse(localStorage.getItem('sn_sales_persons') || '[]').forEach(s => {
-    allUsers.push({ id: s.id, name: s.name, email: s.email, role: 'Sales / Counselor', password: s.password || '—' });
-  });
-
-  // Staff
-  const roleLabel = { operations: 'Operations', presales: 'Pre-Sales', postsales: 'Post-Sales', hr: 'HR' };
-  JSON.parse(localStorage.getItem('sn_staff') || '[]').forEach(s => {
-    allUsers.push({ id: s.id, name: s.name, email: s.email, role: roleLabel[s.role] || s.role, password: s.password || '—' });
-  });
-
-  // Students
-  JSON.parse(localStorage.getItem('sn_students') || '[]').forEach(s => {
-    allUsers.push({ id: s.id, name: s.name, email: s.email, role: 'Student', password: s.password || '—' });
-  });
-
-  // Admin + Founder (from settings or hardcoded)
-  const settings = JSON.parse(localStorage.getItem('sn_sa_settings') || '{}');
-  allUsers.push({ id: 'ADMIN', name: 'Admin', email: 'admin@stemnestacademy.co.uk', role: 'Admin', password: settings.adminPassword || 'admin123' });
-  allUsers.push({ id: 'FOUNDER', name: 'Founder', email: settings.saEmail || 'founder@stemnestacademy.co.uk', role: 'Founder / Super Admin', password: settings.saPassword || 'Founder2024!' });
-
-  // Also merge from password registry (catches password changes)
-  const registry = JSON.parse(localStorage.getItem('sn_password_registry') || '[]');
-  registry.forEach(r => {
-    const idx = allUsers.findIndex(u => u.email === r.email);
-    if (idx !== -1) allUsers[idx].password = r.password;
-  });
-
-  // Filter
-  const filtered = q
-    ? allUsers.filter(u =>
-        u.name.toLowerCase().includes(q) ||
-        u.email.toLowerCase().includes(q) ||
-        u.role.toLowerCase().includes(q)
-      )
-    : allUsers;
-
-  if (!filtered.length) {
-    el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--light);font-weight:700;">No users found.</div>';
+  } catch(e) {
+    el.innerHTML = '<div style="padding:24px;color:#c53030;font-weight:700;">Failed to load users: ' + e.message + '</div>';
     return;
   }
 
-  const roleColors = {
-    'Founder / Super Admin': 'background:linear-gradient(135deg,#1a56db,#7c3aed);color:#fff;',
-    'Admin':                 'background:var(--blue-light);color:var(--blue);',
-    'Student':               'background:var(--green-light);color:var(--green-dark);',
-    'Sales / Counselor':     'background:#fff3e0;color:#e65100;',
-    'Operations':            'background:#ede9fe;color:#5b21b6;',
-    'Pre-Sales':             'background:#fce7f3;color:#9d174d;',
-    'Post-Sales':            'background:#d1fae5;color:#065f46;',
-    'HR':                    'background:#fef3c7;color:#92400e;',
+  _renderCredTab();
+}
+
+function _renderCredTab() {
+  const el = document.getElementById('credentialsChart');
+  if (!el || !_credAllUsers) return;
+
+  const q = (document.getElementById('credSearch')?.value || '').toLowerCase();
+
+  /* Group users */
+  const staffRoles   = ['admin','super_admin','sales','presales','postsales','operations','hr'];
+  const tutorRoles   = ['tutor'];
+  const studentRoles = ['student'];
+
+  let sourceList;
+  if (_credActiveGroup === 'staff')    sourceList = _credAllUsers.filter(u => staffRoles.includes(u.role));
+  else if (_credActiveGroup === 'tutors')   sourceList = _credAllUsers.filter(u => tutorRoles.includes(u.role));
+  else                                      sourceList = _credAllUsers.filter(u => studentRoles.includes(u.role));
+
+  /* Filter by search */
+  const list = q ? sourceList.filter(u =>
+    (u.name  || '').toLowerCase().includes(q) ||
+    (u.email || '').toLowerCase().includes(q) ||
+    (u.role  || '').toLowerCase().includes(q)
+  ) : sourceList;
+
+  const staffCount   = _credAllUsers.filter(u => staffRoles.includes(u.role)).length;
+  const tutorCount   = _credAllUsers.filter(u => tutorRoles.includes(u.role)).length;
+  const studentCount = _credAllUsers.filter(u => studentRoles.includes(u.role)).length;
+
+  const tabBtn = (group, label, count) => {
+    const active = _credActiveGroup === group;
+    return '<button onclick="_credSwitchGroup(\'' + group + '\')" style="' +
+      'flex:1;padding:11px;font-family:\'Nunito\',sans-serif;font-weight:900;font-size:14px;cursor:pointer;border:none;' +
+      (group !== 'staff' ? 'border-left:2px solid #e8eaf0;' : '') +
+      'background:' + (active ? 'var(--blue,#1a56db)' : '#fff') + ';' +
+      'color:' + (active ? '#fff' : 'var(--mid,#4a5568)') + ';">' +
+      label + ' (' + count + ')' +
+    '</button>';
   };
 
-  const thS = 'padding:12px 16px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;letter-spacing:.5px;';
-  const tdS = 'padding:13px 16px;vertical-align:middle;';
+  const thS = 'padding:11px 14px;text-align:left;font-size:11px;font-weight:900;color:var(--light);text-transform:uppercase;letter-spacing:.5px;';
+  const tdS = 'padding:12px 14px;vertical-align:middle;';
 
-  el.innerHTML = `
-    <div style="overflow-x:auto;border-radius:16px;border:1.5px solid #e8eaf0;background:var(--white);">
-      <table style="width:100%;border-collapse:collapse;font-size:13px;">
-        <thead>
-          <tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">
-            <th style="${thS}">ID</th>
-            <th style="${thS}">Name</th>
-            <th style="${thS}">Email</th>
-            <th style="${thS}">Role</th>
-            <th style="${thS}">Password</th>
-            <th style="${thS}">Last Updated</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${filtered.map((u, i) => {
-            const reg = registry.find(r => r.email === u.email);
-            const updated = reg ? new Date(reg.updatedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—';
-            const roleCss = Object.entries(roleColors).find(([k]) => u.role.includes(k.split(' ')[0]))?.[1] || 'background:var(--bg);color:var(--mid);';
-            return `<tr style="border-bottom:1px solid #f0f2f8;${i%2===0?'':'background:#fafbff;'}">
-              <td style="${tdS};font-family:'Fredoka One',cursive;color:var(--blue);font-size:12px;">${u.id}</td>
-              <td style="${tdS};font-weight:800;color:var(--dark);">${u.name}</td>
-              <td style="${tdS};font-size:12px;color:var(--mid);font-weight:700;">${u.email}</td>
-              <td style="${tdS}"><span style="font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;${roleCss}">${u.role}</span></td>
-              <td style="${tdS}">
-                <div style="display:flex;align-items:center;gap:8px;">
-                  <span id="pw-${i}" style="font-family:'Courier New',monospace;font-size:13px;font-weight:700;color:var(--dark);filter:blur(4px);transition:.2s;">${u.password}</span>
-                  <button onclick="togglePwVisibility('pw-${i}',this)" style="background:var(--bg);border:1.5px solid #e8eaf0;border-radius:8px;padding:3px 8px;font-size:11px;font-weight:800;cursor:pointer;color:var(--mid);">👁 Show</button>
-                </div>
-              </td>
-              <td style="${tdS};font-size:12px;color:var(--light);font-weight:700;">${updated}</td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
-    </div>
-    <div style="margin-top:12px;font-size:12px;color:var(--light);font-weight:700;text-align:right;">
-      ${filtered.length} user${filtered.length !== 1 ? 's' : ''} · Passwords are blurred by default for security
-    </div>`;
+  const rows = list.map(function(u, i) {
+    const roleLabel = {
+      super_admin: '👑 Super Admin', admin: '🛡️ Admin', tutor: '🎓 Tutor',
+      student: '🧑‍💻 Student', sales: '💼 Sales', presales: '📥 Pre-Sales',
+      postsales: '💳 Post-Sales', operations: '⚙️ Operations', hr: '👥 HR'
+    }[u.role] || u.role;
+
+    return '<tr style="border-bottom:1px solid #f0f2f8;' + (i%2===0?'':'background:#fafbff;') + '">' +
+      '<td style="' + tdS + ';font-weight:800;color:var(--dark);">' + (u.name || '—') + '</td>' +
+      '<td style="' + tdS + ';font-size:12px;color:var(--mid);font-weight:700;">' + (u.email || '—') + '</td>' +
+      '<td style="' + tdS + ';font-size:12px;font-weight:700;color:var(--light);">' + (u.staff_id || '—') + '</td>' +
+      '<td style="' + tdS + '"><span style="font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;background:var(--blue-light);color:var(--blue);">' + roleLabel + '</span></td>' +
+      '<td style="' + tdS + '">' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+          '<button onclick="credLoginAs(\'' + u.id + '\',\'' + (u.role) + '\')" ' +
+            'style="background:#1a56db;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:12px;cursor:pointer;">🔑 Login As</button>' +
+          (_credActiveGroup === 'students' ?
+            '<button onclick="credDeleteStudent(\'' + u.id + '\',\'' + (u.name || '').replace(/'/g,'') + '\')" ' +
+              'style="background:#fde8e8;color:#c53030;border:1.5px solid #fca5a5;border-radius:8px;padding:7px 14px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:12px;cursor:pointer;">🗑️ Delete</button>' +
+            '<button onclick="credEditName(\'' + u.id + '\',\'' + (u.name || '').replace(/'/g,'') + '\')" ' +
+              'style="background:var(--bg);color:var(--dark);border:1.5px solid #e8eaf0;border-radius:8px;padding:7px 14px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:12px;cursor:pointer;">✏️ Edit Name</button>'
+            : '') +
+        '</div>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+
+  el.innerHTML =
+    '<div style="display:flex;gap:0;margin-bottom:20px;border-radius:12px;overflow:hidden;border:2px solid #e8eaf0;">' +
+      tabBtn('staff',    '👔 Staff & Admin', staffCount) +
+      tabBtn('tutors',   '🎓 Tutors', tutorCount) +
+      tabBtn('students', '🧑‍💻 Students', studentCount) +
+    '</div>' +
+    (list.length === 0
+      ? '<div style="text-align:center;padding:40px;color:var(--light);font-weight:700;">No users found.</div>'
+      : '<div style="overflow-x:auto;border-radius:16px;border:1.5px solid #e8eaf0;background:var(--white);">' +
+          '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+            '<thead><tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">' +
+              '<th style="' + thS + '">Name</th>' +
+              '<th style="' + thS + '">Email</th>' +
+              '<th style="' + thS + '">Staff ID</th>' +
+              '<th style="' + thS + '">Role</th>' +
+              '<th style="' + thS + '">Actions</th>' +
+            '</tr></thead>' +
+            '<tbody>' + rows + '</tbody>' +
+          '</table>' +
+        '</div>'
+    ) +
+    '<div style="margin-top:10px;font-size:12px;color:var(--light);font-weight:700;text-align:right;">' +
+      list.length + ' user' + (list.length !== 1 ? 's' : '') +
+    '</div>';
+}
+
+function _credSwitchGroup(group) {
+  _credActiveGroup = group;
+  _renderCredTab();
+}
+
+async function credLoginAs(userId, role) {
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res   = await fetch('https://api.stemnestacademy.co.uk/api/auth/impersonate/' + userId, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    if (!data.success) { showToast('Login As failed: ' + (data.error || 'unknown'), 'error'); return; }
+
+    /* Save the impersonation token and open the dashboard in a new tab */
+    const tempKey = 'sn_impersonate_token';
+    localStorage.setItem(tempKey, JSON.stringify({
+      token:    data.token,
+      user:     data.user,
+      redirect: data.redirect,
+      expires:  Date.now() + 30 * 60 * 1000,
+    }));
+
+    /* Open dashboard in new tab — the target page reads sn_impersonate_token on load */
+    const url = 'https://stemnestacademy.co.uk' + data.redirect + '?impersonate=1';
+    window.open(url, '_blank');
+    showToast('✅ Opening ' + data.user.name + '\'s dashboard in a new tab.', 'success');
+  } catch(e) {
+    showToast('Login As error: ' + e.message, 'error');
+  }
+}
+
+async function credDeleteStudent(userId, name) {
+  if (!confirm('Delete student "' + name + '"?\n\nThis will:\n• Deactivate their account (they cannot log in)\n• Cancel all future bookings\n• Remove them from the tutor calendar\n\nThis cannot be undone.')) return;
+
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res   = await fetch('https://api.stemnestacademy.co.uk/api/users/' + userId, {
+      method:  'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    if (!data.success) { showToast('Delete failed: ' + (data.error || 'unknown'), 'error'); return; }
+
+    showToast('✅ Student deactivated. ' + (data.cancelledBookings || 0) + ' future bookings cancelled.', 'success');
+    /* Refresh user list */
+    _credAllUsers = _credAllUsers.filter(u => u.id !== userId);
+    _renderCredTab();
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+async function credEditName(userId, currentName) {
+  const newName = prompt('Enter new name for this student:', currentName);
+  if (!newName || newName.trim() === currentName) return;
+
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res   = await fetch('https://api.stemnestacademy.co.uk/api/users/' + userId + '/update-name', {
+      method:  'PUT',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ name: newName.trim() })
+    });
+    const data = await res.json();
+    if (!data.success) { showToast('Update failed: ' + (data.error || 'unknown'), 'error'); return; }
+
+    showToast('✅ Name updated to "' + newName.trim() + '"', 'success');
+    /* Update in-memory list */
+    const idx = _credAllUsers.findIndex(u => u.id === userId);
+    if (idx !== -1) _credAllUsers[idx].name = newName.trim();
+    _renderCredTab();
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  }
 }
 
 function togglePwVisibility(spanId, btn) {
@@ -856,3 +948,4 @@ function togglePwVisibility(spanId, btn) {
   span.style.filter = isBlurred ? 'none' : 'blur(4px)';
   btn.textContent   = isBlurred ? '🙈 Hide' : '👁 Show';
 }
+

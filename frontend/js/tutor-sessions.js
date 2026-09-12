@@ -149,7 +149,16 @@ function renderSessionsTab() {
     const isPast    = b.status === 'completed' || b.status === 'incomplete';
     const minsElapsed = classTime ? Math.floor((now - classTime) / 60000) : -999;
     const hasStarted  = minsElapsed >= 0;
-    const canEnd      = joinedSessions.has(b.id); // active once joined
+
+    /* End button requires: teacher joined + at least 15 mins since JOIN time */
+    const hasJoined = joinedSessions.has(b.id);
+    let canEnd = false;
+    if (hasJoined) {
+      const startTimes = JSON.parse(localStorage.getItem('sn_session_start_times') || '{}');
+      const joinedAt   = startTimes[b.id] ? new Date(startTimes[b.id]) : null;
+      const minsJoined = joinedAt ? Math.floor((now - joinedAt) / 60000) : -1;
+      canEnd = minsJoined >= 15;
+    }
     const typeLabel   = isDemo ? '🎓 Demo' : '📚 Paid';
     const typeCls     = isDemo ? 'sb-demo' : 'sb-paid';
 
@@ -173,7 +182,7 @@ function renderSessionsTab() {
       const endLabel = isDemo ? '🔴 End Demo' : '🔴 End Class';
       const endBtn   = canEnd
         ? `<button class="end-class-btn" onclick="openEndSessionModal('${b.id}')">${endLabel}</button>`
-        : `<button class="end-class-btn" style="opacity:.4;cursor:not-allowed;" title="${joinedSessions.has(b.id) ? 'Available 15 mins after class start' : 'Join class first'}" disabled>${endLabel}</button>`;
+        : `<button class="end-class-btn" style="opacity:.4;cursor:not-allowed;" title="${hasJoined ? 'Available 15 mins after you joined' : 'Join class first'}" disabled>${endLabel}</button>`;
 
       actions = joinBtn + endBtn;
     }
@@ -206,10 +215,11 @@ function teacherJoinClass(bookingId, classLink) {
   joinedSessions.add(bookingId);
 
   if (!alreadyJoined) {
-    // Record join (start) time for this session
-    const startTimes = JSON.parse(_getLocalStr('sn_session_start_times') || '{}');
+    // Record join (start) time for this session — must use localStorage directly
+    // so both renderSessionsTab() and renderUpcomingCards() can read it
+    const startTimes = JSON.parse(localStorage.getItem('sn_session_start_times') || '{}');
     startTimes[bookingId] = new Date().toISOString();
-    _setLocalStr('sn_session_start_times', JSON.stringify(startTimes));
+    localStorage.setItem('sn_session_start_times', JSON.stringify(startTimes));
 
     // First join — check if late (> 4 mins after class start time)
     const b = getBookings().find(x => x.id === bookingId);
@@ -246,6 +256,15 @@ function startAbsentWatcher(booking) {
   const classTime = parseClassDateTime(booking.date, booking.time);
   if (!classTime) return;
 
+  /* SAFETY GUARD: only watch classes scheduled for TODAY.
+     Never mark future bookings absent — this prevents the bug where
+     all future sessions get marked teacher_absent at once. */
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const classDay = new Date(classTime);
+  classDay.setHours(0, 0, 0, 0);
+  if (classDay.getTime() !== today.getTime()) return; // not today — skip
+
   const msUntilAbsent = (classTime.getTime() + 15 * 60 * 1000) - Date.now();
   if (msUntilAbsent <= 0) {
     // Already past 15-min window — check if joined
@@ -260,30 +279,26 @@ function startAbsentWatcher(booking) {
 
 function markTeacherAbsent(booking) {
   const tutor = getCurrentTutor();
-  // Update booking
-  const all = getBookings();
-  const idx = all.findIndex(b => b.id === booking.id);
-  if (idx !== -1) {
-    all[idx].status         = 'teacher_absent';
-    all[idx].teacherAbsent  = true;
-    all[idx].absentAt       = new Date().toISOString();
-    saveBookings(all);
+
+  /* Persist to backend DB via API */
+  const token = localStorage.getItem('sn_access_token');
+  if (token && booking.id) {
+    fetch('https://api.stemnestacademy.co.uk/api/bookings/' + booking.id + '/status', {
+      method:  'PUT',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ status: 'teacher_absent' }),
+    }).catch(e => console.warn('[ABSENT] API call failed:', e.message));
   }
 
-  // Log to operations
-  const ops = JSON.parse(_getLocalStr('sn_absent_teachers') || '[]');
-  ops.unshift({
-    id:          'ABS-' + Date.now().toString(36).toUpperCase(),
-    bookingId:   booking.id,
-    tutorId:     tutor.id,
-    tutorName:   tutor.name,
-    studentName: booking.studentName,
-    subject:     booking.subject,
-    date:        booking.date,
-    time:        booking.time,
-    loggedAt:    new Date().toISOString(),
-  });
-  _setLocalStr('sn_absent_teachers', JSON.stringify(ops));
+  /* Update in-memory TUTOR_DATA so card shows correctly without refresh */
+  if (window.TUTOR_DATA && window.TUTOR_DATA.bookings) {
+    const idx = window.TUTOR_DATA.bookings.findIndex(b => b.id === booking.id);
+    if (idx !== -1) {
+      window.TUTOR_DATA.bookings[idx].status       = 'teacher_absent';
+      window.TUTOR_DATA.bookings[idx].teacherAbsent = true;
+      window.TUTOR_DATA.bookings[idx].absentAt      = new Date().toISOString();
+    }
+  }
 
   showToast('⚠️ Session auto-closed — teacher did not join within 15 minutes. Operations notified.', 'error');
   renderSessionsTab();
@@ -355,6 +370,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (e.target === overlay) closeEndSessionModal();
     });
   }
+
+  /* Auto-refresh sessions every 60s so the 15-min End button unlocks automatically */
+  setInterval(() => {
+    if (typeof renderSessionsTab === 'function')     renderSessionsTab();
+    if (typeof renderOverviewSessions === 'function') renderOverviewSessions();
+  }, 60000);
 });
 
 /* ══════════════════════════════════════════════════════
@@ -386,6 +407,15 @@ function renderOverviewSessions() {
     const hasStarted  = minsElapsed >= 0;
     const isJoined    = joinedSessions.has(b.id);
 
+    /* 15-min rule: End button only active after 15 mins since teacher joined */
+    let canEnd = false;
+    if (isJoined) {
+      const startTimes = JSON.parse(localStorage.getItem('sn_session_start_times') || '{}');
+      const joinedAt   = startTimes[b.id] ? new Date(startTimes[b.id]) : null;
+      const minsJoined = joinedAt ? Math.floor((now - joinedAt) / 60000) : -1;
+      canEnd = minsJoined >= 15;
+    }
+
     // Strip seconds from time display
     const timeDisplay = (b.time || '—').replace(/^(\d{1,2}:\d{2}):\d{2}$/, '$1');
     const dateLabel   = b.date
@@ -402,10 +432,10 @@ function renderOverviewSessions() {
     if (!isPast) {
       actions += '<button class="join-btn" onclick="teacherJoinClass(\'' + b.id + '\',\'' + (b.classLink || '') + '\')">🚀 Join</button>';
       const endLabel = isDemo ? '🔴 End Demo' : '🔴 End Class';
-      if (isJoined) {
+      if (canEnd) {
         actions += '<button class="end-class-btn" onclick="openEndSessionModal(\'' + b.id + '\')">' + endLabel + '</button>';
       } else {
-        actions += '<button class="end-class-btn" style="opacity:.4;cursor:not-allowed;" disabled title="Join class first">' + endLabel + '</button>';
+        actions += '<button class="end-class-btn" style="opacity:.4;cursor:not-allowed;" disabled title="' + (isJoined ? 'Available 15 mins after you joined' : 'Join class first') + '">' + endLabel + '</button>';
       }
     }
 

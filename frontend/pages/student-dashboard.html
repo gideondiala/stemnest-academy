@@ -1,6 +1,43 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
+  <!-- Microsoft Clarity -->
+  <script type="text/javascript">
+    (function(c,l,a,r,i,t,y){
+      c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+      t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+      y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    })(window, document, "clarity", "script", "xer20hj8fr");
+  </script>
+  <!-- End Microsoft Clarity -->
+  <!-- TikTok Pixel Code -->
+  <script>
+    !function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var r="https://analytics.tiktok.com/i18n/pixel/events.js",o=n&&n.partner;ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=r,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};n=document.createElement("script");n.type="text/javascript",n.async=!0,n.src=r+"?sdkid="+e+"&lib="+t;e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(n,e)};ttq.load('D8V60AJC77U45FANPDG0');ttq.load('D91PAORC77U4QRO9NQ0G');ttq.page()}(window,document,'ttq');
+  </script>
+  <!-- End TikTok Pixel Code -->
+  <!-- Google Analytics 4 -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-WB62B0P5KG"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-WB62B0P5KG');
+  </script>
+  <!-- End Google Analytics 4 -->
+  <!-- Auth Guard — must be first script in head -->
+  <script>
+    (function(){
+      var t=localStorage.getItem('sn_access_token');
+      var u=null;try{u=JSON.parse(localStorage.getItem('sn_api_user')||'null');}catch(e){}
+      var roles='student,admin,super_admin';
+      var allowed=roles?roles.split(',').map(function(r){return r.trim();}):[];
+      var redir='/pages/login.html?redirect='+encodeURIComponent(window.location.pathname+window.location.search);
+      if(!t){document.documentElement.style.visibility='hidden';window.location.replace(redir);return;}
+      try{var p=t.split('.');if(p.length===3){var pl=JSON.parse(atob(p[1].replace(/-/g,'+').replace(/_/g,'/')));if(pl.exp&&pl.exp*1000<Date.now()){localStorage.removeItem('sn_access_token');localStorage.removeItem('sn_api_user');document.documentElement.style.visibility='hidden';window.location.replace(redir);return;}}}catch(e){}
+      if(allowed.length){var role=u&&u.role?u.role:'';if(!role||allowed.indexOf(role)===-1){document.documentElement.style.visibility='hidden';window.location.replace('/pages/login.html?error=unauthorized');return;}}
+      document.documentElement.style.visibility='';
+    })();
+  </script>
   <meta charset="UTF-8">
   <link rel="icon" type="image/png" sizes="32x32" href="../assets/icons/icon.png">
   <link rel="icon" type="image/png" sizes="16x16" href="../assets/icons/icon.png">
@@ -25,7 +62,7 @@
   </ul>
   <div class="nav-actions">
     <span style="font-size:13px;font-weight:700;color:var(--light);">
-      <span class="live-dot"></span> James Okafor — Online
+      <span class="live-dot"></span> <span id="navStudentName">Loading…</span> — Online
     </span>
     <a href="login.html" class="btn btn-outline" style="font-size:13px;padding:8px 18px;">Log Out</a>
   </div>
@@ -37,10 +74,10 @@
   <!-- ═══ SIDEBAR ═══ -->
   <div class="dash-sidebar">
     <div class="sidebar-profile">
-      <div class="sidebar-avatar student-avatar" id="sidebarAvatar">JO</div>
-      <div class="sidebar-name" id="sidebarName">James Okafor</div>
-      <div class="sidebar-role">Student · Year 9</div>
-      <div class="student-id-badge">ID: SN-2024-0047</div>
+      <div class="sidebar-avatar student-avatar" id="sidebarAvatar">—</div>
+      <div class="sidebar-name" id="sidebarName">Loading…</div>
+      <div class="sidebar-role" id="sidebarRole">Student</div>
+      <div class="student-id-badge" id="studentIdBadge">ID: —</div>
       <div class="sidebar-status"><span class="live-dot"></span> Online</div>
     </div>
     <div class="sidebar-nav">
@@ -51,7 +88,7 @@
       <a class="sidebar-link"        data-tab="quizzes"       onclick="showTab('quizzes')">      <span class="sl-icon">🧠</span> My Quizzes      <span class="sl-badge" id="quizBadge">2</span></a>
       <a class="sidebar-link"        data-tab="certificates"  onclick="showTab('certificates')"> <span class="sl-icon">🏆</span> Certificates</a>
       <a class="sidebar-link"        data-tab="nest"          onclick="showTab('nest')">          <span class="sl-icon">🪺</span> Learning Nest</a>
-      <a class="sidebar-link"        data-tab="payments"      onclick="showTab('payments')">     <span class="sl-icon">💳</span> Payment Records</a>
+      <a class="sidebar-link"        data-tab="payments"      onclick="showTab('payments')">     <span class="sl-icon">💳</span> Credits &amp; Payments</a>
       <a class="sidebar-link"        data-tab="chat"          onclick="showTab('chat')">          <span class="sl-icon">💬</span> Chat with Tutor</a>
       <div class="sidebar-section-label">Account</div>
       <a class="sidebar-link" data-tab="refer" onclick="showTab('refer')"><span class="sl-icon">🎁</span> Refer &amp; Earn</a>
@@ -69,7 +106,7 @@
     <!-- Top bar -->
     <div class="dash-topbar">
       <div>
-        <div class="dash-greeting"><span id="greetingTime">Good morning ☀️</span>, <span style="color:var(--green);">James</span> 👋</div>
+        <div class="dash-greeting"><span id="greetingTime">Good morning ☀️</span>, <span id="greetingName" style="color:var(--green);">there</span> 👋</div>
         <div class="dash-date" id="dashDate"></div>
       </div>
       <div class="dash-top-actions">
@@ -129,25 +166,8 @@
       <!-- FUN QUIZ WHILE WAITING (shown when student joins early) -->
       <div id="waitingQuizSection" style="display:none;margin-bottom:24px;"></div>
 
-      <!-- JOIN LIVE CLASS CARD -->
-      <div class="join-class-card" id="joinClassCard">
-        <div class="jc-left">
-          <div class="jc-live-pill"><span class="live-dot"></span> Live Now</div>
-          <div class="jc-title">Python for Beginners</div>
-          <div class="jc-meta">
-            <span>👩‍🏫 Tutor: Sarah Rahman</span>
-            <span>🕐 11:00 AM – 12:00 PM</span>
-            <span>📅 Today</span>
-          </div>
-          <div class="jc-desc">Today's topic: <strong>Functions & Return Values</strong> — Module 4 of 8</div>
-        </div>
-        <div class="jc-right">
-          <button class="join-class-btn" onclick="joinClass()">
-            🚀 Join Class Now
-          </button>
-          <div class="jc-note">Link opens in a new tab</div>
-        </div>
-      </div>
+      <!-- JOIN LIVE CLASS CARD — populated by JS from API data -->
+      <div id="joinClassCard"></div>
 
       <!-- PROGRESS BARS -->
       <div class="dash-section-header" style="margin-top:32px;">
@@ -285,8 +305,8 @@
     ══════════════════════════════════════ -->
     <div id="tab-payments" style="display:none;">
       <div class="dash-section-header">
-        <div class="dash-section-title">💳 Payment Records</div>
-        <span style="font-size:13px;font-weight:700;color:var(--light);">Read-only · Managed by StemNest Finance Team</span>
+        <div class="dash-section-title">💳 Credits & Payments</div>
+        <span style="font-size:13px;font-weight:700;color:var(--light);">Top up your credits or view payment history</span>
       </div>
       <div id="paymentRecordsContent"></div>
     </div>
@@ -477,22 +497,38 @@
     </div>
     <div class="pm-body">
       <div class="pm-avatar-row">
-        <div class="pm-avatar student-avatar">JO</div>
+        <div class="pm-avatar student-avatar" id="pmAvatarInitials">—</div>
         <div>
-          <div style="font-weight:800;font-size:16px;color:var(--dark);">James Okafor</div>
-          <div style="font-size:12px;color:var(--light);font-weight:700;margin-top:4px;">Student ID: SN-2024-0047</div>
+          <div style="font-weight:800;font-size:16px;color:var(--dark);" id="pmDisplayName">Loading…</div>
+          <div style="font-size:12px;color:var(--light);font-weight:700;margin-top:4px;" id="pmDisplayId">Student ID: —</div>
         </div>
       </div>
-      <div class="pm-field"><label>Full Name</label><input type="text" value="James Okafor"></div>
-      <div class="pm-field"><label>Email Address</label><input type="email" value="james.okafor@student.stemnest.co.uk"></div>
+      <div class="pm-field"><label>Full Name</label><input type="text" id="pmFieldName" placeholder="Your name"></div>
+      <div class="pm-field"><label>Email Address</label><input type="email" id="pmFieldEmail" placeholder="Email" readonly style="background:var(--bg);color:var(--light);cursor:not-allowed;"></div>
       <div class="pm-field"><label>Year Group</label>
-        <select>
-          <option>Year 7</option><option>Year 8</option><option selected>Year 9</option>
-          <option>Year 10</option><option>Year 11</option><option>Year 12</option><option>Year 13</option>
+        <select id="pmFieldGrade">
+          <option value="Year 1">Year 1</option><option value="Year 2">Year 2</option>
+          <option value="Year 3">Year 3</option><option value="Year 4">Year 4</option>
+          <option value="Year 5">Year 5</option><option value="Year 6">Year 6</option>
+          <option value="Year 7">Year 7</option><option value="Year 8">Year 8</option>
+          <option value="Year 9">Year 9</option><option value="Year 10">Year 10</option>
+          <option value="Year 11">Year 11</option><option value="Year 12">Year 12</option>
+          <option value="Year 13">Year 13</option>
         </select>
       </div>
-      <div class="pm-field"><label>Parent / Guardian Email</label><input type="email" placeholder="parent@email.com"></div>
-      <div class="pm-field"><label>Date of Birth</label><input type="date" id="pmDob" placeholder="Date of birth"></div>
+      <div class="pm-field"><label>Date of Birth</label><input type="date" id="pmDob"></div>
+
+      <!-- Password change section -->
+      <div style="border-top:1.5px solid #e8eaf0;margin:18px 0 14px;padding-top:14px;">
+        <div style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">
+          Change Password
+          <span style="font-weight:600;font-style:italic;color:var(--light);text-transform:none;letter-spacing:0;"> — leave blank to keep current</span>
+        </div>
+        <div class="pm-field"><label>Current Password</label><input type="password" id="pmCurrentPw" placeholder="Enter current password"></div>
+        <div class="pm-field"><label>New Password</label><input type="password" id="pmNewPw" placeholder="At least 8 characters"></div>
+        <div class="pm-field"><label>Confirm New Password</label><input type="password" id="pmConfirmPw" placeholder="Repeat new password"></div>
+      </div>
+
       <div class="pm-footer">
         <button class="btn btn-outline" onclick="closeProfileModal()">Cancel</button>
         <button class="btn btn-green" onclick="saveProfile()">Save Changes ✦</button>

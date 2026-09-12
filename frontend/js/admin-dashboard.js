@@ -1,4 +1,4 @@
-
+﻿
 /* ═══════════════════════════════════════════════════════
    STEMNEST ACADEMY — ADMIN DASHBOARD JS
    Teacher registry, smart assign (subject + availability),
@@ -1135,7 +1135,7 @@ function renderSalesGrid() {
         <div class="tutor-card-av" style="background:${s.color||SP_COLORS[0]}">${s.initials}</div>
         <div class="tutor-card-id">${s.id}</div>
         <div class="tutor-card-name">${s.name}</div>
-        <div class="tutor-card-subject">Academic Counselor</div>
+        <div class="tutor-card-subject">Learning Advisor</div>
         <div class="tutor-card-avail">🌍 ${s.region || '—'}</div>
         <div class="tutor-card-avail" style="color:var(--green);">✅ ${converted} conversions · £${revenue.toLocaleString()}</div>
         <div style="display:flex;gap:8px;margin-top:12px;justify-content:center;">
@@ -1213,7 +1213,7 @@ function saveNewSalesPerson() {
   saveSalesPersons(existing);
 
   console.log(`📧 WELCOME EMAIL TO: ${email}
-Hi ${name.split(' ')[0]}, your StemNest Academic Counselor account is ready.
+Hi ${name.split(' ')[0]}, your StemNest Learning Advisor account is ready.
 ID: ${id} | Password: ${password}
 Dashboard: ${window.location.origin}/frontend/pages/sales-dashboard.html`);
 

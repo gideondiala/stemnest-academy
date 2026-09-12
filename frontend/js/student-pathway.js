@@ -260,58 +260,9 @@ function _injectHomeworkProjects() {
   });
 }
 
-/* ── Update lessons list to show "View Details" button on completed lessons ── */
-const _origRenderLessons = window.renderLessons;
-window.renderLessons = function() {
-  const el = document.getElementById('lessonsList');
-  if (!el) return;
-  const pathwayBookings = window._pathwayBookings || [];
-  if (!pathwayBookings.length) { _origRenderLessons(); return; }
-
-  /* Build lessons from pathway bookings */
-  const lessons = pathwayBookings
-    .filter(b => b.status === 'scheduled' || b.status === 'completed')
-    .sort((a, b) => {
-      if (a.status === 'scheduled' && b.status !== 'scheduled') return -1;
-      if (b.status === 'scheduled' && a.status !== 'scheduled') return 1;
-      return new Date(a.date) - new Date(b.date);
-    })
-    .slice(0, 20);
-
-  if (!lessons.length) { _origRenderLessons(); return; }
-
-  el.innerHTML = lessons.map((b, i) => {
-    const isCompleted = b.status === 'completed';
-    const isLive      = b.status === 'scheduled' && _isClassLiveNow(b);
-    const dateStr     = b.date ? new Date(b.date + 'T12:00:00').toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' }) : '—';
-    const timeStr     = (b.time || '—').replace(/^(\d{1,2}:\d{2}):\d{2}$/, '$1');
-    const lessonTitle = b.pathway_lesson_title || b.subject || 'Class';
-    const lessonNum   = b.pathway_lesson_number ? `Lesson ${b.pathway_lesson_number}` : '';
-
-    return `
-      <div class="lesson-card${isLive ? ' lesson-live' : ''}${isCompleted ? '' : ''}">
-        <div class="lesson-card-left">
-          <div class="lesson-date-box">
-            <div class="lesson-day">${dateStr.split(' ')[1] || ''}</div>
-            <div class="lesson-month">${dateStr.split(' ')[2] || ''}</div>
-          </div>
-          <div class="lesson-info">
-            <div class="lesson-title">${lessonTitle}${lessonNum ? ' <span style="font-size:11px;color:var(--light);font-weight:700;">· ' + lessonNum + '</span>' : ''}</div>
-            <div class="lesson-meta">🕐 ${timeStr} &nbsp;·&nbsp; 👩‍🏫 ${b.tutor_name || 'Tutor'} &nbsp;·&nbsp; ${isCompleted ? '✅ Completed' : '📅 Upcoming'}</div>
-          </div>
-        </div>
-        <div class="lesson-card-right" style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
-          ${isLive ? `<button class="join-btn" onclick="joinClass()">🚀 Join</button>` : ''}
-          ${isCompleted ? `
-            <button onclick="openLessonDetails('${b.id}')"
-              style="background:var(--blue-light);color:var(--blue);border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap;">
-              📖 View Details
-            </button>` : ''}
-          <span class="lesson-arrow">›</span>
-        </div>
-      </div>`;
-  }).join('');
-};
+/* ── Lessons list is now handled by renderLessons() in student-dashboard.js
+   The new two-tab Upcoming/Completed system supersedes this override.
+   openLessonDetails is kept for backward compatibility. ── */
 
 function _isClassLiveNow(booking) {
   if (!booking.date || !booking.time) return false;

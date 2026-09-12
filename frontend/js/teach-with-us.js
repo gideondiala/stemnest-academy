@@ -4,15 +4,9 @@
 ═══════════════════════════════════════════════════════ */
 
 const OPEN_ROLES = [
-  { id:'R001', emoji:'💻', subject:'coding',   title:'Coding Tutor — Python & Scratch',  badge:'urgent', badgeLabel:'🔥 Urgent', tags:['Remote','Part-time','Ages 7–14','Beginner'],        desc:'Teach Python fundamentals and Scratch game design to primary and secondary students. Project-based approach. Curriculum provided.',  pay:'£28–35' },
-  { id:'R002', emoji:'🌐', subject:'coding',   title:'Web Development Tutor',            badge:'open',   badgeLabel:'✅ Open',   tags:['Remote','Part-time','Ages 13–19','Intermediate'],   desc:'Teach HTML, CSS and JavaScript to teens building real websites. Strong front-end knowledge required.',                                pay:'£30–40' },
-  { id:'R003', emoji:'🤖', subject:'coding',   title:'AI & Computer Science Tutor',      badge:'new',    badgeLabel:'✨ New',    tags:['Remote','Part-time','Ages 14–19','Advanced'],       desc:'Teach A-Level Computer Science and AI literacy. Ideal for candidates with a CS degree or industry background.',                       pay:'£35–45' },
-  { id:'R004', emoji:'📐', subject:'maths',    title:'GCSE Maths Tutor',                 badge:'urgent', badgeLabel:'🔥 Urgent', tags:['Remote','Part-time','Ages 14–16','GCSE'],           desc:'Support students preparing for GCSE Maths. Strong exam technique and ability to explain concepts clearly essential.',                 pay:'£25–35' },
-  { id:'R005', emoji:'🧮', subject:'maths',    title:'Primary Maths Tutor',              badge:'open',   badgeLabel:'✅ Open',   tags:['Remote','Part-time','Ages 7–11','KS2'],             desc:'Build number confidence and problem-solving skills in younger learners. Patient, encouraging teaching style required.',               pay:'£25–30' },
-  { id:'R006', emoji:'📊', subject:'maths',    title:'A-Level Maths Tutor',              badge:'open',   badgeLabel:'✅ Open',   tags:['Remote','Part-time','Ages 16–19','A-Level'],        desc:'Teach pure maths, statistics and mechanics to sixth-form students. Degree in Mathematics or related field required.',                 pay:'£35–45' },
-  { id:'R007', emoji:'🧬', subject:'sciences', title:'Biology Tutor — GCSE & A-Level',   badge:'open',   badgeLabel:'✅ Open',   tags:['Remote','Part-time','Ages 14–19','GCSE & A-Level'], desc:'Teach cell biology, genetics, ecology and human physiology. Biology degree or equivalent required.',                                 pay:'£28–38' },
-  { id:'R008', emoji:'⚗️', subject:'sciences', title:'Chemistry Tutor',                  badge:'new',    badgeLabel:'✨ New',    tags:['Remote','Part-time','Ages 14–19','GCSE & A-Level'], desc:'Cover atomic structure, organic chemistry and quantitative analysis. Strong exam board knowledge preferred.',                        pay:'£28–38' },
-  { id:'R009', emoji:'🛰️', subject:'sciences', title:'Physics Tutor — A-Level',          badge:'urgent', badgeLabel:'🔥 Urgent', tags:['Remote','Part-time','Ages 16–19','A-Level'],        desc:'Mechanics, waves, electricity and modern physics for students targeting top university offers. Physics degree required.',              pay:'£35–45' },
+  { id:'R001', emoji:'💻', subject:'coding',   title:'Coding Tutor — Python & Scratch',  badge:'urgent', badgeLabel:'🔥 Urgent', tags:['Remote','Part-time','Ages 6–14','Beginner'],        desc:'Teach Python fundamentals and Scratch game design to primary and secondary students. Project-based approach. Curriculum provided.' },
+  { id:'R002', emoji:'🌐', subject:'coding',   title:'Web Development Tutor',            badge:'open',   badgeLabel:'✅ Open',   tags:['Remote','Part-time','Ages 10–17','Intermediate'],   desc:'Teach HTML, CSS and JavaScript to young people building real websites. Strong front-end knowledge required.' },
+  { id:'R003', emoji:'🤖', subject:'coding',   title:'AI & Computer Science Tutor',      badge:'new',    badgeLabel:'✨ New',    tags:['Remote','Part-time','Ages 12–17','Advanced'],       desc:'Teach AI literacy and Computer Science fundamentals. Ideal for candidates with a CS degree or industry background.' },
 ];
 
 const FAQS = [
@@ -61,8 +55,8 @@ function renderRoles(filter) {
       <div class="tw-role-desc">${r.desc}</div>
       <div class="tw-role-footer">
         <div>
-          <div class="tw-role-pay">${r.pay}</div>
-          <div class="tw-role-pay-note">per hour</div>
+          <div class="tw-role-pay" style="font-size:13px;font-weight:900;color:var(--green-dark);">💷 Competitive Pay</div>
+          <div class="tw-role-pay-note">Performance-based growth</div>
         </div>
         <a href="#apply" class="tw-role-apply-btn" onclick="prefillRole('${r.id}')">Apply Now →</a>
       </div>

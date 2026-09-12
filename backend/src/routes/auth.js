@@ -360,4 +360,57 @@ router.get('/me', requireAuth, async (req, res, next) => {
   }
 });
 
+/* ── POST /api/auth/impersonate/:userId (super_admin only) ── */
+router.post('/impersonate/:userId', requireAuth, async (req, res, next) => {
+  try {
+    /* Only super_admin can impersonate */
+    if (req.user.role !== 'super_admin') {
+      return res.status(403).json({ success: false, error: 'Only super admin can impersonate users' });
+    }
+
+    const target = await pool.query(
+      'SELECT id, name, email, role, staff_id, is_active FROM users WHERE id = $1',
+      [req.params.userId]
+    );
+    if (!target.rows.length) return res.status(404).json({ success: false, error: 'User not found' });
+    const user = target.rows[0];
+    if (!user.is_active) return res.status(400).json({ success: false, error: 'User account is deactivated' });
+
+    /* Issue a short-lived impersonation token (30 minutes) */
+    const token = jwt.sign(
+      {
+        id:     user.id,
+        email:  user.email,
+        role:   user.role,
+        name:   user.name,
+        impersonatedBy: req.user.id,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '30m' }
+    );
+
+    logger.info(`[IMPERSONATE] ${req.user.email} impersonating ${user.name} (${user.role})`);
+
+    /* Return the token + which dashboard to redirect to */
+    const dashboardMap = {
+      student:    '/pages/student-dashboard.html',
+      tutor:      '/pages/tutor-dashboard.html',
+      sales:      '/pages/sales-dashboard.html',
+      presales:   '/pages/presales-dashboard.html',
+      postsales:  '/pages/postsales-dashboard.html',
+      operations: '/pages/operations-dashboard.html',
+      hr:         '/pages/hr-dashboard.html',
+      admin:      '/pages/admin-dashboard.html',
+      super_admin:'/pages/super-admin.html',
+    };
+
+    res.json({
+      success: true,
+      token,
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, staff_id: user.staff_id },
+      redirect: dashboardMap[user.role] || '/pages/login.html',
+    });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;

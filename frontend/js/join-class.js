@@ -1,4 +1,4 @@
-/* ═══════════════════════════════════════════════════════
+﻿/* ═══════════════════════════════════════════════════════
    STEMNEST ACADEMY — JOIN CLASS JS
    Lookup booking by email or WhatsApp, show class details,
    Cancel and Reschedule flows.
@@ -195,7 +195,7 @@ async function confirmCancellation() {
           '<div style="font-size:56px;margin-bottom:16px;">✅</div>' +
           '<div style="font-family:\'Fredoka One\',cursive;font-size:22px;color:#fff;margin-bottom:8px;">Class Cancelled</div>' +
           '<div style="font-size:14px;color:rgba(255,255,255,.8);line-height:1.7;margin-bottom:20px;">Your cancellation has been received. Our team has been notified.<br>We hope to see you again soon!</div>' +
-          '<a href="free-trial.html" style="display:inline-block;background:#fff;color:#1a56db;padding:12px 28px;border-radius:50px;font-family:\'Nunito\',sans-serif;font-weight:900;font-size:14px;text-decoration:none;">📅 Book a New Demo Class</a>' +
+          '<a href="free-trial.html" style="display:inline-block;background:#fff;color:#1a56db;padding:12px 28px;border-radius:50px;font-family:\'Nunito\',sans-serif;font-weight:900;font-size:14px;text-decoration:none;">📅 Book a New Demo</a>' +
         '</div>';
     }
   } catch (err) {
@@ -246,12 +246,14 @@ function openRescheduleFlow() {
 
 function generateTimeOptions() {
   var slots = [];
-  for (var h = 6; h <= 22; h++) {
+  for (var h = 0; h < 24; h++) {
     ['00', '30'].forEach(function(m) {
+      var hh    = h < 10 ? '0' + h : String(h);
       var period = h < 12 ? 'AM' : 'PM';
       var h12    = h % 12 === 0 ? 12 : h % 12;
-      var label  = h12 + ':' + m + ' ' + period;
-      slots.push('<option value="' + label + '">' + label + '</option>');
+      var label  = hh + ':' + m + '  (' + h12 + ':' + m + ' ' + period + ')';
+      var value  = hh + ':' + m;
+      slots.push('<option value="' + value + '">' + label + '</option>');
     });
   }
   return slots.join('');

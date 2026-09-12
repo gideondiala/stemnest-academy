@@ -24,10 +24,30 @@ function navigate(page) {
     'super-admin':       root + 'pages/super-admin.html',
     'operations':        root + 'pages/operations-dashboard.html',
     'presales':          root + 'pages/presales-dashboard.html',
+    'presales-dashboard': root + 'pages/presales-dashboard.html',
     'postsales':         root + 'pages/postsales-dashboard.html',
+    'postsales-dashboard': root + 'pages/postsales-dashboard.html',
     'hr':                root + 'pages/hr-dashboard.html',
+    'hr-dashboard':      root + 'pages/hr-dashboard.html',
+    'sales-dashboard':   root + 'pages/sales-dashboard.html',
+    'operations-dashboard': root + 'pages/operations-dashboard.html',
+    'admin-dashboard':   root + 'pages/admin-dashboard.html',
   };
   if (map[page]) window.location.href = map[page];
+}
+
+/**
+ * After login: check if there's a ?redirect= param and send the user there.
+ * Call this after successful authentication instead of navigate().
+ */
+function navigateAfterLogin(defaultPage) {
+  const params = new URLSearchParams(window.location.search);
+  const redirect = params.get('redirect');
+  if (redirect && redirect.startsWith('/pages/')) {
+    window.location.href = redirect;
+    return;
+  }
+  navigate(defaultPage);
 }
 
 /**
@@ -136,3 +156,42 @@ window.addEventListener('resize', () => {
     document.querySelector('nav')?.classList.remove('nav-mobile-open');
   }
 });
+
+/* ── IMPERSONATION HANDLER ──
+   When a page loads with ?impersonate=1, reads the stored impersonation
+   token and logs the founder in as that user automatically.
+   Called early on every dashboard page load.
+── */
+(function() {
+  if (!window.location.search.includes('impersonate=1')) return;
+  try {
+    var stored = localStorage.getItem('sn_impersonate_token');
+    if (!stored) return;
+    var imp = JSON.parse(stored);
+    if (!imp || !imp.token || Date.now() > imp.expires) {
+      localStorage.removeItem('sn_impersonate_token');
+      return;
+    }
+    /* Set the impersonation token as the active session */
+    localStorage.setItem('sn_access_token', imp.token);
+    localStorage.setItem('sn_api_user', JSON.stringify(imp.user));
+    /* Role-specific identity keys */
+    if (imp.user.role === 'tutor') {
+      localStorage.setItem('sn_current_tutor', JSON.stringify({
+        id: imp.user.staff_id || imp.user.id,
+        dbId: imp.user.id,
+        name: imp.user.name,
+        email: imp.user.email,
+        role: 'tutor',
+      }));
+    }
+    /* Clean up so it doesn't fire again on reload */
+    localStorage.removeItem('sn_impersonate_token');
+    /* Remove the ?impersonate=1 param from URL without reload */
+    try {
+      var url = new URL(window.location.href);
+      url.searchParams.delete('impersonate');
+      window.history.replaceState({}, '', url.toString());
+    } catch(e) {}
+  } catch(e) { /* silent */ }
+})();

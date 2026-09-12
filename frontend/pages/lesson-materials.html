@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lesson Materials – StemNest Academy</title>
+  <link rel="icon" type="image/png" href="../assets/icons/icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: #f4f6fb;
+      color: #1a202c;
+      min-height: 100vh;
+    }
+
+    /* ── Top bar ── */
+    .topbar {
+      background: linear-gradient(135deg, #1a56db, #0e9f6e);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 12px rgba(0,0,0,.15);
+    }
+    .topbar-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+    }
+    .topbar-logo img {
+      height: 36px;
+    }
+    .topbar-title {
+      font-family: 'Fredoka One', cursive;
+      font-size: 20px;
+      color: #fff;
+    }
+    .topbar-back {
+      background: rgba(255,255,255,.2);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 8px 18px;
+      font-family: 'Nunito', sans-serif;
+      font-weight: 800;
+      font-size: 13px;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .topbar-back:hover { background: rgba(255,255,255,.3); }
+
+    /* ── Main wrapper ── */
+    .page-wrap {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 32px 20px 60px;
+    }
+
+    /* ── Loading / Error states ── */
+    .state-card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 60px 40px;
+      text-align: center;
+      box-shadow: 0 4px 24px rgba(0,0,0,.06);
+      margin-top: 32px;
+    }
+    .state-icon { font-size: 56px; margin-bottom: 16px; }
+    .state-title { font-family: 'Fredoka One', cursive; font-size: 24px; color: #1a202c; margin-bottom: 8px; }
+    .state-sub { font-size: 15px; color: #718096; font-weight: 700; }
+
+    /* ── Lesson header ── */
+    .lesson-header {
+      background: #fff;
+      border-radius: 20px;
+      padding: 28px 32px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.06);
+      margin-bottom: 20px;
+    }
+    .lesson-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .badge {
+      font-size: 12px;
+      font-weight: 900;
+      padding: 4px 12px;
+      border-radius: 50px;
+    }
+    .badge-pathway { background: #dbeafe; color: #1e40af; }
+    .badge-grade   { background: #d1fae5; color: #065f46; }
+    .badge-unit    { background: #fff3e0; color: #92400e; }
+    .badge-lesson  { background: #f3e8ff; color: #6b21a8; }
+    .lesson-title {
+      font-family: 'Fredoka One', cursive;
+      font-size: 28px;
+      color: #1a202c;
+      line-height: 1.3;
+    }
+    .lesson-number {
+      font-size: 13px;
+      font-weight: 700;
+      color: #a0aec0;
+      margin-top: 6px;
+    }
+
+    /* ── Section cards ── */
+    .section-card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 24px 28px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.05);
+      margin-bottom: 16px;
+      border-left: 4px solid #e8eaf0;
+    }
+    .section-card.blue   { border-left-color: #1a56db; }
+    .section-card.green  { border-left-color: #0e9f6e; }
+    .section-card.orange { border-left-color: #f59e0b; }
+    .section-card.purple { border-left-color: #7c3aed; }
+    .section-card.teal   { border-left-color: #0694a2; }
+    .section-card.pink   { border-left-color: #e11d48; }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      color: #a0aec0;
+      margin-bottom: 8px;
+    }
+    .section-content {
+      font-size: 15px;
+      font-weight: 600;
+      color: #2d3748;
+      line-height: 1.75;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* ── Task cards ── */
+    .task-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+    @media (max-width: 600px) { .task-grid { grid-template-columns: 1fr; } }
+
+    .task-card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 20px 22px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.05);
+      border-top: 3px solid #1a56db;
+    }
+    .task-card:nth-child(2) { border-top-color: #0e9f6e; }
+
+    .task-num {
+      font-family: 'Fredoka One', cursive;
+      font-size: 13px;
+      color: #1a56db;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+    .task-card:nth-child(2) .task-num { color: #0e9f6e; }
+
+    .task-desc {
+      font-size: 14px;
+      font-weight: 700;
+      color: #2d3748;
+      line-height: 1.6;
+      margin-bottom: 12px;
+    }
+    .task-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #1a56db;
+      color: #fff;
+      text-decoration: none;
+      padding: 8px 16px;
+      border-radius: 10px;
+      font-weight: 900;
+      font-size: 13px;
+      transition: opacity .15s;
+    }
+    .task-card:nth-child(2) .task-link { background: #0e9f6e; }
+    .task-link:hover { opacity: .85; }
+
+    /* ── Homework ── */
+    .hw-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+    @media (max-width: 600px) { .hw-grid { grid-template-columns: 1fr; } }
+
+    .hw-card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 20px 22px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.05);
+      border-top: 3px solid #f59e0b;
+    }
+    .hw-card:nth-child(2) { border-top-color: #e11d48; }
+    .hw-label {
+      font-family: 'Fredoka One', cursive;
+      font-size: 13px;
+      color: #f59e0b;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+    .hw-card:nth-child(2) .hw-label { color: #e11d48; }
+    .hw-text {
+      font-size: 14px;
+      font-weight: 700;
+      color: #2d3748;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
+    /* ── Empty field ── */
+    .coming-soon {
+      font-size: 13px;
+      font-weight: 700;
+      color: #cbd5e0;
+      font-style: italic;
+    }
+
+    /* ── Print button ── */
+    .print-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #f0f4ff;
+      color: #1a56db;
+      border: 1.5px solid #dbeafe;
+      border-radius: 12px;
+      padding: 10px 20px;
+      font-family: 'Nunito', sans-serif;
+      font-weight: 800;
+      font-size: 13px;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    .print-btn:hover { background: #dbeafe; }
+
+    @media print {
+      .topbar, .print-btn { display: none; }
+      body { background: #fff; }
+      .section-card, .task-card, .hw-card { box-shadow: none; border: 1px solid #e8eaf0; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <a href="../index.html" class="topbar-logo">
+    <img src="../assets/images/logo.png" alt="StemNest Academy">
+    <span class="topbar-title">StemNest Academy</span>
+  </a>
+  <button class="topbar-back" onclick="window.close()">✕ Close</button>
+</div>
+
+<!-- Main content -->
+<div class="page-wrap">
+
+  <!-- Loading state (shown while fetching) -->
+  <div id="stateLoading" class="state-card">
+    <div class="state-icon">⏳</div>
+    <div class="state-title">Loading lesson materials…</div>
+    <div class="state-sub">Fetching content from the curriculum</div>
+  </div>
+
+  <!-- Error state (shown on failure) -->
+  <div id="stateError" class="state-card" style="display:none;">
+    <div class="state-icon">📭</div>
+    <div class="state-title" id="errorTitle">Lesson not found</div>
+    <div class="state-sub" id="errorMsg">The lesson materials could not be loaded. Please try again or contact support.</div>
+  </div>
+
+  <!-- Lesson content (shown on success) -->
+  <div id="lessonContent" style="display:none;">
+
+    <!-- Header -->
+    <div class="lesson-header">
+      <div class="lesson-meta">
+        <span class="badge badge-pathway" id="badgePathway">Pathway</span>
+        <span class="badge badge-grade" id="badgeGrade">Grade</span>
+        <span class="badge badge-unit" id="badgeUnit">Unit</span>
+        <span class="badge badge-lesson" id="badgeLessonNum">Lesson</span>
+      </div>
+      <div class="lesson-title" id="lessonTitle">—</div>
+      <div class="lesson-number" id="lessonNumber"></div>
+      <button class="print-btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
+    </div>
+
+    <!-- Learning Objectives -->
+    <div class="section-card blue" id="sectionObjectives">
+      <div class="section-label">🎯 Learning Objectives</div>
+      <div class="section-content" id="contentObjectives"><span class="coming-soon">Content coming soon</span></div>
+    </div>
+
+    <!-- Warm Up / NOVA Moment -->
+    <div class="section-card orange" id="sectionWarmup">
+      <div class="section-label" id="labelWarmup">🔥 Warm Up</div>
+      <div class="section-content" id="contentWarmup"><span class="coming-soon">Content coming soon</span></div>
+    </div>
+
+    <!-- Project Briefing -->
+    <div class="section-card teal" id="sectionBriefing" style="display:none;">
+      <div class="section-label">📋 Project Briefing</div>
+      <div class="section-content" id="contentBriefing"><span class="coming-soon">Content coming soon</span></div>
+    </div>
+
+    <!-- Concept Discovery -->
+    <div class="section-card green" id="sectionConcept">
+      <div class="section-label">💡 Concept Discovery</div>
+      <div class="section-content" id="contentConcept"><span class="coming-soon">Content coming soon</span></div>
+    </div>
+
+    <!-- Tasks -->
+    <div id="sectionTasks">
+      <div class="section-label" style="padding: 0 4px 8px; font-size:11px; font-weight:900; text-transform:uppercase; letter-spacing:.6px; color:#a0aec0;">🛠️ Tasks</div>
+      <div class="task-grid">
+        <div class="task-card" id="task1Card">
+          <div class="task-num">Task 1</div>
+          <div class="task-desc" id="task1Desc"><span class="coming-soon">Content coming soon</span></div>
+          <a id="task1Link" href="#" target="_blank" class="task-link" style="display:none;">🚀 Open Task 1</a>
+        </div>
+        <div class="task-card" id="task2Card">
+          <div class="task-num">Task 2</div>
+          <div class="task-desc" id="task2Desc"><span class="coming-soon">Content coming soon</span></div>
+          <a id="task2Link" href="#" target="_blank" class="task-link" style="display:none;">🚀 Open Task 2</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Homework -->
+    <div id="sectionHomework">
+      <div class="section-label" style="padding: 0 4px 8px; font-size:11px; font-weight:900; text-transform:uppercase; letter-spacing:.6px; color:#a0aec0;">📚 Homework</div>
+      <div class="hw-grid">
+        <div class="hw-card" id="hw1Card">
+          <div class="hw-label">Homework 1</div>
+          <div class="hw-text" id="hw1Content"><span class="coming-soon">Content coming soon</span></div>
+        </div>
+        <div class="hw-card" id="hw2Card">
+          <div class="hw-label">Homework 2</div>
+          <div class="hw-text" id="hw2Content"><span class="coming-soon">Content coming soon</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Portfolio Save (Grade 1-3 only) -->
+    <div class="section-card pink" id="sectionPortfolio" style="display:none;">
+      <div class="section-label">💾 Portfolio Save</div>
+      <div class="section-content" id="contentPortfolio"><span class="coming-soon">Content coming soon</span></div>
+    </div>
+
+    <!-- Debrief -->
+    <div class="section-card purple" id="sectionDebrief">
+      <div class="section-label">🪞 Debrief</div>
+      <div class="section-content" id="contentDebrief"><span class="coming-soon">Content coming soon</span></div>
+    </div>
+
+    <!-- What Comes Next -->
+    <div class="section-card teal" id="sectionNext">
+      <div class="section-label">⏭️ What Comes Next</div>
+      <div class="section-content" id="contentNext"><span class="coming-soon">Content coming soon</span></div>
+    </div>
+
+  </div><!-- end #lessonContent -->
+</div><!-- end .page-wrap -->
+
+<script>
+/* ════════════════════════════════════════════════════════
+   LESSON MATERIALS PAGE
+   Opens in a new tab.
+   URL params:
+     ?lessonId=<pathway_lesson UUID>   — required
+     &bookingId=<booking UUID>         — optional, used for access check
+
+   Access rules (enforced server-side on the API):
+     - Tutor / admin / postsales / presales / super_admin: always accessible
+     - Student: accessible only if booking status = 'completed'
+     
+   Content is fetched live from the DB every page load.
+   When admin adds or edits lesson content it appears immediately
+   on the next page load — no redeployment needed.
+════════════════════════════════════════════════════════ */
+
+const API = 'https://api.stemnestacademy.co.uk';
+
+function getParam(key) {
+  return new URLSearchParams(window.location.search).get(key);
+}
+
+function setText(id, value, fallback) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (value && value.trim()) {
+    el.textContent = value.trim();
+    el.innerHTML = value.trim().replace(/\n/g, '<br>');
+  } else {
+    el.innerHTML = `<span class="coming-soon">${fallback || 'Content coming soon'}</span>`;
+  }
+}
+
+function hide(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = 'none';
+}
+
+function show(id, displayType) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = displayType || 'block';
+}
+
+function showError(title, msg) {
+  hide('stateLoading');
+  hide('lessonContent');
+  document.getElementById('errorTitle').textContent = title;
+  document.getElementById('errorMsg').textContent   = msg;
+  show('stateError');
+}
+
+async function loadLesson() {
+  const lessonId  = getParam('lessonId');
+  const bookingId = getParam('bookingId');
+
+  if (!lessonId) {
+    showError('No lesson specified', 'Please open this page from the class materials button.');
+    return;
+  }
+
+  const token = localStorage.getItem('sn_access_token');
+  if (!token) {
+    showError('Not logged in', 'Please log in to view lesson materials.');
+    return;
+  }
+
+  try {
+    /* Fetch lesson from API — live from DB every time */
+    const url = bookingId
+      ? `${API}/api/pathways/lesson/${lessonId}?bookingId=${bookingId}`
+      : `${API}/api/pathways/lesson/${lessonId}`;
+
+    const res  = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+    const data = await res.json();
+
+    if (!data.success) {
+      if (res.status === 403) {
+        showError('Materials locked 🔒', 'This lesson\'s materials are available after the class is completed. Keep learning!');
+      } else if (res.status === 404) {
+        showError('Lesson not found', 'This lesson does not exist or has been removed.');
+      } else {
+        showError('Could not load materials', data.error || 'Please try again.');
+      }
+      return;
+    }
+
+    const l = data.lesson;
+
+    /* ── Populate header ── */
+    document.title = `${l.title} – StemNest Academy`;
+
+    document.getElementById('badgePathway').textContent  = l.pathway_name  || 'Pathway';
+    document.getElementById('badgeGrade').textContent    = l.grade_name    || `Grade ${l.grade_number || ''}`;
+    document.getElementById('badgeUnit').textContent     = l.unit_name     || `Unit ${l.unit_number || ''}`;
+    document.getElementById('badgeLessonNum').textContent = `Lesson ${l.lesson_number || ''}`;
+    document.getElementById('lessonTitle').textContent   = l.title         || 'Lesson';
+    document.getElementById('lessonNumber').textContent  = `Lesson ${l.lesson_number || '—'} of 72 · ${l.unit_name || ''}`;
+
+    /* ── Grade 1–3 vs 4+ determines NOVA vs Warm Up ── */
+    const gradeNum     = parseInt(l.grade_number) || 4;
+    const isLowerGrade = gradeNum <= 3;
+
+    /* Warm Up / NOVA Moment */
+    document.getElementById('labelWarmup').textContent =
+      isLowerGrade ? '⭐ NOVA Moment — The Story Beat' : '🔥 Warm Up';
+    setText('contentWarmup', l.warm_up);
+
+    /* ── Populate all sections ── */
+    setText('contentObjectives', l.learning_objectives);
+    setText('contentConcept',    l.concept_discovery);
+    setText('contentDebrief',    l.debrief);
+    setText('contentNext',       l.what_comes_next);
+
+    /* Project briefing — only show if has content */
+    if (l.project_briefing && l.project_briefing.trim()) {
+      setText('contentBriefing', l.project_briefing);
+      show('sectionBriefing');
+    }
+
+    /* Tasks */
+    setText('task1Desc', l.task1_description);
+    if (l.task1_link && l.task1_link.trim()) {
+      const a1 = document.getElementById('task1Link');
+      if (a1) { a1.href = l.task1_link; show('task1Link', 'inline-flex'); }
+    }
+    setText('task2Desc', l.task2_description);
+    if (l.task2_link && l.task2_link.trim()) {
+      const a2 = document.getElementById('task2Link');
+      if (a2) { a2.href = l.task2_link; show('task2Link', 'inline-flex'); }
+    }
+
+    /* Homework */
+    setText('hw1Content', l.homework1);
+    setText('hw2Content', l.homework2);
+
+    /* Portfolio Save — Grade 1–3 only */
+    if (isLowerGrade && l.portfolio_save && l.portfolio_save.trim()) {
+      setText('contentPortfolio', l.portfolio_save);
+      show('sectionPortfolio');
+    }
+
+    /* ── Show the content ── */
+    hide('stateLoading');
+    show('lessonContent');
+
+  } catch (err) {
+    showError('Connection error', 'Could not reach the server. Please check your connection and try again.');
+    console.error('[LessonMaterials]', err);
+  }
+}
+
+/* Load on page ready */
+document.addEventListener('DOMContentLoaded', loadLesson);
+</script>
+
+</body>
+</html>

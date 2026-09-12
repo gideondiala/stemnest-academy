@@ -142,8 +142,7 @@ function renderPathwayCards() {
           <div class="card-footer" style="flex-direction:column;gap:10px;align-items:stretch;">
             <div style="display:flex;align-items:center;justify-content:space-between;">
               <div>
-                <div class="course-price" style="color:${hex};">£${parseFloat(p.price||80).toFixed(0)}<span style="font-size:14px;color:var(--light);font-family:'Nunito',sans-serif;">/mo</span></div>
-                <div class="price-note">1-on-1 live sessions</div>
+                <div class="price-note">1-on-1 live sessions · Personalised to your child</div>
               </div>
             </div>
             <div style="display:flex;gap:8px;">
@@ -211,8 +210,8 @@ function openPathwayPanel(slug) {
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;background:${hex}11;border-radius:14px;padding:18px 22px;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
       <div>
-        <div style="font-family:'Fredoka One',cursive;font-size:28px;color:${hex};">£${price.toFixed(0)}<span style="font-size:16px;color:var(--light);font-family:'Nunito',sans-serif;">/month</span></div>
-        <div style="font-size:13px;font-weight:700;color:var(--light);">Grades 1–12 · 72 sessions per grade</div>
+        <div style="font-size:14px;font-weight:800;color:${hex};">1-on-1 live sessions · UK-certified tutor</div>
+        <div style="font-size:13px;font-weight:700;color:var(--light);">Flexible scheduling · Grades 1–12 · Contact us for pricing</div>
       </div>
       <button onclick="closePathwayPanel();openPathwayEnrol('${p ? p.id : slug}','${slug}','${name.replace(/'/g,'')}')"
         style="background:${hex};color:#fff;border:none;border-radius:14px;padding:14px 28px;font-family:'Nunito',sans-serif;font-weight:900;font-size:15px;cursor:pointer;">
@@ -244,8 +243,7 @@ function openPathwayEnrol(pathwayId, slug, pathwayName) {
   const summary = document.getElementById('pathwayEnrolSummary');
   if (summary) summary.innerHTML = `
     <div style="font-weight:900;font-size:16px;color:#1a202c;">${pathwayName}</div>
-    <div style="font-size:13px;color:#4a5568;margin-top:4px;">1-on-1 live sessions · UK-certified tutor · Grades 1–12</div>
-    <div style="font-family:'Fredoka One',cursive;font-size:22px;color:#1a56db;margin-top:8px;">£${price.toFixed(0)}<span style="font-size:14px;color:#718096;font-family:'Nunito',sans-serif;">/month</span></div>`;
+    <div style="font-size:13px;color:#4a5568;margin-top:4px;">1-on-1 live sessions · UK-certified tutor · Grades 1–12</div>`;
 
   /* Set min date to today */
   const dateEl = document.getElementById('pe-startdate');

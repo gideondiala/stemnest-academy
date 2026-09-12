@@ -4,6 +4,116 @@ This document lists features that are partially built, not yet built, or need im
 
 ---
 
+## ⚠️ CRITICAL PLATFORM RULE — NO LOCALSTORAGE FOR BUSINESS DATA
+
+**StemNest Academy is a 100% online platform. All business data MUST be saved to and loaded from the backend API (PostgreSQL database). Do NOT use localStorage to store any of the following:**
+
+- Bookings, sessions, class reports
+- Pipeline records, leads, conversions
+- Student data, credits, payments
+- Teacher data, earnings, availability
+- Any operational data that needs to persist between sessions or devices
+
+**localStorage is ONLY permitted for:**
+- `sn_access_token` — auth JWT (cleared on logout)
+- `sn_api_user` — logged-in user profile (cleared on logout)
+- `sn_current_tutor` / `sn_logged_in_teacher` — tutor identity (cleared on logout)
+- `sn_session_start_times` — in-memory join timestamps for 15-min End button enforcement (session-only, not business data)
+
+**If you find code writing business data to localStorage, replace it with an API call. Every piece of data must be API-first.**
+
+---
+
+## ✅ Recently Completed (July 2026)
+
+### End Class Report — Now API-Driven
+- `submitEndClassReport()` in `dashboard.js` now calls `POST /api/bookings/:id/report` directly
+- Report data (outcome, quality, interest, purchasing power, notes, recording link) persists to `class_reports` table in DB
+- localStorage write removed completely
+- Presales completed tab will now show teacher report data (already reads from API)
+- Submit button disables during API call to prevent double-submit
+
+### 15-Minute End Button Enforcement
+- End Class / End Demo button now only activates **15 minutes after the teacher clicks Join**, not immediately
+- Both `renderSessionsTab()` and `renderOverviewSessions()` enforce this using `sn_session_start_times` (join timestamp)
+- Sessions tab auto-refreshes every 60 seconds so the button unlocks without needing a page reload
+- Tooltip updated to say "Available 15 mins after you joined"
+
+### Sales Dashboard — Teacher Report Visible on Leads
+- `_loadSalesFromAPI()` now merges `classReports` from the sales dashboard API response into bookings
+- `getLeads()` propagates teacher report fields (quality, interest, purchasing power, notes) onto each lead
+- Leads table now has a "Teacher Report" column showing all 4 fields with colour-coded labels
+- If no report submitted yet, shows "No report yet"
+
+### 10-Minute Class Reminder Added
+- `reminders.js` now sends a 3rd reminder email 8–12 minutes before class (in addition to 24hr and 30min)
+- Urgent orange-themed email with direct Join Class button
+- Tracked in `reminders_sent` table with type `'10min'` to prevent duplicates
+
+### Post-Class Summary Email Now Fires for Demo Classes Too
+- `bookings.js` report endpoint now sends post-class summary for **all completed classes** (paid + demo)
+- Demo class emails do not show credits/top-up nudge (not applicable)
+- Paid class emails still include credits remaining and top-up link if ≤3 credits
+
+### Auto-Onboarding on Fincra Webhook
+- When Fincra webhook fires and `student_id` is null (first-time payment), backend now:
+  1. Looks up student details from the linked booking's notes
+  2. Checks if an account already exists for that email — if yes, links it
+  3. If no account exists: creates `users` + `student_profiles` records with a temp password
+  4. Sends a full onboarding email with login credentials, student ID, and credits count
+  5. Updates the payment record with the new `student_id`
+- If onboarding fails for any reason, payment is still confirmed and ops team is notified
+
+---
+
+## ✅ Confirmed Already Built (Audit July 2026 — Previously Mislabelled as Missing)
+
+### LA "Join Class" Button
+- `sales-dashboard.js` — upcoming demos table has a `🚀 Join` button that opens the class Google Meet link
+- Fully wired — shows for any scheduled booking that has a `classLink`
+
+### Fincra Payment Link Generation
+- `sales-dashboard.js` → `generatePaymentLink()` — currency selector (NGN/USD), GBP input, auto-conversion
+- Backend `POST /api/payments/create-link` — calls `fincraService.createCheckout()`, saves to DB, emails link to parent
+- `fincraService.js` — wraps Fincra `/checkout/payments` API with signature, business ID, public/secret keys
+
+### Fincra Webhook
+- `POST /api/payments/fincra/webhook` — full flow: signature verify → double-verify with Fincra API → confirm payment → add credits → handle debt settlement → send receipt email → notify LA → notify ops
+- Marks student as renewed in `renewal_followups` on payment
+
+### Credit Suspension Ladder
+- Backend `bookings.js` report endpoint deducts 1 credit on every completed class
+- Emails sent at 3, 1, 0, -1, -2 credit thresholds with escalating urgency
+- At -2: `credits_suspended = TRUE` set in DB
+- Frontend `student-dashboard.js` reads `credits_suspended`, shows suspension banner, blocks Join Class button
+- On webhook payment: credits restored, `credits_suspended = FALSE`, classes reactivate instantly
+
+### Self-Service Credit Top-Up
+- Student dashboard Payments tab: 4 credit packages (4/8/12/24 classes), styled cards
+- `initiateTopUp()` calls `POST /api/payments/create-link` with student's email and selected package
+- Displays Fincra payment link inline — parent pays → webhook fires → credits added instantly
+
+### Class Reminders
+- `reminders.js` — runs every 15 minutes, sends:
+  - **24-hour reminder**: email at 23–25 hours before class
+  - **30-minute reminder**: email at 28–32 minutes before class
+  - **10-minute reminder**: email at 8–12 minutes before class ← NEW
+- Deduplication via `reminders_sent` table
+- Started automatically on server boot via `index.js`
+
+### Post-Class Summary Email
+- `bookings.js` — fires after tutor submits completed report for **any class** (demo + paid)
+- Includes: subject, date, tutor name, homework/notes, next class date, credits remaining (paid only), top-up nudge
+- `emailService.js` → `sendPostClassSummaryEmail()`
+
+### Retention/Re-Enrolment Automation
+- `retention.js` — runs every 4 hours
+- Day 3: soft follow-up email
+- Day 7: second follow-up with urgency
+- Day 14: final email + flags LA for direct call (email to LA with action steps)
+- Auto-marks as renewed when credits topped up (webhook calls `markStudentRenewed()`)
+- Triggered at 3 credits remaining via `bookings.js` report endpoint
+
 ## Priority 1 — Core Platform Gaps
 
 ### 1.1 Student Quizzes (not yet API-driven)

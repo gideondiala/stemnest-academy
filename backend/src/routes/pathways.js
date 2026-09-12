@@ -44,7 +44,7 @@ const logger  = require('../utils/logger');
 const router = express.Router();
 
 const ADMIN_ROLES = ['admin', 'super_admin'];
-const STAFF_ROLES = ['admin', 'super_admin', 'postsales', 'presales'];
+const STAFF_ROLES = ['admin', 'super_admin', 'postsales', 'presales', 'sales'];
 
 /* ══════════════════════════════════════════════
    PUBLIC — no auth required
@@ -62,6 +62,44 @@ router.get('/public', async (req, res, next) => {
        ORDER BY sort_order ASC, name ASC`
     );
     res.json({ success: true, pathways: result.rows });
+  } catch (err) { next(err); }
+});
+
+/* GET /api/pathways/units-by-ids — student dashboard unit name lookup
+   ?ids[]=uuid1&ids[]=uuid2  — returns {units:[{id,unit_number,name},...]} */
+router.get('/units-by-ids', requireAuth, async (req, res, next) => {
+  try {
+    const ids = [].concat(req.query['ids[]'] || req.query.ids || []).filter(Boolean);
+    if (!ids.length) return res.json({ success: true, units: [] });
+    const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
+    const result = await pool.query(
+      `SELECT id, unit_number, name FROM pathway_units WHERE id IN (${placeholders})`,
+      ids
+    );
+    res.json({ success: true, units: result.rows });
+  } catch (err) { next(err); }
+});
+
+/* GET /api/pathways/lesson/:lessonId — fetch single lesson for materials page
+   Accessible to any authenticated user (student, tutor, admin, postsales) */
+router.get('/lesson/:lessonId', requireAuth, async (req, res, next) => {
+  try {
+    const result = await pool.query(
+      `SELECT pl.*,
+              pu.name        AS unit_name,
+              pu.unit_number AS unit_number,
+              pg.grade_number,
+              pg.name        AS grade_name,
+              p.name         AS pathway_name
+       FROM pathway_lessons pl
+       LEFT JOIN pathway_units  pu ON pu.id = pl.unit_id
+       LEFT JOIN pathway_grades pg ON pg.id = pl.grade_id
+       LEFT JOIN pathways       p  ON p.id  = pg.pathway_id
+       WHERE pl.id = $1`,
+      [req.params.lessonId]
+    );
+    if (!result.rows.length) return res.status(404).json({ success: false, error: 'Lesson not found' });
+    res.json({ success: true, lesson: result.rows[0] });
   } catch (err) { next(err); }
 });
 
