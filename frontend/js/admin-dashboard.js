@@ -1465,18 +1465,17 @@ async function _loadStudents() {
     if (!res.ok) return;
     const data = await res.json();
     _allStudents = (data.users || []).map(u => {
-      /* Determine student status */
-      let status = 'demo';
+      /* Determine student status:
+         - discontinued: account deactivated OR credits at -2 (suspended)
+         - paid: has student_profiles record (credits is a number, even 0)
+         - demo: no student_profiles record yet (credits is null)
+      */
+      let status = "demo";
       if (!u.is_active) {
-        status = 'discontinued';
-      } else if (u.credits > 0 || u.credits === 0) {
-        /* Has a student_profiles record with credits — they are a paid student */
-        status = 'paid';
+        status = "discontinued";
+      } else if (u.credits !== null && u.credits !== undefined) {
+        status = u.credits <= -2 ? "discontinued" : "paid";
       }
-      /* If credits are null they've only done a demo */
-      if (u.credits === null || u.credits === undefined) status = 'demo';
-      /* If suspended treat as discontinued for display */
-      if (u.credits !== null && u.credits <= -2) status = 'discontinued';
 
       return {
         id:        u.id,
