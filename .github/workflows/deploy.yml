@@ -41,13 +41,10 @@ jobs:
           script: |
             set -e
             cd /home/ubuntu/stemnest-academy
-            echo Resetting local changes
             git fetch origin main
             git reset --hard origin/main
             git clean -fd
-            echo Installing dependencies
             cd backend
             npm ci --omit=dev
-            npm run migrate
             pm2 reload stemnest-api --update-env
             pm2 status
