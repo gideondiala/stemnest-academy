@@ -38,7 +38,9 @@
 <!-- Meta Pixel Code -->
 <script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window, document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init', '705705174881422');fbq('track', 'PageView');</script>
 <noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=705705174881422&ev=PageView&noscript=1"/></noscript>
-<!-- End Meta Pixel Code --></head>
+<!-- End Meta Pixel Code --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
 <body>
 
 <!-- ═══ NAVBAR ═══ -->
@@ -76,20 +78,20 @@
 <!-- ═══ PAGE HERO ═══ -->
 <div class="page-hero">
   <div class="breadcrumb"><a href="../index.html">Home</a> › Courses &amp; Pathways</div>
-  <h1>Our Programmes 🚀</h1>
+  <h1>Our Programmes</h1>
   <p>Expert 1-on-1 learning — from Career Pathways in Tech to targeted Maths and Sciences support. Every programme is live, personalised, and built for results.</p>
   <div class="hero-stats">
-    <div class="hstat"><div class="hstat-icon hi-b">💻</div>Live 1-on-1 Sessions</div>
-    <div class="hstat"><div class="hstat-icon hi-g">📊</div>Progress Tracked</div>
-    <div class="hstat"><div class="hstat-icon hi-o">🏆</div>UK-Certified Tutors</div>
+    <div class="hstat"><div class="hstat-icon hi-b"><i class="fa-solid fa-laptop-code"></i></div>Live 1-on-1 Sessions</div>
+    <div class="hstat"><div class="hstat-icon hi-g"><i class="fa-solid fa-chart-line"></i></div>Progress Tracked</div>
+    <div class="hstat"><div class="hstat-icon hi-o"><i class="fa-solid fa-trophy"></i></div>UK-Certified Tutors</div>
   </div>
 </div>
 
 <!-- ═══ MAIN CATEGORY TABS ═══ -->
 <div class="filter-bar" style="padding-bottom:0;">
   <div class="filter-tabs" id="categoryTabs" style="gap:6px;">
-    <div class="filter-tab active" data-category="pathways" onclick="switchCategory('pathways')" style="font-size:15px;padding:12px 28px;">🚀 Tech Career Pathways</div>
-    <div class="filter-tab" data-category="courses" onclick="switchCategory('courses')" style="font-size:15px;padding:12px 28px;">📚 Courses</div>
+    <div class="filter-tab active" data-category="pathways" onclick="switchCategory('pathways')" style="font-size:15px;padding:12px 28px;"><i class="fa-solid fa-rocket"></i> Tech Career Pathways</div>
+    <div class="filter-tab" data-category="courses" onclick="switchCategory('courses')" style="font-size:15px;padding:12px 28px;"><i class="fa-solid fa-book-open"></i> Courses</div>
   </div>
 </div>
 
@@ -107,8 +109,8 @@
   <div class="filter-bar" style="border-top:none;padding-top:0;">
     <div class="filter-tabs" id="filterTabs">
       <div class="filter-tab active" data-filter="all">All Courses</div>
-      <div class="filter-tab" data-filter="maths">📐 Maths</div>
-      <div class="filter-tab" data-filter="sciences">🔬 Sciences</div>
+      <div class="filter-tab" data-filter="maths"><i class="fa-solid fa-square-root-variable"></i> Maths</div>
+      <div class="filter-tab" data-filter="sciences"><i class="fa-solid fa-flask"></i> Sciences</div>
     </div>
     <div class="filter-right">
       <span class="course-count">Showing <span class="count-num" id="countNum">0</span> courses</span>
@@ -172,8 +174,8 @@
   <div class="footer-bottom">
     <div class="footer-copy">© 2026 StemNest Academy Ltd. Registered in England & Wales. All rights reserved.</div>
     <div class="footer-badges">
-      <div class="footer-badge">🇬🇧 UK Based</div>
-      <div class="footer-badge">🔒 Safeguarding First</div>
+      <div class="footer-badge"><i class="fa-solid fa-shield-halved"></i> UK Based</div>
+      <div class="footer-badge"><i class="fa-solid fa-lock"></i> Safeguarding First</div>
       <div class="footer-badge">✦ DBS Checked Tutors</div>
     </div>
   </div>
@@ -197,7 +199,7 @@
 <div id="pathwayEnrolOverlay" style="display:none;position:fixed;inset:0;background:rgba(10,20,50,.7);z-index:9999;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;">
   <div style="background:#fff;border-radius:24px;padding:36px 40px;max-width:540px;width:100%;box-shadow:0 24px 80px rgba(0,0,0,.3);position:relative;margin:auto;">
     <button onclick="closePathwayEnrol()" style="position:absolute;top:16px;right:20px;background:none;border:none;font-size:22px;cursor:pointer;color:#718096;">✕</button>
-    <div style="font-family:'Fredoka One',cursive;font-size:24px;color:#1a202c;margin-bottom:4px;">Enrol in Career Pathway 🚀</div>
+    <div style="font-family:'Fredoka One',cursive;font-size:24px;color:#1a202c;margin-bottom:4px;">Enrol in Career Pathway</div>
     <div style="font-size:14px;color:#718096;margin-bottom:20px;">Complete your details to secure your child's place.</div>
     <div id="pathwayEnrolSummary" style="background:#f0f4ff;border-radius:14px;padding:16px 20px;margin-bottom:24px;"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
@@ -255,14 +257,14 @@
       <label style="font-size:12px;font-weight:900;color:#718096;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:8px;">Does your child have a laptop or desktop computer? *</label>
       <div style="display:flex;gap:16px;">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:800;font-size:14px;color:#1a202c;">
-          <input type="radio" name="pe-device" id="pe-device-yes" value="yes" style="width:16px;height:16px;accent-color:#1a56db;"> ✅ Yes
+          <input type="radio" name="pe-device" id="pe-device-yes" value="yes" style="width:16px;height:16px;accent-color:#1a56db;"> Yes
         </label>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:800;font-size:14px;color:#1a202c;">
-          <input type="radio" name="pe-device" id="pe-device-no" value="no" style="width:16px;height:16px;accent-color:#1a56db;"> ❌ No
+          <input type="radio" name="pe-device" id="pe-device-no" value="no" style="width:16px;height:16px;accent-color:#1a56db;"> No
         </label>
       </div>
       <div id="pe-device-warning" style="display:none;margin-top:8px;background:#fff3e0;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:700;color:#e65100;">
-        ⚠️ A laptop or desktop is required for all StemNest classes. Please ensure your child has access to one before enrolling.
+        <i class="fa-solid fa-triangle-exclamation"></i> A laptop or desktop is required for all StemNest classes. Please ensure your child has access to one before enrolling.
       </div>
     </div>
     <div style="margin-bottom:14px;">
@@ -274,15 +276,15 @@
       <textarea id="pe-notes" placeholder="Any specific goals or learning needs..." style="width:100%;min-height:60px;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;resize:vertical;box-sizing:border-box;"></textarea>
     </div>
     <div style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:12px;padding:14px 16px;margin-bottom:20px;font-size:13px;color:#065f46;font-weight:700;">
-      💳 Our team will contact you within 24 hours to arrange payment and schedule your first class. No payment is taken now.
+      <i class="fa-solid fa-credit-card"></i> Our team will contact you within 24 hours to arrange payment and schedule your first class. No payment is taken now.
     </div>
     <button id="pe-submit-btn" onclick="submitPathwayEnrol()"
       style="width:100%;background:#1a56db;color:#fff;border:none;border-radius:14px;padding:16px;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;cursor:pointer;transition:.2s;"
       onmouseover="this.style.background='#1140b0'" onmouseout="this.style.background='#1a56db'">
-      ✅ Request Enrolment →
+      <i class="fa-solid fa-circle-check"></i> Request Enrolment →
     </button>
     <div style="text-align:center;font-size:12px;color:#a0aec0;margin-top:12px;font-weight:700;">
-      🔒 Secure · No payment now · Our team will follow up within 24 hours
+      <i class="fa-solid fa-lock"></i> Secure · No payment now · Our team will follow up within 24 hours
     </div>
   </div>
 </div>
