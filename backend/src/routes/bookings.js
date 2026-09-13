@@ -1234,6 +1234,100 @@ router.post('/:id/report', requireAuth, requireRole('tutor'), async (req, res, n
       [data.outcome, req.params.id, Object.keys(bNotesObj).length > 0 ? JSON.stringify(bNotesObj) : null]
     );
 
+    /* ── Auto-shift on incomplete: move this booking to next learning day
+       and shift all subsequent bookings forward by one slot ── */
+    if (data.outcome === 'incomplete' && booking.student_id && !booking.is_demo) {
+      try {
+        /* Find the student's next learning day after this booking */
+        const nextDayRes = await pool.query(
+          `SELECT id, date, time FROM bookings
+           WHERE student_id = $1
+             AND id != $2
+             AND status = 'scheduled'
+             AND is_demo = FALSE
+             AND (date > $3 OR (date = $3 AND time > $4))
+           ORDER BY date ASC, time ASC
+           LIMIT 1`,
+          [booking.student_id, booking.id, booking.date, booking.time]
+        );
+
+        if (nextDayRes.rows.length) {
+          const nextSlot = nextDayRes.rows[0];
+          const nextDate = nextSlot.date instanceof Date ? nextSlot.date.toISOString().split('T')[0] : String(nextSlot.date).split('T')[0];
+          const nextTime = String(nextSlot.time).replace(/^(\d{2}:\d{2}):\d{2}$/, '$1');
+
+          /* Get the weekly pattern from the student's enrolment */
+          const enrolRes = await pool.query(
+            `SELECT schedule FROM enrolments
+             WHERE student_id = $1 AND status = 'active'
+             ORDER BY created_at DESC LIMIT 1`,
+            [booking.student_id]
+          );
+          const schedule = enrolRes.rows[0]?.schedule || null;
+
+          /* Move the incomplete booking to the next learning day */
+          await pool.query(
+            `UPDATE bookings
+             SET date = $1::date, time = $2::time,
+                 status = 'scheduled',
+                 rescheduled_from = $4::date,
+                 rescheduled_at = NOW()
+             WHERE id = $3`,
+            [nextDate, nextTime, booking.id, booking.date instanceof Date ? booking.date.toISOString().split('T')[0] : String(booking.date).split('T')[0]]
+          );
+
+          /* Shift all subsequent scheduled bookings for this student forward
+             by finding each one and moving it to the next occurrence after itself */
+          if (schedule) {
+            const futureRes = await pool.query(
+              `SELECT id, date, time FROM bookings
+               WHERE student_id = $1
+                 AND id != $2
+                 AND status = 'scheduled'
+                 AND is_demo = FALSE
+                 AND date >= $3
+               ORDER BY date ASC, time ASC`,
+              [booking.student_id, booking.id, nextDate]
+            );
+
+            /* Build schedule weekday/time pairs */
+            const scheduleSlots = Array.isArray(schedule) ? schedule : JSON.parse(schedule);
+
+            /* Shift each booking one slot forward using the schedule pattern */
+            for (const fb of futureRes.rows) {
+              const fbDate = fb.date instanceof Date ? fb.date.toISOString().split('T')[0] : String(fb.date).split('T')[0];
+              const fbTime = String(fb.time).replace(/^(\d{2}:\d{2}):\d{2}$/, '$1');
+              const fbDt   = new Date(fbDate + 'T12:00:00');
+
+              /* Find next occurrence in schedule after this booking's date */
+              let cursor = new Date(fbDt);
+              cursor.setDate(cursor.getDate() + 1);
+              let found = null;
+              for (let d = 0; d < 14; d++) {
+                const dow = cursor.getDay();
+                const slot = scheduleSlots.find(s => Number(s.weekday) === dow);
+                if (slot) { found = { date: cursor.toISOString().split('T')[0], time: slot.time }; break; }
+                cursor.setDate(cursor.getDate() + 1);
+              }
+
+              if (found) {
+                await pool.query(
+                  `UPDATE bookings SET date = $1::date, time = $2::time,
+                   rescheduled_from = $4::date, rescheduled_at = NOW()
+                   WHERE id = $3`,
+                  [found.date, found.time, fb.id, fbDate]
+                );
+              }
+            }
+          }
+
+          logger.info(`[INCOMPLETE-SHIFT] Booking ${booking.id} and ${nextDayRes.rows.length} subsequent bookings shifted forward for student ${booking.student_id}`);
+        }
+      } catch (shiftErr) {
+        logger.warn('[INCOMPLETE-SHIFT] Auto-shift failed (non-fatal):', shiftErr.message);
+      }
+    }
+
     /* Deduct student credit if completed */
     if (data.outcome === 'completed' || data.outcome === 'partially_completed') {
       if (booking.student_id) {
@@ -1809,6 +1903,186 @@ router.delete('/:id', requireAuth, requireRole('admin','super_admin','presales')
     if (!result.rows.length) return res.status(404).json({ success: false, error: 'Booking not found' });
     logger.info(`[DELETE] Booking ${req.params.id} deleted by ${req.user.email}`);
     res.json({ success: true, message: 'Booking deleted' });
+  } catch (err) { next(err); }
+});
+
+/* ══════════════════════════════════════════════════════
+   PUT /api/bookings/:id/move
+   Move a single booking to a new date/time.
+   Supports two modes via body.mode:
+     "next"   — shift to the student's next learning day
+     "custom" — shift to a specific date/time
+   
+   Validation:
+   - Clash check: reject if tutor has another booking at target time
+   - Boundary check (custom only): reject if target time is after
+     the student's next scheduled booking beyond this one
+══════════════════════════════════════════════════════ */
+router.put('/:id/move', requireAuth, requireRole('admin','super_admin','tutor','presales','postsales'), async (req, res, next) => {
+  try {
+    const { mode, date: newDate, time: newTime, reason } = req.body;
+    if (!mode || !['next', 'custom'].includes(mode)) {
+      return res.status(400).json({ success: false, error: 'mode must be "next" or "custom"' });
+    }
+    if (mode === 'custom' && (!newDate || !newTime)) {
+      return res.status(400).json({ success: false, error: 'date and time required for custom mode' });
+    }
+
+    /* Load the booking */
+    const bRes = await pool.query(
+      `SELECT b.*, e.schedule AS enrolment_schedule
+       FROM bookings b
+       LEFT JOIN enrolments e ON e.id = b.enrolment_id
+       WHERE b.id = $1`,
+      [req.params.id]
+    );
+    if (!bRes.rows.length) return res.status(404).json({ success: false, error: 'Booking not found' });
+    const booking = bRes.rows[0];
+
+    if (!['scheduled'].includes(booking.status)) {
+      return res.status(400).json({ success: false, error: 'Only scheduled bookings can be moved' });
+    }
+
+    let targetDate, targetTime;
+
+    if (mode === 'next') {
+      /* Find the student's next scheduled booking after this one */
+      const nextRes = await pool.query(
+        `SELECT date, time FROM bookings
+         WHERE student_id = $1
+           AND id != $2
+           AND status = 'scheduled'
+           AND is_demo = FALSE
+           AND (date > $3 OR (date = $3 AND time > $4))
+         ORDER BY date ASC, time ASC
+         LIMIT 1`,
+        [booking.student_id, booking.id, booking.date, booking.time]
+      );
+      if (!nextRes.rows.length) {
+        return res.status(400).json({ success: false, error: 'No next learning day found for this student' });
+      }
+      const next = nextRes.rows[0];
+      targetDate = next.date instanceof Date ? next.date.toISOString().split('T')[0] : String(next.date).split('T')[0];
+      targetTime = String(next.time).replace(/^(\d{2}:\d{2}):\d{2}$/, '$1');
+    } else {
+      /* Custom mode */
+      targetDate = newDate;
+      targetTime = newTime;
+
+      /* Boundary check: custom target must not be after the student's next booking */
+      const nextRes = await pool.query(
+        `SELECT date, time FROM bookings
+         WHERE student_id = $1
+           AND id != $2
+           AND status = 'scheduled'
+           AND is_demo = FALSE
+           AND (date > $3 OR (date = $3 AND time > $4))
+         ORDER BY date ASC, time ASC
+         LIMIT 1`,
+        [booking.student_id, booking.id, booking.date, booking.time]
+      );
+      if (nextRes.rows.length) {
+        const nextBooking = nextRes.rows[0];
+        const nextDateStr = nextBooking.date instanceof Date ? nextBooking.date.toISOString().split('T')[0] : String(nextBooking.date).split('T')[0];
+        const nextTimeStr = String(nextBooking.time).replace(/^(\d{2}:\d{2}):\d{2}$/, '$1');
+        const targetDT = new Date(targetDate + 'T' + targetTime + ':00');
+        const nextDT   = new Date(nextDateStr  + 'T' + nextTimeStr  + ':00');
+        if (targetDT >= nextDT) {
+          return res.status(400).json({
+            success: false,
+            error: `Custom time cannot be at or after the student's next scheduled class (${nextDateStr} at ${nextTimeStr}). Choose an earlier time.`
+          });
+        }
+      }
+    }
+
+    /* Clash check: does the tutor have another booking at this exact date+time? */
+    const clashRes = await pool.query(
+      `SELECT b.id, u.name AS student_name, b.is_demo
+       FROM bookings b
+       JOIN users u ON u.id = b.student_id
+       WHERE b.tutor_id = $1
+         AND b.id != $2
+         AND b.status = 'scheduled'
+         AND b.date::text = $3
+         AND b.time::text LIKE $4`,
+      [booking.tutor_id, booking.id, targetDate, targetTime + '%']
+    );
+    if (clashRes.rows.length) {
+      const clash = clashRes.rows[0];
+      const type  = clash.is_demo ? 'Demo' : 'Paid';
+      return res.status(409).json({
+        success: false,
+        error: `Time clash — you already have a ${type} class with ${clash.student_name} at ${targetTime} on ${targetDate}. Please choose a different time.`,
+        clash: { date: targetDate, time: targetTime, studentName: clash.student_name, classType: type }
+      });
+    }
+
+    /* Apply the move */
+    const oldDate = booking.date instanceof Date ? booking.date.toISOString().split('T')[0] : String(booking.date).split('T')[0];
+    const oldTime = String(booking.time).replace(/^(\d{2}:\d{2}):\d{2}$/, '$1');
+
+    await pool.query(
+      `UPDATE bookings
+       SET date = $1::date,
+           time = $2::time,
+           rescheduled_from = $3::date,
+           rescheduled_at = NOW(),
+           notes = CASE
+             WHEN notes IS NULL THEN $5::text
+             ELSE (notes::jsonb || $5::jsonb)::text
+           END
+       WHERE id = $4`,
+      [
+        targetDate,
+        targetTime,
+        oldDate,
+        booking.id,
+        JSON.stringify({ rescheduleReason: reason || 'Moved by ' + req.user.role, movedFrom: oldDate + ' ' + oldTime, movedAt: new Date().toISOString() })
+      ]
+    );
+
+    logger.info(`[MOVE] Booking ${booking.id} moved from ${oldDate} ${oldTime} to ${targetDate} ${targetTime} by ${req.user.email}`);
+    res.json({ success: true, booking: { id: booking.id, date: targetDate, time: targetTime } });
+
+  } catch (err) { next(err); }
+});
+
+/* ══════════════════════════════════════════════════════
+   GET /api/bookings/:id/next-learning-day
+   Returns the next learning day for the student in this booking.
+══════════════════════════════════════════════════════ */
+router.get('/:id/next-learning-day', requireAuth, requireRole('admin','super_admin','tutor','presales','postsales'), async (req, res, next) => {
+  try {
+    const bRes = await pool.query('SELECT * FROM bookings WHERE id = $1', [req.params.id]);
+    if (!bRes.rows.length) return res.status(404).json({ success: false, error: 'Booking not found' });
+    const booking = bRes.rows[0];
+
+    if (!booking.student_id) {
+      return res.status(400).json({ success: false, error: 'Booking has no student' });
+    }
+
+    const nextRes = await pool.query(
+      `SELECT id, date, time FROM bookings
+       WHERE student_id = $1
+         AND id != $2
+         AND status = 'scheduled'
+         AND is_demo = FALSE
+         AND (date > $3 OR (date = $3 AND time > $4))
+       ORDER BY date ASC, time ASC
+       LIMIT 1`,
+      [booking.student_id, booking.id, booking.date, booking.time]
+    );
+
+    if (!nextRes.rows.length) {
+      return res.json({ success: true, nextLearningDay: null, message: 'No next learning day found' });
+    }
+
+    const next = nextRes.rows[0];
+    const dateStr = next.date instanceof Date ? next.date.toISOString().split('T')[0] : String(next.date).split('T')[0];
+    const timeStr = String(next.time).replace(/^(\d{2}:\d{2}):\d{2}$/, '$1');
+
+    res.json({ success: true, nextLearningDay: { date: dateStr, time: timeStr, bookingId: next.id } });
   } catch (err) { next(err); }
 });
 

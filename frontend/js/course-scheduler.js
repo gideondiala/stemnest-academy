@@ -590,3 +590,182 @@ function confirmReschedule() {
     if (typeof showToast === 'function') showToast('Could not reschedule — lesson not found or not a recurring booking.', 'error');
   }
 }
+
+/* ══════════════════════════════════════════════════════
+   NEW RESCHEDULE MODAL — API-driven
+   Replaces the old confirmReschedule() for API bookings
+══════════════════════════════════════════════════════ */
+
+var _rescheduleBookingId = null;
+var _rescheduleMode = null;
+
+function openRescheduleModal(bookingId) {
+  _rescheduleBookingId = bookingId;
+  _rescheduleMode = null;
+
+  /* Reset UI */
+  document.querySelectorAll('input[name="reschedule-mode"]').forEach(r => r.checked = false);
+  var customFields = document.getElementById('reschedule-custom-fields');
+  if (customFields) customFields.style.display = 'none';
+  var clashErr = document.getElementById('reschedule-clash-error');
+  if (clashErr) clashErr.style.display = 'none';
+  var reasonEl = document.getElementById('reschedule-reason');
+  if (reasonEl) reasonEl.value = '';
+  ['reschedule-opt-next-label','reschedule-opt-custom-label'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.style.borderColor = '#e8eaf0';
+  });
+
+  /* Find booking details */
+  var all = window.TUTOR_DATA && window.TUTOR_DATA.bookings ? window.TUTOR_DATA.bookings : (getAllBookings ? getAllBookings() : []);
+  var booking = all.find(function(b) { return b.id === bookingId; });
+
+  var infoEl = document.getElementById('reschedule-lesson-info');
+  if (infoEl && booking) {
+    var lessonLabel = booking.lessonNumber ? 'Lesson ' + booking.lessonNumber + (booking.totalLessons ? ' of ' + booking.totalLessons : '') : '';
+    infoEl.innerHTML =
+      '<strong>' + (booking.studentName || '—') + '</strong>' +
+      (lessonLabel ? ' &nbsp;·&nbsp; ' + lessonLabel : '') +
+      '<br>' + (booking.date || '—') + ' at ' + ((booking.time || '—').replace(/^(\d{1,2}:\d{2}):\d{2}$/, '$1')) +
+      '<br><span style="color:var(--mid);">' + (booking.subject || '') + (booking.lessonName ? ' — ' + booking.lessonName : '') + '</span>';
+  }
+
+  /* Fetch next learning day to show in hint */
+  var token = localStorage.getItem('sn_access_token');
+  if (token && bookingId && bookingId.length > 20) {
+    fetch('https://api.stemnestacademy.co.uk/api/bookings/' + bookingId + '/next-learning-day', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    }).then(function(r) { return r.json(); }).then(function(d) {
+      var hintEl = document.getElementById('reschedule-next-day-hint');
+      if (hintEl && d.success && d.nextLearningDay) {
+        var nd = d.nextLearningDay;
+        var dateDisplay = new Date(nd.date + 'T12:00:00').toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
+        hintEl.textContent = 'Moves to: ' + dateDisplay + ' at ' + nd.time;
+      } else if (hintEl) {
+        hintEl.textContent = 'No next learning day found';
+      }
+    }).catch(function() {});
+  }
+
+  /* Set min date on custom date picker to today */
+  var dateEl = document.getElementById('reschedule-custom-date');
+  if (dateEl) dateEl.min = new Date().toISOString().split('T')[0];
+
+  var overlay = document.getElementById('rescheduleModalOverlay');
+  if (overlay) overlay.classList.add('open');
+}
+
+function selectRescheduleOption(mode) {
+  _rescheduleMode = mode;
+  var customFields = document.getElementById('reschedule-custom-fields');
+  var clashErr = document.getElementById('reschedule-clash-error');
+
+  /* Highlight selected option */
+  ['next', 'custom'].forEach(function(m) {
+    var label = document.getElementById('reschedule-opt-' + m + '-label');
+    if (label) label.style.borderColor = m === mode ? 'var(--blue)' : '#e8eaf0';
+  });
+
+  if (mode === 'custom') {
+    if (customFields) customFields.style.display = 'block';
+  } else {
+    if (customFields) customFields.style.display = 'none';
+    if (clashErr) clashErr.style.display = 'none';
+  }
+}
+
+function closeRescheduleModal() {
+  var overlay = document.getElementById('rescheduleModalOverlay');
+  if (overlay) overlay.classList.remove('open');
+  _rescheduleBookingId = null;
+  _rescheduleMode = null;
+}
+
+async function confirmRescheduleNew() {
+  if (!_rescheduleBookingId) return;
+
+  if (!_rescheduleMode) {
+    if (typeof showToast === 'function') showToast('Please select a reschedule option.', 'error');
+    return;
+  }
+
+  var reason = document.getElementById('reschedule-reason') ? document.getElementById('reschedule-reason').value.trim() : '';
+  if (!reason) {
+    if (typeof showToast === 'function') showToast('Please enter a reason for rescheduling.', 'error');
+    return;
+  }
+
+  var payload = { mode: _rescheduleMode, reason: reason };
+
+  if (_rescheduleMode === 'custom') {
+    var customDate = document.getElementById('reschedule-custom-date') ? document.getElementById('reschedule-custom-date').value : '';
+    var customTime = document.getElementById('reschedule-custom-time') ? document.getElementById('reschedule-custom-time').value : '';
+    if (!customDate || !customTime) {
+      if (typeof showToast === 'function') showToast('Please select both a date and time.', 'error');
+      return;
+    }
+    payload.date = customDate;
+    payload.time = customTime;
+  }
+
+  /* Disable button during request */
+  var btn = document.getElementById('reschedule-confirm-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Rescheduling…'; }
+
+  var token = localStorage.getItem('sn_access_token');
+
+  /* Try API first (for real DB bookings) */
+  if (token && _rescheduleBookingId.length > 20) {
+    try {
+      var res = await fetch('https://api.stemnestacademy.co.uk/api/bookings/' + _rescheduleBookingId + '/move', {
+        method: 'PUT',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      var data = await res.json();
+
+      if (btn) { btn.disabled = false; btn.textContent = 'Confirm Reschedule'; }
+
+      if (!data.success) {
+        /* Show clash error inline */
+        var clashErr = document.getElementById('reschedule-clash-error');
+        if (clashErr) {
+          clashErr.textContent = data.error || 'Could not reschedule';
+          clashErr.style.display = 'block';
+        } else {
+          if (typeof showToast === 'function') showToast(data.error || 'Could not reschedule', 'error');
+        }
+        return;
+      }
+
+      closeRescheduleModal();
+      if (typeof showToast === 'function') showToast('Class rescheduled successfully.', 'success');
+
+      /* Refresh dashboard data */
+      if (typeof _loadTutorFromAPI === 'function') {
+        _loadTutorFromAPI().then(function() {
+          if (typeof renderWeeklyCalendar === 'function') renderWeeklyCalendar();
+          if (typeof renderUpcomingCards   === 'function') renderUpcomingCards();
+          if (typeof renderSessionsTab     === 'function') renderSessionsTab();
+        });
+      }
+      return;
+
+    } catch (err) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Confirm Reschedule'; }
+      if (typeof showToast === 'function') showToast('Network error — please try again.', 'error');
+      return;
+    }
+  }
+
+  /* Fallback: local reschedule for non-API bookings */
+  if (btn) { btn.disabled = false; btn.textContent = 'Confirm Reschedule'; }
+  var success = typeof rescheduleLessonAndShift === 'function' ? rescheduleLessonAndShift(_rescheduleBookingId, reason) : false;
+  closeRescheduleModal();
+  if (success) {
+    if (typeof showToast === 'function') showToast('Class rescheduled.', 'success');
+    if (typeof renderWeeklyCalendar === 'function') renderWeeklyCalendar();
+  } else {
+    if (typeof showToast === 'function') showToast('Could not reschedule this booking.', 'error');
+  }
+}
