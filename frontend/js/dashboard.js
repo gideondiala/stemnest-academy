@@ -783,7 +783,7 @@ function showBookingPopup(bookingId) {
             : `<button onclick="showToast('No class link set yet. Contact admin.','error')" style="background:var(--blue);color:#fff;border:none;border-radius:12px;padding:12px;font-weight:900;font-size:13px;cursor:pointer;width:100%;">🚀 Join Class</button>`}
           <button onclick="document.getElementById('calBookingPopup').remove();openEndClassModal('${b.id}')" style="background:var(--green);color:#fff;border:none;border-radius:12px;padding:12px;font-family:'Nunito',sans-serif;font-weight:900;font-size:13px;cursor:pointer;">✅ End Class</button>
         </div>
-        <button onclick="document.getElementById('calBookingPopup').remove();openRescheduleModal && openRescheduleModal('${b.id}')" style="width:100%;background:var(--bg);border:1.5px solid var(--blue);border-radius:12px;padding:10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;color:var(--blue);margin-bottom:10px;">🔄 Reschedule Class</button>
+        <button onclick="document.getElementById('calBookingPopup').remove(); setTimeout(function(){ openRescheduleModal('${b.id}'); }, 50)" style="width:100%;background:var(--bg);border:1.5px solid var(--blue);border-radius:12px;padding:10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;color:var(--blue);margin-bottom:10px;">🔄 Reschedule Class</button>
         <button onclick="document.getElementById('calBookingPopup').remove()" style="width:100%;background:var(--bg);border:1.5px solid #e8eaf0;border-radius:12px;padding:10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;cursor:pointer;color:var(--mid);">Close</button>
       </div>`;
   }
