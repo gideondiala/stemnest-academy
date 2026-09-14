@@ -276,6 +276,61 @@
       <div id="promotionsList"></div>
     </div>
 
+    <!-- ── TAB: BATCHES ── -->
+    <div id="tab-batches" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">👥 Group Batches</div>
+        <button class="btn btn-outline" style="font-size:13px;" onclick="loadBatches()">🔄 Refresh</button>
+      </div>
+      <div id="batchesList">
+        <div style="text-align:center;padding:40px;color:var(--light);font-weight:700;">Loading batches…</div>
+      </div>
+    </div>
+
+    <!-- ── BATCH TRANSFER MODAL ── -->
+    <div class="modal-overlay" id="batchTransferOverlay">
+      <div class="modal" style="max-width:560px;">
+        <div class="modal-header">
+          <div class="modal-title">🔄 Transfer Batch</div>
+          <button class="modal-close" onclick="closeBatchTransfer()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div id="batchTransferInfo" style="background:var(--bg);border-radius:12px;padding:14px;margin-bottom:20px;font-size:13px;font-weight:700;color:var(--dark);line-height:1.8;"></div>
+
+          <div class="field">
+            <label>New Tutor <span style="color:var(--orange);">*</span></label>
+            <select id="batchTransferTutor" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
+              <option value="">— Keep current tutor —</option>
+            </select>
+          </div>
+
+          <div class="field" style="margin-top:14px;">
+            <label>Transfer From Date <span style="color:var(--orange);">*</span></label>
+            <input type="date" id="batchTransferDate" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
+            <div style="font-size:11px;color:var(--light);margin-top:4px;font-weight:700;">All bookings from this date onwards will be moved to the new schedule</div>
+          </div>
+
+          <div class="field" style="margin-top:14px;">
+            <label>New Schedule <span style="color:var(--orange);">*</span></label>
+            <div id="batchTransferScheduleRows"></div>
+            <button type="button" onclick="addBatchScheduleRow()" style="background:var(--bg);color:var(--blue);border:2px dashed var(--blue);border-radius:10px;padding:8px 16px;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;width:100%;margin-top:8px;">+ Add Day</button>
+          </div>
+
+          <div class="field" style="margin-top:14px;">
+            <label>Google Meet Link <span style="font-size:11px;color:var(--light);font-weight:600;">(leave blank to keep existing)</span></label>
+            <input type="url" id="batchTransferLink" placeholder="https://meet.google.com/... (optional)" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
+          </div>
+
+          <div id="batchTransferError" style="display:none;margin-top:12px;background:#fde8e8;border-radius:10px;padding:12px 14px;font-size:13px;font-weight:700;color:#c53030;"></div>
+
+          <div class="modal-footer" style="margin-top:20px;">
+            <button class="btn btn-outline" onclick="closeBatchTransfer()">Cancel</button>
+            <button class="btn btn-primary" id="batchTransferBtn" onclick="confirmBatchTransfer()">Confirm Transfer ✦</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div><!-- end dash-main -->
 </div><!-- end dash-wrap -->
 

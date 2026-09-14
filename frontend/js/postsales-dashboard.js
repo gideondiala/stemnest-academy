@@ -3522,3 +3522,246 @@ async function confirmBatchReschedule() {
     if (btn) { btn.disabled = false; btn.textContent = '🔄 Apply New Schedule'; }
   }
 }
+
+/* ══════════════════════════════════════════════════════
+   BATCHES TAB — Load, display, and transfer batches
+══════════════════════════════════════════════════════ */
+
+var _activeBatchId = null;
+var _batchScheduleRowCount = 0;
+
+async function loadBatches() {
+  const el = document.getElementById('batchesList');
+  if (!el) return;
+  el.innerHTML = '<div style="text-align:center;padding:32px;color:var(--light);font-weight:700;">Loading…</div>';
+
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/batches', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    if (!data.success) { el.innerHTML = '<div style="color:#c53030;padding:20px;font-weight:700;">Failed to load batches</div>'; return; }
+
+    const batches = data.batches || [];
+    if (!batches.length) {
+      el.innerHTML = '<div style="text-align:center;padding:48px 20px;"><div style="font-size:48px;margin-bottom:12px;">👥</div><div style="font-family:\'Fredoka One\',cursive;font-size:20px;color:var(--dark);">No batches yet</div></div>';
+      return;
+    }
+
+    const statusColor = { active: '#065f46', paused: '#e65100', closed: '#c53030' };
+    const statusBg    = { active: '#d1fae5', paused: '#fff3e0', closed: '#fde8e8' };
+
+    el.innerHTML = '<div class="admin-table-wrap"><table class="admin-table"><thead><tr>' +
+      '<th>Batch ID</th><th>Tutor</th><th>Pathway/Grade</th><th>Schedule</th>' +
+      '<th>Members</th><th>Next Class</th><th>Status</th><th>Actions</th>' +
+      '</tr></thead><tbody>' +
+      batches.map(function(b) {
+        var schedArr = [];
+        try { schedArr = typeof b.schedule === 'string' ? JSON.parse(b.schedule) : (b.schedule || []); } catch(e) {}
+        var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+        var schedText = schedArr.map(function(s) { return days[s.weekday] + ' ' + s.time; }).join(', ');
+        var nextDate = b.nextClassDate ? new Date(b.nextClassDate).toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' }) : '—';
+        var statusLabel = (b.status || 'active').charAt(0).toUpperCase() + (b.status || 'active').slice(1);
+        var st = b.status || 'active';
+        return '<tr>' +
+          '<td><strong style="color:var(--blue);font-family:\'Fredoka One\',cursive;">' + (b.batchRef || b.batch_ref || '—') + '</strong></td>' +
+          '<td>' + (b.tutorName || '—') + '</td>' +
+          '<td>' + (b.pathwayName || '—') + (b.gradeNumber ? ' · Grade ' + b.gradeNumber : '') + '</td>' +
+          '<td style="font-size:12px;">' + (schedText || '—') + '</td>' +
+          '<td style="text-align:center;">' + (b.memberCount || 0) + '</td>' +
+          '<td style="font-size:12px;">' + nextDate + '</td>' +
+          '<td><span style="background:' + (statusBg[st]||'#e8eaf0') + ';color:' + (statusColor[st]||'#4a5568') + ';font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">' + statusLabel + '</span></td>' +
+          '<td><button class="ab-btn ab-btn-view" onclick="openBatchTransfer(\'' + b.id + '\')" style="white-space:nowrap;">🔄 Transfer</button></td>' +
+          '</tr>';
+      }).join('') +
+      '</tbody></table></div>';
+
+  } catch(e) {
+    el.innerHTML = '<div style="color:#c53030;padding:20px;font-weight:700;">Error: ' + e.message + '</div>';
+  }
+}
+
+async function openBatchTransfer(batchId) {
+  _activeBatchId = batchId;
+  _batchScheduleRowCount = 0;
+
+  /* Reset form */
+  const errEl = document.getElementById('batchTransferError');
+  if (errEl) errEl.style.display = 'none';
+  const linkEl = document.getElementById('batchTransferLink');
+  if (linkEl) linkEl.value = '';
+
+  /* Set min date to today */
+  const dateEl = document.getElementById('batchTransferDate');
+  if (dateEl) dateEl.value = new Date().toISOString().split('T')[0];
+
+  /* Load batch details */
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/batches/' + batchId, {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    if (!data.success) return;
+
+    const batch   = data.batch;
+    const members = data.members || [];
+
+    /* Fill info box */
+    const infoEl = document.getElementById('batchTransferInfo');
+    if (infoEl) {
+      var schedArr = [];
+      try { schedArr = typeof batch.schedule === 'string' ? JSON.parse(batch.schedule) : (batch.schedule || []); } catch(e) {}
+      var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      var schedText = schedArr.map(function(s) { return days[s.weekday] + ' ' + s.time; }).join(', ');
+      var memberNames = members.filter(function(m) { return m.status === 'active'; }).map(function(m) { return m.studentName; }).join(', ');
+      infoEl.innerHTML =
+        '<strong>' + (batch.batch_ref || '—') + '</strong>' +
+        ' &nbsp;·&nbsp; Current tutor: <strong>' + (batch.tutorName || '—') + '</strong>' +
+        '<br>Students: ' + (memberNames || '—') +
+        '<br>Current schedule: ' + (schedText || '—') +
+        (batch.class_link ? '<br>Current link: <a href="' + batch.class_link + '" target="_blank" style="color:var(--blue);font-size:11px;">' + batch.class_link.substring(0, 50) + '…</a>' : '');
+    }
+
+    /* Populate tutor dropdown */
+    const tutorSel = document.getElementById('batchTransferTutor');
+    if (tutorSel) {
+      tutorSel.innerHTML = '<option value="">— Keep current tutor (' + (batch.tutorName || '—') + ') —</option>';
+      const tutorRes = await fetch('https://api.stemnestacademy.co.uk/api/users?role=tutor', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      const tutorData = await tutorRes.json();
+      (tutorData.users || []).forEach(function(t) {
+        if (t.id !== batch.tutor_id) {
+          tutorSel.innerHTML += '<option value="' + t.id + '">' + t.name + ' (' + (t.staff_id || t.id.substring(0,8)) + ')</option>';
+        }
+      });
+    }
+
+    /* Pre-fill schedule rows from current schedule */
+    _batchScheduleRowCount = 0;
+    const rowsEl = document.getElementById('batchTransferScheduleRows');
+    if (rowsEl) {
+      rowsEl.innerHTML = '';
+      if (schedArr.length) {
+        schedArr.forEach(function(s) { addBatchScheduleRow(s.weekday, s.time); });
+      } else {
+        addBatchScheduleRow();
+      }
+    }
+
+  } catch(e) {
+    console.error('openBatchTransfer error:', e);
+  }
+
+  const overlay = document.getElementById('batchTransferOverlay');
+  if (overlay) overlay.classList.add('open');
+}
+
+function addBatchScheduleRow(weekday, time) {
+  var rowsEl = document.getElementById('batchTransferScheduleRows');
+  if (!rowsEl) return;
+  var idx = _batchScheduleRowCount++;
+  var days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var row = document.createElement('div');
+  row.id = 'batchSchedRow-' + idx;
+  row.style.cssText = 'display:flex;gap:10px;align-items:center;margin-bottom:8px;';
+  row.innerHTML =
+    '<select id="batchSchedDay-' + idx + '" style="flex:1;padding:10px 12px;border:2px solid #e8eaf0;border-radius:10px;font-family:\'Nunito\',sans-serif;font-size:14px;outline:none;">' +
+    days.map(function(d, i) { return '<option value="' + i + '"' + (weekday !== undefined && weekday === i ? ' selected' : '') + '>' + d + '</option>'; }).join('') +
+    '</select>' +
+    '<input type="time" id="batchSchedTime-' + idx + '" value="' + (time || '16:00') + '" style="flex:1;padding:10px 12px;border:2px solid #e8eaf0;border-radius:10px;font-family:\'Nunito\',sans-serif;font-size:14px;outline:none;">' +
+    (idx > 0 ? '<button type="button" onclick="document.getElementById(\'batchSchedRow-' + idx + '\').remove()" style="background:#fde8e8;color:#c53030;border:none;border-radius:8px;padding:8px 10px;font-size:16px;cursor:pointer;font-weight:900;">×</button>' : '<div style="width:38px;"></div>');
+  rowsEl.appendChild(row);
+}
+
+function closeBatchTransfer() {
+  const overlay = document.getElementById('batchTransferOverlay');
+  if (overlay) overlay.classList.remove('open');
+  _activeBatchId = null;
+}
+
+async function confirmBatchTransfer() {
+  if (!_activeBatchId) return;
+
+  const startDate = document.getElementById('batchTransferDate')?.value;
+  if (!startDate) { showBatchTransferError('Please select a start date.'); return; }
+
+  /* Collect schedule */
+  const schedule = [];
+  var i = 0;
+  while (document.getElementById('batchSchedDay-' + i) || document.getElementById('batchSchedRow-' + i)) {
+    var dayEl  = document.getElementById('batchSchedDay-' + i);
+    var timeEl = document.getElementById('batchSchedTime-' + i);
+    if (dayEl && timeEl && timeEl.value) {
+      schedule.push({ weekday: parseInt(dayEl.value), time: timeEl.value });
+    }
+    i++;
+    if (i > 10) break;
+  }
+  if (!schedule.length) { showBatchTransferError('Please set at least one day and time.'); return; }
+
+  const newTutorId = document.getElementById('batchTransferTutor')?.value || null;
+  const classLink  = document.getElementById('batchTransferLink')?.value.trim() || null;
+
+  const btn = document.getElementById('batchTransferBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Transferring…'; }
+
+  const errEl = document.getElementById('batchTransferError');
+  if (errEl) errEl.style.display = 'none';
+
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const payload = { startDate, schedule };
+    if (newTutorId) payload.newTutorId = newTutorId;
+    if (classLink)  payload.classLink  = classLink;
+
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/batches/' + _activeBatchId + '/reschedule', {
+      method: 'PUT',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+
+    if (btn) { btn.disabled = false; btn.textContent = 'Confirm Transfer ✦'; }
+
+    if (!data.success) {
+      showBatchTransferError(data.error || 'Transfer failed. Please try again.');
+      return;
+    }
+
+    closeBatchTransfer();
+    if (typeof showToast === 'function') {
+      showToast('✅ ' + (data.batchRef || 'Batch') + ' transferred. ' + data.created + ' bookings created.', 'success');
+    }
+    loadBatches();
+
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Confirm Transfer ✦'; }
+    showBatchTransferError('Network error — please try again.');
+  }
+}
+
+function showBatchTransferError(msg) {
+  const el = document.getElementById('batchTransferError');
+  if (el) { el.textContent = msg; el.style.display = 'block'; }
+}
+
+/* Hook into tab switch */
+(function() {
+  var _prevShowPOSTab = window.showPOSTab;
+  if (typeof _prevShowPOSTab === 'function') {
+    window.showPOSTab = function(tab) {
+      _prevShowPOSTab(tab);
+      if (tab === 'batches') loadBatches();
+    };
+  }
+  /* Also bind modal close on overlay click */
+  document.addEventListener('DOMContentLoaded', function() {
+    var overlay = document.getElementById('batchTransferOverlay');
+    if (overlay) overlay.addEventListener('click', function(e) {
+      if (e.target === overlay) closeBatchTransfer();
+    });
+  });
+})();

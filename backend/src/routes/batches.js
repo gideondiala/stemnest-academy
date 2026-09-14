@@ -348,7 +348,7 @@ router.delete('/:id/members/:studentId', requireAuth, requireRole('admin','super
 ══════════════════════════════════════════════ */
 router.put('/:id/reschedule', requireAuth, requireRole('admin','super_admin','postsales'), async (req, res, next) => {
   try {
-    const { startDate, schedule, classLink } = req.body;
+    const { startDate, schedule, classLink, newTutorId } = req.body;
 
     if (!startDate)                                     return res.status(400).json({ success: false, error: 'startDate required' });
     if (!Array.isArray(schedule) || !schedule.length)   return res.status(400).json({ success: false, error: 'schedule required (array of {weekday,time})' });
@@ -362,8 +362,15 @@ router.put('/:id/reschedule', requireAuth, requireRole('admin','super_admin','po
     const batch = batchRes.rows[0];
     if (batch.status === 'closed')   return res.status(400).json({ success: false, error: 'Batch is closed and cannot be rescheduled' });
 
-    const tutorId   = batch.tutor_id;
-    const tutorName = batch.tutor_name;
+    /* If newTutorId provided, use the new tutor; otherwise keep existing */
+    let tutorId   = batch.tutor_id;
+    let tutorName = batch.tutor_name;
+    if (newTutorId && newTutorId !== batch.tutor_id) {
+      const newTutorRes = await pool.query('SELECT id, name FROM users WHERE id = $1 AND role = $2', [newTutorId, 'tutor']);
+      if (!newTutorRes.rows.length) return res.status(404).json({ success: false, error: 'New tutor not found' });
+      tutorId   = newTutorRes.rows[0].id;
+      tutorName = newTutorRes.rows[0].name;
+    }
     const resolvedLink = classLink || batch.class_link || '';
 
     /* ── Clash detection: check new schedule against tutor's other bookings ──
@@ -487,8 +494,8 @@ router.put('/:id/reschedule', requireAuth, requireRole('admin','super_admin','po
 
     /* ── Update batch record with new schedule and class link ── */
     await pool.query(
-      `UPDATE batches SET schedule = $1, class_link = $2, updated_at = NOW() WHERE id = $3`,
-      [JSON.stringify(schedule), resolvedLink, req.params.id]
+      `UPDATE batches SET schedule = $1, class_link = $2, tutor_id = $3, updated_at = NOW() WHERE id = $4`,
+      [JSON.stringify(schedule), resolvedLink, tutorId, req.params.id]
     );
 
     logger.info(`[BATCH RESCHEDULE] ${batch.batch_ref}: cancelled ${totalToReschedule}, created ${createdIds.length} from ${startDate}`);
