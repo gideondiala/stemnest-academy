@@ -552,8 +552,12 @@ function openRescheduleModal(bookingId) {
         var nd = d.nextLearningDay;
         var dateDisplay = new Date(nd.date + 'T12:00:00').toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
         hintEl.textContent = 'Moves to: ' + dateDisplay + ' at ' + nd.time;
+        hintEl.style.color = '';
+        var cb2 = document.getElementById('reschedule-confirm-btn'); if (cb2) cb2.disabled = false;
       } else if (hintEl) {
-        hintEl.textContent = 'No next learning day found';
+        hintEl.textContent = 'No next learning day found — use Custom Date & Time instead.';
+        hintEl.style.color = '#c53030';
+        var cb = document.getElementById('reschedule-confirm-btn'); if (cb) cb.disabled = true;
       }
     }).catch(function() {});
   }
@@ -644,6 +648,7 @@ async function confirmRescheduleNew() {
           clashErr.textContent = data.error || 'Could not reschedule';
           clashErr.style.display = 'block';
         } else {
+        if (typeof showToast === 'function') showToast(data.error || 'Could not reschedule', 'error');
           if (typeof showToast === 'function') showToast(data.error || 'Could not reschedule', 'error');
         }
         return;
