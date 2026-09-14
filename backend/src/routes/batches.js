@@ -22,11 +22,13 @@ const router = express.Router();
 
 /* ── Helper: generate next batch_ref e.g. BATCH-001 ── */
 async function generateBatchRef() {
+  /* Use MAX to find the highest existing batch number.
+     This ensures numbering continues correctly even after deletions. */
   const result = await pool.query(
-    `SELECT batch_ref FROM batches ORDER BY created_at DESC LIMIT 1`
+    `SELECT batch_ref FROM batches ORDER BY CAST(REPLACE(batch_ref, 'BATCH-', '') AS INTEGER) DESC LIMIT 1`
   );
   if (!result.rows.length) return 'BATCH-001';
-  const last = result.rows[0].batch_ref; // e.g. BATCH-007
+  const last = result.rows[0].batch_ref; // e.g. BATCH-004
   const num  = parseInt(last.replace('BATCH-', '')) + 1;
   return 'BATCH-' + String(num).padStart(3, '0');
 }
@@ -157,14 +159,11 @@ router.get('/', requireAuth, requireRole('admin','super_admin','postsales'), asy
         b.grade_number AS "gradeNumber", b.schedule, b.created_at AS "createdAt",
         u_t.name   AS "tutorName",   u_t.id AS "tutorId",
         p.name     AS "pathwayName",
-        COUNT(bm.id) FILTER (WHERE bm.status = 'active') AS "memberCount",
-        MIN(bk.date) FILTER (WHERE bk.status = 'scheduled' AND bk.date >= CURRENT_DATE) AS "nextClassDate"
+        (SELECT COUNT(*) FROM batch_members WHERE batch_id = b.id AND status = 'active') AS "memberCount",
+        (SELECT MIN(date) FROM bookings WHERE batch_id = b.id AND status = 'scheduled' AND date >= CURRENT_DATE) AS "nextClassDate"
       FROM batches b
-      LEFT JOIN users u_t         ON u_t.id  = b.tutor_id
-      LEFT JOIN pathways p         ON p.id    = b.pathway_id
-      LEFT JOIN batch_members bm   ON bm.batch_id = b.id
-      LEFT JOIN bookings bk        ON bk.batch_id = b.id
-      GROUP BY b.id, u_t.name, u_t.id, p.name
+      LEFT JOIN users u_t ON u_t.id = b.tutor_id
+      LEFT JOIN pathways p ON p.id  = b.pathway_id
       ORDER BY b.created_at DESC
     `);
     res.json({ success: true, batches: result.rows });
@@ -506,6 +505,43 @@ router.put('/:id/reschedule', requireAuth, requireRole('admin','super_admin','po
       cancelled: totalToReschedule,
       created: createdIds.length,
       newSchedule: schedule,
+    });
+  } catch (err) { next(err); }
+});
+
+/* ══════════════════════════════════════════════
+   DELETE /api/batches/:id
+   Deletes a batch and all its future scheduled bookings.
+   Past/completed bookings are kept for records.
+   Batch numbering continues from highest remaining number.
+══════════════════════════════════════════════ */
+router.delete('/:id', requireAuth, requireRole('admin','super_admin','postsales'), async (req, res, next) => {
+  try {
+    /* Verify batch exists */
+    const batchRes = await pool.query('SELECT id, batch_ref FROM batches WHERE id = $1', [req.params.id]);
+    if (!batchRes.rows.length) return res.status(404).json({ success: false, error: 'Batch not found' });
+    const batch = batchRes.rows[0];
+
+    /* Cancel all future scheduled bookings for this batch */
+    const cancelRes = await pool.query(
+      `UPDATE bookings SET status = 'cancelled'
+       WHERE batch_id = $1 AND status = 'scheduled' AND date >= CURRENT_DATE
+       RETURNING id`,
+      [req.params.id]
+    );
+
+    /* Remove batch members */
+    await pool.query('DELETE FROM batch_members WHERE batch_id = $1', [req.params.id]);
+
+    /* Delete the batch record */
+    await pool.query('DELETE FROM batches WHERE id = $1', [req.params.id]);
+
+    logger.info(`[BATCH DELETE] ${batch.batch_ref} deleted by ${req.user.email}. ${cancelRes.rows.length} future bookings cancelled.`);
+
+    res.json({
+      success: true,
+      message: `Batch ${batch.batch_ref} deleted successfully`,
+      cancelledBookings: cancelRes.rows.length,
     });
   } catch (err) { next(err); }
 });

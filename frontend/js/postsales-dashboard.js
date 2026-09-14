@@ -3572,7 +3572,10 @@ async function loadBatches() {
           '<td style="text-align:center;">' + (b.memberCount || 0) + '</td>' +
           '<td style="font-size:12px;">' + nextDate + '</td>' +
           '<td><span style="background:' + (statusBg[st]||'#e8eaf0') + ';color:' + (statusColor[st]||'#4a5568') + ';font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">' + statusLabel + '</span></td>' +
-          '<td><button class="ab-btn ab-btn-view" onclick="openBatchTransfer(\'' + b.id + '\')" style="white-space:nowrap;">🔄 Transfer</button></td>' +
+          '<td style="display:flex;gap:6px;flex-wrap:wrap;">' +
+            '<button class="ab-btn ab-btn-view" onclick="openBatchTransfer(\'' + b.id + '\')" style="white-space:nowrap;">🔄 Transfer</button>' +
+            '<button class="ab-btn" style="background:#fde8e8;color:#c53030;white-space:nowrap;" onclick="deleteBatch(\'' + b.id + '\',\'' + (b.batchRef||b.batch_ref||'') + '\')">🗑 Delete</button>' +
+          '</td>' +
           '</tr>';
       }).join('') +
       '</tbody></table></div>';
@@ -3746,6 +3749,23 @@ async function confirmBatchTransfer() {
 function showBatchTransferError(msg) {
   const el = document.getElementById('batchTransferError');
   if (el) { el.textContent = msg; el.style.display = 'block'; }
+}
+
+async function deleteBatch(batchId, batchRef) {
+  if (!confirm('Delete ' + batchRef + '? This will cancel all future classes for this batch and cannot be undone.')) return;
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/batches/' + batchId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    if (!data.success) { showToast(data.error || 'Delete failed', 'error'); return; }
+    showToast('✅ ' + batchRef + ' deleted. ' + (data.cancelledBookings || 0) + ' future bookings cancelled.', 'success');
+    loadBatches();
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  }
 }
 
 /* Hook into tab switch */
