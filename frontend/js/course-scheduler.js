@@ -642,15 +642,15 @@ async function confirmRescheduleNew() {
       if (btn) { btn.disabled = false; btn.textContent = 'Confirm Reschedule'; }
 
       if (!data.success) {
-        /* Show clash error inline */
+        /* Show error — visible for both 'next' and 'custom' modes */
         var clashErr = document.getElementById('reschedule-clash-error');
         if (clashErr) {
           clashErr.textContent = data.error || 'Could not reschedule';
           clashErr.style.display = 'block';
-        } else {
-        if (typeof showToast === 'function') showToast(data.error || 'Could not reschedule', 'error');
-          if (typeof showToast === 'function') showToast(data.error || 'Could not reschedule', 'error');
         }
+        if (typeof showToast === 'function') showToast(data.error || 'Could not reschedule', 'error');
+        return;
+      }
         return;
       }
 
