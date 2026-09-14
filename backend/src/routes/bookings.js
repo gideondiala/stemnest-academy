@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Bookings routes
  * GET    /api/bookings              â€” list (filtered by role)
  * POST   /api/bookings              â€” create demo booking (public)
@@ -1943,7 +1943,7 @@ router.put('/:id/move', requireAuth, requireRole('admin','super_admin','tutor','
       return res.status(400).json({ success: false, error: 'Only scheduled bookings can be moved' });
     }
 
-    let targetDate, targetTime;
+    let targetDate, targetTime, nextBookingId = null;
 
     if (mode === 'next') {
       /* Find the student's next scheduled booking after this one */
@@ -1964,6 +1964,7 @@ router.put('/:id/move', requireAuth, requireRole('admin','super_admin','tutor','
       const next = nextRes.rows[0];
       targetDate = next.date instanceof Date ? next.date.toISOString().split('T')[0] : String(next.date).split('T')[0];
       targetTime = String(next.time).replace(/^(\d{2}:\d{2}):\d{2}$/, '$1');
+      nextBookingId = next.id;
     } else {
       /* Custom mode */
       targetDate = newDate;
@@ -2003,10 +2004,11 @@ router.put('/:id/move', requireAuth, requireRole('admin','super_admin','tutor','
        JOIN users u ON u.id = b.student_id
        WHERE b.tutor_id = $1
          AND b.id != $2
+         AND ($5 IS NULL OR b.id != $5)
          AND b.status = 'scheduled'
          AND b.date::text = $3
          AND b.time::text LIKE $4`,
-      [booking.tutor_id, booking.id, targetDate, targetTime + '%']
+      [booking.tutor_id, booking.id, targetDate, targetTime + '%', nextBookingId]
     );
     if (clashRes.rows.length) {
       const clash = clashRes.rows[0];
