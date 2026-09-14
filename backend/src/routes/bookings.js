@@ -2021,6 +2021,9 @@ router.put('/:id/move', requireAuth, requireRole('admin','super_admin','tutor','
     /* Apply the move */
     const oldDate = booking.date instanceof Date ? booking.date.toISOString().split('T')[0] : String(booking.date).split('T')[0];
     const oldTime = String(booking.time).replace(/^(\d{2}:\d{2}):\d{2}$/, '$1');
+    let notesObj = {};
+    try { notesObj = typeof booking.notes === "string" ? JSON.parse(booking.notes || "{}") : (booking.notes || {}); } catch(e) { notesObj = {}; }
+    Object.assign(notesObj, { rescheduleReason: reason || ("Moved by " + req.user.role), movedFrom: oldDate + " " + oldTime, movedAt: new Date().toISOString() });
 
     await pool.query(
       `UPDATE bookings
@@ -2028,14 +2031,16 @@ router.put('/:id/move', requireAuth, requireRole('admin','super_admin','tutor','
            time = $2::time,
            rescheduled_from = $3::date,
            rescheduled_at = NOW(),
-           notes = CASE
-             WHEN notes IS NULL THEN $5::text
-             ELSE (notes::jsonb || $5::jsonb)::text
-           END
+           notes = $5
        WHERE id = $4`,
       [
         targetDate,
         targetTime,
+        oldDate,
+        booking.id,
+        JSON.stringify(notesObj)
+      ]
+    );
         oldDate,
         booking.id,
         JSON.stringify({ rescheduleReason: reason || 'Moved by ' + req.user.role, movedFrom: oldDate + ' ' + oldTime, movedAt: new Date().toISOString() })
