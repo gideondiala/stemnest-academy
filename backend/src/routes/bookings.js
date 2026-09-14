@@ -1997,19 +1997,23 @@ router.put('/:id/move', requireAuth, requireRole('admin','super_admin','tutor','
       }
     }
 
-    /* Clash check: does the tutor have another booking at this exact date+time? */
-    const clashRes = await pool.query(
-      `SELECT b.id, u.name AS student_name, b.is_demo
+    /* Clash check: does the tutor have another booking at this exact date+time?
+       For 'next' mode, nextBookingId is set — exclude it so the student's own
+       next lesson doesn't falsely trigger a clash. */
+    const clashParams = [booking.tutor_id, booking.id, targetDate, targetTime + '%'];
+    let clashQuery = `SELECT b.id, u.name AS student_name, b.is_demo
        FROM bookings b
        JOIN users u ON u.id = b.student_id
        WHERE b.tutor_id = $1
          AND b.id != $2
-         AND ($5 IS NULL OR b.id != $5)
          AND b.status = 'scheduled'
          AND b.date::text = $3
-         AND b.time::text LIKE $4`,
-      [booking.tutor_id, booking.id, targetDate, targetTime + '%', nextBookingId]
-    );
+         AND b.time::text LIKE $4`;
+    if (nextBookingId) {
+      clashParams.push(nextBookingId);
+      clashQuery += ` AND b.id != $${clashParams.length}`;
+    }
+    const clashRes = await pool.query(clashQuery, clashParams);
     if (clashRes.rows.length) {
       const clash = clashRes.rows[0];
       const type  = clash.is_demo ? 'Demo' : 'Paid';
