@@ -2041,11 +2041,6 @@ router.put('/:id/move', requireAuth, requireRole('admin','super_admin','tutor','
         JSON.stringify(notesObj)
       ]
     );
-        oldDate,
-        booking.id,
-        JSON.stringify({ rescheduleReason: reason || 'Moved by ' + req.user.role, movedFrom: oldDate + ' ' + oldTime, movedAt: new Date().toISOString() })
-      ]
-    );
 
     logger.info(`[MOVE] Booking ${booking.id} moved from ${oldDate} ${oldTime} to ${targetDate} ${targetTime} by ${req.user.email}`);
     res.json({ success: true, booking: { id: booking.id, date: targetDate, time: targetTime } });
