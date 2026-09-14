@@ -530,6 +530,14 @@ router.delete('/:id', requireAuth, requireRole('admin','super_admin','postsales'
       [req.params.id]
     );
 
+    /* Null out batch_id on past/completed bookings so the FK constraint
+       does not block deleting the batch record */
+    await pool.query(
+      `UPDATE bookings SET batch_id = NULL
+       WHERE batch_id = $1`,
+      [req.params.id]
+    );
+
     /* Remove batch members */
     await pool.query('DELETE FROM batch_members WHERE batch_id = $1', [req.params.id]);
 
