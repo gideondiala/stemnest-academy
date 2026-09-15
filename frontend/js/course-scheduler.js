@@ -1,7 +1,7 @@
-/* ═══════════════════════════════════════════════════════
-   STEMNEST ACADEMY — COURSE SCHEDULER (course-scheduler.js)
+/* ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+   STEMNEST ACADEMY ΓÇö COURSE SCHEDULER (course-scheduler.js)
    Handles recurring lesson generation and rescheduling.
-   ─────────────────────────────────────────────────────
+   ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
    KEY CONCEPTS:
    - An "enrolment" links a student to a course + teacher
      with a fixed weekly schedule (e.g. Mon 18:00 + Wed 16:00)
@@ -9,11 +9,11 @@
      and written to sn_bookings + teacher calendar
    - Rescheduling one lesson shifts it + all future lessons
      forward by one learning day in the weekly pattern
-═══════════════════════════════════════════════════════ */
+ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ */
 
-/* ─────────────────────────────────────────────────────
+/* ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
    STORAGE HELPERS
-───────────────────────────────────────────────────── */
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 function _getGlobalData() {
   return window.PS_DATA || window.ADMIN_DATA || window.TUTOR_DATA || window.STUDENT_DATA || window;
 }
@@ -34,9 +34,9 @@ function getCourseList() {
   return (typeof DEFAULT_COURSES !== 'undefined' ? DEFAULT_COURSES : []);
 }
 
-/* ─────────────────────────────────────────────────────
+/* ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
    DATE UTILITIES
-───────────────────────────────────────────────────── */
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 
 /** Format a Date as "YYYY-MM-DD" */
 function _fmtDate(d) {
@@ -54,7 +54,7 @@ function _fmtDateDisplay(d) {
 
 /** Convert "HH:MM" 24h to "H:MM AM/PM" */
 function _to12h(t) {
-  if (!t) return '—';
+  if (!t) return 'ΓÇö';
   const [h, m] = t.split(':').map(Number);
   const period = h >= 12 ? 'PM' : 'AM';
   const h12 = h % 12 || 12;
@@ -62,10 +62,10 @@ function _to12h(t) {
 }
 
 /**
- * Given a start date and an array of weekday numbers (0=Sun…6=Sat),
+ * Given a start date and an array of weekday numbers (0=SunΓÇª6=Sat),
  * generate the next N dates that fall on those weekdays, in order.
  * e.g. startDate=Mon, weekdays=[1,3] (Mon+Wed), count=6
- *   → Mon, Wed, Mon, Wed, Mon, Wed
+ *   ΓåÆ Mon, Wed, Mon, Wed, Mon, Wed
  */
 function generateLessonDates(startDate, weekdays, count) {
   const sorted = [...weekdays].sort((a, b) => a - b);
@@ -104,9 +104,9 @@ function nextLearningDay(afterDate, schedule) {
   return null;
 }
 
-/* ─────────────────────────────────────────────────────
+/* ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
    WRITE CALENDAR SLOT
-───────────────────────────────────────────────────── */
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 function _writeCalendarSlot(teacherId, dateKey, timeKey, bookingId) {
   try {
     const d = _getGlobalData();
@@ -141,9 +141,9 @@ function _clearCalendarSlot(teacherId, dateKey, timeKey) {
   } catch (e) { console.warn('_clearCalendarSlot error:', e); }
 }
 
-/* ─────────────────────────────────────────────────────
+/* ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
    CORE: CREATE ENROLMENT + GENERATE ALL LESSONS
-───────────────────────────────────────────────────── */
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 
 /**
  * Creates an enrolment and generates all lesson bookings.
@@ -247,9 +247,9 @@ function createEnrolment(opts) {
   return enrolId;
 }
 
-/* ─────────────────────────────────────────────────────
+/* ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
    RESCHEDULE: shift one lesson + all future lessons
-───────────────────────────────────────────────────── */
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 
 /**
  * Reschedules a single lesson booking and shifts all subsequent
@@ -322,10 +322,10 @@ function _time12to24(t) {
   return String(h).padStart(2, '0') + ':' + m[2];
 }
 
-/* ─────────────────────────────────────────────────────
-   ENROLMENT MODAL — UI CONTROLLER
+/* ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+   ENROLMENT MODAL ΓÇö UI CONTROLLER
    Called from presales-dashboard.js
-───────────────────────────────────────────────────── */
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 
 let _enrolBookingId = null; // the completed-demo booking being converted
 
@@ -340,11 +340,11 @@ function openEnrolmentModal(bookingId) {
   const infoEl = document.getElementById('enrol-student-info');
   if (infoEl && demo) {
     infoEl.innerHTML =
-      '<strong>' + (demo.studentName || '—') + '</strong>' +
-      ' &nbsp;·&nbsp; ' + (demo.grade || '—') +
-      ' &nbsp;·&nbsp; Age ' + (demo.age || '—') +
-      '<br>📧 ' + (demo.email || '—') +
-      ' &nbsp;·&nbsp; 📱 ' + (demo.whatsapp || '—');
+      '<strong>' + (demo.studentName || 'ΓÇö') + '</strong>' +
+      ' &nbsp;┬╖&nbsp; ' + (demo.grade || 'ΓÇö') +
+      ' &nbsp;┬╖&nbsp; Age ' + (demo.age || 'ΓÇö') +
+      '<br>≡ƒôº ' + (demo.email || 'ΓÇö') +
+      ' &nbsp;┬╖&nbsp; ≡ƒô▒ ' + (demo.whatsapp || 'ΓÇö');
   }
 
   // Populate course dropdown
@@ -381,7 +381,7 @@ function _populateEnrolCourseDropdown(subjectHint) {
     filtered = courses.filter(c => c.subject && c.subject.toLowerCase().includes(sub));
     if (!filtered.length) filtered = courses;
   }
-  sel.innerHTML = '<option value="">— Select a course —</option>' +
+  sel.innerHTML = '<option value="">ΓÇö Select a course ΓÇö</option>' +
     filtered.map(c =>
       '<option value="' + c.id + '">' + c.name + ' (' + (c.lessons ? c.lessons.length : c.classes) + ' lessons)</option>'
     ).join('');
@@ -397,8 +397,8 @@ function _populateEnrolTeacherDropdown(subjectHint) {
       const filtered = teachers.filter(t => t.subject && t.subject.toLowerCase().includes(sub));
       if (filtered.length) teachers = filtered;
     }
-    sel.innerHTML = '<option value="">— Select a teacher —</option>' +
-      teachers.map(t => '<option value="' + t.id + '">' + t.name + ' (' + t.id + ') · ' + t.subject + '</option>').join('');
+    sel.innerHTML = '<option value="">ΓÇö Select a teacher ΓÇö</option>' +
+      teachers.map(t => '<option value="' + t.id + '">' + t.name + ' (' + t.id + ') ┬╖ ' + t.subject + '</option>').join('');
   } catch (e) { /* silent */ }
 }
 
@@ -412,12 +412,12 @@ function _buildScheduleRow(idx) {
   const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   return '<div class="enrol-schedule-row" id="enrol-row-' + idx + '" style="display:flex;gap:12px;align-items:center;margin-bottom:12px;">' +
     '<select id="enrol-day-' + idx + '" style="flex:1;padding:10px 12px;border:2px solid #e8eaf0;border-radius:12px;font-family:\'Nunito\',sans-serif;font-size:14px;font-weight:700;color:var(--dark,#1a202c);outline:none;background:#fff;">' +
-    '<option value="">— Day —</option>' +
+    '<option value="">ΓÇö Day ΓÇö</option>' +
     days.map((d, i) => '<option value="' + i + '">' + d + '</option>').join('') +
     '</select>' +
     '<input type="time" id="enrol-time-' + idx + '" style="flex:1;padding:10px 12px;border:2px solid #e8eaf0;border-radius:12px;font-family:\'Nunito\',sans-serif;font-size:14px;font-weight:700;color:var(--dark,#1a202c);outline:none;">' +
     (idx > 0
-      ? '<button type="button" onclick="removeScheduleRow(' + idx + ')" style="background:#fde8e8;color:#c53030;border:none;border-radius:10px;padding:8px 12px;font-size:18px;cursor:pointer;font-weight:900;line-height:1;">×</button>'
+      ? '<button type="button" onclick="removeScheduleRow(' + idx + ')" style="background:#fde8e8;color:#c53030;border:none;border-radius:10px;padding:8px 12px;font-size:18px;cursor:pointer;font-weight:900;line-height:1;">├ù</button>'
       : '<div style="width:40px;"></div>') +
     '</div>';
 }
@@ -491,7 +491,7 @@ function confirmEnrolment() {
     const course = getCourseList().find(c => c.id === courseId);
     const total  = course ? (course.lessons ? course.lessons.length : course.classes) : '?';
     if (typeof showToast === 'function') {
-      showToast('✅ Enrolment created! ' + total + ' lessons scheduled for ' + (demo ? demo.studentName : 'student') + '.', 'success');
+      showToast('Γ£à Enrolment created! ' + total + ' lessons scheduled for ' + (demo ? demo.studentName : 'student') + '.', 'success');
     }
 
     // Refresh any open tabs
@@ -504,12 +504,12 @@ function confirmEnrolment() {
   }
 }
 
-/* ─────────────────────────────────────────────────────
-   RESCHEDULE MODAL — UI CONTROLLER
+/* ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+   RESCHEDULE MODAL ΓÇö UI CONTROLLER
    Called from tutor calendar when clicking a booked slot
-───────────────────────────────────────────────────── */
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 
-/* openRescheduleModal — API-driven version below */
+/* openRescheduleModal ΓÇö API-driven version below */
 function openRescheduleModal(bookingId) {
   _rescheduleBookingId = bookingId;
   _rescheduleMode = null;
@@ -535,10 +535,10 @@ function openRescheduleModal(bookingId) {
   if (infoEl && booking) {
     var lessonLabel = booking.lessonNumber ? 'Lesson ' + booking.lessonNumber + (booking.totalLessons ? ' of ' + booking.totalLessons : '') : '';
     infoEl.innerHTML =
-      '<strong>' + (booking.studentName || '—') + '</strong>' +
-      (lessonLabel ? ' &nbsp;·&nbsp; ' + lessonLabel : '') +
-      '<br>' + (booking.date || '—') + ' at ' + ((booking.time || '—').replace(/^(\d{1,2}:\d{2}):\d{2}$/, '$1')) +
-      '<br><span style="color:var(--mid);">' + (booking.subject || '') + (booking.lessonName ? ' — ' + booking.lessonName : '') + '</span>';
+      '<strong>' + (booking.studentName || 'ΓÇö') + '</strong>' +
+      (lessonLabel ? ' &nbsp;┬╖&nbsp; ' + lessonLabel : '') +
+      '<br>' + (booking.date || 'ΓÇö') + ' at ' + ((booking.time || 'ΓÇö').replace(/^(\d{1,2}:\d{2}):\d{2}$/, '$1')) +
+      '<br><span style="color:var(--mid);">' + (booking.subject || '') + (booking.lessonName ? ' ΓÇö ' + booking.lessonName : '') + '</span>';
   }
 
   /* Fetch next learning day to show in hint */
@@ -555,9 +555,9 @@ function openRescheduleModal(bookingId) {
         hintEl.style.color = '';
         var cb2 = document.getElementById('reschedule-confirm-btn'); if (cb2) cb2.disabled = false;
       } else if (hintEl) {
-        hintEl.textContent = 'No next learning day found — use Custom Date & Time instead.';
-        hintEl.style.color = '#c53030';
-        var cb = document.getElementById('reschedule-confirm-btn'); if (cb) cb.disabled = true;
+        /* Fallback: API didn't return a next day (shouldn't happen with +7 logic) */
+        hintEl.textContent = 'Shifts to next week (same time).';
+        hintEl.style.color = '';
       }
     }).catch(function() {});
   }
@@ -581,11 +581,19 @@ function selectRescheduleOption(mode) {
     if (label) label.style.borderColor = m === mode ? 'var(--blue)' : '#e8eaf0';
   });
 
+  /* Hide any previous error message when switching mode */
+  if (clashErr) clashErr.style.display = 'none';
+
   if (mode === 'custom') {
     if (customFields) customFields.style.display = 'block';
+    /* Re-enable button — custom mode is always available */
+    var btn = document.getElementById('reschedule-confirm-btn');
+    if (btn) { btn.disabled = false; btn.textContent = 'Confirm Reschedule'; }
   } else {
     if (customFields) customFields.style.display = 'none';
-    if (clashErr) clashErr.style.display = 'none';
+    /* Re-enable button for next mode (hint shows target date) */
+    var btn = document.getElementById('reschedule-confirm-btn');
+    if (btn && btn.disabled) { btn.disabled = false; btn.textContent = 'Confirm Reschedule'; }
   }
 }
 
@@ -625,7 +633,7 @@ async function confirmRescheduleNew() {
 
   /* Disable button during request */
   var btn = document.getElementById('reschedule-confirm-btn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Rescheduling…'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Rescheduling...'; }
 
   var token = localStorage.getItem('sn_access_token');
 
@@ -642,15 +650,13 @@ async function confirmRescheduleNew() {
       if (btn) { btn.disabled = false; btn.textContent = 'Confirm Reschedule'; }
 
       if (!data.success) {
-        /* Show error — visible for both 'next' and 'custom' modes */
+        /* Show error inline — clash-error div is now outside custom-fields so always visible */
         var clashErr = document.getElementById('reschedule-clash-error');
         if (clashErr) {
           clashErr.textContent = data.error || 'Could not reschedule';
           clashErr.style.display = 'block';
         }
         if (typeof showToast === 'function') showToast(data.error || 'Could not reschedule', 'error');
-        return;
-      }
         return;
       }
 

@@ -1946,25 +1946,13 @@ router.put('/:id/move', requireAuth, requireRole('admin','super_admin','tutor','
     let targetDate, targetTime, nextBookingId = null;
 
     if (mode === 'next') {
-      /* Find the student's next scheduled booking after this one */
-      const nextRes = await pool.query(
-        `SELECT date, time FROM bookings
-         WHERE student_id = $1
-           AND id != $2
-           AND status = 'scheduled'
-           AND is_demo = FALSE
-           AND (date > $3 OR (date = $3 AND time > $4))
-         ORDER BY date ASC, time ASC
-         LIMIT 1`,
-        [booking.student_id, booking.id, booking.date, booking.time]
-      );
-      if (!nextRes.rows.length) {
-        return res.status(400).json({ success: false, error: 'No next learning day found for this student' });
-      }
-      const next = nextRes.rows[0];
-      targetDate = next.date instanceof Date ? next.date.toISOString().split('T')[0] : String(next.date).split('T')[0];
-      targetTime = String(next.time).replace(/^(\d{2}:\d{2}):\d{2}$/, '$1');
-      nextBookingId = next.id;
+      /* Shift to next week — same weekday and time, +7 days.
+         Simple, predictable, no dependency on other bookings. */
+      const bookingDate = booking.date instanceof Date ? booking.date : new Date(booking.date);
+      const nextWeek = new Date(bookingDate);
+      nextWeek.setUTCDate(nextWeek.getUTCDate() + 7);
+      targetDate = nextWeek.toISOString().split('T')[0];
+      targetTime = String(booking.time).replace(/^(\d{2}:\d{2}):\d{2}$/, '$1');
     } else {
       /* Custom mode */
       targetDate = newDate;
@@ -1997,9 +1985,7 @@ router.put('/:id/move', requireAuth, requireRole('admin','super_admin','tutor','
       }
     }
 
-    /* Clash check: does the tutor have another booking at this exact date+time?
-       For 'next' mode, nextBookingId is set — exclude it so the student's own
-       next lesson doesn't falsely trigger a clash. */
+    /* Clash check: does the tutor have another booking at this exact date+time? */
     const clashParams = [booking.tutor_id, booking.id, targetDate, targetTime + '%'];
     let clashQuery = `SELECT b.id, u.name AS student_name, b.is_demo
        FROM bookings b
@@ -2056,39 +2042,23 @@ router.put('/:id/move', requireAuth, requireRole('admin','super_admin','tutor','
 
 /* ══════════════════════════════════════════════════════
    GET /api/bookings/:id/next-learning-day
-   Returns the next learning day for the student in this booking.
+   Returns the next learning day = this booking's date + 7 days, same time.
+   This is always predictable and works even if the student has no other bookings.
 ══════════════════════════════════════════════════════ */
 router.get('/:id/next-learning-day', requireAuth, requireRole('admin','super_admin','tutor','presales','postsales'), async (req, res, next) => {
   try {
-    const bRes = await pool.query('SELECT * FROM bookings WHERE id = $1', [req.params.id]);
+    const bRes = await pool.query('SELECT id, date, time FROM bookings WHERE id = $1', [req.params.id]);
     if (!bRes.rows.length) return res.status(404).json({ success: false, error: 'Booking not found' });
     const booking = bRes.rows[0];
 
-    if (!booking.student_id) {
-      return res.status(400).json({ success: false, error: 'Booking has no student' });
-    }
+    /* Next learning day = same weekday & time, one week later */
+    const bookingDate = booking.date instanceof Date ? booking.date : new Date(booking.date);
+    const nextWeek = new Date(bookingDate);
+    nextWeek.setUTCDate(nextWeek.getUTCDate() + 7);
+    const dateStr = nextWeek.toISOString().split('T')[0];
+    const timeStr = String(booking.time).replace(/^(\d{2}:\d{2}):\d{2}$/, '$1');
 
-    const nextRes = await pool.query(
-      `SELECT id, date, time FROM bookings
-       WHERE student_id = $1
-         AND id != $2
-         AND status = 'scheduled'
-         AND is_demo = FALSE
-         AND (date > $3 OR (date = $3 AND time > $4))
-       ORDER BY date ASC, time ASC
-       LIMIT 1`,
-      [booking.student_id, booking.id, booking.date, booking.time]
-    );
-
-    if (!nextRes.rows.length) {
-      return res.json({ success: true, nextLearningDay: null, message: 'No next learning day found' });
-    }
-
-    const next = nextRes.rows[0];
-    const dateStr = next.date instanceof Date ? next.date.toISOString().split('T')[0] : String(next.date).split('T')[0];
-    const timeStr = String(next.time).replace(/^(\d{2}:\d{2}):\d{2}$/, '$1');
-
-    res.json({ success: true, nextLearningDay: { date: dateStr, time: timeStr, bookingId: next.id } });
+    res.json({ success: true, nextLearningDay: { date: dateStr, time: timeStr } });
   } catch (err) { next(err); }
 });
 
