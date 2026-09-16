@@ -554,4 +554,403 @@ router.delete('/:id', requireAuth, requireRole('admin','super_admin','postsales'
   } catch (err) { next(err); }
 });
 
+/* ══════════════════════════════════════════════
+   POST /api/batches/:id/transfer-member
+   Move a student from this batch to another batch.
+
+   Mode 1 — move to existing batch:
+     Body: { studentId, targetBatchId }
+     The student inherits the target batch's tutor/schedule/link.
+
+   Mode 2 — move to a NEW batch (created inline):
+     Body: { studentId, newBatch: { tutorId, classLink, schedule,
+             startDate, pathwayId?, gradeNumber?, notes? } }
+     Creates the new batch (single student is allowed here), transfers student.
+
+   In both modes:
+   - Student is soft-removed from source batch (status='transferred')
+   - Student is added to target batch
+   - Remaining future bookings from source batch are cancelled
+   - New bookings are generated on the target schedule
+══════════════════════════════════════════════ */
+router.post('/:id/transfer-member', requireAuth, requireRole('admin','super_admin','postsales'), async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { studentId, targetBatchId, newBatch } = req.body;
+    if (!studentId) return res.status(400).json({ success: false, error: 'studentId required' });
+    if (!targetBatchId && !newBatch) return res.status(400).json({ success: false, error: 'targetBatchId or newBatch required' });
+
+    /* ── Verify student is active member of source batch ── */
+    const memberRes = await client.query(
+      `SELECT bm.id FROM batch_members bm
+       WHERE bm.batch_id = $1 AND bm.student_id = $2 AND bm.status = 'active'`,
+      [req.params.id, studentId]
+    );
+    if (!memberRes.rows.length) {
+      return res.status(404).json({ success: false, error: 'Student is not an active member of this batch' });
+    }
+
+    const stuRes = await client.query('SELECT name FROM users WHERE id = $1', [studentId]);
+    const studentName = stuRes.rows[0]?.name || studentId;
+
+    /* ── Resolve target batch ── */
+    let destBatchId, destBatchRef, destTutorId, destTutorName, destClassLink, destSchedule;
+
+    if (targetBatchId) {
+      /* Mode 1: existing batch */
+      const destRes = await client.query(
+        `SELECT b.id, b.batch_ref, b.tutor_id, b.class_link, b.schedule, b.status,
+                u.name AS tutor_name
+         FROM batches b LEFT JOIN users u ON u.id = b.tutor_id
+         WHERE b.id = $1`,
+        [targetBatchId]
+      );
+      if (!destRes.rows.length) return res.status(404).json({ success: false, error: 'Target batch not found' });
+      const dest = destRes.rows[0];
+      if (dest.status === 'closed') return res.status(400).json({ success: false, error: 'Target batch is closed' });
+
+      /* Check target has room */
+      const countRes = await client.query(
+        `SELECT COUNT(*) AS cnt FROM batch_members WHERE batch_id = $1 AND status = 'active'`,
+        [targetBatchId]
+      );
+      if (parseInt(countRes.rows[0].cnt) >= 3) {
+        return res.status(400).json({ success: false, error: 'Target batch is full (max 3 students)' });
+      }
+
+      destBatchId   = dest.id;
+      destBatchRef  = dest.batch_ref;
+      destTutorId   = dest.tutor_id;
+      destTutorName = dest.tutor_name;
+      destClassLink = dest.class_link;
+      destSchedule  = Array.isArray(dest.schedule) ? dest.schedule : JSON.parse(dest.schedule || '[]');
+    } else {
+      /* Mode 2: create a new batch inline */
+      const { tutorId, classLink, schedule, startDate, pathwayId, gradeNumber, notes } = newBatch;
+      if (!tutorId)                                      return res.status(400).json({ success: false, error: 'newBatch.tutorId required' });
+      if (!classLink)                                    return res.status(400).json({ success: false, error: 'newBatch.classLink required' });
+      if (!Array.isArray(schedule) || !schedule.length)  return res.status(400).json({ success: false, error: 'newBatch.schedule required' });
+      if (!startDate)                                    return res.status(400).json({ success: false, error: 'newBatch.startDate required' });
+
+      const newTutorRes = await client.query('SELECT id, name FROM users WHERE id = $1', [tutorId]);
+      if (!newTutorRes.rows.length) return res.status(404).json({ success: false, error: 'New tutor not found' });
+
+      const batchRef = await generateBatchRef();
+      const batchResult = await client.query(
+        `INSERT INTO batches (batch_ref, tutor_id, pathway_id, grade_number, class_link, schedule, notes, created_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+        [batchRef, tutorId, pathwayId || null, gradeNumber || null,
+         classLink, JSON.stringify(schedule), notes || null, req.user.id]
+      );
+
+      destBatchId   = batchResult.rows[0].id;
+      destBatchRef  = batchRef;
+      destTutorId   = tutorId;
+      destTutorName = newTutorRes.rows[0].name;
+      destClassLink = classLink;
+      destSchedule  = schedule;
+    }
+
+    /* ── Get source batch info ── */
+    const srcRes = await client.query(
+      `SELECT batch_ref, grade_number, pathway_id FROM batches WHERE id = $1`,
+      [req.params.id]
+    );
+    const srcBatch = srcRes.rows[0];
+
+    /* ── Count completed classes for this student in source batch
+          (to preserve lesson continuation) ── */
+    const completedRes = await client.query(
+      `SELECT COUNT(*) AS cnt FROM bookings
+       WHERE batch_id = $1
+         AND status IN ('completed','partially_completed')
+         AND (
+           student_id = $2
+           OR id IN (
+             SELECT booking_id FROM booking_attendance WHERE student_id = $2 AND present = true
+           )
+         )`,
+      [req.params.id, studentId]
+    );
+    const lessonsCompleted = parseInt(completedRes.rows[0].cnt) || 0;
+
+    /* ── Cancel remaining future bookings for this student in source batch ── */
+    const cancelRes = await client.query(
+      `UPDATE bookings
+       SET status = 'cancelled'
+       WHERE batch_id = $1
+         AND status = 'scheduled'
+         AND date >= CURRENT_DATE
+       RETURNING id, lesson_name, lesson_number_in_grade, pathway_lesson_id, grade`,
+      [req.params.id]
+    );
+    const cancelledBookings = cancelRes.rows;
+
+    /* ── Soft-remove student from source batch ── */
+    await client.query(
+      `UPDATE batch_members SET status = 'transferred', removed_at = NOW(),
+       removal_reason = $3
+       WHERE batch_id = $1 AND student_id = $2 AND status = 'active'`,
+      [req.params.id, studentId, `Transferred to ${destBatchRef} by ${req.user.email}`]
+    );
+
+    /* ── Add student to destination batch ── */
+    await client.query(
+      `INSERT INTO batch_members (batch_id, student_id)
+       VALUES ($1, $2)
+       ON CONFLICT (batch_id, student_id)
+       DO UPDATE SET status = 'active', removed_at = NULL, removal_reason = NULL`,
+      [destBatchId, studentId]
+    );
+
+    /* ── Generate new bookings for student on destination schedule ──
+       Use the cancelled bookings' lesson data to preserve sequence.
+       If no cancelled bookings exist (batch was already finished), generate fresh. */
+    const lessonsToSchedule = cancelledBookings.length || 0;
+    let createdCount = 0;
+
+    if (lessonsToSchedule > 0) {
+      /* Generate dates from destination schedule */
+      const startDateStr = new Date().toISOString().split('T')[0]; // from today
+      const newDates = [];
+      const start = new Date(startDateStr + 'T12:00:00Z');
+      const slotStarts = destSchedule.map(slot => {
+        const d = new Date(start);
+        const dayDiff = (slot.weekday - d.getDay() + 7) % 7 || 7; // always go to next occurrence
+        d.setDate(d.getDate() + dayDiff);
+        return { ...slot, next: new Date(d) };
+      });
+
+      while (newDates.length < lessonsToSchedule) {
+        slotStarts.sort((a, b) => a.next - b.next);
+        const slot = slotStarts[0];
+        newDates.push({ date: slot.next.toISOString().split('T')[0], time: slot.time });
+        const nextOcc = new Date(slot.next);
+        nextOcc.setDate(nextOcc.getDate() + 7);
+        slotStarts[0].next = nextOcc;
+      }
+
+      for (let i = 0; i < cancelledBookings.length; i++) {
+        const nd  = newDates[i];
+        const old = cancelledBookings[i];
+        await client.query(
+          `INSERT INTO bookings
+             (subject, grade, date, time, class_link, status, is_demo,
+              tutor_id, student_id, batch_id, lesson_name, notes,
+              booked_at, scheduled_at, pathway_lesson_id, lesson_number_in_grade)
+           VALUES ($1,$2,$3::date,$4::time,$5,'scheduled',FALSE,
+                   $6,$7,$8,$9,$10,NOW(),NOW(),$11,$12)`,
+          [
+            'Coding',
+            old.grade || (srcBatch.grade_number ? `Grade ${srcBatch.grade_number}` : 'Group'),
+            nd.date,
+            nd.time.substring(0, 5),
+            destClassLink,
+            destTutorId,
+            studentId,
+            destBatchId,
+            old.lesson_name || `Lesson ${old.lesson_number_in_grade || (lessonsCompleted + i + 1)}`,
+            JSON.stringify({
+              batchRef: destBatchRef, tutorName: destTutorName,
+              classLink: destClassLink, isBatchClass: true,
+              transferredFrom: srcBatch.batch_ref,
+              transferredAt: new Date().toISOString(),
+            }),
+            old.pathway_lesson_id || null,
+            old.lesson_number_in_grade || (lessonsCompleted + i + 1),
+          ]
+        );
+        createdCount++;
+      }
+    }
+
+    await client.query('COMMIT');
+    logger.info(`[BATCH TRANSFER] ${studentName} transferred from ${srcBatch.batch_ref} to ${destBatchRef} by ${req.user.email}. ${cancelledBookings.length} cancelled, ${createdCount} created.`);
+
+    res.json({
+      success: true,
+      message: `${studentName} transferred from ${srcBatch.batch_ref} to ${destBatchRef}`,
+      studentName,
+      sourceBatch:  srcBatch.batch_ref,
+      destBatch:    destBatchRef,
+      destBatchId,
+      cancelled:    cancelledBookings.length,
+      created:      createdCount,
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    next(err);
+  } finally {
+    client.release();
+  }
+});
+
+/* ══════════════════════════════════════════════
+   POST /api/batches/:id/transfer-member
+   Move a student from this batch to another batch.
+
+   Mode 1 - move to existing batch:
+     Body: { studentId, targetBatchId }
+
+   Mode 2 - move to a NEW batch (created inline):
+     Body: { studentId, newBatch: { tutorId, classLink, schedule, startDate,
+             pathwayId?, gradeNumber?, notes? } }
+
+   In both modes:
+   - Student is soft-removed from source (status='transferred')
+   - Student is added to destination batch
+   - Future bookings on source are cancelled
+   - New bookings generated on destination schedule
+   All in a single DB transaction.
+============================================== */
+router.post('/:id/transfer-member', requireAuth, requireRole('admin','super_admin','postsales'), async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { studentId, targetBatchId, newBatch } = req.body;
+    if (!studentId) return res.status(400).json({ success: false, error: 'studentId required' });
+    if (!targetBatchId && !newBatch) return res.status(400).json({ success: false, error: 'targetBatchId or newBatch required' });
+
+    /* Verify student is active in source batch */
+    const memberRes = await client.query(
+      'SELECT id FROM batch_members WHERE batch_id = $1 AND student_id = $2 AND status = $$active$$',
+      [req.params.id, studentId]
+    );
+    if (!memberRes.rows.length)
+      return res.status(404).json({ success: false, error: 'Student is not an active member of this batch' });
+
+    const stuRes = await client.query('SELECT name FROM users WHERE id = $1', [studentId]);
+    const studentName = stuRes.rows[0] ? stuRes.rows[0].name : studentId;
+
+    /* Resolve destination batch */
+    var destBatchId, destBatchRef, destTutorId, destTutorName, destClassLink, destSchedule;
+
+    if (targetBatchId) {
+      const destRes = await client.query(
+        'SELECT b.id, b.batch_ref, b.tutor_id, b.class_link, b.schedule, b.status, u.name AS tutor_name FROM batches b LEFT JOIN users u ON u.id = b.tutor_id WHERE b.id = $1',
+        [targetBatchId]
+      );
+      if (!destRes.rows.length) return res.status(404).json({ success: false, error: 'Target batch not found' });
+      const dest = destRes.rows[0];
+      if (dest.status === 'closed') return res.status(400).json({ success: false, error: 'Target batch is closed' });
+
+      const countRes = await client.query(
+        'SELECT COUNT(*) AS cnt FROM batch_members WHERE batch_id = $1 AND status = $$active$$',
+        [targetBatchId]
+      );
+      if (parseInt(countRes.rows[0].cnt) >= 3)
+        return res.status(400).json({ success: false, error: 'Target batch is full (max 3 students)' });
+
+      destBatchId   = dest.id;
+      destBatchRef  = dest.batch_ref;
+      destTutorId   = dest.tutor_id;
+      destTutorName = dest.tutor_name;
+      destClassLink = dest.class_link;
+      destSchedule  = Array.isArray(dest.schedule) ? dest.schedule : JSON.parse(dest.schedule || '[]');
+    } else {
+      const nb = newBatch;
+      if (!nb.tutorId)                                 return res.status(400).json({ success: false, error: 'newBatch.tutorId required' });
+      if (!nb.classLink)                               return res.status(400).json({ success: false, error: 'newBatch.classLink required' });
+      if (!Array.isArray(nb.schedule) || !nb.schedule.length) return res.status(400).json({ success: false, error: 'newBatch.schedule required' });
+      if (!nb.startDate)                               return res.status(400).json({ success: false, error: 'newBatch.startDate required' });
+
+      const newTutorRes = await client.query('SELECT id, name FROM users WHERE id = $1', [nb.tutorId]);
+      if (!newTutorRes.rows.length) return res.status(404).json({ success: false, error: 'Tutor not found' });
+
+      const batchRef = await generateBatchRef();
+      const batchResult = await client.query(
+        'INSERT INTO batches (batch_ref, tutor_id, pathway_id, grade_number, class_link, schedule, notes, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
+        [batchRef, nb.tutorId, nb.pathwayId || null, nb.gradeNumber || null, nb.classLink, JSON.stringify(nb.schedule), nb.notes || null, req.user.id]
+      );
+
+      destBatchId   = batchResult.rows[0].id;
+      destBatchRef  = batchRef;
+      destTutorId   = nb.tutorId;
+      destTutorName = newTutorRes.rows[0].name;
+      destClassLink = nb.classLink;
+      destSchedule  = nb.schedule;
+    }
+
+    /* Source batch info */
+    const srcRes = await client.query('SELECT batch_ref, grade_number FROM batches WHERE id = $1', [req.params.id]);
+    const srcBatch = srcRes.rows[0];
+
+    /* Cancel remaining future batch bookings */
+    const cancelRes = await client.query(
+      'UPDATE bookings SET status = $$cancelled$$ WHERE batch_id = $1 AND status = $$scheduled$$ AND date >= CURRENT_DATE RETURNING id, lesson_name, lesson_number_in_grade, pathway_lesson_id, grade',
+      [req.params.id]
+    );
+    const cancelledBookings = cancelRes.rows;
+
+    /* Soft-remove from source batch */
+    await client.query(
+      'UPDATE batch_members SET status = $$transferred$$, removed_at = NOW(), removal_reason = $3 WHERE batch_id = $1 AND student_id = $2 AND status = $$active$$',
+      [req.params.id, studentId, 'Transferred to ' + destBatchRef + ' by ' + req.user.email]
+    );
+
+    /* Add to destination batch */
+    await client.query(
+      'INSERT INTO batch_members (batch_id, student_id) VALUES ($1, $2) ON CONFLICT (batch_id, student_id) DO UPDATE SET status = $$active$$, removed_at = NULL, removal_reason = NULL',
+      [destBatchId, studentId]
+    );
+
+    /* Generate new bookings on destination schedule */
+    var createdCount = 0;
+    if (cancelledBookings.length > 0) {
+      const startStr = new Date().toISOString().split('T')[0];
+      const newDates = [];
+      const startD = new Date(startStr + 'T12:00:00Z');
+      const slots = destSchedule.map(function(slot) {
+        const d = new Date(startD);
+        var diff = (slot.weekday - d.getDay() + 7) % 7;
+        if (diff === 0) diff = 7; /* always at least 1 day ahead */
+        d.setDate(d.getDate() + diff);
+        return Object.assign({}, slot, { next: new Date(d) });
+      });
+      while (newDates.length < cancelledBookings.length) {
+        slots.sort(function(a, b) { return a.next - b.next; });
+        newDates.push({ date: slots[0].next.toISOString().split('T')[0], time: slots[0].time });
+        var n = new Date(slots[0].next);
+        n.setDate(n.getDate() + 7);
+        slots[0].next = n;
+      }
+      for (var i = 0; i < cancelledBookings.length; i++) {
+        var nd  = newDates[i];
+        var old = cancelledBookings[i];
+        await client.query(
+          'INSERT INTO bookings (subject, grade, date, time, class_link, status, is_demo, tutor_id, student_id, batch_id, lesson_name, notes, booked_at, scheduled_at, pathway_lesson_id, lesson_number_in_grade) VALUES ($1,$2,$3::date,$4::time,$5,$$scheduled$$,FALSE,$6,$7,$8,$9,$10,NOW(),NOW(),$11,$12)',
+          [
+            'Coding',
+            old.grade || (srcBatch.grade_number ? 'Grade ' + srcBatch.grade_number : 'Group'),
+            nd.date, nd.time.substring(0, 5), destClassLink,
+            destTutorId, studentId, destBatchId,
+            old.lesson_name || ('Lesson ' + (old.lesson_number_in_grade || (i + 1))),
+            JSON.stringify({ batchRef: destBatchRef, tutorName: destTutorName, classLink: destClassLink, isBatchClass: true, transferredFrom: srcBatch.batch_ref }),
+            old.pathway_lesson_id || null,
+            old.lesson_number_in_grade || (i + 1),
+          ]
+        );
+        createdCount++;
+      }
+    }
+
+    await client.query('COMMIT');
+    logger.info('[BATCH TRANSFER] ' + studentName + ' transferred from ' + srcBatch.batch_ref + ' to ' + destBatchRef + ' by ' + req.user.email + '. Cancelled: ' + cancelledBookings.length + ', Created: ' + createdCount);
+
+    res.json({
+      success: true,
+      message: studentName + ' transferred to ' + destBatchRef,
+      studentName, sourceBatch: srcBatch.batch_ref, destBatch: destBatchRef, destBatchId,
+      cancelled: cancelledBookings.length, created: createdCount,
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    next(err);
+  } finally {
+    client.release();
+  }
+});
 module.exports = router;

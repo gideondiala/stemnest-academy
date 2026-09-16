@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <!-- Microsoft Clarity -->
@@ -867,5 +867,108 @@
   </div>
 </div>
 
+
+<!-- STUDENT TRANSFER MODAL -->
+<div class="modal-overlay" id="studentTransferOverlay">
+  <div class="modal" style="max-width:560px;max-height:92vh;overflow-y:auto;">
+    <div class="modal-header">
+      <div class="modal-title" id="studentTransferTitle">↔ Transfer Student</div>
+      <button class="modal-close" onclick="closeStudentTransferModal()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <div style="background:var(--blue-light);border-radius:12px;padding:13px 16px;margin-bottom:20px;font-size:13px;font-weight:700;color:var(--blue);" id="studentTransferInfo"></div>
+
+      <!-- Tab switcher -->
+      <div style="display:flex;gap:0;border:2px solid #e8eaf0;border-radius:12px;overflow:hidden;margin-bottom:20px;">
+        <button id="stTab1" onclick="switchTransferTab('existing')"
+          style="flex:1;padding:11px;background:var(--blue);color:#fff;border:none;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;">
+          Move to Existing Batch
+        </button>
+        <button id="stTab2" onclick="switchTransferTab('new')"
+          style="flex:1;padding:11px;background:var(--bg);color:var(--mid);border:none;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;">
+          Create New Batch
+        </button>
+      </div>
+
+      <!-- Tab: existing batch -->
+      <div id="stPanelExisting">
+        <div class="pm-field">
+          <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Select Destination Batch</label>
+          <div style="font-size:12px;color:var(--light);font-weight:700;margin-bottom:8px;">Only active batches with space (fewer than 3 students) are shown</div>
+          <select id="st-target-batch" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;outline:none;background:#fff;">
+            <option value="">⏳ Loading batches…</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:12px;margin-top:8px;">
+          <button class="btn btn-outline" style="flex:1;" onclick="closeStudentTransferModal()">Cancel</button>
+          <button onclick="confirmTransferToExisting()" style="flex:2;padding:13px;background:var(--blue);color:#fff;border:none;border-radius:12px;font-family:'Nunito',sans-serif;font-weight:900;font-size:14px;cursor:pointer;" id="stConfirmExistingBtn">
+            ↔ Transfer Student
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab: new batch -->
+      <div id="stPanelNew" style="display:none;">
+
+        <div class="pm-field">
+          <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">👩‍🏫 New Teacher <span style="color:#e53e3e;">*</span></label>
+          <select id="st-new-tutor" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;outline:none;background:#fff;">
+            <option value="">— Select teacher —</option>
+          </select>
+        </div>
+
+        <div class="pm-field">
+          <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">🔗 Google Meet Link <span style="color:#e53e3e;">*</span></label>
+          <input type="url" id="st-new-link" placeholder="https://meet.google.com/xxx-xxxx-xxx"
+            style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;outline:none;">
+        </div>
+
+        <div class="pm-field">
+          <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">📅 New Schedule Starts <span style="color:#e53e3e;">*</span></label>
+          <input type="date" id="st-new-start"
+            style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;outline:none;">
+        </div>
+
+        <div class="pm-field">
+          <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">🗓️ Weekly Schedule <span style="color:#e53e3e;">*</span></label>
+          <div id="st-schedule-rows"></div>
+          <button type="button" onclick="addSTScheduleRow()"
+            style="background:var(--bg);color:var(--blue);border:2px dashed var(--blue);border-radius:12px;padding:9px 18px;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;width:100%;margin-top:4px;">
+            + Add Another Day
+          </button>
+        </div>
+
+        <div style="display:flex;gap:12px;margin-top:8px;">
+          <button class="btn btn-outline" style="flex:1;" onclick="closeStudentTransferModal()">Cancel</button>
+          <button onclick="confirmTransferToNew()" style="flex:2;padding:13px;background:var(--green);color:#fff;border:none;border-radius:12px;font-family:'Nunito',sans-serif;font-weight:900;font-size:14px;cursor:pointer;" id="stConfirmNewBtn">
+            ✨ Create Batch & Transfer
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ADD MEMBER MODAL (replaces prompt-based picker) -->
+<div class="modal-overlay" id="addMemberOverlay">
+  <div class="modal" style="max-width:480px;max-height:88vh;overflow-y:auto;">
+    <div class="modal-header">
+      <div class="modal-title">➕ Add Student to Batch</div>
+      <button class="modal-close" onclick="closeAddMemberModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="margin-bottom:14px;">
+        <input type="text" id="am-search" placeholder="🔍 Search by name or ID…" oninput="filterAMStudents()"
+          style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;box-sizing:border-box;">
+      </div>
+      <div id="am-student-list" style="max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;"></div>
+      <div style="margin-top:16px;display:flex;gap:12px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="closeAddMemberModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
 </body>
 </html>

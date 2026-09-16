@@ -3147,10 +3147,7 @@ async function openBatchDetail(batchId) {
               ${m.creditsSuspended ? ' &nbsp;<span style="background:#fde8e8;color:#c53030;font-size:10px;font-weight:900;padding:2px 8px;border-radius:50px;">🔒 PAUSED</span>' : ''}
             </div>
           </div>
-          <button onclick="removeFromBatch('${batchId}','${m.studentId}','${m.studentName.replace(/'/g,'')}')"
-            style="background:#fde8e8;color:#c53030;border:none;border-radius:8px;padding:7px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;">
-            ✕ Remove
-          </button>
+          
         </div>`).join('')}
 
       ${members.filter(m => m.status === 'active').length < 3 ? `
@@ -3785,3 +3782,329 @@ async function deleteBatch(batchId, batchRef) {
     });
   });
 })();
+
+
+/* ══════════════════════════════════════════════════════
+   STUDENT TRANSFER FEATURE
+   Transfer a student from one batch to another
+   (existing batch OR brand-new batch created inline)
+══════════════════════════════════════════════════════ */
+
+var _transferSourceBatchId = null;
+var _transferStudentId     = null;
+var _transferStudentName   = null;
+
+/* Open transfer modal — called from student card in batch detail */
+async function openStudentTransferModal(sourceBatchId, studentId, studentName) {
+  _transferSourceBatchId = sourceBatchId;
+  _transferStudentId     = studentId;
+  _transferStudentName   = studentName;
+
+  var titleEl = document.getElementById('studentTransferTitle');
+  if (titleEl) titleEl.textContent = '\u2194 Transfer ' + studentName;
+
+  var infoEl = document.getElementById('studentTransferInfo');
+  if (infoEl) infoEl.innerHTML = '<strong>' + studentName + '</strong> will be moved out of the current batch. Choose a destination below.';
+
+  /* Default to "existing batch" tab */
+  switchTransferTab('existing');
+
+  /* Set min date on new batch start date */
+  var tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  var startEl = document.getElementById('st-new-start');
+  if (startEl) {
+    startEl.min   = tomorrow.toISOString().split('T')[0];
+    startEl.value = tomorrow.toISOString().split('T')[0];
+  }
+
+  /* Reset new batch schedule rows */
+  var container = document.getElementById('st-schedule-rows');
+  if (container) container.innerHTML = _buildSTSchedRow(0) + _buildSTSchedRow(1);
+
+  /* Load existing eligible batches */
+  await _loadEligibleBatches(sourceBatchId, studentId);
+
+  /* Load tutors for new batch tab */
+  await _loadSTTutors();
+
+  /* Close batch detail so transfer modal is clearly visible */
+  closeBatchDetailModal();
+
+  document.getElementById('studentTransferOverlay').classList.add('open');
+}
+
+function closeStudentTransferModal() {
+  document.getElementById('studentTransferOverlay').classList.remove('open');
+  _transferSourceBatchId = null;
+  _transferStudentId     = null;
+  _transferStudentName   = null;
+}
+
+function switchTransferTab(tab) {
+  var isExisting = tab === 'existing';
+  document.getElementById('stPanelExisting').style.display = isExisting ? 'block' : 'none';
+  document.getElementById('stPanelNew').style.display      = isExisting ? 'none'  : 'block';
+  document.getElementById('stTab1').style.background = isExisting ? 'var(--blue)' : 'var(--bg)';
+  document.getElementById('stTab1').style.color      = isExisting ? '#fff' : 'var(--mid)';
+  document.getElementById('stTab2').style.background = isExisting ? 'var(--bg)' : 'var(--blue)';
+  document.getElementById('stTab2').style.color      = isExisting ? 'var(--mid)' : '#fff';
+}
+
+async function _loadEligibleBatches(sourceBatchId, studentId) {
+  var sel = document.getElementById('st-target-batch');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">\u23f3 Loading batches\u2026</option>';
+  try {
+    var token = localStorage.getItem('sn_access_token');
+    var res   = await fetch('https://api.stemnestacademy.co.uk/api/batches', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    var data  = await res.json();
+    var batches = (data.batches || []).filter(function(b) {
+      return b.id !== sourceBatchId &&
+             b.status === 'active' &&
+             (parseInt(b.memberCount) || 0) < 3;
+    });
+
+    if (!batches.length) {
+      sel.innerHTML = '<option value="">No eligible batches found \u2014 use Create New Batch</option>';
+      return;
+    }
+    var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    sel.innerHTML = '<option value="">\u2014 Select a batch \u2014</option>' +
+      batches.map(function(b) {
+        var sched = [];
+        try { sched = typeof b.schedule === 'string' ? JSON.parse(b.schedule) : (b.schedule || []); } catch(e) {}
+        var schedStr = sched.map(function(s) { return days[s.weekday] + ' ' + s.time; }).join(', ');
+        return '<option value="' + b.id + '">' +
+          (b.batchRef || b.batch_ref) + ' \u2014 ' + (b.tutorName || '\u2014') +
+          ' (' + (parseInt(b.memberCount) || 0) + '/3 students)' +
+          (schedStr ? ' \u00b7 ' + schedStr : '') +
+          '</option>';
+      }).join('');
+  } catch(e) {
+    sel.innerHTML = '<option value="">Failed to load batches</option>';
+  }
+}
+
+async function _loadSTTutors() {
+  var sel = document.getElementById('st-new-tutor');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">\u23f3 Loading tutors\u2026</option>';
+  try {
+    var token = localStorage.getItem('sn_access_token');
+    var res   = await fetch('https://api.stemnestacademy.co.uk/api/users?role=tutor&limit=100', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    var data  = await res.json();
+    var tutors = data.users || [];
+    sel.innerHTML = '<option value="">\u2014 Select teacher \u2014</option>' +
+      tutors.map(function(t) {
+        return '<option value="' + t.id + '">' + t.name + ' (' + (t.staff_id || t.id.slice(0,8)) + ')</option>';
+      }).join('');
+  } catch(e) {
+    sel.innerHTML = '<option value="">Failed to load tutors</option>';
+  }
+}
+
+/* Schedule row builder for new batch tab */
+function _buildSTSchedRow(idx) {
+  var days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var removeBtn = idx > 0
+    ? '<button type="button" onclick="document.getElementById(\'st-row-' + idx + '\').remove()" style="background:#fde8e8;color:#c53030;border:none;border-radius:10px;padding:8px 12px;font-size:18px;cursor:pointer;font-weight:900;line-height:1;">\u00d7</button>'
+    : '<div style="width:40px;"></div>';
+  return '<div id="st-row-' + idx + '" style="display:flex;gap:10px;align-items:center;margin-bottom:10px;">' +
+    '<select id="st-day-' + idx + '" style="flex:1;padding:10px 12px;border:2px solid #e8eaf0;border-radius:12px;font-family:\'Nunito\',sans-serif;font-size:14px;font-weight:700;outline:none;background:#fff;">' +
+    '<option value="">\u2014 Day \u2014</option>' +
+    days.map(function(d, i) { return '<option value="' + i + '">' + d + '</option>'; }).join('') +
+    '</select>' +
+    '<input type="time" id="st-time-' + idx + '" style="flex:1;padding:10px 12px;border:2px solid #e8eaf0;border-radius:12px;font-family:\'Nunito\',sans-serif;font-size:14px;font-weight:700;outline:none;">' +
+    removeBtn +
+    '</div>';
+}
+
+function addSTScheduleRow() {
+  var container = document.getElementById('st-schedule-rows');
+  if (!container) return;
+  var existing = container.querySelectorAll('[id^="st-row-"]').length;
+  if (existing >= 5) { showToast('Maximum 5 days per week.', 'error'); return; }
+  var div = document.createElement('div');
+  div.innerHTML = _buildSTSchedRow(existing);
+  container.appendChild(div.firstChild);
+}
+
+function _getSTSchedule() {
+  var schedule  = [];
+  var container = document.getElementById('st-schedule-rows');
+  if (!container) return schedule;
+  container.querySelectorAll('[id^="st-row-"]').forEach(function(row) {
+    var dayEl  = row.querySelector('select[id^="st-day-"]');
+    var timeEl = row.querySelector('input[type="time"]');
+    if (dayEl && timeEl && dayEl.value !== '' && timeEl.value) {
+      schedule.push({ weekday: parseInt(dayEl.value), time: timeEl.value });
+    }
+  });
+  return schedule;
+}
+
+/* ── Confirm: move to existing batch ── */
+async function confirmTransferToExisting() {
+  var targetBatchId = document.getElementById('st-target-batch').value;
+  if (!targetBatchId) { showToast('Please select a destination batch.', 'error'); return; }
+  if (!_transferStudentId || !_transferSourceBatchId) { showToast('No student selected.', 'error'); return; }
+
+  var btn = document.getElementById('stConfirmExistingBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '\u23f3 Transferring\u2026'; }
+
+  try {
+    var token = localStorage.getItem('sn_access_token');
+    var res   = await fetch('https://api.stemnestacademy.co.uk/api/batches/' + _transferSourceBatchId + '/transfer-member', {
+      method:  'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ studentId: _transferStudentId, targetBatchId: targetBatchId }),
+    });
+    var data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Transfer failed');
+
+    showToast('\u2705 ' + data.studentName + ' transferred to ' + data.destBatch + '! ' + data.created + ' new classes created.', 'success', 7000);
+    closeStudentTransferModal();
+    renderBatchesTab();
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '\u2194 Transfer Student'; }
+  }
+}
+
+/* ── Confirm: create new batch and transfer ── */
+async function confirmTransferToNew() {
+  var tutorId   = document.getElementById('st-new-tutor').value;
+  var classLink = document.getElementById('st-new-link').value.trim();
+  var startDate = document.getElementById('st-new-start').value;
+  var schedule  = _getSTSchedule();
+
+  if (!tutorId)        { showToast('Please select a teacher.', 'error'); return; }
+  if (!classLink)      { showToast('Please enter a Google Meet link.', 'error'); return; }
+  if (!startDate)      { showToast('Please select a start date.', 'error'); return; }
+  if (!schedule.length){ showToast('Please add at least one class day and time.', 'error'); return; }
+  if (!_transferStudentId || !_transferSourceBatchId) { showToast('No student selected.', 'error'); return; }
+
+  var btn = document.getElementById('stConfirmNewBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '\u23f3 Creating batch\u2026'; }
+
+  try {
+    var token = localStorage.getItem('sn_access_token');
+    var res   = await fetch('https://api.stemnestacademy.co.uk/api/batches/' + _transferSourceBatchId + '/transfer-member', {
+      method:  'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        studentId: _transferStudentId,
+        newBatch: { tutorId: tutorId, classLink: classLink, schedule: schedule, startDate: startDate },
+      }),
+    });
+    var data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Transfer failed');
+
+    showToast('\u2705 ' + data.destBatch + ' created! ' + data.studentName + ' transferred with ' + data.created + ' new classes.', 'success', 7000);
+    closeStudentTransferModal();
+    renderBatchesTab();
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '\u2728 Create Batch & Transfer'; }
+  }
+}
+
+/* Bind overlay close on backdrop click */
+document.addEventListener('DOMContentLoaded', function() {
+  var o = document.getElementById('studentTransferOverlay');
+  if (o) o.addEventListener('click', function(e) { if (e.target === o) closeStudentTransferModal(); });
+  var o2 = document.getElementById('addMemberOverlay');
+  if (o2) o2.addEventListener('click', function(e) { if (e.target === o2) closeAddMemberModal(); });
+});
+
+/* ══════════════════════════════════════════════════════
+   IMPROVED ADD MEMBER MODAL
+   Replaces the old prompt()-based student picker
+══════════════════════════════════════════════════════ */
+
+var _addMemberBatchId  = null;
+var _amAllStudents     = [];
+
+async function openAddMemberModal(batchId) {
+  _addMemberBatchId = batchId;
+  _amAllStudents    = [];
+
+  document.getElementById('addMemberOverlay').classList.add('open');
+  document.getElementById('am-search').value = '';
+  document.getElementById('am-student-list').innerHTML =
+    '<div style="text-align:center;padding:24px;color:var(--light);font-weight:700;">\u23f3 Loading students\u2026</div>';
+
+  try {
+    var token = localStorage.getItem('sn_access_token');
+    var res   = await fetch('https://api.stemnestacademy.co.uk/api/users?role=student&limit=300', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    var data  = await res.json();
+    _amAllStudents = data.users || [];
+    _renderAMStudents(_amAllStudents, batchId);
+  } catch(e) {
+    document.getElementById('am-student-list').innerHTML =
+      '<div style="padding:16px;color:#c53030;font-weight:700;">Failed to load students: ' + e.message + '</div>';
+  }
+}
+
+function closeAddMemberModal() {
+  document.getElementById('addMemberOverlay').classList.remove('open');
+  _addMemberBatchId = null;
+  _amAllStudents    = [];
+}
+
+function filterAMStudents() {
+  var q = (document.getElementById('am-search').value || '').toLowerCase();
+  var filtered = q
+    ? _amAllStudents.filter(function(s) {
+        return (s.name || '').toLowerCase().includes(q) || (s.staff_id || '').toLowerCase().includes(q) || (s.email || '').toLowerCase().includes(q);
+      })
+    : _amAllStudents;
+  _renderAMStudents(filtered, _addMemberBatchId);
+}
+
+function _renderAMStudents(students, batchId) {
+  var el = document.getElementById('am-student-list');
+  if (!el) return;
+  if (!students.length) {
+    el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--light);font-weight:700;">No students found.</div>';
+    return;
+  }
+  el.innerHTML = students.map(function(s) {
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border:1.5px solid #e8eaf0;border-radius:10px;gap:10px;">' +
+      '<div>' +
+        '<div style="font-weight:800;font-size:14px;color:var(--dark);">' + (s.name || '\u2014') + '</div>' +
+        '<div style="font-size:11px;color:var(--light);">' + (s.staff_id || s.id.slice(0,8)) + ' \u00b7 ' + (s.email || '\u2014') + '</div>' +
+      '</div>' +
+      '<button onclick="addMemberToBatch(\'' + batchId + '\',\'' + s.id + '\',\'' + (s.name || '').replace(/'/g,'') + '\')" ' +
+        'style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap;">' +
+        '+ Add' +
+      '</button>' +
+    '</div>';
+  }).join('');
+}
+
+async function addMemberToBatch(batchId, studentId, studentName) {
+  try {
+    var token = localStorage.getItem('sn_access_token');
+    var res   = await fetch('https://api.stemnestacademy.co.uk/api/batches/' + batchId + '/members', {
+      method:  'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ studentId: studentId }),
+    });
+    var data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Failed to add student');
+    showToast('\u2705 ' + studentName + ' added to batch!', 'success');
+    closeAddMemberModal();
+    renderBatchesTab();
+    openBatchDetail(batchId);
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
