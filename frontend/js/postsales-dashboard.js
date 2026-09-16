@@ -3147,7 +3147,16 @@ async function openBatchDetail(batchId) {
               ${m.creditsSuspended ? ' &nbsp;<span style="background:#fde8e8;color:#c53030;font-size:10px;font-weight:900;padding:2px 8px;border-radius:50px;">🔒 PAUSED</span>' : ''}
             </div>
           </div>
-          
+          <div style="display:flex;gap:6px;flex-shrink:0;">
+            <button onclick="openStudentTransferModal('${batchId}','${m.studentId}','${m.studentName.replace(/'/g,'')}') "
+              style="background:#e0f0ff;color:var(--blue);border:1.5px solid var(--blue);border-radius:8px;padding:7px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap;">
+              &#8596; Transfer
+            </button>
+            <button onclick="removeFromBatch('${batchId}','${m.studentId}','${m.studentName.replace(/'/g,'')}') "
+              style="background:#fde8e8;color:#c53030;border:none;border-radius:8px;padding:7px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap;">
+              &#215; Remove
+            </button>
+          </div>
         </div>`).join('')}
 
       ${members.filter(m => m.status === 'active').length < 3 ? `
