@@ -660,21 +660,7 @@ router.post('/:id/transfer-member', requireAuth, requireRole('admin','super_admi
     );
     const srcBatch = srcRes.rows[0];
 
-    /* ── Count completed classes for this student in source batch
-          (to preserve lesson continuation) ── */
-    const completedRes = await client.query(
-      `SELECT COUNT(*) AS cnt FROM bookings
-       WHERE batch_id = $1
-         AND status IN ('completed','partially_completed')
-         AND (
-           student_id = $2
-           OR id IN (
-             SELECT booking_id FROM booking_attendance WHERE student_id = $2 AND present = true
-           )
-         )`,
-      [req.params.id, studentId]
-    );
-    const lessonsCompleted = parseInt(completedRes.rows[0].cnt) || 0;
+
 
     /* ── Cancel remaining future bookings for this student in source batch ── */
     const cancelRes = await client.query(
@@ -751,7 +737,7 @@ router.post('/:id/transfer-member', requireAuth, requireRole('admin','super_admi
             destTutorId,
             studentId,
             destBatchId,
-            old.lesson_name || `Lesson ${old.lesson_number_in_grade || (lessonsCompleted + i + 1)}`,
+            old.lesson_name || `Lesson ${old.lesson_number_in_grade || (i + 1)}`,
             JSON.stringify({
               batchRef: destBatchRef, tutorName: destTutorName,
               classLink: destClassLink, isBatchClass: true,
@@ -759,7 +745,7 @@ router.post('/:id/transfer-member', requireAuth, requireRole('admin','super_admi
               transferredAt: new Date().toISOString(),
             }),
             old.pathway_lesson_id || null,
-            old.lesson_number_in_grade || (lessonsCompleted + i + 1),
+            old.lesson_number_in_grade || (i + 1),
           ]
         );
         createdCount++;
