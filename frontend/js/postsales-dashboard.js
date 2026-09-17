@@ -1529,7 +1529,7 @@ function renderPaidStudents() {
         studentName:    p.student_name || p.studentName || '—',
         email:          p.student_email || p.studentEmail || '—',
         whatsapp:       p.whatsapp || '—',
-        subject:        p.subject || '—',
+        subject:        p.course_name || p.subject || '—',
         course:         p.course_name || p.course || '—',
         paymentAmount:  p.amount,
         paymentCurrency: p.currency || 'GBP',
@@ -1607,7 +1607,7 @@ function renderPaidStudents() {
         <thead>
           <tr style="background:var(--bg);border-bottom:2px solid #e8eaf0;">
             <th style="${thStyle()}">Student</th>
-            <th style="${thStyle()}">Subject / Course</th>
+            <th style="${thStyle()}">Pathway / Course</th>
             <th style="${thStyle()}">Contact</th>
             <th style="${thStyle()}">Amount Paid</th>
             <th style="${thStyle()}">Credits</th>

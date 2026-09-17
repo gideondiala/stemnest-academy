@@ -268,6 +268,9 @@ async function _loadTutorFromAPI() {
           bookedAt:        b.booked_at || b.created_at,
           scheduledAt:     b.scheduled_at,
           creditsSuspended: b.student_credits_suspended === true || b.student_credits_suspended === 'true',
+          batchId:         b.batch_id || notes.batchRef ? (b.batch_id || '') : '',
+          batchRef:        notes.batchRef || '',
+          isBatchClass:    notes.isBatchClass === true || !!b.batch_id,
         };
       });
     }
@@ -741,6 +744,70 @@ function showBookingPopup(bookingId) {
         </div>
         <button onclick="document.getElementById('calBookingPopup').remove()" style="width:100%;background:var(--bg);border:1.5px solid #e8eaf0;border-radius:12px;padding:10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;cursor:pointer;color:var(--mid);">Close</button>
       </div>`;
+  } else if (b.isBatchClass && b.batchId) {
+    /* ── BATCH CLASS popup — fetch members and show student list ── */
+    const batchRef  = b.batchRef || 'Batch';
+    const lessonTitle = b.lessonName || ('Lesson ' + (b.lessonNumber || ''));
+    popup.innerHTML = `
+      <div style="background:var(--white);border-radius:20px;padding:28px 32px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 16px 60px rgba(0,0,0,.25);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span style="background:#e0f0ff;color:var(--blue);font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">👥 GROUP CLASS</span>
+            <span style="font-family:'Fredoka One',cursive;font-size:14px;color:var(--blue);">${batchRef}</span>
+          </div>
+          <button onclick="document.getElementById('calBookingPopup').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--light);">✕</button>
+        </div>
+        <div style="background:var(--blue-light);border-radius:12px;padding:16px;margin-bottom:14px;">
+          <div style="font-weight:900;font-size:16px;color:var(--dark);margin-bottom:4px;">${lessonTitle}</div>
+          <div style="font-size:13px;color:var(--mid);font-weight:700;line-height:2;">
+            📖 <strong>${b.subject || b.courseName || 'Coding'}</strong>${b.lessonNumber ? ' · Lesson ' + b.lessonNumber : ''}<br>
+            📅 <strong>${b.date || '—'}</strong> at <strong>${timeDisplay}</strong>
+          </div>
+        </div>
+        <div id="batchPopupStudents" style="margin-bottom:14px;">
+          <div style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:var(--light);margin-bottom:8px;">👩‍🎓 Students in this class</div>
+          <div id="batchPopupStudentsList" style="font-size:13px;color:var(--light);font-weight:700;">⏳ Loading students…</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+          ${b.classLink
+            ? `<a href="${b.classLink}" target="_blank" onclick="teacherJoinClass('${b.id}','${b.classLink}')" style="display:block;background:var(--blue);color:#fff;text-align:center;padding:12px;border-radius:12px;font-weight:900;font-size:13px;text-decoration:none;">🚀 Join Class</a>`
+            : `<button onclick="showToast('No class link set yet.','error')" style="background:var(--blue);color:#fff;border:none;border-radius:12px;padding:12px;font-weight:900;font-size:13px;cursor:pointer;width:100%;">🚀 Join Class</button>`}
+          <button onclick="document.getElementById('calBookingPopup').remove();openEndClassModal('${b.id}')" style="background:var(--green);color:#fff;border:none;border-radius:12px;padding:12px;font-family:'Nunito',sans-serif;font-weight:900;font-size:13px;cursor:pointer;">✅ End Class</button>
+        </div>
+        <button onclick="document.getElementById('calBookingPopup').remove()" style="width:100%;background:var(--bg);border:1.5px solid #e8eaf0;border-radius:12px;padding:10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;cursor:pointer;color:var(--mid);">Close</button>
+      </div>`;
+
+    /* Fetch batch members asynchronously after popup is shown */
+    const token = localStorage.getItem('sn_access_token');
+    fetch('https://api.stemnestacademy.co.uk/api/batches/' + b.batchId, {
+      headers: { 'Authorization': 'Bearer ' + token }
+    }).then(r => r.json()).then(data => {
+      const listEl = document.getElementById('batchPopupStudentsList');
+      if (!listEl) return;
+      const members = (data.members || []).filter(m => m.status === 'active');
+      if (!members.length) { listEl.textContent = 'No students found.'; return; }
+      const pathwayLine = data.batch && data.batch.pathwayName
+        ? `<div style="background:#f0fdf4;border-radius:8px;padding:7px 12px;margin-bottom:10px;font-size:12px;font-weight:700;color:#065f46;">📚 Pathway: ${data.batch.pathwayName}${data.batch.grade_number ? ' · Grade ' + data.batch.grade_number : ''}</div>`
+        : '';
+      listEl.innerHTML = pathwayLine + members.map(function(m) {
+        const phone = m.phone || m.whatsapp || '—';
+        const safeName = (m.studentName || '').replace(/'/g, "\\'");
+        const safePhone = phone.replace(/'/g, "\\'");
+        return `<div style="border:1.5px solid #e8eaf0;border-radius:10px;padding:11px 14px;margin-bottom:8px;">
+          <div style="font-weight:900;font-size:14px;color:var(--dark);margin-bottom:4px;">${m.studentName || '—'}</div>
+          <div style="font-size:12px;color:var(--mid);font-weight:700;line-height:1.8;">
+            🎓 Grade: <strong>${m.grade || '—'}</strong><br>
+            🪪 Student ID: <strong>${m.staffId || m.studentId.slice(0,8).toUpperCase()}</strong><br>
+            📧 ${m.email || '—'}<br>
+            📱 ${phone}${phone !== '—' ? ` <button onclick="navigator.clipboard.writeText('${safePhone}').then(()=>showToast('📋 Copied!')).catch(()=>{var el=document.createElement('input');el.value='${safePhone}';document.body.appendChild(el);el.select();document.execCommand('copy');document.body.removeChild(el);showToast('📋 Copied!');})" style="background:var(--blue);color:#fff;border:none;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:800;cursor:pointer;margin-left:4px;">📋</button>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+    }).catch(function() {
+      const listEl = document.getElementById('batchPopupStudentsList');
+      if (listEl) listEl.textContent = 'Could not load students.';
+    });
+
   } else {
     // PAID popup: topic, date, time, student phone, join, end, reschedule, close
     // If lessonName equals studentName (no pathway linked), fall back to courseName/subject
@@ -787,7 +854,6 @@ function showBookingPopup(bookingId) {
         <button onclick="document.getElementById('calBookingPopup').remove()" style="width:100%;background:var(--bg);border:1.5px solid #e8eaf0;border-radius:12px;padding:10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;cursor:pointer;color:var(--mid);">Close</button>
       </div>`;
   }
-
   popup.addEventListener('click', e => { if (e.target === popup) popup.remove(); });
   document.body.appendChild(popup);
 }

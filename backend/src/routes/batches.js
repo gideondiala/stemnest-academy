@@ -187,7 +187,10 @@ router.get('/:id', requireAuth, requireRole('admin','super_admin','postsales','t
     const membersRes = await pool.query(`
       SELECT bm.id, bm.status, bm.joined_at AS "joinedAt", bm.removal_reason AS "removalReason",
              u.id AS "studentId", u.name AS "studentName", u.email,
-             sp.credits, sp.credits_suspended AS "creditsSuspended", sp.grade
+             u.phone, u.whatsapp, u.staff_id AS "staffId",
+             u.parent_name AS "parentName", u.grade AS "userGrade",
+             COALESCE(sp.grade, u.grade) AS grade,
+             sp.credits, sp.credits_suspended AS "creditsSuspended"
       FROM batch_members bm
       JOIN users u ON u.id = bm.student_id
       LEFT JOIN student_profiles sp ON sp.user_id = u.id
@@ -676,7 +679,7 @@ router.post('/:id/transfer-member', requireAuth, requireRole('admin','super_admi
 
     /* ── Soft-remove student from source batch ── */
     await client.query(
-      `UPDATE batch_members SET status = 'transferred', removed_at = NOW(),
+      `UPDATE batch_members SET status = 'removed', removed_at = NOW(),
        removal_reason = $3
        WHERE batch_id = $1 AND student_id = $2 AND status = 'active'`,
       [req.params.id, studentId, `Transferred to ${destBatchRef} by ${req.user.email}`]

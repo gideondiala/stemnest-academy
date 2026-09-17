@@ -409,6 +409,10 @@ router.get('/dashboard/:role', requireAuth, async (req, res, next) => {
                     LEFT JOIN users u_t ON u_t.id = b.tutor_id
                     LEFT JOIN pathway_lessons pl ON pl.id = b.pathway_lesson_id
                     WHERE b.student_id = $1
+                       OR b.batch_id IN (
+                         SELECT bm.batch_id FROM batch_members bm
+                         WHERE bm.student_id = $1 AND bm.status = 'active'
+                       )
                     ORDER BY b.date ASC LIMIT 200`, [userId]),
         pool.query(`SELECT * FROM payments WHERE student_id = $1 ORDER BY created_at DESC LIMIT 100`, [userId]),
         pool.query(`SELECT c.* FROM courses c
