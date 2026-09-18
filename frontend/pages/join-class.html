@@ -1,0 +1,119 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Microsoft Clarity -->
+  <script type="text/javascript">
+    (function(c,l,a,r,i,t,y){
+      c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+      t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+      y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    })(window, document, "clarity", "script", "xer20hj8fr");
+  </script>
+  <!-- End Microsoft Clarity -->
+  <!-- TikTok Pixel Code -->
+  <script>
+    !function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var r="https://analytics.tiktok.com/i18n/pixel/events.js",o=n&&n.partner;ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=r,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};n=document.createElement("script");n.type="text/javascript",n.async=!0,n.src=r+"?sdkid="+e+"&lib="+t;e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(n,e)};ttq.load('D8V60AJC77U45FANPDG0');ttq.load('D91PAORC77U4QRO9NQ0G');ttq.page()}(window,document,'ttq');
+  </script>
+  <!-- End TikTok Pixel Code -->
+  <!-- Google Analytics 4 -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-WB62B0P5KG"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-WB62B0P5KG');
+  </script>
+  <!-- End Google Analytics 4 -->
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" sizes="32x32" href="../assets/icons/icon.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="../assets/icons/icon.png">
+  <link rel="apple-touch-icon" href="../assets/icons/icon.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Join Your Class – StemNest Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/join-class.css">
+  <link rel="stylesheet" href="../css/mobile.css">
+<!-- Meta Pixel Code -->
+<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window, document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init', '705705174881422');fbq('track', 'PageView');</script>
+<noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=705705174881422&ev=PageView&noscript=1"/></noscript>
+<!-- End Meta Pixel Code --></head>
+<body>
+
+<nav class="lp-nav" style="border-bottom:1.5px solid #e8eaf0;box-shadow:0 2px 12px rgba(0,0,0,.06);">
+  <a class="logo" href="../index.html">
+    <img src="../assets/images/logo.png" alt="StemNest Academy" class="logo-img">
+  </a>
+  <div class="nav-actions">
+    <a href="free-trial.html" class="btn btn-primary" style="font-size:13px;padding:8px 20px;">Book a Demo ✦</a>
+  </div>
+</nav>
+
+<!-- ── LOOKUP SCREEN ── -->
+<div class="jc-page" id="lookupScreen">
+  <div class="jc-card">
+    <div class="jc-icon">📡</div>
+    <h1 class="jc-title">Join Your Class</h1>
+    <p class="jc-sub">Enter your Gmail address or WhatsApp number to find your class details and join button.</p>
+    <div class="jc-field">
+      <label>Gmail Address or WhatsApp Number</label>
+      <input type="text" id="lookupInput" placeholder="e.g. parent@gmail.com or +44 7700 000000"
+             onkeydown="if(event.key==='Enter') findClass()">
+    </div>
+    <button class="jc-btn" onclick="findClass()">
+      <span id="lookupBtnText">🔍 Find My Class</span>
+    </button>
+    <div class="jc-lookup-note">
+      Don't have a booking yet?
+      <a href="free-trial.html">Book your FREE demo class →</a>
+    </div>
+  </div>
+</div>
+
+<!-- ── CLASS SCREEN ── -->
+<div class="jc-page" id="classScreen" style="display:none;">
+  <div class="jc-class-wrap">
+
+    <!-- Student info card -->
+    <div class="jc-student-card" id="studentCard"></div>
+
+    <!-- Join button card -->
+    <div class="jc-join-card" id="joinCard"></div>
+
+    <!-- Rules card -->
+    <div class="jc-rules-card">
+      <div class="jc-rules-title">📋 Class Rules & Tips for a Great Session</div>
+      <div class="jc-rules-grid">
+        <div class="jc-rule"><div class="jc-rule-icon">💻</div><div><strong>Use a laptop or desktop</strong><br>Phones make it hard to see and share work.</div></div>
+        <div class="jc-rule"><div class="jc-rule-icon">🔇</div><div><strong>Find a quiet spot</strong><br>Reduce background noise so your tutor can hear you clearly.</div></div>
+        <div class="jc-rule"><div class="jc-rule-icon">📷</div><div><strong>Camera on, please</strong><br>Seeing each other makes learning much more effective.</div></div>
+        <div class="jc-rule"><div class="jc-rule-icon">⏰</div><div><strong>Join 2–3 minutes early</strong><br>Test your mic and camera before the session starts.</div></div>
+        <div class="jc-rule"><div class="jc-rule-icon">📓</div><div><strong>Have a notebook ready</strong><br>Write down key points — it helps you remember.</div></div>
+        <div class="jc-rule"><div class="jc-rule-icon">🙋</div><div><strong>Ask questions freely</strong><br>There are no silly questions. Your tutor is here to help.</div></div>
+        <div class="jc-rule"><div class="jc-rule-icon">🌐</div><div><strong>Good internet connection</strong><br>Use Wi-Fi if possible for the best video quality.</div></div>
+        <div class="jc-rule"><div class="jc-rule-icon">😊</div><div><strong>Have fun!</strong><br>Learning is exciting — enjoy every moment of your class.</div></div>
+      </div>
+    </div>
+
+    <div style="text-align:center;margin-top:16px;">
+      <a href="../index.html" style="font-size:14px;font-weight:700;color:var(--light);text-decoration:none;">← Back to StemNest Academy</a>
+    </div>
+  </div>
+</div>
+
+<!-- ── NO BOOKING SCREEN ── -->
+<div class="jc-page" id="noBookingScreen" style="display:none;">
+  <div class="jc-card">
+    <div class="jc-icon">😕</div>
+    <h1 class="jc-title">No Booking Found</h1>
+    <p class="jc-sub">We couldn't find a booking for <strong id="notFoundQuery"></strong>.<br>Double-check your email or WhatsApp number, or book a free class below.</p>
+    <a href="free-trial.html" class="jc-btn" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;">🎓 Book a FREE Demo Class</a>
+    <button class="jc-btn-outline" onclick="resetLookup()">← Try Again</button>
+  </div>
+</div>
+
+<script src="../js/utils.js"></script>
+<script src="../js/join-class.js"></script>
+</body>
+</html>

@@ -1,0 +1,396 @@
+﻿/* ═══════════════════════════════════════════════════════
+   STEMNEST ACADEMY — LOGIN.JS
+   Role switcher, form validation, login handler.
+═══════════════════════════════════════════════════════ */
+
+let currentRole = 'student';
+
+const loginConfig = {
+  tutor: {
+    eyebrowClass: 'eyebrow-tutor',
+    eyebrowText:  '📡 Tutor Portal',
+    title:        'Welcome back,<br>ready to teach? 👋',
+    sub:          'Log in to access your dashboard, schedule and upcoming live sessions.',
+    btnClass:     'btn-tutor-login',
+    btnIcon:      '🎓',
+    btnText:      'Log In as Tutor',
+    tutorActive:  'active-tutor',
+    studentActive:'',
+    panelClass:   'panel-tutor',
+    panelIcon:    '🎓',
+    panelTitle:   'Welcome back,<br>Tutor! 👋',
+    panelSub:     "Log in to access your full teaching dashboard.",
+    ctaText:      '👩‍🏫 Join Us as a Tutor',
+    ctaAction:    () => navigate('home'),
+    cards: `
+      <div class="pcard">
+        <div class="pcard-icon">📅</div>
+        <div><div class="pcard-title">View your class schedule</div><div class="pcard-sub">See all upcoming sessions at a glance</div></div>
+      </div>
+      <div class="pcard">
+        <div class="pcard-icon">🚀</div>
+        <div><div class="pcard-title">Join live sessions</div><div class="pcard-sub">One click to open your class link</div></div>
+      </div>
+      <div class="pcard">
+        <div class="pcard-icon">📁</div>
+        <div><div class="pcard-title">Review student projects</div><div class="pcard-sub">Give feedback and track student progress</div></div>
+      </div>`,
+  },
+  student: {
+    eyebrowClass: 'eyebrow-student',
+    eyebrowText:  '🧑‍💻 Student Portal',
+    title:        "Hey there,<br>ready to learn? 🚀",
+    sub:          "Log in to join your live class, check homework and see how far you've come.",
+    btnClass:     'btn-student-login',
+    btnIcon:      '🚀',
+    btnText:      'Log In & Join Class',
+    tutorActive:  '',
+    studentActive:'active-student',
+    panelClass:   'panel-student',
+    panelIcon:    '🧑‍💻',
+    panelTitle:   'Your learning<br>awaits you! 🚀',
+    panelSub:     "Log in to access your personal learning dashboard.",
+    ctaText:      '🎓 Book a Demo — No commitment needed',
+    ctaAction:    () => navigate('home'),
+    cards: `
+      <div class="pcard">
+        <div class="pcard-icon">📚</div>
+        <div><div class="pcard-title">View your upcoming lessons</div><div class="pcard-sub">See your full class schedule and lesson topics</div></div>
+      </div>
+      <div class="pcard">
+        <div class="pcard-icon">🧠</div>
+        <div><div class="pcard-title">Take quizzes & submit projects</div><div class="pcard-sub">Test your knowledge and track your progress</div></div>
+      </div>
+      <div class="pcard">
+        <div class="pcard-icon">🏆</div>
+        <div><div class="pcard-title">Earn certificates</div><div class="pcard-sub">Complete your pathway and unlock achievements</div></div>
+      </div>`,
+  },
+};
+
+/* ── INIT ── */
+document.addEventListener('DOMContentLoaded', () => {
+  switchRole('student');
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter') handleLogin();
+  });
+
+  /* Show message if redirected here due to auth failure */
+  const params = new URLSearchParams(window.location.search);
+  const error  = params.get('error');
+  const redirect = params.get('redirect');
+  if (error === 'unauthorized') {
+    showToast('⚠️ You do not have permission to access that page. Please log in with the correct account.', 'error');
+  } else if (redirect) {
+    showToast('Please log in to continue.', 'info');
+  }
+});
+
+/* ── SEED DEFAULT REGISTRIES — REMOVED
+   All user data now comes from the real database via API.
+   No hardcoded teachers, sales, or staff in localStorage.
+── */
+function seedRegistries() {
+  // No-op: data is loaded from the API, not seeded locally.
+}
+
+/* ── SWITCH ROLE ── */
+function switchRole(role) {
+  currentRole = role;
+  const c = loginConfig[role];
+
+  // Toggle buttons
+  document.getElementById('tutorBtn').className   = 'role-btn ' + c.tutorActive;
+  document.getElementById('studentBtn').className = 'role-btn ' + c.studentActive;
+
+  // Welcome copy
+  const ey = document.getElementById('formEyebrow');
+  ey.className   = 'form-eyebrow ' + c.eyebrowClass;
+  ey.textContent = c.eyebrowText;
+  document.getElementById('formTitle').innerHTML = c.title;
+  document.getElementById('formSub').textContent = c.sub;
+
+  // Input focus colour
+  const pw = document.getElementById('passwordInput');
+  const em = document.getElementById('emailInput');
+  if (role === 'student') {
+    pw?.classList.add('focus-green');
+    em?.classList.add('focus-green');
+  } else {
+    pw?.classList.remove('focus-green');
+    em?.classList.remove('focus-green');
+  }
+
+  // Login button
+  const btn = document.getElementById('loginBtn');
+  btn.className = 'login-btn ' + c.btnClass;
+  document.getElementById('btnIcon').textContent = c.btnIcon;
+  document.getElementById('btnText').textContent = c.btnText;
+
+  // Right panel
+  document.getElementById('brandPanel').className = 'brand-panel ' + c.panelClass;
+  document.getElementById('panelIcon').textContent  = c.panelIcon;
+  document.getElementById('panelTitle').innerHTML   = c.panelTitle;
+  document.getElementById('panelSub').textContent   = c.panelSub;
+  document.getElementById('panelCards').innerHTML   = c.cards;
+
+  // CTA link below divider
+  const cta = document.getElementById('loginCtaLink');
+  cta.innerHTML = c.ctaText;
+  cta.onclick   = c.ctaAction;
+}
+
+/* ── PASSWORD TOGGLE ── */
+function togglePw() {
+  const inp = document.getElementById('passwordInput');
+  const btn = document.getElementById('pwToggle');
+  if (inp.type === 'password') { inp.type = 'text';     btn.textContent = '🙈'; }
+  else                         { inp.type = 'password'; btn.textContent = '👁️'; }
+}
+
+/* ── HANDLE LOGIN ── */
+async function handleLogin() {
+  const email = document.getElementById('emailInput')?.value.trim();
+  const pw    = document.getElementById('passwordInput')?.value;
+  const btn   = document.getElementById('loginBtn');
+
+  if (!email || !pw) {
+    btn.style.animation = 'none';
+    btn.offsetHeight;
+    btn.style.animation = 'shake .4s ease';
+    return;
+  }
+
+  btn.style.opacity       = '0.7';
+  btn.style.pointerEvents = 'none';
+  document.getElementById('btnText').textContent = 'Logging in…';
+  document.getElementById('btnIcon').textContent = '⏳';
+
+  /* ── Try real API first ── */
+  const apiOnline = await isApiAvailable();
+
+  if (apiOnline) {
+    try {
+      const user = await Auth.login(email, pw);
+
+      document.getElementById('btnIcon').textContent = '✅';
+      document.getElementById('btnText').textContent = `Welcome, ${user.name.split(' ')[0]}! Redirecting…`;
+
+      /* Route by role */
+      const roleRoutes = {
+        tutor:       'tutor-dashboard',
+        student:     'student-dashboard',
+        sales:       'sales-dashboard',
+        presales:    'presales-dashboard',
+        postsales:   'postsales-dashboard',
+        operations:  'operations-dashboard',
+        hr:          'hr-dashboard',
+        admin:       'admin-dashboard',
+        super_admin: 'super-admin',
+      };
+
+      const dest = roleRoutes[user.role];
+      if (dest) {
+        /* Store auth token and full user profile for dashboard use */
+        if (user.role === 'tutor') {
+          localStorage.setItem('sn_logged_in_teacher', user.staffId || user.id);
+          /* Store full tutor profile so dashboard doesn't need to look up sn_teachers */
+          localStorage.setItem('sn_current_tutor', JSON.stringify({
+            id:           user.staffId || user.id,
+            dbId:         user.id,
+            name:         user.name,
+            email:        user.email,
+            role:         user.role,
+            initials:     user.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase(),
+          }));
+        }
+        if (user.role === 'sales')   localStorage.setItem('sn_logged_in_sales',   user.staffId || user.id);
+        if (user.role === 'student') localStorage.setItem('sn_logged_in_student', user.email);
+        setTimeout(() => navigateAfterLogin(dest), 700);
+      } else {
+        throw new Error('Unknown role: ' + user.role);
+      }
+      return;
+    } catch (err) {
+      /* API login failed — show error */
+      btn.style.opacity       = '1';
+      btn.style.pointerEvents = '';
+      document.getElementById('btnIcon').textContent = '❌';
+      document.getElementById('btnText').textContent = err.message === 'Invalid email or password'
+        ? 'Invalid credentials' : 'Login failed — try again';
+      btn.style.animation = 'none';
+      btn.offsetHeight;
+      btn.style.animation = 'shake .4s ease';
+      setTimeout(() => {
+        document.getElementById('btnIcon').textContent = loginConfig[currentRole].btnIcon;
+        document.getElementById('btnText').textContent = loginConfig[currentRole].btnText;
+      }, 2000);
+      return;
+    }
+  }
+
+  /* ── Fallback: localStorage (offline / demo mode) ── */
+  setTimeout(() => {
+    btn.style.opacity       = '1';
+    btn.style.pointerEvents = '';
+
+    if (currentRole === 'tutor') {
+      const teachers = JSON.parse(localStorage.getItem('sn_teachers') || '[]');
+      const teacher  = teachers.find(t => t.email.toLowerCase() === email.toLowerCase() && t.password === pw);
+      const salesPersons = JSON.parse(localStorage.getItem('sn_sales_persons') || '[]');
+      const salesPerson  = salesPersons.find(s => s.email.toLowerCase() === email.toLowerCase() && s.password === pw);
+      const staff = JSON.parse(localStorage.getItem('sn_staff') || '[]');
+      const staffMember = staff.find(s => s.email.toLowerCase() === email.toLowerCase() && s.password === pw);
+
+      if (teacher) {
+        localStorage.setItem('sn_logged_in_teacher', teacher.id);
+        document.getElementById('btnIcon').textContent = '✅';
+        document.getElementById('btnText').textContent = `Welcome back, ${teacher.name.split(' ')[0]}!`;
+        setTimeout(() => navigate('tutor-dashboard'), 700);
+      } else if (salesPerson) {
+        localStorage.setItem('sn_logged_in_sales', salesPerson.id);
+        document.getElementById('btnIcon').textContent = '✅';
+        document.getElementById('btnText').textContent = `Welcome, ${salesPerson.name.split(' ')[0]}!`;
+        setTimeout(() => navigate('sales-dashboard'), 700);
+      } else if (staffMember) {
+        document.getElementById('btnIcon').textContent = '✅';
+        document.getElementById('btnText').textContent = 'Welcome! Redirecting…';
+        setTimeout(() => navigate(staffMember.role), 700);
+      } else if (email === 'admin@stemnestacademy.co.uk' && pw === 'admin123') {
+        document.getElementById('btnIcon').textContent = '✅';
+        document.getElementById('btnText').textContent = 'Welcome, Admin!';
+        setTimeout(() => navigate('admin-dashboard'), 700);
+      } else if (email === 'founder@stemnestacademy.co.uk' && pw === 'Founder2024!') {
+        document.getElementById('btnIcon').textContent = '✅';
+        document.getElementById('btnText').textContent = 'Welcome, Founder!';
+        setTimeout(() => navigate('super-admin'), 700);
+      } else {
+        document.getElementById('btnIcon').textContent = '❌';
+        document.getElementById('btnText').textContent = 'Invalid credentials';
+        btn.style.animation = 'none';
+        btn.offsetHeight;
+        btn.style.animation = 'shake .4s ease';
+        setTimeout(() => {
+          document.getElementById('btnIcon').textContent = loginConfig[currentRole].btnIcon;
+          document.getElementById('btnText').textContent = loginConfig[currentRole].btnText;
+        }, 1500);
+      }
+    } else {
+      // Student login — no offline fallback. API must be available.
+      document.getElementById('btnIcon').textContent = '❌';
+      document.getElementById('btnText').textContent = 'Cannot connect — check your internet';
+      btn.style.animation = 'none';
+      btn.offsetHeight;
+      btn.style.animation = 'shake .4s ease';
+      setTimeout(() => {
+        document.getElementById('btnIcon').textContent = loginConfig[currentRole].btnIcon;
+        document.getElementById('btnText').textContent = loginConfig[currentRole].btnText;
+        btn.style.opacity       = '1';
+        btn.style.pointerEvents = '';
+      }, 2000);
+    }
+  }, 1200);
+}
+
+/* ══════════════════════════════════════════════════════
+   FORGOT PASSWORD
+══════════════════════════════════════════════════════ */
+function openForgotPassword() {
+  document.getElementById('forgotStep1').style.display = 'block';
+  document.getElementById('forgotStep2').style.display = 'none';
+  const emailEl = document.getElementById('forgotEmail');
+  if (emailEl) emailEl.value = '';
+  document.getElementById('forgotPwOverlay').classList.add('open');
+}
+
+function closeForgotPassword() {
+  document.getElementById('forgotPwOverlay').classList.remove('open');
+}
+
+async function submitForgotPassword() {
+  const email = document.getElementById('forgotEmail')?.value.trim().toLowerCase();
+  if (!email) { showToast('Please enter your email address.', 'error'); return; }
+
+  const btn = document.querySelector('#forgotStep1 button.btn-primary') ||
+              document.querySelector('#forgotStep1 .btn');
+
+  if (btn) { btn.textContent = 'Sending…'; btn.disabled = true; }
+
+  /* Try real API first */
+  const apiOnline = await isApiAvailable();
+  if (apiOnline) {
+    try {
+      await Auth.forgotPassword(email);
+      document.getElementById('forgotStep1').style.display = 'none';
+      document.getElementById('forgotStep2').style.display = 'block';
+      document.getElementById('forgotSuccessMsg').textContent =
+        `If ${email} is registered, a reset link has been sent to that address. Check your email and WhatsApp.`;
+      const tempBox = document.getElementById('forgotTempPwBox');
+      if (tempBox) tempBox.style.display = 'none';
+      if (btn) { btn.textContent = 'Send Reset Link'; btn.disabled = false; }
+      return;
+    } catch (err) {
+      /* Fall through to localStorage */
+    }
+  }
+
+  /* Fallback: localStorage demo mode */
+  if (btn) { btn.textContent = 'Send Reset Link'; btn.disabled = false; }
+
+  let found = null, registry = null, registryKey = null;
+  const teachers = JSON.parse(localStorage.getItem('sn_teachers') || '[]');
+  const teacher  = teachers.find(t => t.email.toLowerCase() === email);
+  if (teacher) { found = teacher; registry = teachers; registryKey = 'sn_teachers'; }
+
+  if (!found) {
+    const sales = JSON.parse(localStorage.getItem('sn_sales_persons') || '[]');
+    const sp    = sales.find(s => s.email.toLowerCase() === email);
+    if (sp) { found = sp; registry = sales; registryKey = 'sn_sales_persons'; }
+  }
+  if (!found) {
+    const staff = JSON.parse(localStorage.getItem('sn_staff') || '[]');
+    const sm    = staff.find(s => s.email.toLowerCase() === email);
+    if (sm) { found = sm; registry = staff; registryKey = 'sn_staff'; }
+  }
+  if (!found) {
+    const students = JSON.parse(localStorage.getItem('sn_students') || '[]');
+    const st       = students.find(s => s.email.toLowerCase() === email);
+    if (st) { found = st; registry = students; registryKey = 'sn_students'; }
+  }
+  if (!found && email === 'admin@stemnestacademy.co.uk')   found = { name:'Admin',   email, password:'admin123',   _isAdmin:true };
+  if (!found && email === 'founder@stemnestacademy.co.uk') found = { name:'Founder', email, password:'Founder2024!', _isFounder:true };
+
+  if (!found) { showToast('No account found with that email address.', 'error'); return; }
+
+  const tempPw = 'SN' + Math.random().toString(36).slice(2, 8).toUpperCase() + '!';
+  if (registry && registryKey) {
+    const idx = registry.findIndex(u => u.email.toLowerCase() === email);
+    if (idx !== -1) { registry[idx].password = tempPw; localStorage.setItem(registryKey, JSON.stringify(registry)); }
+  }
+
+  document.getElementById('forgotStep1').style.display = 'none';
+  document.getElementById('forgotStep2').style.display = 'block';
+  document.getElementById('forgotSuccessMsg').textContent =
+    `A temporary password has been sent to ${email}. Use it to log in, then change your password.`;
+  const tempBox = document.getElementById('forgotTempPwBox');
+  if (tempBox) {
+    tempBox.style.display = 'block';
+    tempBox.innerHTML = `<strong>Temp Password (demo mode):</strong><br><span style="font-family:'Courier New',monospace;font-size:16px;color:var(--blue);font-weight:900;">${tempPw}</span>`;
+  }
+}
+
+/* Bind overlay close */
+document.addEventListener('DOMContentLoaded', () => {
+  const overlay = document.getElementById('forgotPwOverlay');
+  overlay?.addEventListener('click', e => { if (e.target === overlay) closeForgotPassword(); });
+});
+
+/* ── PASSWORD REGISTRY (for Super Admin chart) ── */
+function updatePasswordRegistry(user) {
+  const reg = JSON.parse(localStorage.getItem('sn_password_registry') || '[]');
+  const idx = reg.findIndex(u => u.id === user.id || u.email === user.email);
+  const entry = { id: user.id || user.email, name: user.name, email: user.email, role: user.role || 'user', password: user.password, updatedAt: new Date().toISOString() };
+  if (idx !== -1) reg[idx] = entry;
+  else reg.unshift(entry);
+  localStorage.setItem('sn_password_registry', JSON.stringify(reg));
+}

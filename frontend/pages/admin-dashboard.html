@@ -1,0 +1,881 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Microsoft Clarity -->
+  <script type="text/javascript">
+    (function(c,l,a,r,i,t,y){
+      c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+      t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+      y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    })(window, document, "clarity", "script", "xer20hj8fr");
+  </script>
+  <!-- End Microsoft Clarity -->
+  <!-- TikTok Pixel Code -->
+  <script>
+    !function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var r="https://analytics.tiktok.com/i18n/pixel/events.js",o=n&&n.partner;ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=r,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};n=document.createElement("script");n.type="text/javascript",n.async=!0,n.src=r+"?sdkid="+e+"&lib="+t;e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(n,e)};ttq.load('D8V60AJC77U45FANPDG0');ttq.load('D91PAORC77U4QRO9NQ0G');ttq.page()}(window,document,'ttq');
+  </script>
+  <!-- End TikTok Pixel Code -->
+  <!-- Google Analytics 4 -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-WB62B0P5KG"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-WB62B0P5KG');
+  </script>
+  <!-- End Google Analytics 4 -->
+  <!-- Auth Guard — must be first script in head -->
+  <script>
+    (function(){
+      var t=localStorage.getItem('sn_access_token');
+      var u=null;try{u=JSON.parse(localStorage.getItem('sn_api_user')||'null');}catch(e){}
+      var roles='admin,super_admin';
+      var allowed=roles?roles.split(',').map(function(r){return r.trim();}):[];
+      var redir='/pages/login.html?redirect='+encodeURIComponent(window.location.pathname+window.location.search);
+      if(!t){document.documentElement.style.visibility='hidden';window.location.replace(redir);return;}
+      try{var p=t.split('.');if(p.length===3){var pl=JSON.parse(atob(p[1].replace(/-/g,'+').replace(/_/g,'/')));if(pl.exp&&pl.exp*1000<Date.now()){localStorage.removeItem('sn_access_token');localStorage.removeItem('sn_api_user');document.documentElement.style.visibility='hidden';window.location.replace(redir);return;}}}catch(e){}
+      if(allowed.length){var role=u&&u.role?u.role:'';if(!role||allowed.indexOf(role)===-1){document.documentElement.style.visibility='hidden';window.location.replace('/pages/login.html?error=unauthorized');return;}}
+      document.documentElement.style.visibility='';
+    })();
+  </script>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" sizes="32x32" href="../assets/icons/icon.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="../assets/icons/icon.png">
+  <link rel="apple-touch-icon" href="../assets/icons/icon.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard – StemNest Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/dashboard.css">
+  <link rel="stylesheet" href="../css/admin-dashboard.css">
+</head>
+<body>
+
+<nav style="position:sticky;top:0;z-index:200;">
+  <a class="logo" href="../index.html">
+    <img src="../assets/images/logo.png" alt="StemNest Academy" class="logo-img">
+  </a>
+  <ul class="nav-links"><li><a href="../index.html">← Back to Website</a></li></ul>
+  <div class="nav-actions">
+    <span style="font-size:13px;font-weight:700;color:var(--light);"><span class="live-dot"></span> Admin Panel</span>
+    <a href="login.html" class="btn btn-outline" style="font-size:13px;padding:8px 18px;">Log Out</a>
+  </div>
+</nav>
+
+<div class="dash-wrap">
+
+  <!-- SIDEBAR -->
+  <div class="dash-sidebar">
+    <div class="sidebar-profile">
+      <div class="sidebar-avatar" style="background:linear-gradient(135deg,var(--orange),#fbbf24);">AD</div>
+      <div class="sidebar-name">Admin</div>
+      <div class="sidebar-role">StemNest Admin</div>
+      <div class="sidebar-status"><span class="live-dot"></span> Online</div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="sidebar-section-label">Bookings</div>
+      <a class="sidebar-link active" data-tab="bookings"   onclick="showAdminTab('bookings')">  <span class="sl-icon">📋</span> All Bookings <span class="sl-badge" id="newBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="scheduled"  onclick="showAdminTab('scheduled')"> <span class="sl-icon">📅</span> Scheduled</a>
+      <a class="sidebar-link"        data-tab="completed"  onclick="showAdminTab('completed')"> <span class="sl-icon">✅</span> Completed</a>
+      <div class="sidebar-section-label">Students</div>
+      <a class="sidebar-link" data-tab="students" onclick="showAdminTab('students')"><span class="sl-icon">🎓</span> All Students <span class="sl-badge" id="studentBadge">0</span></a>
+      <div class="sidebar-section-label">Teachers</div>
+      <a class="sidebar-link"        data-tab="tutors"      onclick="showAdminTab('tutors')">      <span class="sl-icon">👩‍🏫</span> All Teachers <span class="sl-badge" id="teacherBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="add-teacher" onclick="showAdminTab('add-teacher')"> <span class="sl-icon">➕</span> Add Teacher</a>
+      <div class="sidebar-section-label">Courses</div>
+      <a class="sidebar-link"        data-tab="courses"     onclick="showAdminTab('courses')">     <span class="sl-icon">📚</span> All Courses <span class="sl-badge" id="courseBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="add-course"  onclick="showAdminTab('add-course')">  <span class="sl-icon">➕</span> Add Course</a>
+      <a class="sidebar-link"        data-tab="companion-admin" onclick="showAdminTab('companion-admin')"><span class="sl-icon">📖</span> Companion Materials</a>
+      <div class="sidebar-section-label">Career Pathways</div>
+      <a class="sidebar-link"        data-tab="pathways"    onclick="showAdminTab('pathways')">    <span class="sl-icon">🚀</span> All Pathways <span class="sl-badge" id="pathwayBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="add-pathway" onclick="resetPathwayForm();showAdminTab('add-pathway')"> <span class="sl-icon">➕</span> Add Pathway</a>
+      <div class="sidebar-section-label">Quizzes</div>
+      <a class="sidebar-link"        data-tab="quizzes"     onclick="showAdminTab('quizzes')">     <span class="sl-icon">🧠</span> All Quizzes <span class="sl-badge" id="quizAdminBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="upload-quiz" onclick="showAdminTab('upload-quiz')"> <span class="sl-icon">⬆️</span> Upload Quiz</a>
+      <div class="sidebar-section-label">Sales Team</div>      <a class="sidebar-link"        data-tab="sales"       onclick="showAdminTab('sales')">       <span class="sl-icon">💼</span> Sales Persons <span class="sl-badge" id="salesBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="add-sales"   onclick="showAdminTab('add-sales')">   <span class="sl-icon">➕</span> Add Sales Person</a>
+      <div class="sidebar-section-label">Reports</div>
+      <a class="sidebar-link"        data-tab="class-reports" onclick="showAdminTab('class-reports')"><span class="sl-icon">📊</span> Class Reports</a>
+      <div class="sidebar-section-label">Blog</div>
+      <a class="sidebar-link"        data-tab="blog-posts"    onclick="showAdminTab('blog-posts')">  <span class="sl-icon">✍️</span> All Posts <span class="sl-badge" id="blogBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="blog-new"      onclick="showAdminTab('blog-new')">    <span class="sl-icon">➕</span> New Post</a>
+      <div class="sidebar-section-label">Communications</div>
+      <a class="sidebar-link"        data-tab="bulk-email"    onclick="showAdminTab('bulk-email')">  <span class="sl-icon">📧</span> Bulk Email</a>
+      <div class="sidebar-section-label">Links</div>
+      <a class="sidebar-link" href="free-trial.html" target="_blank"><span class="sl-icon">🔗</span> Landing Page</a>
+      <a class="sidebar-link" href="blog.html" target="_blank"><span class="sl-icon">📰</span> View Blog</a>
+    </div>
+    <div class="sidebar-bottom">
+      <button class="logout-btn" onclick="window.location.href='login.html'">🚪 Log Out</button>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="dash-main">
+
+    <div class="dash-topbar">
+      <div>
+        <div class="dash-greeting">📋 Admin Dashboard</div>
+        <div class="dash-date" id="adminDate"></div>
+      </div>
+      <div class="dash-top-actions">
+        <button class="btn btn-outline" onclick="exportCSV()">⬇ Export CSV</button>
+        <button class="btn btn-primary" onclick="refreshBookings()">🔄 Refresh</button>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="dash-stats">
+      <div class="dstat ds-orange"><div class="dstat-icon di-orange">📋</div><div class="dstat-val" id="statTotal">0</div><div class="dstat-label">Total Bookings</div><div class="dstat-trend trend-up" id="statNew">0 new today</div></div>
+      <div class="dstat ds-blue"><div class="dstat-icon di-blue">⏳</div><div class="dstat-val" id="statPending">0</div><div class="dstat-label">Pending</div><div class="dstat-trend trend-neutral">Needs tutor assigned</div></div>
+      <div class="dstat ds-green"><div class="dstat-icon di-green">📅</div><div class="dstat-val" id="statScheduled">0</div><div class="dstat-label">Scheduled</div><div class="dstat-trend trend-up">Tutor assigned</div></div>
+      <div class="dstat ds-purple"><div class="dstat-icon di-purple">👩‍🏫</div><div class="dstat-val" id="statTeachers">0</div><div class="dstat-label">Teachers</div><div class="dstat-trend trend-up">On platform</div></div>
+      <div class="dstat" style="border-color:rgba(6,148,162,.15);"><div class="dstat-icon" style="background:rgba(6,148,162,.12);">📚</div><div class="dstat-val" id="statCourses">0</div><div class="dstat-label">Courses</div><div class="dstat-trend trend-up">In catalogue</div></div>
+    </div>
+
+    <!-- ── TAB: ALL BOOKINGS ── -->
+    <div id="tab-bookings">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📋 All Bookings</div>
+        <div class="admin-filters">
+          <input type="text" id="searchInput" placeholder="🔍 Search name, email, WhatsApp..." class="admin-search" oninput="filterBookings()">
+          <select id="filterSubject" class="admin-filter-sel" onchange="filterBookings()">
+            <option value="">All Subjects</option>
+            <option>Coding</option><option>Maths</option><option>Sciences</option>
+          </select>
+          <select id="filterStatus" class="admin-filter-sel" onchange="filterBookings()">
+            <option value="">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="scheduled">Scheduled</option>
+            <option value="completed">Completed</option>
+          </select>
+        </div>
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr>
+            <th>Booking ID</th><th>Student</th><th>Age/Grade</th><th>Subject</th>
+            <th>Date & Time</th><th>Parent Email</th><th>WhatsApp</th>
+            <th>Device</th><th>Booked At</th><th>Status</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="bookingsBody"></tbody>
+        </table>
+        <div class="admin-empty" id="adminEmpty" style="display:none;">
+          <div style="font-size:48px;">📭</div>
+          <div style="font-family:'Fredoka One',cursive;font-size:22px;color:var(--dark);margin-top:12px;">No bookings yet</div>
+          <div style="font-size:14px;color:var(--light);margin-top:8px;">Bookings from the landing page will appear here instantly.</div>
+          <a href="free-trial.html" target="_blank" class="btn btn-primary" style="margin-top:20px;">View Landing Page →</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB: SCHEDULED ── -->
+    <div id="tab-scheduled" style="display:none;">
+      <div class="dash-section-header"><div class="dash-section-title">📅 Scheduled Classes</div></div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr><th>Student</th><th>Subject</th><th>Date & Time</th><th>Tutor</th><th>Email</th><th>WhatsApp</th><th>Class Link</th><th>Actions</th></tr></thead>
+          <tbody id="scheduledBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── TAB: COMPLETED ── -->
+    <div id="tab-completed" style="display:none;">
+      <div class="dash-section-header"><div class="dash-section-title">✅ Completed Classes</div></div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr><th>Student</th><th>Subject</th><th>Date & Time</th><th>Tutor</th><th>Email</th><th>WhatsApp</th></tr></thead>
+          <tbody id="completedBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── TAB: ALL TEACHERS ── -->
+    <div id="tab-tutors" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">👩‍🏫 All Teachers</div>
+        <button class="btn btn-primary" style="font-size:13px;padding:9px 20px;" onclick="showAdminTab('add-teacher')">➕ Add Teacher</button>
+      </div>
+      <div class="tutor-assign-grid" id="tutorGrid"></div>
+    </div>
+
+    <!-- ── TAB: ADD TEACHER ── -->
+    <div id="tab-add-teacher" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">➕ Onboard New Teacher</div>
+      </div>
+      <div class="add-teacher-form-wrap">
+        <form class="add-teacher-form" id="addTeacherForm" onsubmit="return false;">
+
+          <div class="atf-section-title">👤 Personal Details</div>
+          <div class="atf-grid">
+            <div class="atf-field atf-full">
+              <label>Full Name <span class="req">*</span></label>
+              <input type="text" id="at-name" placeholder="e.g. Sarah Rahman" required>
+            </div>
+            <div class="atf-field">
+              <label>Email Address <span class="req">*</span></label>
+              <input type="email" id="at-email" placeholder="sarah@stemnestacademy.co.uk" required>
+            </div>
+            <div class="atf-field">
+              <label>Phone Number</label>
+              <input type="tel" id="at-phone" placeholder="+44 7700 000000">
+            </div>
+            <div class="atf-field atf-full">
+              <label>Default Password <span class="req">*</span></label>
+              <div style="position:relative;">
+                <input type="text" id="at-password" placeholder="e.g. StemNest2024!" required>
+                <button type="button" class="atf-gen-btn" onclick="generatePassword()">🔀 Generate</button>
+              </div>
+              <div class="atf-hint">Teacher will be prompted to change this on first login.</div>
+            </div>
+            <div class="atf-field">
+              <label>Date of Birth</label>
+              <input type="date" id="at-dob" title="Used for birthday greeting">
+            </div>
+          </div>
+
+          <div class="atf-divider"></div>
+          <div class="atf-section-title">📚 Teaching Profile</div>
+          <div class="atf-grid">
+            <div class="atf-field">
+              <label>Primary Subject <span class="req">*</span></label>
+              <select id="at-subject" required onchange="updateTeacherId()">
+                <option value="">Select subject</option>
+                <option value="Coding">💻 Coding</option>
+                <option value="Maths">📐 Maths</option>
+                <option value="Sciences">🔬 Sciences</option>
+              </select>
+            </div>
+            <div class="atf-field">
+              <label>Teacher ID (auto-generated)</label>
+              <input type="text" id="at-id" placeholder="e.g. CT001" readonly style="background:var(--bg);color:var(--blue);font-weight:900;">
+            </div>
+            <div class="atf-field atf-full">
+              <label>Courses Qualified to Teach <span class="req">*</span></label>
+              <div class="atf-courses-grid" id="atCoursesGrid"></div>
+            </div>
+            <div class="atf-field atf-full">
+              <label>Grade Groups Assigned <span class="req">*</span></label>
+              <div class="atf-grades-grid" id="atGradesGrid"></div>
+            </div>
+            <div class="atf-field atf-full">
+              <label>Eligible Teaching Regions</label>
+              <div class="atf-grades-grid" id="atRegionsGrid"></div>
+            </div>
+            <div class="atf-field atf-full">
+              <label>Short Bio</label>
+              <textarea id="at-bio" placeholder="Brief description of the teacher's background and expertise..."></textarea>
+            </div>
+            <div class="atf-field">
+              <label>Availability</label>
+              <select id="at-availability">
+                <option value="Mon–Fri, 9am–6pm">Mon–Fri, 9am–6pm</option>
+                <option value="Mon–Sat, 9am–6pm">Mon–Sat, 9am–6pm</option>
+                <option value="Mon–Fri, 2pm–9pm">Mon–Fri, 2pm–9pm</option>
+                <option value="Weekends Only">Weekends Only</option>
+                <option value="Flexible">Flexible</option>
+              </select>
+            </div>
+            <div class="atf-field">
+              <label>DBS Checked</label>
+              <select id="at-dbs">
+                <option value="yes">✅ Yes — DBS Verified</option>
+                <option value="pending">⏳ Pending</option>
+                <option value="no">❌ Not yet</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="atf-divider"></div>
+          <div class="atf-actions">
+            <button type="button" class="btn btn-outline" onclick="resetAddTeacherForm()">Clear Form</button>
+            <button type="button" class="btn btn-primary" onclick="saveNewTeacher()">✦ Create Teacher Account</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ── TAB: ALL COURSES ── -->
+    <div id="tab-courses" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📚 Course Catalogue</div>
+        <button class="btn btn-primary" style="font-size:13px;padding:9px 20px;" onclick="showAdminTab('add-course')">➕ Add Course</button>
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr>
+            <th>Course ID</th><th>Title</th><th>Category</th><th>Level</th>
+            <th>Age</th><th>Price/mo</th><th>Classes</th>
+            <th>Students</th><th>Rating</th><th>Duration</th><th>Badge</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="coursesTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── TAB: ADD / EDIT COURSE ── -->
+    <div id="tab-add-course" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title" id="addCourseTabTitle">➕ Add New Course</div>
+        <button class="btn btn-outline" style="font-size:13px;" onclick="showAdminTab('courses')">← Back to Courses</button>
+      </div>
+      <div class="add-teacher-form-wrap">
+        <form class="add-teacher-form" id="addCourseForm" onsubmit="return false;">
+
+          <div class="atf-section-title">📋 Course Identity</div>
+          <div class="atf-grid">
+            <div class="atf-field">
+              <label>Course ID (auto-generated)</label>
+              <input type="text" id="ac-id" readonly style="background:var(--bg);color:var(--blue);font-weight:900;" placeholder="e.g. CRS010">
+            </div>
+            <div class="atf-field">
+              <label>Course Title <span class="req">*</span></label>
+              <input type="text" id="ac-name" placeholder="e.g. Python for Beginners" required>
+            </div>
+            <div class="atf-field atf-full">
+              <label>Short Description <span class="req">*</span></label>
+              <textarea id="ac-desc" placeholder="Briefly describe what students will learn in this course..."></textarea>
+            </div>
+          </div>
+
+          <div class="atf-divider"></div>
+          <div class="atf-section-title">🏷️ Classification</div>
+          <div class="atf-grid">
+            <div class="atf-field">
+              <label>Subject Category <span class="req">*</span></label>
+              <select id="ac-subject" required>
+                <option value="">Select category</option>
+                <option value="coding">💻 Coding & Tech</option>
+                <option value="maths">📐 Mathematics</option>
+                <option value="sciences">🔬 Sciences</option>
+              </select>
+            </div>
+            <div class="atf-field">
+              <label>Level <span class="req">*</span></label>
+              <select id="ac-level" required>
+                <option value="">Select level</option>
+                <option value="Beginner">🟢 Beginner</option>
+                <option value="Intermediate">🟡 Intermediate</option>
+                <option value="Advanced">🔴 Advanced</option>
+              </select>
+            </div>
+            <div class="atf-field">
+              <label>Age Range <span class="req">*</span></label>
+              <input type="text" id="ac-age" placeholder="e.g. Ages 10–14" required>
+            </div>
+            <div class="atf-field">
+              <label>Badge</label>
+              <select id="ac-badge">
+                <option value="">None</option>
+                <option value="popular">🔥 Popular</option>
+                <option value="new">✨ New</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="atf-divider"></div>
+          <div class="atf-section-title">💰 Pricing & Stats</div>
+          <div class="atf-grid">
+            <div class="atf-field">
+              <label>Price (£/month) <span class="req">*</span></label>
+              <input type="number" id="ac-price" placeholder="e.g. 99" min="0" required>
+            </div>
+            <div class="atf-field">
+              <label>Number of Classes <span class="req">*</span></label>
+              <input type="number" id="ac-classes" placeholder="e.g. 24" min="1" required>
+            </div>
+            <div class="atf-field">
+              <label>Course Duration</label>
+              <input type="text" id="ac-duration" placeholder="e.g. 6 months">
+            </div>
+            <div class="atf-field">
+              <label>Students Enrolled</label>
+              <input type="number" id="ac-students" placeholder="e.g. 312" min="0">
+            </div>
+            <div class="atf-field">
+              <label>Rating (1.0 – 5.0)</label>
+              <input type="number" id="ac-rating" placeholder="e.g. 4.9" min="1" max="5" step="0.1">
+            </div>
+          </div>
+
+          <div class="atf-divider"></div>
+          <div class="atf-section-title">🎨 Appearance</div>
+          <div class="atf-grid">
+            <div class="atf-field atf-full">
+              <label>Course Icon (emoji)</label>
+              <div class="ac-emoji-grid" id="acEmojiGrid"></div>
+            </div>
+            <div class="atf-field atf-full">
+              <label>Card Accent Colour</label>
+              <div class="ac-color-grid" id="acColorGrid"></div>
+            </div>
+          </div>
+
+          <div class="atf-divider"></div>
+          <div class="atf-section-title">📋 Lesson Details & Activity Links</div>
+          <div style="background:var(--blue-light);border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13px;font-weight:700;color:var(--blue);">
+            💡 Add activity links and slides for each lesson. Teachers and students will see these when they click on a booked class slot. You can add as many lessons as the course has.
+          </div>
+          <div id="lessonLinksContainer"></div>
+          <button type="button" onclick="addLessonRow()" style="background:var(--bg);color:var(--blue);border:2px dashed var(--blue);border-radius:12px;padding:10px 20px;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;width:100%;margin-bottom:16px;">+ Add Lesson</button>
+
+          <div class="atf-divider"></div>
+          <div class="atf-actions">
+            <button type="button" class="btn btn-outline" onclick="resetCourseForm()">Clear Form</button>
+            <button type="button" class="btn btn-primary" id="saveCourseBtn" onclick="saveCourse()">✦ Save Course</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ── TAB: ALL QUIZZES ── -->
+    <div id="tab-quizzes" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🧠 Unit Quizzes</div>
+        <button class="btn btn-primary" style="font-size:13px;padding:9px 20px;" onclick="showAdminTab('upload-quiz')">⬆️ Upload New Quiz</button>
+      </div>
+      <div style="background:#f0f4ff;border-radius:12px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:#1e40af;font-weight:700;">
+        🧠 Unit quizzes are 40-question multiple-choice tests. Upload a JSON file generated by AI. One quiz per unit per grade per pathway.
+        Each student gets the quiz after completing their unit. Scores are auto-graded and visible on the student dashboard.
+      </div>
+      <div id="quizzesTableWrap">
+        <div style="text-align:center;padding:40px;color:var(--light);font-weight:700;">Loading quizzes…</div>
+      </div>
+    </div>
+
+    <!-- ── TAB: UPLOAD QUIZ ── -->
+    <div id="tab-upload-quiz" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">⬆️ Upload Unit Quiz</div>
+        <button class="btn btn-outline" style="font-size:13px;" onclick="showAdminTab('quizzes')">← Back to Quizzes</button>
+      </div>
+
+      <div style="max-width:640px;">
+        <!-- Instructions -->
+        <div style="background:#fff3e0;border-radius:14px;padding:20px 22px;margin-bottom:24px;border-left:4px solid #e65100;">
+          <div style="font-weight:900;color:#e65100;font-size:15px;margin-bottom:10px;">📋 How to generate a quiz with AI</div>
+          <p style="font-size:13px;color:#4a5568;line-height:1.7;margin-bottom:8px;">Give this prompt to ChatGPT or Claude:</p>
+          <div style="background:#1a202c;color:#68d391;border-radius:10px;padding:14px 16px;font-family:monospace;font-size:12px;line-height:1.7;white-space:pre-wrap;">"Generate 40 multiple-choice quiz questions for a unit on [TOPIC] in a technology course for children aged 10–17. Return the result as a valid JSON object in this exact format:
+
+{
+  &quot;unit&quot;: &quot;Unit 1 — Introduction to HTML&quot;,
+  &quot;questions&quot;: [
+    {
+      &quot;q&quot;: &quot;Question text here?&quot;,
+      &quot;options&quot;: [&quot;Option A&quot;, &quot;Option B&quot;, &quot;Option C&quot;, &quot;Option D&quot;],
+      &quot;answer&quot;: 0
+    }
+  ]
+}
+
+The &quot;answer&quot; field is the index (0-3) of the correct option. Generate all 40 questions."</div>
+          <p style="font-size:12px;color:#718096;margin-top:10px;">Save the JSON output as a <strong>.json</strong> file, then upload it below.</p>
+        </div>
+
+        <!-- Upload form -->
+        <div style="background:var(--white);border-radius:16px;padding:28px;border:1.5px solid #e8eaf0;box-shadow:0 4px 20px rgba(0,0,0,.06);">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+            <div>
+              <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Pathway *</label>
+              <select id="quizPathwaySelect" onchange="loadQuizGrades()"
+                style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;background:var(--white);">
+                <option value="">— Select Pathway —</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Grade *</label>
+              <select id="quizGradeSelect" onchange="loadQuizUnits()"
+                style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;background:var(--white);">
+                <option value="">— Select Grade —</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Unit *</label>
+              <select id="quizUnitSelect"
+                style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;background:var(--white);">
+                <option value="">— Select Unit —</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Pass Score % (default 70)</label>
+              <input type="number" id="quizPassScore" value="70" min="1" max="100"
+                style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;box-sizing:border-box;">
+            </div>
+          </div>
+
+          <div style="margin-bottom:20px;">
+            <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:8px;">Quiz JSON File * (.json)</label>
+            <div id="quizDropZone"
+              style="border:2px dashed #e8eaf0;border-radius:14px;padding:36px 20px;text-align:center;cursor:pointer;transition:.2s;background:var(--bg);"
+              onclick="document.getElementById('quizFileInput').click()"
+              ondragover="event.preventDefault();this.style.borderColor='var(--blue)';this.style.background='#f0f4ff';"
+              ondragleave="this.style.borderColor='#e8eaf0';this.style.background='var(--bg)';"
+              ondrop="handleQuizFileDrop(event)">
+              <div style="font-size:40px;margin-bottom:10px;">📂</div>
+              <div style="font-weight:800;color:var(--dark);font-size:14px;">Drop your .json file here, or click to browse</div>
+              <div id="quizFileNameDisplay" style="font-size:13px;color:var(--light);margin-top:8px;font-weight:700;">No file selected</div>
+            </div>
+            <input type="file" id="quizFileInput" accept=".json,application/json" style="display:none;" onchange="handleQuizFileSelect(this)">
+          </div>
+
+          <div id="quizParsePreview" style="display:none;background:#f0fdf4;border-radius:12px;padding:14px 18px;margin-bottom:16px;font-size:13px;font-weight:700;color:#065f46;border-left:3px solid #0e9f6e;"></div>
+          <div id="quizParseError"   style="display:none;background:#fde8e8;border-radius:12px;padding:14px 18px;margin-bottom:16px;font-size:13px;font-weight:700;color:#c53030;border-left:3px solid #c53030;"></div>
+
+          <button id="quizUploadBtn" onclick="submitQuizUpload()" disabled
+            style="width:100%;background:#e8eaf0;color:#a0aec0;border:none;border-radius:14px;padding:14px;font-family:'Nunito',sans-serif;font-weight:900;font-size:15px;cursor:not-allowed;transition:.2s;">
+            ⬆️ Upload Quiz
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB: ALL SALES PERSONS ── -->
+    <div id="tab-sales" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">💼 Sales Team</div>
+        <button class="btn btn-primary" style="font-size:13px;padding:9px 20px;" onclick="showAdminTab('add-sales')">➕ Add Sales Person</button>
+      </div>
+      <div class="tutor-assign-grid" id="salesGrid"></div>
+    </div>
+
+    <!-- ── TAB: ADD SALES PERSON ── -->
+    <div id="tab-add-sales" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">➕ Add Sales Person / Learning Advisor</div>
+      </div>
+      <div class="add-teacher-form-wrap">
+        <form class="add-teacher-form" onsubmit="return false;">
+          <div class="atf-section-title">👤 Personal Details</div>
+          <div class="atf-grid">
+            <div class="atf-field atf-full"><label>Full Name <span class="req">*</span></label><input type="text" id="sp-name" placeholder="e.g. Alex Johnson" required></div>
+            <div class="atf-field"><label>Email Address <span class="req">*</span></label><input type="email" id="sp-email" placeholder="alex@stemnestacademy.co.uk" required></div>
+            <div class="atf-field"><label>Phone Number</label><input type="tel" id="sp-phone" placeholder="+44 7700 000000"></div>
+            <div class="atf-field atf-full">
+              <label>Default Password <span class="req">*</span></label>
+              <div style="position:relative;"><input type="text" id="sp-password" placeholder="e.g. StemNest2024!" required><button type="button" class="atf-gen-btn" onclick="generateSalesPassword()">🔀 Generate</button></div>
+              <div class="atf-hint">Sales person will be prompted to change this on first login.</div>
+            </div>
+            <div class="atf-field"><label>Sales Person ID (auto)</label><input type="text" id="sp-id" readonly style="background:var(--bg);color:var(--orange);font-weight:900;"></div>
+            <div class="atf-field"><label>Region / Territory</label><input type="text" id="sp-region" placeholder="e.g. UK, West Africa, Global"></div>
+            <div class="atf-field atf-full"><label>Short Bio / Notes</label><textarea id="sp-bio" placeholder="Background, languages spoken, target markets..."></textarea></div>
+          </div>
+          <div class="atf-divider"></div>
+          <div class="atf-actions">
+            <button type="button" class="btn btn-outline" onclick="resetSalesForm()">Clear</button>
+            <button type="button" class="btn btn-primary" onclick="saveNewSalesPerson()">✦ Create Account</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ── TAB: CLASS REPORTS ── -->
+    <div id="tab-class-reports" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📊 Class Reports</div>
+        <div class="admin-filters">
+          <select id="reportFilter" class="admin-filter-sel" onchange="renderClassReports()">
+            <option value="all">All Reports</option>
+            <option value="completed">✅ Completed</option>
+            <option value="incomplete">❌ Incomplete</option>
+          </select>
+        </div>
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr>
+            <th>Student</th><th>Subject</th><th>Date</th><th>Teacher</th>
+            <th>Outcome</th><th>Class Quality</th><th>Sales Potential</th>
+            <th>Sales Person</th><th>Sales Status</th><th>Report</th>
+          </tr></thead>
+          <tbody id="classReportsBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── TAB: COMPANION MATERIALS ── -->
+    <div id="tab-companion-admin" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📖 Teacher Companion Materials</div>
+        <button class="btn btn-primary" style="font-size:13px;padding:9px 20px;" onclick="openAddMaterialModal()">➕ Upload Material</button>
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr>
+            <th>ID</th><th>Title</th><th>Type</th><th>Course</th><th>Description</th><th>URL / Link</th><th>Uploaded</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="materialsTableBody"></tbody>
+        </table>
+      </div>
+    </div><!-- end tab-companion-admin -->
+
+    <!-- ── TAB: ALL PATHWAYS ── -->
+    <div id="tab-pathways" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🚀 Career Pathways</div>
+        <button class="btn btn-primary" style="font-size:13px;padding:9px 20px;" onclick="resetPathwayForm();showAdminTab('add-pathway')">➕ Add Pathway</button>
+      </div>
+      <div style="background:#f0f4ff;border-radius:12px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:#1e40af;font-weight:700;">
+        🚀 Career Pathways are the Tech programmes (Data Science, Web Dev, etc.). Each pathway has 12 grades, each grade has 8 units, each unit has 8 lessons. Grade courses are internal — only visible to admin and post-sales.
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr>
+            <th>Pathway</th><th>Price</th><th>Grades</th><th>Status</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="pathwaysTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── TAB: ADD / EDIT PATHWAY ── -->
+    <div id="tab-add-pathway" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title" id="addPathwayTabTitle">➕ Add New Pathway</div>
+        <button class="btn btn-outline" style="font-size:13px;" onclick="showAdminTab('pathways')">← Back to Pathways</button>
+      </div>
+      <div class="add-teacher-form-wrap">
+        <form class="add-teacher-form" onsubmit="return false;">
+          <input type="hidden" id="pw-id">
+          <div class="atf-grid">
+            <div class="atf-field" style="grid-column:1/-1;">
+              <label>Pathway Name <span class="req">*</span></label>
+              <input type="text" id="pw-name" placeholder="e.g. Data Science & Analytics">
+            </div>
+            <div class="atf-field">
+              <label>Tagline <span class="req">*</span></label>
+              <input type="text" id="pw-tagline" placeholder="e.g. Become a Data Scientist and Analytics Expert">
+            </div>
+            <div class="atf-field">
+              <label>Price per Month (£) <span class="req">*</span></label>
+              <input type="number" id="pw-price" placeholder="80" min="0" step="0.01">
+            </div>
+            <div class="atf-field">
+              <label>Emoji</label>
+              <input type="text" id="pw-emoji" placeholder="🚀" maxlength="4">
+            </div>
+            <div class="atf-field">
+              <label>Colour</label>
+              <select id="pw-color">
+                <option value="blue">Blue</option>
+                <option value="green">Green</option>
+                <option value="orange">Orange</option>
+                <option value="purple">Purple</option>
+                <option value="teal">Teal</option>
+                <option value="pink">Pink</option>
+              </select>
+            </div>
+            <div class="atf-field" style="grid-column:1/-1;">
+              <label>Intro (one sentence)</label>
+              <input type="text" id="pw-intro" placeholder="e.g. Turn curiosity into insights through the power of data.">
+            </div>
+            <div class="atf-field" style="grid-column:1/-1;">
+              <label>Full Description</label>
+              <textarea id="pw-description" rows="4" placeholder="Full pathway description..."></textarea>
+            </div>
+            <div class="atf-field" style="grid-column:1/-1;">
+              <label>What Students Will Learn <span style="font-size:11px;color:var(--light);">(one item per line)</span></label>
+              <textarea id="pw-learn" rows="5" placeholder="Data Literacy and Digital Skills&#10;Python Programming&#10;Machine Learning Fundamentals"></textarea>
+            </div>
+            <div class="atf-field" style="grid-column:1/-1;">
+              <label>Career Outcomes <span style="font-size:11px;color:var(--light);">(one item per line)</span></label>
+              <textarea id="pw-outcomes" rows="4" placeholder="Data Scientist&#10;Data Analyst&#10;Machine Learning Engineer"></textarea>
+            </div>
+            <div class="atf-field" style="grid-column:1/-1;">
+              <label>Graduation Outcome</label>
+              <textarea id="pw-graduation" rows="3" placeholder="Students graduate with..."></textarea>
+            </div>
+          </div>
+          <div class="atf-divider"></div>
+          <div class="atf-actions">
+            <button type="button" class="btn btn-outline" onclick="resetPathwayForm()">Clear</button>
+            <button type="button" class="btn btn-primary" id="savePathwayBtn" onclick="savePathway()">✦ Save Pathway</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ── TAB: PATHWAY DETAIL (grades/units/lessons) ── -->
+    <div id="tab-pathway-detail" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title" id="pathwayDetailTitle">🚀 Pathway Detail</div>
+        <button class="btn btn-outline" style="font-size:13px;" onclick="showAdminTab('pathways')">← Back to Pathways</button>
+      </div>
+      <div id="pathwayDetailContent"></div>
+    </div>
+
+    <!-- ── TAB: ALL STUDENTS ── -->
+    <div id="tab-students" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🎓 All Students</div>
+        <div class="admin-filters">
+          <input type="text" id="studentSearchInput" placeholder="🔍 Search name, email, student ID..." class="admin-search" oninput="filterStudents()">
+          <select id="studentFilterStatus" class="admin-filter-sel" onchange="filterStudents()">
+            <option value="">All Students</option>
+            <option value="paid">💚 Paid / Active</option>
+            <option value="demo">🎓 Demo Only</option>
+            <option value="discontinued">🔴 Discontinued</option>
+          </select>
+        </div>
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr>
+            <th>Student ID</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Grade</th>
+            <th>Credits</th>
+            <th>Status</th>
+            <th>Enrolled</th>
+            <th>Actions</th>
+          </tr></thead>
+          <tbody id="studentsTableBody">
+            <tr><td colspan="8" style="text-align:center;padding:32px;color:var(--light);">Loading students…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- end dash-main -->
+</div><!-- end dash-wrap -->
+
+<!-- ═══ BLOG TABS (injected into dash-main via JS) ═══ -->
+<!-- These are rendered by admin-blog.js into the dash-main area -->
+
+<!-- ═══ ASSIGN TUTOR MODAL ═══ -->
+<div class="modal-overlay" id="assignModalOverlay">
+  <div class="modal" style="max-width:580px;">
+    <div class="modal-header">
+      <div class="modal-title">👩‍🏫 Assign Teacher</div>
+      <button class="modal-close" onclick="closeAssignModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="assignBookingInfo" style="background:var(--bg);border-radius:12px;padding:16px;margin-bottom:20px;font-size:14px;font-weight:700;color:var(--mid);line-height:1.8;"></div>
+
+      <!-- Available teachers for this subject -->
+      <div style="margin-bottom:16px;">
+        <div style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px;">Available Teachers</div>
+        <div id="availTeacherCards"></div>
+      </div>
+
+      <div class="field">
+        <label>Selected Teacher</label>
+        <select id="assignTutorSelect"></select>
+      </div>
+      <div class="field" style="margin-top:12px;">
+        <label>Class Link (Google Meet / Zoom) *</label>
+        <input type="url" id="assignClassLink" placeholder="https://meet.google.com/xxx-xxxx-xxx">
+      </div>
+      <div class="field" style="margin-top:12px;">
+        <label>Notes for Teacher (optional)</label>
+        <textarea id="assignNotes" style="min-height:60px;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;width:100%;outline:none;" placeholder="Any special notes..."></textarea>
+      </div>
+      <div class="field" style="margin-top:12px;">
+        <label>Assign Learning Advisor (Sales Person)</label>
+        <select id="assignSalesSelect">
+          <option value="">— Select sales person —</option>
+        </select>
+        <div style="font-size:11px;color:var(--light);font-weight:700;margin-top:4px;">They will join the class at the end to pitch courses to the parent.</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeAssignModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="confirmAssign()">Assign & Notify ✦</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ BOOKING DETAIL MODAL ═══ -->
+<div class="modal-overlay" id="detailModalOverlay">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <div class="modal-title">📋 Booking Details</div>
+      <button class="modal-close" onclick="closeDetailModal()">✕</button>
+    </div>
+    <div class="modal-body" id="detailModalBody"></div>
+  </div>
+</div>
+
+<!-- ═══ TEACHER DETAIL MODAL ═══ -->
+<div class="modal-overlay" id="teacherDetailOverlay">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-header">
+      <div class="modal-title">👩‍🏫 Teacher Profile</div>
+      <button class="modal-close" onclick="closeTeacherDetail()">✕</button>
+    </div>
+    <div class="modal-body" id="teacherDetailBody"></div>
+  </div>
+</div>
+
+<!-- ═══ ADD MATERIAL MODAL ═══ -->
+<div class="modal-overlay" id="addMaterialOverlay">
+  <div class="modal" style="max-width:540px;">
+    <div class="modal-header">
+      <div class="modal-title">📖 Upload Companion Material</div>
+      <button class="modal-close" onclick="closeAddMaterialModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Material Title <span style="color:var(--orange);">*</span></label>
+        <input type="text" id="mat-title" placeholder="e.g. Python Basics — Lesson 1 Notes">
+      </div>
+      <div class="field" style="margin-top:12px;">
+        <label>Type <span style="color:var(--orange);">*</span></label>
+        <select id="mat-type">
+          <option value="curriculum">📋 Curriculum</option>
+          <option value="lesson_plan">📝 Lesson Plan</option>
+          <option value="notes">📓 Lesson Notes</option>
+          <option value="quiz_solution">✅ Quiz Solutions</option>
+          <option value="activity">🎯 Activity Guide</option>
+          <option value="tool">🔧 Quick Tool</option>
+          <option value="other">📄 Other Resource</option>
+        </select>
+      </div>
+      <div class="field" style="margin-top:12px;">
+        <label>Course (leave blank for all courses)</label>
+        <select id="mat-course">
+          <option value="">All Courses</option>
+        </select>
+      </div>
+      <div class="field" style="margin-top:12px;">
+        <label>URL / Google Drive Link <span style="color:var(--orange);">*</span></label>
+        <input type="url" id="mat-url" placeholder="https://drive.google.com/...">
+        <div style="font-size:11px;color:var(--light);font-weight:700;margin-top:4px;">Upload the PDF to Google Drive and paste the shareable link here.</div>
+      </div>
+      <div class="field" style="margin-top:12px;">
+        <label>Short Description</label>
+        <textarea id="mat-desc" style="min-height:60px;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;width:100%;outline:none;" placeholder="Brief description of what this material covers..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeAddMaterialModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveMaterial()">Save Material ✦</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/api.js"></script>
+<script src="../js/api-sync.js"></script>
+<script src="../js/wa.js"></script>
+<script src="../js/utils.js"></script>
+<script src="../js/admin-dashboard.js"></script>
+<script src="../js/admin-blog.js"></script>
+<script src="../js/mail-system.js"></script>
+<script src="../js/admin-pathways.js"></script>
+<script src="../js/admin-quizzes.js"></script>
+<script>
+// Wire bulk email tab into admin showAdminTab
+document.addEventListener('DOMContentLoaded', () => {
+  injectBulkEmailTab(document.querySelector('.dash-main'));
+  const _origAdmin = window.showAdminTab;
+  window.showAdminTab = function(tab) {
+    _origAdmin(tab);
+    if (tab === 'bulk-email') renderEmailLog();
+  };
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,1601 @@
+﻿
+/* ═══════════════════════════════════════════════════════
+   STEMNEST ACADEMY — ADMIN DASHBOARD JS
+   Teacher registry, smart assign (subject + availability),
+   add teacher form, bookings table, CSV export.
+═══════════════════════════════════════════════════════ */
+
+/* ══════════════════════════════════════════════════════
+   TEACHER REGISTRY (fetched from API via window.ADMIN_DATA)
+══════════════════════════════════════════════════════ */
+const SUBJECT_PREFIX = { Coding: 'CT', Maths: 'MT', Sciences: 'ST' };
+
+const ALL_COURSES = {
+  Coding:   ['Python for Beginners','Scratch & Game Design','Web Dev: HTML/CSS/JS','A-Level Computer Science','AI Literacy'],
+  Maths:    ['Primary Maths Boost','GCSE Maths Prep','A-Level Maths Mastery'],
+  Sciences: ['GCSE Biology','GCSE Chemistry','A-Level Physics'],
+};
+
+const ALL_GRADES = [
+  'Year 2–3','Year 4–6','Year 7–9','Year 10–11','Year 12–13',
+  'Grade 1–3','Grade 4–6','Grade 7–9','Grade 10–12',
+];
+
+const TUTOR_COLORS = [
+  'linear-gradient(135deg,var(--blue),#4f87f5)',
+  'linear-gradient(135deg,var(--green),#3dd9a4)',
+  'linear-gradient(135deg,var(--orange),#ffaa80)',
+  'linear-gradient(135deg,var(--purple),#a78bfa)',
+  'linear-gradient(135deg,#0694a2,#67e8f9)',
+  'linear-gradient(135deg,#e63387,#f9a8d4)',
+];
+
+function getTeachers() {
+  return window.ADMIN_DATA.tutors.map(t => ({
+    id: t.id,
+    staff_id: t.staff_id,
+    name: t.name,
+    initials: t.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase(),
+    subject: t.subject || '—',
+    email: t.email,
+    phone: t.phone || '—',
+    courses: t.courses || [],
+    gradeGroups: t.grade_groups || [],
+    availability: t.availability || '—',
+    color: TUTOR_COLORS[0],
+    photo: null
+  }));
+}
+
+function saveTeachers(list) {
+  // Now handled by backend API. Local state updated for immediate rendering.
+  window.ADMIN_DATA.tutors = list;
+}
+
+function nextTeacherId(subject) {
+  const prefix   = SUBJECT_PREFIX[subject] || 'TT';
+  const teachers = window.ADMIN_DATA.tutors || [];
+  /* Look at ALL users with this prefix in the DB (via loaded tutors) */
+  const existing = teachers
+    .map(t => t.staff_id || '')
+    .filter(id => id && id.startsWith(prefix))
+    .map(id => parseInt(id.slice(prefix.length)) || 0);
+  const next = existing.length ? Math.max(...existing) + 1 : 1;
+  return prefix + String(next).padStart(3, '0');
+}
+
+/* ══════════════════════════════════════════════════════
+   AVAILABILITY HELPERS
+══════════════════════════════════════════════════════ */
+function getTeacherAvailability(teacherId) {
+  return window.ADMIN_DATA.tutorAvail?.[teacherId]?.slots || {};
+}
+
+function getAvailableSlotsForDate(teacherId, dateStr) {
+  const avail = getTeacherAvailability(teacherId);
+  return Object.keys(avail).filter(k => k.startsWith(dateStr + '|')).map(k => k.split('|')[1]);
+}
+
+function isTeacherAvailableAt(teacherId, dateStr, timeStr) {
+  const avail = getTeacherAvailability(teacherId);
+  return !!avail[dateStr + '|' + timeStr];
+}
+
+/* ══════════════════════════════════════════════════════
+   STATE
+══════════════════════════════════════════════════════ */
+let allBookings      = [];
+let filteredBookings = [];
+let activeAssignId   = null;
+const ADMIN_TABS     = ['bookings','scheduled','completed','tutors','add-teacher','courses','add-course'];
+
+/* ── ADMIN GLOBAL DATA ── */
+window.ADMIN_DATA = {
+  bookings: [],
+  classReports: [],
+  pipelines: [],
+  courses: [],
+  materials: [],
+  tutors: [],
+  sales: []
+};
+
+/* ── INIT ── */
+document.addEventListener('DOMContentLoaded', () => {
+  setAdminDate();
+  _loadAdminFromAPI().then(() => {
+    loadBookings();
+    renderTutors();
+    buildAddTeacherForm();
+    bindModalCloses();
+    showAdminTab('bookings');
+  });
+
+  /* Auto-refresh every 60 seconds */
+  setInterval(() => {
+    _loadAdminFromAPI().then(() => {
+      loadBookings();
+      updateStats();
+    });
+  }, 60000);
+});
+
+/* ── Sync from real API into window.ADMIN_DATA ── */
+async function _loadAdminFromAPI() {
+  try {
+    if (typeof isApiAvailable === 'function' && !(await isApiAvailable())) return;
+    const token = localStorage.getItem('sn_access_token');
+    if (!token) return;
+
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/sync/dashboard/admin', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (!res.ok) return;
+    
+    const data = await res.json();
+    if (data.success) {
+      window.ADMIN_DATA.bookings     = data.bookings || [];
+      window.ADMIN_DATA.classReports = data.classReports || [];
+      window.ADMIN_DATA.pipelines    = data.pipelines || [];
+      window.ADMIN_DATA.courses      = data.courses || [];
+      window.ADMIN_DATA.materials    = data.materials || [];
+      window.ADMIN_DATA.tutors       = data.tutors || [];
+      window.ADMIN_DATA.sales        = data.sales || [];
+    }
+  } catch (e) { console.warn('[ADMIN] API load failed:', e.message); }
+}
+
+
+function setAdminDate() {
+  const el = document.getElementById('adminDate');
+  if (el) el.textContent = new Date().toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+}
+
+/* ── TAB SWITCHING ── */
+function showAdminTab(tab) {
+  ADMIN_TABS.forEach(t => {
+    const el = document.getElementById('tab-' + t);
+    if (el) el.style.display = t === tab ? 'block' : 'none';
+  });
+  document.querySelectorAll('.sidebar-link[data-tab]').forEach(link => {
+    link.classList.toggle('active', link.dataset.tab === tab);
+  });
+  if (tab === 'scheduled')   renderScheduledTab();
+  if (tab === 'completed')   renderCompletedTab();
+  if (tab === 'tutors')      renderTutors();
+  if (tab === 'add-teacher') resetAddTeacherForm();
+  if (tab === 'courses')     renderCoursesTable();
+  if (tab === 'add-course')  buildCourseForm();
+}
+
+/* ══════════════════════════════════════════════════════
+   BOOKINGS
+══════════════════════════════════════════════════════ */
+async function loadBookings() {
+  const apiBookings = window.ADMIN_DATA.bookings.map(b => ({
+    id:              b.id,
+    studentName:     b.student_name || b.notes?.studentName || '—',
+    age:             b.notes?.age   || b.grade || '—',
+    grade:           b.grade        || b.notes?.grade || '—',
+    email:           b.student_email || b.notes?.email || '—',
+    whatsapp:        b.notes?.whatsapp || '—',
+    subject:         b.subject,
+    date:            b.date,
+    time:            b.time,
+    status:          b.status,
+    assignedTutor:   b.tutor_name   || '—',
+    assignedTutorId: b.tutor_id,
+    classLink:       b.class_link   || '',
+    bookedAt:        b.booked_at    || b.created_at,
+    isDemoClass:     b.is_demo,
+    _fromApi:        true,
+  }));
+  allBookings = apiBookings;
+  filteredBookings = [...allBookings];
+  updateStats();
+  renderBookingsTable(filteredBookings);
+}
+
+function refreshBookings() { loadBookings(); showToast('✅ Bookings refreshed!'); }
+
+function updateStats() {
+  const teachers  = getTeachers();
+  const today     = new Date().toISOString().split('T')[0];
+  setText('statTotal',     allBookings.length);
+  setText('statPending',   allBookings.filter(b => b.status === 'pending').length);
+  setText('statScheduled', allBookings.filter(b => b.status === 'scheduled').length);
+  setText('statTeachers',  teachers.length);
+  setText('statCourses',   getAdminCourses().length);
+  setText('statNew',       allBookings.filter(b => b.bookedAt?.startsWith(today)).length + ' new today');
+  setText('newBadge',      allBookings.filter(b => b.status === 'pending').length);
+  setText('teacherBadge',  teachers.length);
+  setText('courseBadge',   getAdminCourses().length);
+}
+
+function setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
+
+function renderBookingsTable(bookings) {
+  const tbody = document.getElementById('bookingsBody');
+  const empty = document.getElementById('adminEmpty');
+  if (!tbody) return;
+  if (bookings.length === 0) {
+    tbody.innerHTML = '';
+    if (empty) empty.style.display = 'block';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+  tbody.innerHTML = bookings.map(b => `
+    <tr>
+      <td><span style="font-family:'Fredoka One',cursive;font-size:12px;color:var(--blue);">${b.id}</span></td>
+      <td><strong>${b.studentName}</strong></td>
+      <td>${b.age} yrs · ${b.grade}</td>
+      <td><span class="ab-subject ab-${(b.subject||'').toLowerCase()}">${b.subject}</span></td>
+      <td>${formatDate(b.date)}<br><span style="color:var(--light);font-size:12px;">${b.time}</span></td>
+      <td style="font-size:12px;">${b.email}</td>
+      <td style="font-size:12px;">
+        ${b.whatsapp && b.whatsapp !== '—'
+          ? `<a href="https://wa.me/${b.whatsapp.replace(/[\s\-\(\)\+]/g,'')}" target="_blank"
+              style="color:#25D366;font-weight:800;font-size:12px;text-decoration:none;">
+              📱 ${b.whatsapp}
+            </a>`
+          : b.whatsapp || '—'}
+      </td>
+      <td>${b.device||'—'}</td>
+      <td style="font-size:12px;">${formatDateTime(b.bookedAt)}</td>
+      <td><span class="ab-status ab-${b.status}">${capitalise(b.status)}</span></td>
+      <td>
+        <button class="ab-btn ab-btn-view" onclick="viewBooking('${b.id}')">👁 View</button>
+        ${b.status==='pending'   ? `<button class="ab-btn ab-btn-assign"   onclick="openAssignModal('${b.id}')">👩‍🏫 Assign</button>` : ''}
+        ${b.status==='scheduled' ? `<button class="ab-btn ab-btn-complete" onclick="markComplete('${b.id}')">✅ Done</button>` : ''}
+      </td>
+    </tr>`).join('');
+}
+
+function filterBookings() {
+  const q       = (document.getElementById('searchInput')?.value || '').toLowerCase();
+  const subject = document.getElementById('filterSubject')?.value || '';
+  const status  = document.getElementById('filterStatus')?.value  || '';
+  filteredBookings = allBookings.filter(b => {
+    const matchQ = !q || b.studentName?.toLowerCase().includes(q) || b.email?.toLowerCase().includes(q) || b.whatsapp?.includes(q) || b.id?.toLowerCase().includes(q);
+    return matchQ && (!subject || b.subject===subject) && (!status || b.status===status);
+  });
+  renderBookingsTable(filteredBookings);
+}
+
+function renderScheduledTab() {
+  const tbody = document.getElementById('scheduledBody');
+  if (!tbody) return;
+  const list = allBookings.filter(b => b.status==='scheduled');
+  if (!list.length) { tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--light);">No scheduled classes yet.</td></tr>'; return; }
+  tbody.innerHTML = list.map(b => `
+    <tr>
+      <td><strong>${b.studentName}</strong></td>
+      <td><span class="ab-subject ab-${(b.subject||'').toLowerCase()}">${b.subject}</span></td>
+      <td>${formatDate(b.date)} · ${b.time}</td>
+      <td>${b.assignedTutor||'—'}</td>
+      <td style="font-size:12px;">${b.email}</td>
+      <td style="font-size:12px;">${b.whatsapp}</td>
+      <td>${b.classLink ? `<a href="${b.classLink}" target="_blank" style="color:var(--blue);font-weight:700;font-size:12px;">Join →</a>` : '—'}</td>
+      <td><button class="ab-btn ab-btn-complete" onclick="markComplete('${b.id}')">✅ Done</button></td>
+    </tr>`).join('');
+}
+
+function renderCompletedTab() {
+  const tbody = document.getElementById('completedBody');
+  if (!tbody) return;
+  const list = allBookings.filter(b => b.status==='completed');
+  if (!list.length) { tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--light);">No completed classes yet.</td></tr>'; return; }
+  tbody.innerHTML = list.map(b => `
+    <tr>
+      <td><strong>${b.studentName}</strong></td>
+      <td><span class="ab-subject ab-${(b.subject||'').toLowerCase()}">${b.subject}</span></td>
+      <td>${formatDate(b.date)} · ${b.time}</td>
+      <td>${b.assignedTutor||'—'}</td>
+      <td style="font-size:12px;">${b.email}</td>
+      <td style="font-size:12px;">${b.whatsapp}</td>
+    </tr>`).join('');
+}
+
+/* ── VIEW BOOKING ── */
+function viewBooking(id) {
+  const b = allBookings.find(x => x.id===id);
+  if (!b) return;
+  document.getElementById('detailModalBody').innerHTML = [
+    ['Booking ID',b.id],['Student',b.studentName],['Age',b.age+' yrs'],['Grade',b.grade],
+    ['Subject',b.subject],['Date',formatDate(b.date)],['Time',b.time],['Timezone',b.timezone],
+    ['Parent Email',b.email],['WhatsApp',b.whatsapp],['Parent Name',b.parentName||'—'],
+    ['Device',b.device||'—'],['Status',capitalise(b.status)],
+    ['Tutor Assigned',b.assignedTutor||'Not yet assigned'],
+    ['Class Link',b.classLink?`<a href="${b.classLink}" target="_blank">${b.classLink}</a>`:'Not set'],
+    ['Booked At',formatDateTime(b.bookedAt)],
+  ].map(([l,v])=>`<div class="detail-row"><div class="detail-label">${l}</div><div class="detail-val">${v}</div></div>`).join('');
+  document.getElementById('detailModalOverlay').classList.add('open');
+}
+function closeDetailModal() { document.getElementById('detailModalOverlay').classList.remove('open'); }
+
+/* ── MARK COMPLETE ── */
+async function markComplete(id) {
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/bookings/' + id + '/status', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify({ status: 'completed' })
+    });
+    const data = await res.json();
+    if (!data.success) { showToast(data.error || 'Failed to mark complete', 'error'); return; }
+  } catch (err) {
+    console.warn('[Admin] markComplete API failed, updating locally:', err.message);
+  }
+  await _loadAdminFromAPI();
+  loadBookings();
+  showToast('✅ Class marked as completed!');
+}
+
+function updateBooking(id, changes) {
+  const all = window.ADMIN_DATA.bookings;
+  const idx = all.findIndex(b=>b.id===id);
+  if (idx!==-1) { all[idx]={...all[idx],...changes}; }
+}
+
+/* ══════════════════════════════════════════════════════
+   SMART ASSIGN MODAL
+   Filters teachers by subject + checks availability slots
+══════════════════════════════════════════════════════ */
+function openAssignModal(id) {
+  activeAssignId = id;
+  const b = allBookings.find(x => x.id===id);
+  if (!b) return;
+
+  document.getElementById('assignBookingInfo').innerHTML = `
+    🎓 <strong>${b.studentName}</strong> (${b.grade}, Age ${b.age})<br>
+    📚 <strong>${b.subject}</strong> &nbsp;·&nbsp; 📅 ${formatDate(b.date)} at ${b.time}<br>
+    📧 ${b.email} &nbsp;·&nbsp; 📱 ${b.whatsapp}`;
+
+  // Filter teachers by subject
+  const teachers = getTeachers().filter(t => t.subject === b.subject);
+
+  // Build availability-aware teacher cards
+  const cardsEl = document.getElementById('availTeacherCards');
+  if (cardsEl) {
+    if (teachers.length === 0) {
+      cardsEl.innerHTML = `<div style="color:var(--light);font-size:13px;font-weight:700;padding:12px;">No ${b.subject} teachers found. <a onclick="showAdminTab('add-teacher')" style="color:var(--blue);cursor:pointer;">Add one →</a></div>`;
+    } else {
+      cardsEl.innerHTML = teachers.map(t => {
+        const slots    = getAvailableSlotsForDate(t.id, b.date);
+        const isAvail  = isTeacherAvailableAt(t.id, b.date, b.time);
+        const slotText = slots.length ? slots.slice(0,4).join(', ') + (slots.length>4?'…':'') : 'No slots set';
+        return `
+          <div class="assign-teacher-card ${isAvail ? 'atc-available' : ''}" onclick="selectAssignTeacher('${t.id}')">
+            <div class="atc-av" style="background:${t.color||TUTOR_COLORS[0]}">${t.photo ? `<img src="${t.photo}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : t.initials}</div>
+            <div class="atc-info">
+              <div class="atc-name">${t.name} <span class="atc-id">${t.id}</span></div>
+              <div class="atc-subject">${t.subject} · ${t.availability||'—'}</div>
+              <div class="atc-slots ${isAvail?'atc-slots-avail':''}">
+                ${isAvail ? '✅ Available at ' + b.time : '⚠️ Available: ' + slotText}
+              </div>
+            </div>
+            ${isAvail ? '<div class="atc-badge">Available</div>' : ''}
+          </div>`;
+      }).join('');
+    }
+  }
+
+  // Populate select — sort available first
+  const sel = document.getElementById('assignTutorSelect');
+  const sorted = [...teachers].sort((a,b_) => {
+    const aAvail = isTeacherAvailableAt(a.id, b.date, b.time) ? 0 : 1;
+    const bAvail = isTeacherAvailableAt(b_.id, b.date, b.time) ? 0 : 1;
+    return aAvail - bAvail;
+  });
+  sel.innerHTML = sorted.map(t => {
+    const avail = isTeacherAvailableAt(t.id, b.date, b.time);
+    return `<option value="${t.id}">${avail ? '✅ ' : '⚠️ '} ${t.name} (${t.id}) — ${t.subject}</option>`;
+  }).join('');
+
+  document.getElementById('assignClassLink').value = '';
+  document.getElementById('assignNotes').value = '';
+  document.getElementById('assignModalOverlay').classList.add('open');
+}
+
+function selectAssignTeacher(id) {
+  const sel = document.getElementById('assignTutorSelect');
+  if (sel) sel.value = id;
+  // Highlight selected card
+  document.querySelectorAll('.assign-teacher-card').forEach(c => {
+    c.classList.toggle('atc-selected', c.getAttribute('onclick')?.includes(id));
+  });
+}
+
+function closeAssignModal() {
+  document.getElementById('assignModalOverlay').classList.remove('open');
+  activeAssignId = null;
+}
+
+async function confirmAssign() {
+  const tutorId   = document.getElementById('assignTutorSelect').value;
+  const classLink = document.getElementById('assignClassLink').value.trim();
+  const notes     = document.getElementById('assignNotes').value.trim();
+  if (!tutorId)   { showToast('Please select a teacher.', 'error'); return; }
+  if (!classLink) { showToast('Please enter the class link (Google Meet / Zoom).', 'error'); return; }
+
+  const teacher = getTeachers().find(t => t.id === tutorId);
+
+  const btn = document.querySelector('#assignModalOverlay .ab-btn-assign, #assignModalOverlay button[onclick="confirmAssign()"]');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Assigning…'; }
+
+  const doAssign = async (tok) => fetch(
+    'https://api.stemnestacademy.co.uk/api/bookings/' + activeAssignId + '/assign',
+    { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok }, body: JSON.stringify({ tutorId, classLink, notes: notes || undefined }) }
+  );
+
+  try {
+    let token = localStorage.getItem('sn_access_token');
+    let res = await doAssign(token);
+
+    /* Auto-refresh token on 401/403 */
+    if (res.status === 401 || res.status === 403) {
+      const refreshToken = localStorage.getItem('sn_refresh_token');
+      if (refreshToken) {
+        const rRes = await fetch('https://api.stemnestacademy.co.uk/api/auth/refresh', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refreshToken })
+        });
+        const rData = await rRes.json();
+        if (rData.success) {
+          localStorage.setItem('sn_access_token', rData.accessToken);
+          if (rData.refreshToken) localStorage.setItem('sn_refresh_token', rData.refreshToken);
+          token = rData.accessToken;
+          res = await doAssign(token);
+        }
+      }
+    }
+
+    if (res.status === 401 || res.status === 403) {
+      if (btn) { btn.disabled = false; btn.textContent = '✅ Confirm Assign'; }
+      closeAssignModal();
+      showToast('⚠️ Session expired. Please log in again.', 'error');
+      setTimeout(() => { window.location.href = '/pages/login.html'; }, 2000);
+      return;
+    }
+
+    const data = await res.json();
+    if (btn) { btn.disabled = false; btn.textContent = '✅ Confirm Assign'; }
+
+    if (!data.success) {
+      showToast(data.error || 'Failed to assign teacher', 'error');
+      return;
+    }
+
+    closeAssignModal();
+    await _loadAdminFromAPI();
+    loadBookings();
+    showToast(`✅ ${teacher?.name || 'Teacher'} assigned and notified!`);
+  } catch (err) {
+    if (btn) { btn.disabled = false; btn.textContent = '✅ Confirm Assign'; }
+    console.error('[Admin] Assign failed:', err);
+    showToast('Network error. Please try again.', 'error');
+  }
+}
+
+function simulateTeacherNotification(teacher, booking, classLink) {
+  if (!teacher || !booking) return;
+  const msg = `
+📧 EMAIL TO: ${teacher.email}
+Subject: New Class Assigned — ${booking.subject} with ${booking.studentName}
+
+Hi ${teacher.name.split(' ')[0]},
+
+You have been assigned a new demo class:
+
+🎓 Student:  ${booking.studentName} (${booking.grade}, Age ${booking.age})
+📚 Subject:  ${booking.subject}
+📅 Date:     ${formatDate(booking.date)}
+🕐 Time:     ${booking.time}
+🔗 Class Link: ${classLink}
+
+Please log in to your dashboard to view full details.
+Dashboard: ${window.location.origin}/frontend/pages/tutor-dashboard.html
+
+StemNest Academy
+  `;
+  console.log(msg);
+}
+
+/* ══════════════════════════════════════════════════════
+   TEACHERS TAB
+══════════════════════════════════════════════════════ */
+function renderTutors() {
+  const grid = document.getElementById('tutorGrid');
+  if (!grid) return;
+  const teachers = getTeachers();
+  if (teachers.length === 0) {
+    grid.innerHTML = `<div style="text-align:center;padding:40px;color:var(--light);font-weight:700;">No teachers yet. <a onclick="showAdminTab('add-teacher')" style="color:var(--blue);cursor:pointer;">Add the first one →</a></div>`;
+    return;
+  }
+  grid.innerHTML = teachers.map(t => {
+    const avail  = getTeacherAvailability(t.id);
+    const slotCount = Object.keys(avail).length;
+    return `
+      <div class="tutor-card">
+        <div class="tutor-card-av" style="background:${t.color||TUTOR_COLORS[0]}">
+          ${t.photo ? `<img src="${t.photo}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" alt="${t.name}">` : t.initials}
+        </div>
+        <div class="tutor-card-id">${t.id}</div>
+        <div class="tutor-card-name">${t.name}</div>
+        <div class="tutor-card-subject">${t.subject}</div>
+        <div class="tutor-card-avail">🕐 ${t.availability||'—'}</div>
+        <div class="tutor-card-avail" style="color:${slotCount>0?'var(--green)':'var(--light)'}">
+          📅 ${slotCount} availability slot${slotCount!==1?'s':''} set
+        </div>
+        <div class="tutor-card-tags">${(t.courses||[]).slice(0,3).map(c=>`<span class="tutor-card-tag">${c}</span>`).join('')}</div>
+        <div style="display:flex;gap:8px;margin-top:12px;justify-content:center;">
+          <button class="ab-btn ab-btn-view" onclick="viewTeacher('${t.id}')">👁 View</button>
+          <button class="ab-btn" style="background:var(--orange-light);color:var(--orange-dark);" onclick="deleteTeacher('${t.id}')">🗑 Remove</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function viewTeacher(id) {
+  const t = getTeachers().find(x => x.id===id);
+  if (!t) return;
+  const avail = getTeacherAvailability(id);
+  document.getElementById('teacherDetailBody').innerHTML = `
+    <div style="text-align:center;margin-bottom:20px;">
+      <div style="width:80px;height:80px;border-radius:50%;background:${t.color||TUTOR_COLORS[0]};display:flex;align-items:center;justify-content:center;font-family:'Fredoka One',cursive;font-size:28px;color:#fff;margin:0 auto 12px;overflow:hidden;">
+        ${t.photo ? `<img src="${t.photo}" style="width:100%;height:100%;object-fit:cover;">` : t.initials}
+      </div>
+      <div style="font-family:'Fredoka One',cursive;font-size:22px;color:var(--dark);">${t.name}</div>
+      <div style="font-size:12px;font-weight:900;color:var(--blue);margin-top:4px;">${t.id}</div>
+    </div>
+    ${[
+      ['Subject',    t.subject],
+      ['Email',      t.email],
+      ['Phone',      t.phone||'—'],
+      ['Availability',t.availability||'—'],
+      ['DBS',        t.dbs==='yes'?'✅ Verified':t.dbs==='pending'?'⏳ Pending':'❌ Not yet'],
+      ['Courses',    (t.courses||[]).join(', ')||'—'],
+      ['Grade Groups',(t.gradeGroups||[]).join(', ')||'—'],
+      ['Regions',    (t.regions||['Global']).join(', ')],
+      ['Bio',        t.bio||'—'],
+      ['Avail Slots', Object.keys(avail).length + ' slots set'],
+    ].map(([l,v])=>`<div class="detail-row"><div class="detail-label">${l}</div><div class="detail-val">${v}</div></div>`).join('')}`;
+  document.getElementById('teacherDetailOverlay').classList.add('open');
+}
+function closeTeacherDetail() { document.getElementById('teacherDetailOverlay').classList.remove('open'); }
+
+function deleteTeacher(id) {
+  const t = getTeachers().find(x => x.id===id);
+  if (!t) return;
+  if (!confirm(`Remove ${t.name} (${t.id}) from the platform? This cannot be undone.`)) return;
+  const updated = getTeachers().filter(x => x.id!==id);
+  saveTeachers(updated);
+  renderTutors();
+  updateStats();
+  showToast(`${t.name} removed.`);
+}
+
+/* ══════════════════════════════════════════════════════
+   ADD TEACHER FORM
+══════════════════════════════════════════════════════ */
+function buildAddTeacherForm() {
+  // Courses checkboxes
+  const cg = document.getElementById('atCoursesGrid');
+  if (cg) {
+    cg.innerHTML = Object.entries(ALL_COURSES).map(([subj, courses]) =>
+      courses.map(c => `
+        <label class="atf-check-opt">
+          <input type="checkbox" name="at-course" value="${c}" data-subject="${subj}">
+          <span>${c}</span>
+        </label>`).join('')
+    ).join('');
+  }
+  // Grade checkboxes
+  const gg = document.getElementById('atGradesGrid');
+  if (gg) {
+    gg.innerHTML = ALL_GRADES.map(g => `
+      <label class="atf-check-opt">
+        <input type="checkbox" name="at-grade" value="${g}">
+        <span>${g}</span>
+      </label>`).join('');
+  }
+  // Regions checkboxes
+  const rg = document.getElementById('atRegionsGrid');
+  const ALL_REGIONS = ['Africa','Europe','Asia','North America','South America','Middle East','Oceania','Global'];
+  if (rg) {
+    rg.innerHTML = ALL_REGIONS.map(r => `
+      <label class="atf-check-opt">
+        <input type="checkbox" name="at-region" value="${r}" ${r === 'Global' ? 'checked' : ''}>
+        <span>${r}</span>
+      </label>`).join('');
+  }
+}
+
+function updateTeacherId() {
+  const subject = document.getElementById('at-subject')?.value;
+  const idEl    = document.getElementById('at-id');
+  if (idEl && subject) idEl.value = nextTeacherId(subject);
+  else if (idEl) idEl.value = '';
+}
+
+function generatePassword() {
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#';
+  const pw    = 'SN' + Array.from({length:8}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+  const el    = document.getElementById('at-password');
+  if (el) el.value = pw;
+}
+
+function resetAddTeacherForm() {
+  ['at-name','at-email','at-phone','at-password','at-bio','at-id','at-dob'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  const subj = document.getElementById('at-subject'); if (subj) subj.value = '';
+  document.querySelectorAll('input[name="at-course"], input[name="at-grade"]').forEach(cb => cb.checked = false);
+}
+
+async function saveNewTeacher() {
+  const name     = document.getElementById('at-name')?.value.trim();
+  const email    = document.getElementById('at-email')?.value.trim();
+  const password = document.getElementById('at-password')?.value.trim();
+  const subject  = document.getElementById('at-subject')?.value;
+  const phone    = document.getElementById('at-phone')?.value.trim();
+  const bio      = document.getElementById('at-bio')?.value.trim();
+  const avail    = document.getElementById('at-availability')?.value;
+  const dbs      = document.getElementById('at-dbs')?.value;
+
+  if (!name)     { showToast('Please enter the teacher\'s name.', 'error'); return; }
+  if (!email)    { showToast('Please enter the teacher\'s email.', 'error'); return; }
+  if (!password) { showToast('Please set a default password.', 'error'); return; }
+  if (!subject)  { showToast('Please select a primary subject.', 'error'); return; }
+
+  const courses     = [...document.querySelectorAll('input[name="at-course"]:checked')].map(c => c.value);
+  const gradeGroups = [...document.querySelectorAll('input[name="at-grade"]:checked')].map(c => c.value);
+  const regions     = [...document.querySelectorAll('input[name="at-region"]:checked')].map(c => c.value);
+
+  if (courses.length === 0)     { showToast('Please select at least one course.', 'error'); return; }
+  if (gradeGroups.length === 0) { showToast('Please select at least one grade group.', 'error'); return; }
+
+  const id = nextTeacherId(subject);
+
+  const payload = {
+    name, email, password, role: 'tutor', staff_id: id, phone, subject,
+    courses, gradeGroups, availability: avail, dbs,
+    regions: regions.length > 0 ? regions : ['Global']
+  };
+
+  try {
+    const btn = document.querySelector('button[onclick="saveNewTeacher()"]');
+    if (btn) btn.disabled = true;
+
+    const token = localStorage.getItem('sn_access_token');
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/users', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+    if (btn) btn.disabled = false;
+
+    if (!data.success) {
+      showToast(data.error || 'Failed to create teacher', 'error');
+      return;
+    }
+
+    showToast(`✅ ${name} added successfully! Welcome email sent.`);
+    resetAddTeacherForm();
+    
+    // Refresh tutors from API
+    await _loadAdminFromAPI();
+    showAdminTab('tutors');
+    updateStats();
+
+  } catch (err) {
+    console.error('Teacher creation failed:', err);
+    showToast('A network error occurred. Please try again.', 'error');
+    const btn = document.querySelector('button[onclick="saveNewTeacher()"]');
+    if (btn) btn.disabled = false;
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   EXPORT CSV
+══════════════════════════════════════════════════════ */
+function exportCSV() {
+  if (!allBookings.length) { showToast('No bookings to export.', 'error'); return; }
+  const headers = ['ID','Student','Age','Grade','Subject','Date','Time','Timezone','Email','WhatsApp','Parent Name','Device','Status','Tutor','Booked At'];
+  const rows = allBookings.map(b => [
+    b.id,b.studentName,b.age,b.grade,b.subject,b.date,b.time,b.timezone,
+    b.email,b.whatsapp,b.parentName,b.device,b.status,b.assignedTutor||'',formatDateTime(b.bookedAt),
+  ].map(v=>`"${(v||'').toString().replace(/"/g,'""')}"`).join(','));
+  const csv  = [headers.join(','),...rows].join('\n');
+  const blob = new Blob([csv],{type:'text/csv'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href=url; a.download=`stemnest-bookings-${new Date().toISOString().split('T')[0]}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+  showToast('✅ CSV exported!');
+}
+
+/* ══════════════════════════════════════════════════════
+   MODAL BINDINGS & HELPERS
+══════════════════════════════════════════════════════ */
+function bindModalCloses() {
+  ['assignModalOverlay','detailModalOverlay','teacherDetailOverlay'].forEach(id => {
+    const el = document.getElementById(id);
+    el?.addEventListener('click', e => {
+      if (e.target !== el) return;
+      if (id==='assignModalOverlay') closeAssignModal();
+      else if (id==='detailModalOverlay') closeDetailModal();
+      else closeTeacherDetail();
+    });
+  });
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '—';
+  try { return new Date(dateStr+'T12:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'}); }
+  catch { return dateStr; }
+}
+function formatDateTime(iso) {
+  if (!iso) return '—';
+  try { return new Date(iso).toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+  catch { return iso; }
+}
+function capitalise(str) { return str ? str.charAt(0).toUpperCase()+str.slice(1) : '—'; }
+
+/* ══════════════════════════════════════════════════════
+   COURSE MANAGEMENT (Admin only)
+══════════════════════════════════════════════════════ */
+
+const COURSE_EMOJIS = ['💻','📐','🔬','⚗️','🧬','🧪','🤖','🧠','📊','📡','🎮','🌍','🏗️','✏️','📱','🛰️','🔭','🧲','💡','🖥️'];
+const COURSE_COLORS = [
+  { id:'blue',   hex:'#1a56db', label:'Blue'   },
+  { id:'green',  hex:'#0e9f6e', label:'Green'  },
+  { id:'orange', hex:'#ff6b35', label:'Orange' },
+  { id:'purple', hex:'#7c3aed', label:'Purple' },
+  { id:'teal',   hex:'#0694a2', label:'Teal'   },
+  { id:'pink',   hex:'#e63387', label:'Pink'   },
+];
+
+let acSelectedEmoji = '💻';
+let acSelectedColor = 'blue';
+let editingCourseId = null; // null = adding new, string = editing existing
+
+/* ── Helpers ── */
+function getAdminCourses() {
+  return window.ADMIN_DATA.courses || [];
+}
+
+function saveAdminCourses(list) {
+  window.ADMIN_DATA.courses = list;
+  // Note: individual save/delete calls handle API persistence
+}
+
+function nextCourseId() {
+  const courses = getAdminCourses();
+  const nums    = courses.map(c => parseInt(c.id.replace('CRS','')) || 0);
+  const next    = nums.length ? Math.max(...nums) + 1 : 1;
+  return 'CRS' + String(next).padStart(3, '0');
+}
+
+/* ── Render courses table ── */
+function renderCoursesTable() {
+  const tbody = document.getElementById('coursesTableBody');
+  if (!tbody) return;
+  const courses = getAdminCourses();
+  setText('statCourses', courses.length);
+  setText('courseBadge', courses.length);
+
+  if (courses.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:32px;color:var(--light);">No courses yet. Add the first one!</td></tr>';
+    return;
+  }
+
+  const subjectLabel = { coding:'💻 Coding', maths:'📐 Maths', sciences:'🔬 Sciences' };
+  const badgeLabel   = { popular:'🔥 Popular', new:'✨ New', '':'—' };
+  const levelColor   = { Beginner:'var(--green)', Intermediate:'var(--orange)', Advanced:'var(--blue)' };
+
+  tbody.innerHTML = courses.map(c => `
+    <tr>
+      <td><span style="font-family:'Fredoka One',cursive;font-size:12px;color:var(--blue);">${c.id}</span></td>
+      <td><strong>${c.emoji} ${c.name}</strong></td>
+      <td><span class="ab-subject ab-${c.subject}">${subjectLabel[c.subject] || c.subject}</span></td>
+      <td><span style="font-size:12px;font-weight:800;color:${levelColor[c.level]||'var(--mid)'};">${c.level||'—'}</span></td>
+      <td style="font-size:12px;">${c.age}</td>
+      <td><strong>£${c.price}</strong></td>
+      <td>${c.classes}</td>
+      <td>${(c.students||0).toLocaleString()}</td>
+      <td>
+        <span style="color:#f59e0b;">★</span>
+        <strong>${c.rating}</strong>
+      </td>
+      <td style="font-size:12px;">${c.duration||'—'}</td>
+      <td>${badgeLabel[c.badge||'']}</td>
+      <td>
+        <button class="ab-btn ab-btn-assign" onclick="editCourse('${c.id}')">✏️ Edit</button>
+        <button class="ab-btn" style="background:var(--orange-light);color:var(--orange-dark);" onclick="deleteCourse('${c.id}')">🗑 Delete</button>
+      </td>
+    </tr>`).join('');
+}
+
+/* ── Build emoji + colour pickers ── */
+function buildCourseForm() {
+  const eg = document.getElementById('acEmojiGrid');
+  if (eg) {
+    eg.innerHTML = COURSE_EMOJIS.map(em => `
+      <button type="button" class="ac-emoji-btn ${em === acSelectedEmoji ? 'selected' : ''}"
+              onclick="selectCourseEmoji(this,'${em}')">${em}</button>`).join('');
+  }
+  const cg = document.getElementById('acColorGrid');
+  if (cg) {
+    cg.innerHTML = COURSE_COLORS.map(co => `
+      <div class="ac-color-swatch ${co.id === acSelectedColor ? 'selected' : ''}"
+           style="background:${co.hex};" title="${co.label}"
+           onclick="selectCourseColor(this,'${co.id}')"></div>`).join('');
+  }
+  // Set auto-generated ID
+  if (!editingCourseId) {
+    const idEl = document.getElementById('ac-id');
+    if (idEl) idEl.value = nextCourseId();
+  }
+  // Build lesson rows
+  renderLessonRows();
+}
+
+function selectCourseEmoji(btn, emoji) {
+  acSelectedEmoji = emoji;
+  document.querySelectorAll('.ac-emoji-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+function selectCourseColor(swatch, colorId) {
+  acSelectedColor = colorId;
+  document.querySelectorAll('.ac-color-swatch').forEach(s => s.classList.remove('selected'));
+  swatch.classList.add('selected');
+}
+
+/* ── Lesson rows state ── */
+let _lessonRows = []; // [{number, name, activityLink, slidesLink}]
+
+function renderLessonRows() {
+  const container = document.getElementById('lessonLinksContainer');
+  if (!container) return;
+  if (_lessonRows.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--light);font-size:13px;font-weight:700;">No lessons added yet. Click "+ Add Lesson" to start.</div>';
+    return;
+  }
+  container.innerHTML = _lessonRows.map((row, idx) => `
+    <div style="background:var(--bg);border-radius:14px;padding:16px;margin-bottom:12px;border:1.5px solid #e8eaf0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div style="font-family:'Fredoka One',cursive;font-size:15px;color:var(--blue);">Lesson ${row.number}</div>
+        <button type="button" onclick="removeLessonRow(${idx})" style="background:#fde8e8;color:#c53030;border:none;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:900;cursor:pointer;">✕ Remove</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px;">Lesson Title</label>
+          <input type="text" value="${row.name || ''}" placeholder="e.g. Variables & Data Types"
+            oninput="_lessonRows[${idx}].name = this.value"
+            style="width:100%;padding:9px 12px;border:2px solid #e8eaf0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:13px;outline:none;">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px;">🔗 Activity Link</label>
+          <input type="url" value="${row.activityLink || ''}" placeholder="https://replit.com/... or Google Classroom"
+            oninput="_lessonRows[${idx}].activityLink = this.value"
+            style="width:100%;padding:9px 12px;border:2px solid #e8eaf0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:13px;outline:none;">
+        </div>
+        <div style="grid-column:1/-1;">
+          <label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px;">📊 Slides / Explanation Link</label>
+          <input type="url" value="${row.slidesLink || ''}" placeholder="https://docs.google.com/presentation/... or Canva link"
+            oninput="_lessonRows[${idx}].slidesLink = this.value"
+            style="width:100%;padding:9px 12px;border:2px solid #e8eaf0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:13px;outline:none;">
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function addLessonRow() {
+  const nextNum = _lessonRows.length > 0 ? Math.max(..._lessonRows.map(r => r.number)) + 1 : 1;
+  _lessonRows.push({ number: nextNum, name: '', activityLink: '', slidesLink: '' });
+  renderLessonRows();
+}
+
+function removeLessonRow(idx) {
+  _lessonRows.splice(idx, 1);
+  // Re-number
+  _lessonRows.forEach((r, i) => { r.number = i + 1; });
+  renderLessonRows();
+}
+
+/* ── Edit existing course ── */
+function editCourse(id) {
+  const c = getAdminCourses().find(x => x.id === id);
+  if (!c) return;
+  editingCourseId = id;
+
+  // Set title
+  const titleEl = document.getElementById('addCourseTabTitle');
+  if (titleEl) titleEl.textContent = '✏️ Edit Course';
+  const btnEl = document.getElementById('saveCourseBtn');
+  if (btnEl) btnEl.textContent = '✦ Update Course';
+
+  showAdminTab('add-course');
+
+  // Populate fields
+  const set = (elId, val) => { const el = document.getElementById(elId); if (el) el.value = val || ''; };
+  set('ac-id',       c.id);
+  set('ac-name',     c.name);
+  set('ac-desc',     c.desc);
+  set('ac-subject',  c.subject);
+  set('ac-level',    c.level || '');
+  set('ac-age',      c.age);
+  set('ac-badge',    c.badge || '');
+  set('ac-price',    c.price);
+  set('ac-classes',  c.classes);
+  set('ac-duration', c.duration || '');
+  set('ac-students', c.students || 0);
+  set('ac-rating',   c.rating);
+
+  acSelectedEmoji = c.emoji || '💻';
+  acSelectedColor = c.color || 'blue';
+
+  // Load lesson rows from saved lessons array
+  _lessonRows = (c.lessons || []).map(l => ({
+    number:       l.number || 1,
+    name:         l.name || '',
+    activityLink: l.activityLink || '',
+    slidesLink:   l.slidesLink || '',
+  }));
+
+  buildCourseForm();
+}
+
+/* ── Delete course ── */
+async function deleteCourse(id) {
+  const c = getAdminCourses().find(x => x.id === id);
+  if (!c) return;
+  if (!confirm(`Delete "${c.name}" (${c.id})? This will remove it from the public catalogue.`)) return;
+
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/courses/' + id, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    if (!data.success) { showToast(data.error || 'Failed to delete', 'error'); return; }
+  } catch(e) { showToast('Network error', 'error'); return; }
+
+  await _loadAdminFromAPI();
+  renderCoursesTable();
+  updateStats();
+  showToast(`"${c.name}" deleted.`);
+}
+
+/* ── Save / update course ── */
+async function saveCourse() {
+  const name    = document.getElementById('ac-name')?.value.trim();
+  const desc    = document.getElementById('ac-desc')?.value.trim();
+  const subject = document.getElementById('ac-subject')?.value;
+  const level   = document.getElementById('ac-level')?.value;
+  const age     = document.getElementById('ac-age')?.value.trim();
+  const price   = parseFloat(document.getElementById('ac-price')?.value);
+  const classes = parseInt(document.getElementById('ac-classes')?.value);
+
+  if (!name)              { showToast('Please enter a course title.', 'error'); return; }
+  if (!desc)              { showToast('Please enter a description.', 'error'); return; }
+  if (!subject)           { showToast('Please select a subject category.', 'error'); return; }
+  if (!level)             { showToast('Please select a level.', 'error'); return; }
+  if (!age)               { showToast('Please enter an age range.', 'error'); return; }
+  if (!price || isNaN(price)) { showToast('Please enter a valid price.', 'error'); return; }
+  if (!classes || isNaN(classes)) { showToast('Please enter the number of classes.', 'error'); return; }
+
+  const lessons = _lessonRows.filter(r => r.name).map(r => ({
+    number:       r.number,
+    name:         r.name.trim(),
+    activityLink: r.activityLink?.trim() || '',
+    slidesLink:   r.slidesLink?.trim() || '',
+  }));
+
+  const courseData = {
+    id:          editingCourseId || nextCourseId(),
+    name,
+    description: desc,
+    subject,
+    level,
+    age_range:   age,
+    price,
+    num_classes: classes,
+    duration:    document.getElementById('ac-duration')?.value.trim() || '',
+    students:    parseInt(document.getElementById('ac-students')?.value) || 0,
+    rating:      parseFloat(document.getElementById('ac-rating')?.value) || 5.0,
+    badge:       document.getElementById('ac-badge')?.value || '',
+    emoji:       acSelectedEmoji,
+    color:       acSelectedColor,
+    lessons,
+  };
+
+  const btn = document.getElementById('saveCourseBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Saving…'; }
+
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    let res;
+
+    if (editingCourseId) {
+      /* Update existing course */
+      res = await fetch('https://api.stemnestacademy.co.uk/api/courses/' + editingCourseId, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify(courseData)
+      });
+    } else {
+      /* Create new course */
+      res = await fetch('https://api.stemnestacademy.co.uk/api/courses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify(courseData)
+      });
+    }
+
+    const data = await res.json();
+    if (btn) { btn.disabled = false; btn.textContent = editingCourseId ? '✦ Update Course' : '✦ Save Course'; }
+
+    if (!data.success) {
+      showToast(data.error || 'Failed to save course', 'error');
+      return;
+    }
+
+    showToast(editingCourseId ? `✅ "${name}" updated!` : `✅ "${name}" added to catalogue!`);
+    resetCourseForm();
+    await _loadAdminFromAPI();
+    showAdminTab('courses');
+
+  } catch (err) {
+    if (btn) { btn.disabled = false; btn.textContent = editingCourseId ? '✦ Update Course' : '✦ Save Course'; }
+    showToast('Network error. Please try again.', 'error');
+  }
+}
+
+/* ── Reset course form ── */
+function resetCourseForm() {
+  editingCourseId = null;
+  _lessonRows = [];
+  const titleEl = document.getElementById('addCourseTabTitle');
+  if (titleEl) titleEl.textContent = '➕ Add New Course';
+  const btnEl = document.getElementById('saveCourseBtn');
+  if (btnEl) btnEl.textContent = '✦ Save Course';
+
+  ['ac-name','ac-desc','ac-age','ac-price','ac-classes','ac-duration','ac-students','ac-rating'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  const subj = document.getElementById('ac-subject'); if (subj) subj.value = '';
+  const lvl  = document.getElementById('ac-level');   if (lvl)  lvl.value  = '';
+  const bdg  = document.getElementById('ac-badge');   if (bdg)  bdg.value  = '';
+
+  acSelectedEmoji = '💻';
+  acSelectedColor = 'blue';
+  buildCourseForm();
+}
+
+/* ══════════════════════════════════════════════════════
+   SALES PERSONS REGISTRY
+══════════════════════════════════════════════════════ */
+const SP_COLORS = [
+  'linear-gradient(135deg,#ff6b35,#fbbf24)',
+  'linear-gradient(135deg,#7c3aed,#a78bfa)',
+  'linear-gradient(135deg,#0694a2,#67e8f9)',
+  'linear-gradient(135deg,#e63387,#f9a8d4)',
+];
+
+function getSalesPersons() {
+  return window.ADMIN_DATA.sales.map(s => ({
+    id: s.id,
+    name: s.name,
+    initials: s.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase(),
+    email: s.email,
+    phone: s.phone || '—',
+    region: 'Global',
+    color: SP_COLORS[0],
+    createdAt: new Date().toISOString()
+  }));
+}
+function saveSalesPersons(list) { window.ADMIN_DATA.sales = list; }
+
+function nextSalesId() {
+  const all  = getSalesPersons();
+  const nums = all.map(s => parseInt(s.id.replace('SP','')) || 0);
+  const next = nums.length ? Math.max(...nums) + 1 : 1;
+  return 'SP' + String(next).padStart(3, '0');
+}
+
+/* ── Render sales grid ── */
+function renderSalesGrid() {
+  const grid = document.getElementById('salesGrid');
+  if (!grid) return;
+  const persons = getSalesPersons();
+  setText('salesBadge', persons.length);
+
+  if (!persons.length) {
+    grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--light);font-weight:700;">No sales persons yet.</div>';
+    return;
+  }
+
+  grid.innerHTML = persons.map(s => {
+    const pipeline = window.ADMIN_DATA.pipelines.filter(p => p.assignedSalesId === s.id) || [];
+    const converted = pipeline.filter(p => p.status === 'converted').length;
+    const revenue   = pipeline.filter(p => p.status === 'converted').reduce((sum, p) => sum + (parseFloat(p.paymentAmount) || 0), 0);
+    return `
+      <div class="tutor-card">
+        <div class="tutor-card-av" style="background:${s.color||SP_COLORS[0]}">${s.initials}</div>
+        <div class="tutor-card-id">${s.id}</div>
+        <div class="tutor-card-name">${s.name}</div>
+        <div class="tutor-card-subject">Learning Advisor</div>
+        <div class="tutor-card-avail">🌍 ${s.region || '—'}</div>
+        <div class="tutor-card-avail" style="color:var(--green);">✅ ${converted} conversions · £${revenue.toLocaleString()}</div>
+        <div style="display:flex;gap:8px;margin-top:12px;justify-content:center;">
+          <button class="ab-btn ab-btn-view" onclick="viewSalesPerson('${s.id}')">👁 View</button>
+          <button class="ab-btn" style="background:var(--orange-light);color:var(--orange-dark);" onclick="deleteSalesPerson('${s.id}')">🗑 Remove</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function viewSalesPerson(id) {
+  const s = getSalesPersons().find(x => x.id === id);
+  if (!s) return;
+  const pipeline = window.ADMIN_DATA.pipelines.filter(p => p.assignedSalesId === id) || [];
+  const converted = pipeline.filter(p => p.status === 'converted').length;
+  showToast(`${s.name} · ${converted} conversions`, 'info');
+}
+
+function deleteSalesPerson(id) {
+  const s = getSalesPersons().find(x => x.id === id);
+  if (!s || !confirm(`Remove ${s.name} (${s.id})?`)) return;
+  saveSalesPersons(getSalesPersons().filter(x => x.id !== id));
+  renderSalesGrid();
+  showToast(`${s.name} removed.`);
+}
+
+/* ── Add sales person form ── */
+document.addEventListener('DOMContentLoaded', () => {
+  // Auto-generate SP ID on page load
+  const idEl = document.getElementById('sp-id');
+  if (idEl) idEl.value = nextSalesId();
+});
+
+function generateSalesPassword() {
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#';
+  const pw    = 'SN' + Array.from({length:8}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+  const el    = document.getElementById('sp-password');
+  if (el) el.value = pw;
+}
+
+function resetSalesForm() {
+  ['sp-name','sp-email','sp-phone','sp-password','sp-region','sp-bio'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  const idEl = document.getElementById('sp-id');
+  if (idEl) idEl.value = nextSalesId();
+}
+
+function saveNewSalesPerson() {
+  const name     = document.getElementById('sp-name')?.value.trim();
+  const email    = document.getElementById('sp-email')?.value.trim();
+  const password = document.getElementById('sp-password')?.value.trim();
+  if (!name)     { showToast('Please enter a name.', 'error'); return; }
+  if (!email)    { showToast('Please enter an email.', 'error'); return; }
+  if (!password) { showToast('Please set a password.', 'error'); return; }
+
+  const existing = getSalesPersons();
+  if (existing.some(s => s.email.toLowerCase() === email.toLowerCase())) {
+    showToast('A sales person with this email already exists.', 'error'); return;
+  }
+
+  const id       = nextSalesId();
+  const initials = name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+  const newSP    = {
+    id, name, initials, email, password,
+    phone:     document.getElementById('sp-phone')?.value.trim(),
+    region:    document.getElementById('sp-region')?.value.trim(),
+    bio:       document.getElementById('sp-bio')?.value.trim(),
+    color:     SP_COLORS[existing.length % SP_COLORS.length],
+    photo:     null,
+    createdAt: new Date().toISOString(),
+  };
+
+  existing.push(newSP);
+  saveSalesPersons(existing);
+
+  console.log(`📧 WELCOME EMAIL TO: ${email}
+Hi ${name.split(' ')[0]}, your StemNest Learning Advisor account is ready.
+ID: ${id} | Password: ${password}
+Dashboard: ${window.location.origin}/frontend/pages/sales-dashboard.html`);
+
+  showToast(`✅ ${name} (${id}) created! Welcome email sent.`);
+  resetSalesForm();
+  showAdminTab('sales');
+}
+
+/* ── Populate sales select in assign modal ── */
+function populateSalesSelect() {
+  const sel = document.getElementById('assignSalesSelect');
+  if (!sel) return;
+  const persons = getSalesPersons();
+  sel.innerHTML = '<option value="">— Select sales person —</option>' +
+    persons.map(s => `<option value="${s.id}">${s.name} (${s.id}) · ${s.region || 'Global'}</option>`).join('');
+}
+
+/* ── CLASS REPORTS TAB ── */
+function renderClassReports() {
+  const tbody = document.getElementById('classReportsBody');
+  if (!tbody) return;
+  const filter  = document.getElementById('reportFilter')?.value || 'all';
+  const reports = window.ADMIN_DATA.classReports || [];
+  const bookings = window.ADMIN_DATA.bookings || [];
+
+  let list = reports;
+  if (filter === 'completed')  list = reports.filter(r => r.outcome === 'completed');
+  if (filter === 'incomplete') list = reports.filter(r => r.outcome === 'incomplete');
+
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--light);">No class reports yet.</td></tr>';
+    return;
+  }
+
+  const qualityLabel = { excellent:'⭐⭐⭐⭐⭐', good:'⭐⭐⭐⭐', average:'⭐⭐⭐', poor:'⭐⭐' };
+  const interestLabel = { very_high:'🔥 Very High', high:'✅ High', medium:'🤔 Medium', low:'😐 Low', none:'❌ None' };
+  const salesStatusLabel = { converted:'✅ Converted', pitched:'📣 Pitched', interested:'🔥 Interested', followup:'📞 Follow-up', lost:'❌ Lost' };
+
+  tbody.innerHTML = list.map(r => {
+    const b = bookings.find(x => x.id === r.bookingId) || {};
+    const pipeline = window.ADMIN_DATA.pipelines.filter(p => p.assignedSalesId === b.assignedSalesId) || [];
+    const pitchRecord = pipeline.find(p => p.bookingId === r.bookingId);
+    return `
+      <tr>
+        <td><strong>${b.studentName || r.bookingId}</strong></td>
+        <td><span class="ab-subject ab-${(b.subject||'').toLowerCase()}">${b.subject||'—'}</span></td>
+        <td style="font-size:12px;">${formatDate(b.date)} ${b.time||''}</td>
+        <td style="font-size:12px;">${r.tutorName||'—'}</td>
+        <td><span class="ab-status ${r.outcome==='completed'?'ab-scheduled':'ab-pending'}">${r.outcome==='completed'?'✅ Complete':'❌ Incomplete'}</span></td>
+        <td>${r.outcome==='completed' ? (qualityLabel[r.classQuality]||r.classQuality||'—') : `<span style="font-size:12px;color:var(--light);">${r.incompleteReason?.slice(0,40)||'—'}</span>`}</td>
+        <td>${r.outcome==='completed' ? (interestLabel[r.studentInterest]||'—') : '—'}</td>
+        <td style="font-size:12px;">${b.assignedSalesName||'—'}</td>
+        <td>${pitchRecord ? `<span class="ab-status ab-${pitchRecord.status==='converted'?'completed':'pending'}">${salesStatusLabel[pitchRecord.status]||pitchRecord.status}</span>` : '—'}</td>
+        <td style="font-size:12px;max-width:160px;">${r.notes||r.incompleteReason||'—'}</td>
+      </tr>`;
+  }).join('');
+}
+
+/* ── Hook sales into showAdminTab and updateStats ── */
+const _origShowAdminTab = showAdminTab;
+showAdminTab = function(tab) {
+  // Extend ADMIN_TABS array if needed
+  if (!ADMIN_TABS.includes('sales'))         ADMIN_TABS.push('sales');
+  if (!ADMIN_TABS.includes('add-sales'))     ADMIN_TABS.push('add-sales');
+  if (!ADMIN_TABS.includes('class-reports')) ADMIN_TABS.push('class-reports');
+  _origShowAdminTab(tab);
+  if (tab === 'sales')         renderSalesGrid();
+  if (tab === 'class-reports') renderClassReports();
+  if (tab === 'add-sales') {
+    const idEl = document.getElementById('sp-id');
+    if (idEl) idEl.value = nextSalesId();
+  }
+};
+
+/* ── Extend confirmAssign to attach sales person ── */
+const _origConfirmAssign = confirmAssign;
+confirmAssign = function() {
+  const salesId = document.getElementById('assignSalesSelect')?.value;
+  const salesPerson = salesId ? getSalesPersons().find(s => s.id === salesId) : null;
+
+  // Patch the booking with sales person before calling original
+  if (salesId && activeAssignId) {
+    updateBooking(activeAssignId, {
+      assignedSalesId:   salesId,
+      assignedSalesName: salesPerson?.name || '—',
+    });
+    // Notify sales person
+    if (salesPerson) {
+      const b = allBookings.find(x => x.id === activeAssignId);
+      console.log(`📧 SALES NOTIFICATION TO: ${salesPerson.email}
+Subject: New Demo Class Assigned — ${b?.subject} with ${b?.studentName}
+
+Hi ${salesPerson.name.split(' ')[0]},
+
+A demo class has been assigned to you for counseling:
+
+🎓 Student:  ${b?.studentName} (${b?.grade}, Age ${b?.age})
+📚 Subject:  ${b?.subject}
+📅 Date:     ${formatDate(b?.date)}
+🕐 Time:     ${b?.time}
+👩‍🏫 Teacher: ${b?.assignedTutor || 'TBD'}
+
+You will join at the END of the class to pitch courses to the parent.
+Dashboard: ${window.location.origin}/frontend/pages/sales-dashboard.html
+
+StemNest Academy`);
+    }
+  }
+  _origConfirmAssign();
+};
+
+/* ── Populate sales select when assign modal opens ── */
+const _origOpenAssignModal = openAssignModal;
+openAssignModal = function(id) {
+  _origOpenAssignModal(id);
+  populateSalesSelect();
+};
+
+/* ── Update stats to include sales count ── */
+const _origUpdateStats = updateStats;
+updateStats = function() {
+  _origUpdateStats();
+  setText('salesBadge', getSalesPersons().length);
+};
+
+/* ══════════════════════════════════════════════════════
+   COMPANION MATERIALS (Admin uploads for teachers)
+══════════════════════════════════════════════════════ */
+
+function getMaterials() {
+  return window.ADMIN_DATA.materials || [];
+}
+function saveMaterials(list) { window.ADMIN_DATA.materials = list; }
+
+function nextMaterialId() {
+  const all  = getMaterials();
+  const nums = all.map(m => parseInt(m.id?.replace('MAT','')) || 0);
+  const next = nums.length ? Math.max(...nums) + 1 : 1;
+  return 'MAT' + String(next).padStart(3,'0');
+}
+
+function renderMaterialsTable() {
+  const tbody = document.getElementById('materialsTableBody');
+  if (!tbody) return;
+  const list = getMaterials();
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--light);">No materials uploaded yet. Click "Upload Material" to add the first one.</td></tr>';
+    return;
+  }
+  const typeLabel = { curriculum:'📋 Curriculum', lesson_plan:'📝 Lesson Plan', notes:'📓 Notes', quiz_solution:'✅ Quiz Solutions', activity:'🎯 Activity', tool:'🔧 Tool', other:'📄 Other' };
+  tbody.innerHTML = list.map(m => `
+    <tr>
+      <td><span style="font-family:'Fredoka One',cursive;font-size:12px;color:var(--blue);">${m.id}</span></td>
+      <td><strong>${m.title}</strong></td>
+      <td>${typeLabel[m.type] || m.type}</td>
+      <td>${m.course || 'All Courses'}</td>
+      <td style="font-size:12px;max-width:160px;">${m.description || '—'}</td>
+      <td>${m.url ? `<a href="${m.url}" target="_blank" style="color:var(--blue);font-weight:700;font-size:12px;">Open ↗</a>` : '—'}</td>
+      <td style="font-size:12px;">${formatDateTime(m.uploadedAt)}</td>
+      <td>
+        <button class="ab-btn" style="background:var(--orange-light);color:var(--orange-dark);" onclick="deleteMaterial('${m.id}')">🗑 Delete</button>
+      </td>
+    </tr>`).join('');
+}
+
+function openAddMaterialModal() {
+  // Populate course dropdown
+  const sel = document.getElementById('mat-course');
+  if (sel) {
+    const courses = getAdminCourses();
+    sel.innerHTML = '<option value="">All Courses</option>' +
+      courses.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+  }
+  ['mat-title','mat-url','mat-desc'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  const typeEl = document.getElementById('mat-type'); if (typeEl) typeEl.value = 'curriculum';
+  document.getElementById('addMaterialOverlay')?.classList.add('open');
+}
+
+function closeAddMaterialModal() {
+  document.getElementById('addMaterialOverlay')?.classList.remove('open');
+}
+
+function saveMaterial() {
+  const title = document.getElementById('mat-title')?.value.trim();
+  const url   = document.getElementById('mat-url')?.value.trim();
+  const type  = document.getElementById('mat-type')?.value;
+  if (!title) { showToast('Please enter a title.', 'error'); return; }
+  if (!url)   { showToast('Please enter a URL.', 'error'); return; }
+
+  const material = {
+    id:          nextMaterialId(),
+    title,
+    type,
+    course:      document.getElementById('mat-course')?.value || '',
+    url,
+    description: document.getElementById('mat-desc')?.value.trim(),
+    uploadedAt:  new Date().toISOString(),
+  };
+
+  const all = getMaterials();
+  all.unshift(material);
+  saveMaterials(all);
+  closeAddMaterialModal();
+  renderMaterialsTable();
+  showToast(`✅ "${title}" uploaded! Teachers can now access it in My Companion.`);
+}
+
+function deleteMaterial(id) {
+  const m = getMaterials().find(x => x.id === id);
+  if (!m || !confirm(`Delete "${m.title}"?`)) return;
+  saveMaterials(getMaterials().filter(x => x.id !== id));
+  renderMaterialsTable();
+  showToast(`"${m.title}" deleted.`);
+}
+
+/* Hook companion-admin into showAdminTab */
+const _origShowAdminTab2 = showAdminTab;
+showAdminTab = function(tab) {
+  // Add companion-admin to tabs list
+  if (!ADMIN_TABS.includes('companion-admin')) ADMIN_TABS.push('companion-admin');
+  _origShowAdminTab2(tab);
+  if (tab === 'companion-admin') renderMaterialsTable();
+};
+
+/* Bind add material modal close on overlay */
+document.addEventListener('DOMContentLoaded', () => {
+  const overlay = document.getElementById('addMaterialOverlay');
+  overlay?.addEventListener('click', e => { if (e.target === overlay) closeAddMaterialModal(); });
+});
+
+/* ══════════════════════════════════════════════════════
+   ALL STUDENTS TAB
+   Loads all students from API, filterable by status,
+   searchable by name/email/student ID.
+   "View Dashboard" button impersonates the student.
+══════════════════════════════════════════════════════ */
+
+let _allStudents = [];
+let _studentFilter = '';
+let _studentSearch = '';
+
+async function _loadStudents() {
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    if (!token) return;
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/users?role=student', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    _allStudents = (data.users || []).map(u => {
+      /* Determine student status:
+         - discontinued: account deactivated OR credits at -2 (suspended)
+         - paid: has student_profiles record (credits is a number, even 0)
+         - demo: no student_profiles record yet (credits is null)
+      */
+      let status = "demo";
+      if (!u.is_active) {
+        status = "discontinued";
+      } else if (u.credits !== null && u.credits !== undefined) {
+        status = u.credits <= -2 ? "discontinued" : "paid";
+      }
+
+      return {
+        id:        u.id,
+        staffId:   u.staff_id || '—',
+        name:      u.name,
+        email:     u.email,
+        grade:     u.grade || '—',
+        credits:   u.credits !== null && u.credits !== undefined ? u.credits : null,
+        status:    status,
+        isActive:  u.is_active,
+        createdAt: u.created_at,
+      };
+    });
+
+    /* Update badge count */
+    const badgeEl = document.getElementById('studentBadge');
+    if (badgeEl) badgeEl.textContent = _allStudents.length;
+
+    filterStudents();
+  } catch(e) {
+    console.warn('[Admin] Failed to load students:', e.message);
+  }
+}
+
+function filterStudents() {
+  _studentFilter = document.getElementById('studentFilterStatus')?.value || '';
+  _studentSearch = (document.getElementById('studentSearchInput')?.value || '').toLowerCase().trim();
+
+  let list = _allStudents;
+
+  if (_studentFilter) {
+    list = list.filter(s => s.status === _studentFilter);
+  }
+
+  if (_studentSearch) {
+    list = list.filter(s =>
+      s.name?.toLowerCase().includes(_studentSearch) ||
+      s.email?.toLowerCase().includes(_studentSearch) ||
+      s.staffId?.toLowerCase().includes(_studentSearch)
+    );
+  }
+
+  renderStudentsTable(list);
+}
+
+function renderStudentsTable(list) {
+  const tbody = document.getElementById('studentsTableBody');
+  if (!tbody) return;
+
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--light);font-weight:700;">No students found.</td></tr>';
+    return;
+  }
+
+  const statusBadge = {
+    paid:         '<span style="background:#d1fae5;color:#065f46;font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">💚 Active</span>',
+    demo:         '<span style="background:#fff3e0;color:#e65100;font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">🎓 Demo</span>',
+    discontinued: '<span style="background:#fde8e8;color:#c53030;font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">🔴 Discontinued</span>',
+  };
+
+  tbody.innerHTML = list.map(s => {
+    const creditsDisplay = s.credits !== null ? s.credits : '—';
+    const creditsColor   = s.credits !== null && s.credits <= 0 ? 'color:#c53030;font-weight:900;' : '';
+    const enrolledDate   = s.createdAt ? new Date(s.createdAt).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }) : '—';
+
+    /* View Dashboard button — only for paid and discontinued (not demo — no student dashboard) */
+    const viewBtn = (s.status === 'paid' || s.status === 'discontinued')
+      ? `<button class="ab-btn ab-btn-view" onclick="impersonateStudent('${s.id}')" title="Open this student's dashboard as them">👁 View Dashboard</button>`
+      : '<span style="font-size:12px;color:var(--light);font-weight:700;">Demo only</span>';
+
+    return `<tr>
+      <td><span style="font-family:'Fredoka One',cursive;font-size:12px;color:var(--blue);">${s.staffId}</span></td>
+      <td><strong>${s.name}</strong></td>
+      <td style="font-size:12px;">${s.email}</td>
+      <td style="font-size:13px;">${s.grade}</td>
+      <td style="font-size:13px;${creditsColor}">${creditsDisplay}</td>
+      <td>${statusBadge[s.status] || s.status}</td>
+      <td style="font-size:12px;">${enrolledDate}</td>
+      <td style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">${viewBtn}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function impersonateStudent(studentId) {
+  try {
+    const token = localStorage.getItem('sn_access_token');
+    if (!token) { showToast('Session expired. Please log in again.', 'error'); return; }
+
+    const btn = event.target;
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Opening…'; }
+
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/auth/impersonate/' + studentId, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+
+    const data = await res.json();
+    if (btn) { btn.disabled = false; btn.textContent = '👁 View Dashboard'; }
+
+    if (!data.success) {
+      showToast(data.error || 'Failed to open student dashboard', 'error');
+      return;
+    }
+
+    /* Open student dashboard in new tab with impersonation token */
+    const url = '/pages/student-dashboard.html?impersonate=1&token=' + encodeURIComponent(data.token) + '&studentId=' + encodeURIComponent(studentId);
+    window.open(url, '_blank');
+
+  } catch(e) {
+    showToast('Network error — could not open student dashboard.', 'error');
+    console.error('[Impersonate]', e);
+  }
+}
+
+/* Hook All Students into showAdminTab */
+(function() {
+  var _prev = window.showAdminTab;
+  window.showAdminTab = function(tab) {
+    if (!ADMIN_TABS.includes('students')) ADMIN_TABS.push('students');
+    if (typeof _prev === 'function') _prev(tab);
+    if (tab === 'students') _loadStudents();
+  };
+})();

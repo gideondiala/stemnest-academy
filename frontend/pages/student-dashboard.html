@@ -1,0 +1,611 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Microsoft Clarity -->
+  <script type="text/javascript">
+    (function(c,l,a,r,i,t,y){
+      c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+      t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+      y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    })(window, document, "clarity", "script", "xer20hj8fr");
+  </script>
+  <!-- End Microsoft Clarity -->
+  <!-- TikTok Pixel Code -->
+  <script>
+    !function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var r="https://analytics.tiktok.com/i18n/pixel/events.js",o=n&&n.partner;ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=r,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};n=document.createElement("script");n.type="text/javascript",n.async=!0,n.src=r+"?sdkid="+e+"&lib="+t;e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(n,e)};ttq.load('D8V60AJC77U45FANPDG0');ttq.load('D91PAORC77U4QRO9NQ0G');ttq.page()}(window,document,'ttq');
+  </script>
+  <!-- End TikTok Pixel Code -->
+  <!-- Google Analytics 4 -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-WB62B0P5KG"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-WB62B0P5KG');
+  </script>
+  <!-- End Google Analytics 4 -->
+  <!-- Auth Guard — must be first script in head -->
+  <script>
+    (function(){
+      /* Check for impersonation token in URL */
+      var urlParams = new URLSearchParams(window.location.search);
+      var impToken = urlParams.get('token');
+      var isImpersonate = urlParams.get('impersonate') === '1';
+
+      if (isImpersonate && impToken) {
+        /* Set as the active token so all API calls use it */
+        localStorage.setItem('sn_access_token', impToken);
+        /* Store separately so we know this is an impersonation session */
+        sessionStorage.setItem('sn_impersonate_token', impToken);
+        /* Clean the URL */
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+
+      var t=localStorage.getItem('sn_access_token');
+      var u=null;try{u=JSON.parse(localStorage.getItem('sn_api_user')||'null');}catch(e){}
+      var redir='/pages/login.html?redirect='+encodeURIComponent(window.location.pathname+window.location.search);
+      if(!t){document.documentElement.style.visibility='hidden';window.location.replace(redir);return;}
+      try{var p=t.split('.');if(p.length===3){var pl=JSON.parse(atob(p[1].replace(/-/g,'+').replace(/_/g,'/')));if(pl.exp&&pl.exp*1000<Date.now()){localStorage.removeItem('sn_access_token');localStorage.removeItem('sn_api_user');document.documentElement.style.visibility='hidden';window.location.replace(redir);return;}}}catch(e){}
+      document.documentElement.style.visibility='';
+    })();
+  </script>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" sizes="32x32" href="../assets/icons/icon.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="../assets/icons/icon.png">
+  <link rel="apple-touch-icon" href="../assets/icons/icon.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Dashboard – StemNest Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/dashboard.css">
+  <link rel="stylesheet" href="../css/student-dashboard.css">
+</head>
+<body>
+
+<!-- ═══ TOP NAV ═══ -->
+<nav style="position:sticky;top:0;z-index:200;">
+  <a class="logo" href="../index.html">
+    <img src="../assets/images/logo.png" alt="StemNest Academy" class="logo-img">
+  </a>
+  <ul class="nav-links">
+    <li><a href="../index.html">← Back to Website</a></li>
+  </ul>
+  <div class="nav-actions">
+    <span style="font-size:13px;font-weight:700;color:var(--light);">
+      <span class="live-dot"></span> <span id="navStudentName">Loading…</span> — Online
+    </span>
+    <a href="login.html" class="btn btn-outline" style="font-size:13px;padding:8px 18px;">Log Out</a>
+  </div>
+</nav>
+
+<!-- ═══ DASHBOARD LAYOUT ═══ -->
+<div class="dash-wrap">
+
+  <!-- ═══ SIDEBAR ═══ -->
+  <div class="dash-sidebar">
+    <div class="sidebar-profile">
+      <div class="sidebar-avatar student-avatar" id="sidebarAvatar">—</div>
+      <div class="sidebar-name" id="sidebarName">Loading…</div>
+      <div class="sidebar-role" id="sidebarRole">Student</div>
+      <div class="student-id-badge" id="studentIdBadge">ID: —</div>
+      <div class="sidebar-status"><span class="live-dot"></span> Online</div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="sidebar-section-label">My Learning</div>
+      <a class="sidebar-link active" data-tab="overview"      onclick="showTab('overview')">     <span class="sl-icon">🏠</span> Overview</a>
+      <a class="sidebar-link"        data-tab="lessons"       onclick="showTab('lessons')">      <span class="sl-icon">📚</span> My Lessons</a>
+      <a class="sidebar-link"        data-tab="projects"      onclick="showTab('projects')">     <span class="sl-icon">📁</span> My Projects     <span class="sl-badge" id="projBadge">3</span></a>
+      <a class="sidebar-link"        data-tab="quizzes"       onclick="showTab('quizzes')">      <span class="sl-icon">🧠</span> My Quizzes      <span class="sl-badge" id="quizBadge">2</span></a>
+      <a class="sidebar-link"        data-tab="certificates"  onclick="showTab('certificates')"> <span class="sl-icon">🏆</span> Certificates</a>
+      <a class="sidebar-link"        data-tab="nest"          onclick="showTab('nest')">          <span class="sl-icon">🪺</span> Learning Nest</a>
+      <a class="sidebar-link"        data-tab="payments"      onclick="showTab('payments')">     <span class="sl-icon">💳</span> Credits &amp; Payments</a>
+      <a class="sidebar-link"        data-tab="chat"          onclick="showTab('chat')">          <span class="sl-icon">💬</span> Chat with Tutor</a>
+      <div class="sidebar-section-label">Account</div>
+      <a class="sidebar-link" data-tab="refer" onclick="showTab('refer')"><span class="sl-icon">🎁</span> Refer &amp; Earn</a>
+      <a class="sidebar-link" onclick="openProfileModal()"><span class="sl-icon">👤</span> My Profile</a>
+      <a class="sidebar-link" href="../index.html"><span class="sl-icon">🌐</span> Back to Website</a>
+    </div>
+    <div class="sidebar-bottom">
+      <button class="logout-btn" onclick="window.location.href='login.html'">🚪 Log Out</button>
+    </div>
+  </div>
+
+  <!-- ═══ MAIN CONTENT ═══ -->
+  <div class="dash-main">
+
+    <!-- Top bar -->
+    <div class="dash-topbar">
+      <div>
+        <div class="dash-greeting"><span id="greetingTime">Good morning ☀️</span>, <span id="greetingName" style="color:var(--green);">there</span> 👋</div>
+        <div class="dash-date" id="dashDate"></div>
+      </div>
+      <div class="dash-top-actions">
+        <button class="btn btn-outline" onclick="openProfileModal()">👤 My Profile</button>
+        <button class="btn btn-green"   onclick="showTab('lessons')">📚 My Lessons</button>
+      </div>
+    </div>
+
+    <!-- Stat cards -->
+    <div class="dash-stats" id="studentStatCards">
+      <div class="dstat ds-green">
+        <div class="dstat-icon di-green">📡</div>
+        <div class="dstat-val" id="statClassesDone">12</div>
+        <div class="dstat-label">Classes Done</div>
+        <div class="dstat-trend trend-up">↑ 2 this week</div>
+      </div>
+      <div class="dstat ds-blue">
+        <div class="dstat-icon di-blue">📚</div>
+        <div class="dstat-val" id="statCoursesEnrolled">3</div>
+        <div class="dstat-label">Courses Enrolled</div>
+        <div class="dstat-trend trend-up">Active learner</div>
+      </div>
+      <div class="dstat ds-orange">
+        <div class="dstat-icon di-orange">📁</div>
+        <div class="dstat-val" id="statProjectsPending">3</div>
+        <div class="dstat-label">Projects Pending</div>
+        <div class="dstat-trend trend-neutral">Due this week</div>
+      </div>
+      <div class="dstat ds-purple">
+        <div class="dstat-icon di-purple">🏆</div>
+        <div class="dstat-val" id="statCertificates">2</div>
+        <div class="dstat-label">Certificates</div>
+        <div class="dstat-trend trend-up">Keep going!</div>
+      </div>
+      <div class="dstat" style="background:linear-gradient(135deg,#1a56db,#0e9f6e);border:none;">
+        <div class="dstat-icon" style="background:rgba(255,255,255,.2);">🎟️</div>
+        <div class="dstat-val" id="statCreditsRemaining" style="color:#fff;">—</div>
+        <div class="dstat-label" style="color:rgba(255,255,255,.85);">Credits Remaining</div>
+        <div class="dstat-trend" id="statCreditsNote" style="color:rgba(255,255,255,.7);">Class credits</div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         TAB: OVERVIEW
+    ══════════════════════════════════════ -->
+    <div id="tab-overview">
+
+      <!-- PAYMENT LINK SECTION (appears when credits ≤ 3) -->
+      <div id="paymentLinkSection" style="display:none;margin-bottom:24px;"></div>
+
+      <!-- DEMO COUNTDOWN CARD (shown for demo students) -->
+      <div id="demoCountdownSection" style="display:none;margin-bottom:24px;"></div>
+
+      <!-- POST-DEMO FEE CARD (shown after demo is completed) -->
+      <div id="postDemoFeeSection" style="display:none;margin-bottom:24px;"></div>
+
+      <!-- FUN QUIZ WHILE WAITING (shown when student joins early) -->
+      <div id="waitingQuizSection" style="display:none;margin-bottom:24px;"></div>
+
+      <!-- JOIN LIVE CLASS CARD — populated by JS from API data -->
+      <div id="joinClassCard"></div>
+
+      <!-- PROGRESS BARS -->
+      <div class="dash-section-header" style="margin-top:32px;">
+        <div class="dash-section-title">📊 My Course Progress</div>
+        <a class="dash-section-link" onclick="showTab('lessons')">View lessons →</a>
+      </div>
+      <div class="dash-panel" style="margin-bottom:32px;">
+        <div class="progress-list" id="progressList"></div>
+      </div>
+
+      <!-- UPCOMING LESSONS PREVIEW -->
+      <div class="dash-section-header">
+        <div class="dash-section-title">📅 Upcoming Lessons</div>
+        <a class="dash-section-link" onclick="showTab('lessons')">See all →</a>
+      </div>
+      <div class="dash-panel" style="margin-bottom:32px;">
+        <div class="session-list" id="upcomingPreview"></div>
+      </div>
+
+    </div><!-- end tab-overview -->
+
+    <!-- ══════════════════════════════════════
+         TAB: MY LESSONS
+    ══════════════════════════════════════ -->
+    <div id="tab-lessons" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📚 My Lessons</div>
+        <span style="font-size:13px;font-weight:800;color:var(--green);">Next 6 upcoming</span>
+      </div>
+
+      <div class="lessons-layout">
+        <!-- LEFT: lesson list -->
+        <div class="lessons-list-col">
+          <div id="lessonsList"></div>
+        </div>
+        <!-- RIGHT: module panel -->
+        <div class="lessons-module-col">
+          <div class="module-panel" id="modulePanel">
+            <div class="module-panel-empty">
+              <div style="font-size:48px;">📖</div>
+              <div style="font-family:'Fredoka One',cursive;font-size:20px;color:var(--dark);margin-top:12px;">Select a lesson</div>
+              <div style="font-size:14px;color:var(--light);margin-top:8px;">Click any lesson on the left to see its modules and what you'll cover.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div><!-- end tab-lessons -->
+
+    <!-- ══════════════════════════════════════
+         TAB: MY PROJECTS
+    ══════════════════════════════════════ -->
+    <div id="tab-projects" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📁 My Projects</div>
+      </div>
+
+      <!-- Toggle buttons -->
+      <div style="display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap;">
+        <button id="projToggle-pending"   class="proj-toggle-btn proj-toggle-active" onclick="showProjectSection('pending')">🔲 Pending Projects <span id="projPendingCount" style="background:rgba(255,255,255,.3);border-radius:50px;padding:1px 8px;font-size:11px;margin-left:4px;">0</span></button>
+        <button id="projToggle-submitted" class="proj-toggle-btn"                    onclick="showProjectSection('submitted')">✅ Submitted Projects <span id="projSubmittedCount" style="background:rgba(0,0,0,.08);border-radius:50px;padding:1px 8px;font-size:11px;margin-left:4px;">0</span></button>
+        <button id="projToggle-reviewed"  class="proj-toggle-btn"                    onclick="showProjectSection('reviewed')">⭐ Reviewed Projects <span id="projReviewedCount" style="background:rgba(0,0,0,.08);border-radius:50px;padding:1px 8px;font-size:11px;margin-left:4px;">0</span></button>
+      </div>
+
+      <!-- Pending section -->
+      <div id="projSection-pending">
+        <div class="student-project-grid" id="pendingProjects"></div>
+        <div id="pendingLoadMore" style="display:none;text-align:center;margin-top:16px;">
+          <button class="btn btn-outline" onclick="loadMoreProjects('pending')">Load More →</button>
+        </div>
+      </div>
+
+      <!-- Submitted section -->
+      <div id="projSection-submitted" style="display:none;">
+        <div class="student-project-grid" id="submittedProjects"></div>
+        <div id="submittedLoadMore" style="display:none;text-align:center;margin-top:16px;">
+          <button class="btn btn-outline" onclick="loadMoreProjects('submitted')">Load More →</button>
+        </div>
+      </div>
+
+      <!-- Reviewed section -->
+      <div id="projSection-reviewed" style="display:none;">
+        <div class="student-project-grid" id="reviewedProjects"></div>
+        <div id="reviewedLoadMore" style="display:none;text-align:center;margin-top:16px;">
+          <button class="btn btn-outline" onclick="loadMoreProjects('reviewed')">Load More →</button>
+        </div>
+      </div>
+    </div><!-- end tab-projects -->
+
+    <!-- ══════════════════════════════════════
+         TAB: MY QUIZZES
+    ══════════════════════════════════════ -->
+    <div id="tab-quizzes" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🧠 My Quizzes</div>
+      </div>
+
+      <!-- Pending quizzes -->
+      <div class="proj-section-label">📝 Pending Quizzes</div>
+      <div class="quiz-grid" id="pendingQuizzes"></div>
+
+      <!-- Completed quizzes -->
+      <div class="proj-section-label" style="margin-top:36px;">✅ Completed Quizzes</div>
+      <div class="quiz-grid" id="completedQuizzes"></div>
+    </div><!-- end tab-quizzes -->
+
+    <!-- ══════════════════════════════════════
+         TAB: CERTIFICATES
+    ══════════════════════════════════════ -->
+    <div id="tab-certificates" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🏆 My Certificates</div>
+        <span style="font-size:13px;font-weight:800;color:var(--light);" id="certCount">2 earned</span>
+      </div>
+      <div class="cert-grid" id="certGrid"></div>
+      <div class="cert-empty" id="certEmpty" style="display:none;">
+        <div style="font-size:56px;">🎓</div>
+        <div style="font-family:'Fredoka One',cursive;font-size:22px;color:var(--dark);margin-top:16px;">No certificates yet</div>
+        <div style="font-size:15px;color:var(--light);margin-top:8px;">Complete a course to earn your first certificate!</div>
+      </div>
+    </div><!-- end tab-certificates -->
+
+    <!-- ══════════════════════════════════════
+         TAB: LEARNING NEST
+    ══════════════════════════════════════ -->
+    <div id="tab-nest" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🪺 Learning Nest</div>
+        <span style="font-size:13px;font-weight:700;color:var(--light);">Your past classes, summaries & recordings</span>
+      </div>
+      <div id="learningNestContent"></div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         TAB: PAYMENT RECORDS
+    ══════════════════════════════════════ -->
+    <div id="tab-payments" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">💳 Credits & Payments</div>
+        <span style="font-size:13px;font-weight:700;color:var(--light);">Top up your credits or view payment history</span>
+      </div>
+      <div id="paymentRecordsContent"></div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         TAB: CHAT WITH TUTOR
+    ══════════════════════════════════════ -->
+    <div id="tab-chat" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">💬 Chat with Your Tutor</div>
+        <span style="font-size:13px;font-weight:700;color:var(--light);">Messages include your name & ID automatically</span>
+      </div>
+      <div class="chat-wrap">
+        <div class="chat-messages" id="chatMessages"></div>
+        <div class="chat-input-bar">
+          <label class="chat-attach-btn" title="Attach image or document (max 5MB)">
+            📎
+            <input type="file" accept="image/*,.pdf,.doc,.docx" style="display:none;" onchange="handleChatFileUpload(this)">
+          </label>
+          <input type="text" id="chatInput" class="chat-input" placeholder="Type a message to your tutor..." onkeydown="if(event.key==='Enter')sendChatMessage()">
+          <button class="chat-send-btn" onclick="sendChatMessage()">Send →</button>
+        </div>
+        <div style="font-size:11px;color:var(--light);font-weight:700;padding:6px 16px;">
+          Your messages are sent with your name (<strong>${STUDENT?.name || 'Student'}</strong>) and ID so your tutor can identify you.
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         TAB: REFER & EARN
+    ══════════════════════════════════════ -->
+    <div id="tab-refer" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🎁 Refer &amp; Earn</div>
+        <span style="font-size:13px;font-weight:700;color:var(--light);">Refer a friend and earn credits when they enroll!</span>
+      </div>
+
+      <!-- How it works banner -->
+      <div style="background:linear-gradient(135deg,#1a56db,#0e9f6e);border-radius:20px;padding:28px 32px;margin-bottom:28px;color:#fff;">
+        <div style="font-family:'Fredoka One',cursive;font-size:24px;margin-bottom:8px;">🎁 Refer a Friend, Earn Credits!</div>
+        <div style="font-size:14px;opacity:.9;line-height:1.7;margin-bottom:16px;">
+          Know someone who would love StemNest? Refer them! When they enroll, you'll earn bonus class credits added to your account.
+        </div>
+        <div style="display:flex;gap:20px;flex-wrap:wrap;">
+          <div style="background:rgba(255,255,255,.15);border-radius:12px;padding:12px 18px;text-align:center;">
+            <div style="font-family:'Fredoka One',cursive;font-size:22px;">1️⃣</div>
+            <div style="font-size:12px;font-weight:800;margin-top:4px;">Fill the form below</div>
+          </div>
+          <div style="background:rgba(255,255,255,.15);border-radius:12px;padding:12px 18px;text-align:center;">
+            <div style="font-family:'Fredoka One',cursive;font-size:22px;">2️⃣</div>
+            <div style="font-size:12px;font-weight:800;margin-top:4px;">We contact them</div>
+          </div>
+          <div style="background:rgba(255,255,255,.15);border-radius:12px;padding:12px 18px;text-align:center;">
+            <div style="font-family:'Fredoka One',cursive;font-size:22px;">3️⃣</div>
+            <div style="font-size:12px;font-weight:800;margin-top:4px;">They enroll → you earn!</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Referral form -->
+      <div style="background:var(--white);border-radius:20px;border:1.5px solid #e8eaf0;padding:28px 32px;max-width:600px;">
+        <div style="font-family:'Fredoka One',cursive;font-size:18px;color:var(--dark);margin-bottom:20px;">📝 Refer Someone Now</div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+          <div>
+            <label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Student's Full Name <span style="color:#e53e3e;">*</span></label>
+            <input type="text" id="ref-name" placeholder="e.g. Amara Johnson"
+              style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Year Group / Grade</label>
+            <input type="text" id="ref-grade" placeholder="e.g. Year 8"
+              style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Age</label>
+            <input type="number" id="ref-age" placeholder="e.g. 13" min="5" max="18"
+              style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Parent Email <span style="color:#e53e3e;">*</span></label>
+            <input type="email" id="ref-email" placeholder="parent@email.com"
+              style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Parent WhatsApp <span style="color:#e53e3e;">*</span></label>
+            <input type="tel" id="ref-phone" placeholder="+44 7700 000000"
+              style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">Your Relationship to Student</label>
+            <input type="text" id="ref-relationship" placeholder="e.g. Classmate, Friend, Sibling"
+              style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;box-sizing:border-box;">
+          </div>
+        </div>
+
+        <div style="margin-bottom:20px;">
+          <label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:8px;">Does this student need a free demo class first?</label>
+          <div style="display:flex;gap:12px;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:800;font-size:14px;color:var(--dark);">
+              <input type="radio" name="ref-demo" id="ref-demo-yes" value="yes" checked style="width:16px;height:16px;accent-color:var(--blue);">
+              📅 Yes, book a demo
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:800;font-size:14px;color:var(--dark);">
+              <input type="radio" name="ref-demo" id="ref-demo-no" value="no" style="width:16px;height:16px;accent-color:var(--blue);">
+              ✅ No, enroll directly
+            </label>
+          </div>
+        </div>
+
+        <button onclick="submitReferral()"
+          style="width:100%;background:linear-gradient(135deg,#1a56db,#0e9f6e);color:#fff;border:none;border-radius:14px;padding:14px 24px;font-family:'Fredoka One',cursive;font-size:18px;cursor:pointer;transition:.15s;"
+          onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'">
+          🎁 Send Referral
+        </button>
+
+        <div id="referralSuccessMsg" style="display:none;margin-top:16px;background:var(--green-light);border-radius:12px;padding:14px 18px;font-size:14px;font-weight:800;color:var(--green-dark);text-align:center;">
+          ✅ Referral sent! Our team will reach out to them soon. Credits will be added to your account when they enroll.
+        </div>
+      </div>
+
+      <!-- Past referrals -->
+      <div style="margin-top:32px;">
+        <div class="dash-section-header">
+          <div class="dash-section-title">📊 My Referrals</div>
+          <button class="btn btn-outline" style="font-size:12px;" onclick="loadMyReferrals()">🔄 Refresh</button>
+        </div>
+        <div id="myReferralsList">
+          <div style="text-align:center;padding:32px;color:var(--light);font-weight:700;">Your referrals will appear here.</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end dash-main -->
+</div><!-- end dash-wrap -->
+
+<!-- ═══════════════════════════════════════════════════
+     PROJECT DETAIL MODAL
+═══════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="projectModalOverlay">
+  <div class="modal" style="max-width:680px;">
+    <div class="modal-header">
+      <div class="modal-title" id="projModalTitle">Project Title</div>
+      <button class="modal-close" onclick="closeProjectModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="proj-modal-meta" id="projModalMeta"></div>
+      <div class="proj-modal-brief" id="projModalBrief"></div>
+      <div class="proj-modal-steps" id="projModalSteps"></div>
+      <div class="proj-submit-area" id="projSubmitArea">
+        <label class="proj-submit-label">📝 Your Submission</label>
+        <textarea id="projSubmitText" placeholder="Describe your approach, paste your code, or share a link to your work..."></textarea>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:12px;" onclick="submitProject()">
+          Submit Project ✦
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     QUIZ PORTAL MODAL
+═══════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="quizModalOverlay">
+  <div class="modal quiz-modal">
+    <div class="modal-header">
+      <div class="modal-title" id="quizModalTitle">Quiz</div>
+      <div class="quiz-progress-wrap">
+        <span id="quizProgressText">Q 1 / 10</span>
+        <div class="quiz-progress-bar"><div class="quiz-progress-fill" id="quizProgressFill"></div></div>
+      </div>
+      <button class="modal-close" onclick="closeQuizModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="quizPortal"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     PROFILE MODAL
+═══════════════════════════════════════════════════ -->
+<div class="profile-modal-overlay" id="profileModalOverlay">
+  <div class="profile-modal">
+    <div class="pm-header">
+      <div class="pm-title">👤 My Profile</div>
+      <button class="modal-close" onclick="closeProfileModal()">✕</button>
+    </div>
+    <div class="pm-body">
+      <div class="pm-avatar-row">
+        <div class="pm-avatar student-avatar" id="pmAvatarInitials">—</div>
+        <div>
+          <div style="font-weight:800;font-size:16px;color:var(--dark);" id="pmDisplayName">Loading…</div>
+          <div style="font-size:12px;color:var(--light);font-weight:700;margin-top:4px;" id="pmDisplayId">Student ID: —</div>
+        </div>
+      </div>
+      <div class="pm-field"><label>Full Name</label><input type="text" id="pmFieldName" placeholder="Your name"></div>
+      <div class="pm-field"><label>Email Address</label><input type="email" id="pmFieldEmail" placeholder="Email" readonly style="background:var(--bg);color:var(--light);cursor:not-allowed;"></div>
+      <div class="pm-field"><label>Year Group</label>
+        <select id="pmFieldGrade">
+          <option value="Year 1">Year 1</option><option value="Year 2">Year 2</option>
+          <option value="Year 3">Year 3</option><option value="Year 4">Year 4</option>
+          <option value="Year 5">Year 5</option><option value="Year 6">Year 6</option>
+          <option value="Year 7">Year 7</option><option value="Year 8">Year 8</option>
+          <option value="Year 9">Year 9</option><option value="Year 10">Year 10</option>
+          <option value="Year 11">Year 11</option><option value="Year 12">Year 12</option>
+          <option value="Year 13">Year 13</option>
+        </select>
+      </div>
+      <div class="pm-field"><label>Date of Birth</label><input type="date" id="pmDob"></div>
+
+      <!-- Password change section -->
+      <div style="border-top:1.5px solid #e8eaf0;margin:18px 0 14px;padding-top:14px;">
+        <div style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">
+          Change Password
+          <span style="font-weight:600;font-style:italic;color:var(--light);text-transform:none;letter-spacing:0;"> — leave blank to keep current</span>
+        </div>
+        <div class="pm-field"><label>Current Password</label><input type="password" id="pmCurrentPw" placeholder="Enter current password"></div>
+        <div class="pm-field"><label>New Password</label><input type="password" id="pmNewPw" placeholder="At least 8 characters"></div>
+        <div class="pm-field"><label>Confirm New Password</label><input type="password" id="pmConfirmPw" placeholder="Repeat new password"></div>
+      </div>
+
+      <div class="pm-footer">
+        <button class="btn btn-outline" onclick="closeProfileModal()">Cancel</button>
+        <button class="btn btn-green" onclick="saveProfile()">Save Changes ✦</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     CERTIFICATE PREVIEW MODAL
+═══════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="certModalOverlay">
+  <div class="modal cert-preview-modal">
+    <div class="modal-header">
+      <div class="modal-title">🏆 Certificate Preview</div>
+      <button class="modal-close" onclick="closeCertModal()">✕</button>
+    </div>
+    <div class="modal-body" style="padding:0;">
+      <div class="certificate-doc" id="certificateDoc">
+        <!-- rendered by JS -->
+      </div>
+      <div style="padding:20px 28px;display:flex;gap:12px;justify-content:flex-end;border-top:1px solid #e8eaf0;">
+        <button class="btn btn-outline" onclick="closeCertModal()">Close</button>
+        <button class="btn btn-primary" onclick="downloadCert()">⬇ Download PDF</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ LEARNING NEST CLASS MODAL ═══ -->
+<div class="modal-overlay" id="nestClassModal">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-header">
+      <div class="modal-title">🪺 Class Summary</div>
+      <button class="modal-close" onclick="document.getElementById('nestClassModal').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body" id="nestClassBody"></div>
+  </div>
+</div>
+
+<script src="../js/api.js"></script>
+<script src="../js/api-sync.js"></script>
+<script src="../js/utils.js"></script>
+<script src="../js/student-dashboard.js"></script>
+<script src="../js/student-upgrades.js"></script>
+<script src="../js/student-pathway.js"></script>
+<style>
+.proj-toggle-btn {
+  padding: 10px 20px;
+  border-radius: 50px;
+  border: 2px solid #e8eaf0;
+  background: #fff;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 800;
+  font-size: 13px;
+  color: #718096;
+  cursor: pointer;
+  transition: .15s;
+}
+.proj-toggle-btn:hover { border-color: var(--blue); color: var(--blue); background: #eff6ff; }
+.proj-toggle-active { background: var(--blue); color: #fff; border-color: var(--blue); box-shadow: 0 4px 12px rgba(26,86,219,.25); }
+.proj-toggle-active span { background: rgba(255,255,255,.3) !important; color: #fff; }
+/* Make stat cards smaller when 5 are shown */
+#studentStatCards { grid-template-columns: repeat(5, 1fr); }
+@media (max-width: 1100px) { #studentStatCards { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 700px)  { #studentStatCards { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</body>
+</html>

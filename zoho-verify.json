@@ -1,0 +1,15 @@
+{
+  "Changes": [
+    {
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "stemnestacademy.co.uk",
+        "Type": "TXT",
+        "TTL": 300,
+        "ResourceRecords": [
+          { "Value": "\"zoho-verification=zb51423542.zmverify.zoho.com\"" }
+        ]
+      }
+    }
+  ]
+}

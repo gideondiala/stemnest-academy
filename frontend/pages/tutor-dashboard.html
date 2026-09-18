@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Microsoft Clarity -->
+  <script type="text/javascript">
+    (function(c,l,a,r,i,t,y){
+      c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+      t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+      y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    })(window, document, "clarity", "script", "xer20hj8fr");
+  </script>
+  <!-- End Microsoft Clarity -->
+  <!-- TikTok Pixel Code -->
+  <script>
+    !function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var r="https://analytics.tiktok.com/i18n/pixel/events.js",o=n&&n.partner;ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=r,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};n=document.createElement("script");n.type="text/javascript",n.async=!0,n.src=r+"?sdkid="+e+"&lib="+t;e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(n,e)};ttq.load('D8V60AJC77U45FANPDG0');ttq.load('D91PAORC77U4QRO9NQ0G');ttq.page()}(window,document,'ttq');
+  </script>
+  <!-- End TikTok Pixel Code -->
+  <!-- Google Analytics 4 -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-WB62B0P5KG"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-WB62B0P5KG');
+  </script>
+  <!-- End Google Analytics 4 -->
+  <!-- Auth Guard — must be first script in head -->
+  <script>
+    (function(){
+      var t=localStorage.getItem('sn_access_token');
+      var u=null;try{u=JSON.parse(localStorage.getItem('sn_api_user')||'null');}catch(e){}
+      var roles='tutor,admin,super_admin';
+      var allowed=roles?roles.split(',').map(function(r){return r.trim();}):[];
+      var redir='/pages/login.html?redirect='+encodeURIComponent(window.location.pathname+window.location.search);
+      if(!t){document.documentElement.style.visibility='hidden';window.location.replace(redir);return;}
+      try{var p=t.split('.');if(p.length===3){var pl=JSON.parse(atob(p[1].replace(/-/g,'+').replace(/_/g,'/')));if(pl.exp&&pl.exp*1000<Date.now()){localStorage.removeItem('sn_access_token');localStorage.removeItem('sn_api_user');document.documentElement.style.visibility='hidden';window.location.replace(redir);return;}}}catch(e){}
+      if(allowed.length){var role=u&&u.role?u.role:'';if(!role||allowed.indexOf(role)===-1){document.documentElement.style.visibility='hidden';window.location.replace('/pages/login.html?error=unauthorized');return;}}
+      document.documentElement.style.visibility='';
+    })();
+  </script>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" sizes="32x32" href="../assets/icons/icon.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="../assets/icons/icon.png">
+  <link rel="apple-touch-icon" href="../assets/icons/icon.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tutor Dashboard – StemNest Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/dashboard.css">
+  <link rel="stylesheet" href="../css/tutor-calendar.css">
+</head>
+<body>
+
+<!-- ═══ TOP NAV ═══ -->
+<nav style="position:sticky;top:0;z-index:200;">
+  <a class="logo" href="../index.html">
+    <img src="../assets/images/logo.png" alt="StemNest Academy" class="logo-img">
+  </a>
+  <ul class="nav-links">
+    <li><a href="../index.html">← Back to Website</a></li>
+  </ul>
+  <div class="nav-actions">
+    <span style="font-size:13px;font-weight:700;color:var(--light);">
+      <span class="live-dot"></span> <span id="navTutorName">Loading…</span> — Online
+    </span>
+    <a href="login.html" class="btn btn-outline" style="font-size:13px;padding:8px 18px;">Log Out</a>
+  </div>
+</nav>
+
+<div class="dash-wrap">
+
+  <!-- ═══ SIDEBAR ═══ -->
+  <div class="dash-sidebar">
+    <div class="sidebar-profile">
+      <!-- Avatar: photo or initials — rendered by JS -->
+      <div id="sidebarAvatarWrap"></div>
+      <div class="sidebar-name" id="sidebarName">—</div>
+      <div class="sidebar-role" id="sidebarRole">—</div>
+      <div class="tutor-id-badge" id="tutorIdBadge">—</div>
+      <div class="sidebar-status"><span class="live-dot"></span> Online</div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="sidebar-section-label">Main</div>
+      <a class="sidebar-link active" data-tab="overview"   onclick="showDashTab('overview')">  <span class="sl-icon">🏠</span> Overview</a>
+      <a class="sidebar-link"        data-tab="sessions"   onclick="showDashTab('sessions')">  <span class="sl-icon">📡</span> Live Sessions</a>
+      <a class="sidebar-link"        data-tab="projects"   onclick="showDashTab('projects')">  <span class="sl-icon">📁</span> Student Projects</a>
+      <a class="sidebar-link"        data-tab="calendar"   onclick="showDashTab('calendar')">  <span class="sl-icon">📅</span> Availability</a>
+      <a class="sidebar-link"        data-tab="companion"  onclick="showDashTab('companion')"> <span class="sl-icon">📚</span> My Companion</a>
+      <a class="sidebar-link"        data-tab="leaderboard" onclick="showDashTab('leaderboard')"><span class="sl-icon">🏆</span> Leaderboard</a>
+      <a class="sidebar-link"        data-tab="records"     onclick="showDashTab('records')">    <span class="sl-icon">📋</span> Class Records</a>
+      <a class="sidebar-link"        data-tab="kyc"        onclick="showDashTab('kyc')">       <span class="sl-icon">🪪</span> My KYC</a>
+      <div class="sidebar-section-label">Account</div>
+      <a class="sidebar-link" onclick="openProfileModal()"><span class="sl-icon">👤</span> Update Profile</a>
+      <a class="sidebar-link" href="../index.html"><span class="sl-icon">🌐</span> Back to Website</a>
+    </div>
+    <div class="sidebar-bottom">
+      <button class="logout-btn" onclick="window.location.href='login.html'">🚪 Log Out</button>
+    </div>
+  </div>
+
+  <!-- ═══ MAIN CONTENT ═══ -->
+  <div class="dash-main">
+
+    <!-- Top bar -->
+    <div class="dash-topbar">
+      <div>
+        <div class="dash-greeting"><span id="greetingTime">Good morning ☀️</span>, <span id="greetingName" style="color:var(--blue);">—</span> 👋</div>
+        <div class="dash-date" id="dashDate"></div>
+      </div>
+      <div class="dash-top-actions">
+        <button class="btn btn-outline" onclick="openProfileModal()">👤 My Profile</button>
+        <button class="btn btn-primary" onclick="showDashTab('sessions')">📡 Start Session</button>
+      </div>
+    </div>
+
+    <!-- Stat cards -->
+    <div class="dash-stats">
+      <div class="dstat ds-blue">
+        <div class="dstat-icon di-blue">📡</div>
+        <div class="dstat-val" id="statSessionsToday">0</div>
+        <div class="dstat-label">Sessions Today</div>
+        <div class="dstat-trend trend-up" id="statSessionsTrend">Loading…</div>
+      </div>
+      <div class="dstat ds-green">
+        <div class="dstat-icon di-green">💷</div>
+        <div class="dstat-val" id="overviewEarnings">£0</div>
+        <div class="dstat-label">Live Earnings</div>
+        <div class="dstat-trend trend-up">This month</div>
+      </div>
+      <div class="dstat ds-purple">
+        <div class="dstat-icon di-purple">⭐</div>
+        <div class="dstat-val" id="overviewPoints">0</div>
+        <div class="dstat-label">Points</div>
+        <div class="dstat-trend trend-up" onclick="showDashTab('leaderboard')" style="cursor:pointer;color:var(--blue);">View leaderboard →</div>
+      </div>
+      <div class="dstat ds-orange">
+        <div class="dstat-icon di-orange">📋</div>
+        <div class="dstat-val" id="statProjectsPending">0</div>
+        <div class="dstat-label">Projects to Review</div>
+        <div class="dstat-trend trend-neutral">Awaiting your feedback</div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="dash-section-header"><div class="dash-section-title">Quick Actions</div></div>
+    <div class="quick-actions" id="quickActions">
+      <div class="qa-btn qa-blue"   onclick="showDashTab('sessions')"><div class="qa-icon qi-blue">📡</div><div><div class="qa-label">Manage Sessions</div><div class="qa-sub">Start, join or reschedule</div></div></div>
+      <div class="qa-btn qa-orange" onclick="showDashTab('projects')"><div class="qa-icon qi-orange">📁</div><div><div class="qa-label">Student Projects</div><div class="qa-sub" id="qaProjectsSub">Loading…</div></div></div>
+      <div class="qa-btn qa-green"  onclick="showDashTab('calendar')"><div class="qa-icon qi-green">📅</div><div><div class="qa-label">Set Availability</div><div class="qa-sub">Mark your free slots</div></div></div>
+      <div class="qa-btn qa-purple" onclick="openProfileModal()"><div class="qa-icon qi-purple">👤</div><div><div class="qa-label">Update Profile</div><div class="qa-sub">Bio, photo &amp; subjects</div></div></div>
+    </div>
+
+    <!-- ── TAB: OVERVIEW ── -->
+    <div id="tab-overview">
+
+      <!-- UPCOMING SESSIONS — 3 cards always visible -->
+      <div class="dash-section-header" style="margin-bottom:16px;">
+        <div class="dash-section-title">📡 Upcoming Sessions</div>
+        <button class="btn btn-outline" style="font-size:12px;" onclick="if(typeof renderUpcomingCards==='function')renderUpcomingCards()">🔄 Refresh</button>
+      </div>
+      <div id="upcomingSessionCards" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px;">
+
+        <!-- Card 1: Current Class -->
+        <div id="sessionCard0" style="background:var(--white);border-radius:20px;padding:24px;box-shadow:0 4px 20px rgba(0,0,0,.08);display:flex;flex-direction:column;gap:10px;border-top:4px solid var(--blue);">
+          <div style="font-family:'Fredoka One',cursive;font-size:12px;color:var(--blue);text-transform:uppercase;letter-spacing:.5px;">Current Class</div>
+          <div style="font-family:'Fredoka One',cursive;font-size:18px;color:var(--dark);">—</div>
+          <div style="font-size:13px;font-weight:700;color:var(--light);">🕐 No session scheduled</div>
+          <div style="font-size:12px;color:var(--light);">Sessions appear once Pre-Sales schedules a class for you.</div>
+          <div style="display:flex;gap:8px;margin-top:auto;">
+            <button style="background:var(--green);color:#fff;border:none;border-radius:12px;padding:10px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:not-allowed;flex:1;opacity:.5;" disabled>🚀 Join</button>
+            <button style="background:#c53030;color:rgba(255,255,255,.5);border:none;border-radius:12px;padding:10px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:not-allowed;flex:1;opacity:.5;" disabled>🔴 End</button>
+          </div>
+        </div>
+
+        <!-- Card 2: Next Class -->
+        <div id="sessionCard1" style="background:var(--white);border-radius:20px;padding:24px;box-shadow:0 4px 20px rgba(0,0,0,.08);display:flex;flex-direction:column;gap:10px;border-top:4px solid var(--green);">
+          <div style="font-family:'Fredoka One',cursive;font-size:12px;color:var(--green);text-transform:uppercase;letter-spacing:.5px;">Next Class</div>
+          <div style="font-family:'Fredoka One',cursive;font-size:18px;color:var(--dark);">—</div>
+          <div style="font-size:13px;font-weight:700;color:var(--light);">🕐 No session scheduled</div>
+          <div style="font-size:12px;color:var(--light);">Sessions appear once Pre-Sales schedules a class for you.</div>
+          <div style="display:flex;gap:8px;margin-top:auto;">
+            <button style="background:var(--green);color:#fff;border:none;border-radius:12px;padding:10px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:not-allowed;flex:1;opacity:.5;" disabled>🚀 Join</button>
+            <button style="background:#c53030;color:rgba(255,255,255,.5);border:none;border-radius:12px;padding:10px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:not-allowed;flex:1;opacity:.5;" disabled>🔴 End</button>
+          </div>
+        </div>
+
+        <!-- Card 3: Next Class -->
+        <div id="sessionCard2" style="background:var(--white);border-radius:20px;padding:24px;box-shadow:0 4px 20px rgba(0,0,0,.08);display:flex;flex-direction:column;gap:10px;border-top:4px solid var(--orange);">
+          <div style="font-family:'Fredoka One',cursive;font-size:12px;color:var(--orange);text-transform:uppercase;letter-spacing:.5px;">Next Class</div>
+          <div style="font-family:'Fredoka One',cursive;font-size:18px;color:var(--dark);">—</div>
+          <div style="font-size:13px;font-weight:700;color:var(--light);">🕐 No session scheduled</div>
+          <div style="font-size:12px;color:var(--light);">Sessions appear once Pre-Sales schedules a class for you.</div>
+          <div style="display:flex;gap:8px;margin-top:auto;">
+            <button style="background:var(--green);color:#fff;border:none;border-radius:12px;padding:10px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:not-allowed;flex:1;opacity:.5;" disabled>🚀 Join</button>
+            <button style="background:#c53030;color:rgba(255,255,255,.5);border:none;border-radius:12px;padding:10px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:not-allowed;flex:1;opacity:.5;" disabled>🔴 End</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Quick Actions + rest of overview -->
+      <div class="dash-grid-2">
+        <div class="dash-panel">
+          <div class="dash-section-header">
+            <div class="dash-section-title">📡 Today's Sessions</div>
+            <a class="dash-section-link" onclick="showDashTab('sessions')">See all →</a>
+          </div>
+          <div class="session-list" id="overviewSessionsList"><div style="text-align:center;padding:24px;color:var(--light);font-size:13px;font-weight:700;">Loading sessions…</div></div>
+        </div>
+        <div class="dash-panel">
+          <div class="dash-section-header">
+            <div class="dash-section-title">📁 Projects to Review</div>
+            <a class="dash-section-link" onclick="showDashTab('projects')">See all →</a>
+          </div>
+          <div class="project-list" id="overviewProjectsList">
+            <div style="text-align:center;padding:24px;color:var(--light);font-size:13px;font-weight:700;">Loading projects…</div>
+          </div>
+        </div>
+      </div>
+      <div class="dash-section-header">
+        <div class="dash-section-title">📅 This Week</div>
+        <a class="dash-section-link" onclick="showDashTab('calendar')">Set availability →</a>
+      </div>
+      <div class="cal-strip" id="calStrip"></div>
+    </div>
+
+    <!-- ── TAB: SESSIONS ── -->
+    <div id="tab-sessions" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📡 Manage Live Sessions</div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-outline" style="font-size:13px;" onclick="renderSessionsTab()">🔄 Refresh</button>
+        </div>
+      </div>
+      <div id="sessionsDiagnostic"></div>
+      <div class="session-list" id="sessionsListDynamic"></div>
+    </div>
+    <!-- ── TAB: PROJECTS ── -->
+    <div id="tab-projects" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📁 Student Projects</div>
+        <span style="font-size:13px;font-weight:800;color:var(--orange);" id="projectsTabBadge">Loading…</span>
+      </div>
+      <div class="dash-panel">
+        <div class="project-list" id="projectsListDynamic">
+          <div style="text-align:center;padding:40px;color:var(--light);font-weight:700;">Loading projects…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB: CALENDAR / AVAILABILITY ── -->
+    <div id="tab-calendar" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📅 Set Your Weekly Availability</div>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <span class="wcal-summary" id="availSummary">0 slots marked</span>
+          <button class="btn btn-outline" style="font-size:12px;padding:7px 14px;" onclick="clearWeekAvailability()">Clear Week</button>
+        </div>
+      </div>
+
+      <!-- Legend -->
+      <div class="wcal-legend">
+        <div class="wcal-legend-item"><div class="wcal-legend-dot wcal-legend-avail"></div> Available</div>
+        <div class="wcal-legend-item"><div class="wcal-legend-dot wcal-legend-past"></div> Past</div>
+        <div class="wcal-legend-item"><div class="wcal-legend-dot wcal-legend-empty"></div> Click to mark available</div>
+      </div>
+
+      <!-- Week nav -->
+      <div class="wcal-nav">
+        <button class="cal-nav-btn" onclick="changeWeek(-1)">‹ Prev</button>
+        <div class="wcal-week-label" id="weekLabel">—</div>
+        <button class="cal-nav-btn" onclick="changeWeek(1)">Next ›</button>
+      </div>
+
+      <!-- Calendar grid rendered by JS -->
+      <div id="weeklyCalContainer"></div>
+
+      <div class="wcal-hint">
+        💡 Click any slot to toggle availability. Green = you're free. Admin will see your available slots when assigning classes.
+      </div>
+    </div>
+
+    <!-- ── TAB: CALENDAR / AVAILABILITY ── -->
+    <div id="tab-calendar" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📅 Set Your Weekly Availability</div>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <span class="wcal-summary" id="availSummary">0 slots marked</span>
+          <button class="btn btn-outline" style="font-size:12px;padding:7px 14px;" onclick="clearWeekAvailability()">Clear Week</button>
+        </div>
+      </div>
+      <div class="wcal-legend">
+        <div class="wcal-legend-item"><div class="wcal-legend-dot wcal-legend-avail"></div> Available</div>
+        <div class="wcal-legend-item"><div class="wcal-legend-dot wcal-legend-paid"></div> Paid Class</div>
+        <div class="wcal-legend-item"><div class="wcal-legend-dot wcal-legend-demo"></div> Demo Class</div>
+        <div class="wcal-legend-item"><div class="wcal-legend-dot wcal-legend-past"></div> Past / Locked</div>
+        <div class="wcal-legend-item"><div class="wcal-legend-dot wcal-legend-empty"></div> Click to mark available</div>
+      </div>
+      <div class="wcal-nav">
+        <button class="cal-nav-btn" onclick="changeWeek(-1)">‹ Prev</button>
+        <div class="wcal-week-label" id="weekLabel">—</div>
+        <button class="cal-nav-btn" onclick="changeWeek(1)">Next ›</button>
+      </div>
+      <div id="weeklyCalContainer"></div>
+      <div class="wcal-hint">💡 Green = available. Blue = paid class booked. Orange = demo class booked. Past slots are locked. Click a booked slot to see details.</div>
+    </div>
+
+    <!-- ── TAB: MY COMPANION ── -->
+    <div id="tab-companion" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📚 My Companion</div>
+        <span style="font-size:13px;font-weight:700;color:var(--light);">Course materials for your assigned courses</span>
+      </div>
+      <div id="companionContent"></div>
+    </div>
+
+    <!-- ── TAB: LEADERBOARD ── -->
+    <div id="tab-leaderboard" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🏆 Leaderboard & Earnings</div>
+      </div>
+      <!-- Earnings cards -->
+      <div class="dash-stats" style="margin-bottom:28px;">
+        <div class="dstat ds-green">
+          <div class="dstat-icon di-green">💷</div>
+          <div class="dstat-val" id="liveEarnings">$0</div>
+          <div class="dstat-label">Live Earnings</div>
+          <div class="dstat-trend trend-up">This month</div>
+        </div>
+        <div class="dstat ds-purple">
+          <div class="dstat-icon di-purple">⭐</div>
+          <div class="dstat-val" id="totalPoints">0</div>
+          <div class="dstat-label">Total Points</div>
+          <div class="dstat-trend trend-up">All time</div>
+        </div>
+        <div class="dstat ds-blue">
+          <div class="dstat-icon di-blue">🎓</div>
+          <div class="dstat-val" id="statCompletedDemo">0</div>
+          <div class="dstat-label">Completed Demos</div>
+          <div class="dstat-trend trend-up">All time</div>
+        </div>
+        <div class="dstat ds-green" style="border-top:4px solid #0e9f6e;">
+          <div class="dstat-icon di-green">📚</div>
+          <div class="dstat-val" id="statCompletedPaid">0</div>
+          <div class="dstat-label">Completed Paid</div>
+          <div class="dstat-trend trend-up">All time</div>
+        </div>
+        <div class="dstat ds-orange">
+          <div class="dstat-icon di-orange">⚠️</div>
+          <div class="dstat-val" id="lateJoins">0</div>
+          <div class="dstat-label">Late Joins</div>
+          <div class="dstat-trend trend-neutral" id="lateJoinNote">This month</div>
+        </div>
+      </div>
+      <!-- Points breakdown -->
+      <div class="dash-panel" style="margin-bottom:24px;">
+        <div class="dash-section-header"><div class="dash-section-title">📊 Points System</div></div>
+        <div class="points-breakdown" id="pointsBreakdown"></div>
+      </div>
+      <!-- Leaderboard table -->
+      <div class="dash-panel">
+        <div class="dash-section-header"><div class="dash-section-title">🏆 All Tutors Ranking</div></div>
+        <div id="leaderboardList"></div>
+      </div>
+    </div>
+
+    <!-- ── TAB: KYC ── -->
+    <div id="tab-kyc" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🪪 My KYC — Know Your Profile</div>
+        <span style="font-size:13px;font-weight:700;color:var(--light);">Use this to introduce yourself in Demo classes</span>
+      </div>
+      <div class="kyc-wrap" id="kycContent"></div>
+    </div>
+
+    <!-- ── TAB: CLASS RECORDS ── -->
+    <div id="tab-records" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📋 Class Records</div>
+        <span style="font-size:13px;font-weight:700;color:var(--light);">All your classes — completed, incomplete, demo and paid</span>
+      </div>
+      <!-- Filter buttons -->
+      <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
+        <button id="recFilter-today" class="rec-filter-btn rec-filter-active" onclick="filterClassRecords('today')">📅 Today</button>
+        <button id="recFilter-week"  class="rec-filter-btn" onclick="filterClassRecords('week')">📆 This Week</button>
+        <button id="recFilter-month" class="rec-filter-btn" onclick="filterClassRecords('month')">🗓️ This Month</button>
+        <button id="recFilter-all"   class="rec-filter-btn" onclick="filterClassRecords('all')">📚 All Classes</button>
+      </div>
+      <div id="classRecordsTable"></div>
+    </div>
+
+  </div><!-- end dash-main -->
+</div><!-- end dash-wrap -->
+
+<!-- ═══ PROFILE MODAL ═══ -->
+<div class="profile-modal-overlay" id="profileModalOverlay">
+  <div class="profile-modal" style="max-width:540px;">
+    <div class="pm-header">
+      <div class="pm-title">👤 Update Profile</div>
+      <button class="modal-close" onclick="closeProfileModal()">✕</button>
+    </div>
+    <div class="pm-body">
+
+      <!-- Photo upload row -->
+      <div class="pm-avatar-row">
+        <div id="pmAvatarPreview" style="cursor:pointer;" onclick="triggerPhotoUpload()" title="Click to upload photo"></div>
+        <div>
+          <div style="font-weight:800;font-size:14px;color:var(--dark);" id="pmTutorName">—</div>
+          <div style="font-size:12px;color:var(--blue);font-weight:800;margin:4px 0;" id="pmTutorId">—</div>
+          <button class="btn btn-outline" style="font-size:12px;padding:6px 14px;margin-top:6px;" onclick="triggerPhotoUpload()">📷 Upload Photo</button>
+          <input type="file" id="photoUploadInput" accept="image/*" style="display:none;">
+          <div style="font-size:11px;color:var(--light);margin-top:4px;">JPG, PNG or GIF · Max 2MB</div>
+        </div>
+      </div>
+
+      <div class="pm-field"><label>Full Name</label><input type="text" id="pmFieldName" placeholder="Your full name"></div>
+      <div class="pm-field"><label>Email Address</label><input type="email" id="pmFieldEmail" placeholder="you@stemnestacademy.co.uk"></div>
+      <div class="pm-field"><label>Phone Number</label><input type="tel" id="pmFieldPhone" placeholder="+44 7700 000000"></div>
+      <div class="pm-field"><label>Subject Specialisms</label><input type="text" id="pmFieldSubjects" placeholder="e.g. Python, Scratch, Web Dev"></div>
+      <div class="pm-field"><label>Age Groups You Teach</label><input type="text" id="pmFieldAgeGroups" placeholder="e.g. Ages 7–19"></div>
+      <div class="pm-field"><label>Short Bio</label><textarea id="pmFieldBio" placeholder="Tell students a bit about yourself..."></textarea></div>
+      <div class="pm-field"><label>Change Password</label><input type="password" id="pmFieldPassword" placeholder="Leave blank to keep current password"></div>
+      <div class="pm-field"><label>Date of Birth</label><input type="date" id="pmFieldDob" placeholder="Your date of birth"></div>
+
+      <div class="pm-footer">
+        <button class="btn btn-outline" onclick="closeProfileModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveProfile()">Save Changes ✦</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ END CLASS MODAL ═══ -->
+<div class="modal-overlay" id="endClassModalOverlay">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <div class="modal-title" id="endClassModalTitle">📋 End Class Report</div>
+      <button class="modal-close" onclick="closeEndClassModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="endClassBookingInfo" style="background:var(--bg);border-radius:12px;padding:14px;margin-bottom:18px;font-size:14px;font-weight:700;color:var(--mid);line-height:1.8;"></div>
+
+      <div class="field">
+        <label>Class Outcome <span style="color:var(--orange);">*</span></label>
+        <div style="display:flex;gap:12px;margin-top:6px;">
+          <label style="display:flex;align-items:center;gap:8px;padding:10px 18px;border:2px solid #e8eaf0;border-radius:12px;cursor:pointer;font-weight:800;font-size:14px;transition:.2s;" id="outcomeCompleteLabel">
+            <input type="radio" name="classOutcome" value="completed" onchange="toggleOutcomeFields()" style="width:auto;"> ✅ Completed
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;padding:10px 18px;border:2px solid #e8eaf0;border-radius:12px;cursor:pointer;font-weight:800;font-size:14px;transition:.2s;" id="outcomeIncompleteLabel">
+            <input type="radio" name="classOutcome" value="incomplete" onchange="toggleOutcomeFields()" style="width:auto;"> ❌ Incomplete
+          </label>
+        </div>
+      </div>
+
+      <!-- Incomplete fields -->
+      <div id="incompleteFields" style="display:none;margin-top:14px;">
+        <div class="field">
+          <label>Reason for Incomplete Class <span style="color:var(--orange);">*</span></label>
+          <textarea id="incompleteReason" style="min-height:80px;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;width:100%;outline:none;resize:vertical;" placeholder="What happened? e.g. Student didn't show up, technical issues, parent cancelled..."></textarea>
+        </div>
+      </div>
+
+      <!-- Completed fields -->
+      <div id="completedFields" style="display:none;margin-top:14px;">
+        <div class="field">
+          <label>How was the class? (Overall quality)</label>
+          <select id="classQuality">
+            <option value="excellent">⭐⭐⭐⭐⭐ Excellent — Student was engaged and progressed well</option>
+            <option value="good">⭐⭐⭐⭐ Good — Solid session, minor issues</option>
+            <option value="average">⭐⭐⭐ Average — Some engagement challenges</option>
+            <option value="poor">⭐⭐ Poor — Student struggled significantly</option>
+          </select>
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Student & Parent Interest Level</label>
+          <select id="studentInterest">
+            <option value="very_high">🔥 Very High — Parent was very enthusiastic, asked about pricing</option>
+            <option value="high">✅ High — Positive response, likely to enrol</option>
+            <option value="medium">🤔 Medium — Interested but undecided</option>
+            <option value="low">😐 Low — Not very engaged</option>
+            <option value="none">❌ None — No interest shown</option>
+          </select>
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Perceived Purchasing Power</label>
+          <select id="purchasingPower">
+            <option value="high">💰 High — Clearly able to afford</option>
+            <option value="medium">💵 Medium — Possible with right pitch</option>
+            <option value="low">💸 Low — Budget may be a concern</option>
+          </select>
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Additional Notes for Sales Team</label>
+          <textarea id="classNotes" style="min-height:80px;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;width:100%;outline:none;resize:vertical;" placeholder="Any useful context for the sales person — parent's concerns, student's goals, best course to pitch..."></textarea>
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>🎥 Recording Link (paste after class ends)</label>
+          <input type="url" id="recordingLink" placeholder="https://drive.google.com/... or Zoom recording link" style="padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;width:100%;outline:none;">
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeEndClassModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="submitEndClassReport()">Submit Report ✦</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ RESCHEDULE LESSON MODAL ═══ -->
+<div class="modal-overlay" id="rescheduleModalOverlay">
+  <div class="modal" style="max-width:500px;">
+    <div class="modal-header">
+      <div class="modal-title">Reschedule Class</div>
+      <button class="modal-close" onclick="closeRescheduleModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--bg);border-radius:12px;padding:14px 16px;margin-bottom:20px;font-size:13px;font-weight:700;color:var(--dark);line-height:1.8;" id="reschedule-lesson-info">—</div>
+
+      <!-- Option selector -->
+      <div id="reschedule-options" style="margin-bottom:20px;">
+        <div style="font-size:13px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px;">How would you like to reschedule?</div>
+        <label style="display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border:2px solid #e8eaf0;border-radius:14px;cursor:pointer;margin-bottom:10px;transition:.15s;" id="reschedule-opt-next-label" onclick="selectRescheduleOption('next')">
+          <input type="radio" name="reschedule-mode" value="next" id="reschedule-opt-next" style="margin-top:2px;width:auto;accent-color:var(--blue);">
+          <div>
+            <div style="font-weight:900;font-size:14px;color:var(--dark);">Shift to Next Learning Day</div>
+            <div style="font-size:12px;color:var(--light);margin-top:2px;" id="reschedule-next-day-hint">Moves this class to next week — same day and time (+7 days)</div>
+          </div>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border:2px solid #e8eaf0;border-radius:14px;cursor:pointer;transition:.15s;" id="reschedule-opt-custom-label" onclick="selectRescheduleOption('custom')">
+          <input type="radio" name="reschedule-mode" value="custom" id="reschedule-opt-custom" style="margin-top:2px;width:auto;accent-color:var(--blue);">
+          <div>
+            <div style="font-weight:900;font-size:14px;color:var(--dark);">Choose a Custom Date &amp; Time</div>
+            <div style="font-size:12px;color:var(--light);margin-top:2px;">Pick any date and time — cannot go beyond the student's next class</div>
+          </div>
+        </label>
+      </div>
+
+      <!-- Custom date/time fields (shown only when custom is selected) -->
+      <div id="reschedule-custom-fields" style="display:none;margin-bottom:20px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div>
+            <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">New Date</label>
+            <input type="date" id="reschedule-custom-date" style="width:100%;padding:10px 12px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:6px;">New Time</label>
+            <input type="time" id="reschedule-custom-time" style="width:100%;padding:10px 12px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;box-sizing:border-box;">
+          </div>
+        </div>
+      </div>
+
+      <div id="reschedule-clash-error" style="display:none;margin-bottom:12px;background:#fde8e8;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:700;color:#c53030;"></div>
+
+      <div class="field">
+        <label>Reason for Reschedule <span style="color:var(--orange);">*</span></label>
+        <textarea id="reschedule-reason" placeholder="e.g. Student unavailable — family event" rows="2"
+          style="min-height:60px;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;width:100%;outline:none;resize:vertical;"></textarea>
+      </div>
+
+      <div class="modal-footer" style="margin-top:20px;">
+        <button class="btn btn-outline" onclick="closeRescheduleModal()">Cancel</button>
+        <button class="btn btn-primary" id="reschedule-confirm-btn" onclick="confirmRescheduleNew()">Confirm Reschedule</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/api.js"></script>
+<script src="../js/api-sync.js"></script>
+<script src="../js/wa.js"></script>
+<script src="../js/utils.js"></script>
+<script src="../js/dashboard.js"></script>
+<script src="../js/tutor-companion.js"></script>
+<script src="../js/tutor-sessions.js"></script>
+<script src="../js/tutor-sessions-v2.js"></script>
+<script src="../js/course-scheduler.js"></script>
+<script src="../js/tutor-projects.js"></script>
+</body>
+</html>

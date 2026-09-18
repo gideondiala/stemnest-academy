@@ -1,0 +1,15 @@
+{
+  "Changes": [
+    {
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "billing.stemnestacademy.co.uk",
+        "Type": "CNAME",
+        "TTL": 300,
+        "ResourceRecords": [
+          { "Value": "hosted-checkout.stripecdn.com" }
+        ]
+      }
+    }
+  ]
+}

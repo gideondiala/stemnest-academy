@@ -1,0 +1,17 @@
+Lets work on this website properly. I want to finish up with the functionalities and work on email system. but most functionalities keep failing.
+I just logged in using another browser i have never used and everything is empty. The presales dasboard was empty. This means no record in the database online? are they still stored in the local browser? remember we are fully an online edtech company.
+we should be able to access everythingfrom anywhere once we can login with the right credentials.
+
+I want thsi to be fully functional as it was when it was saving on the local browsereven if you have to redesign the database again.
+the flow should be simple and direct. if we need to change the entire architecture I do not mind.
+
+When a parent books a demo session it has to be saved properly in the databaseand the presales agent should be able to see it no matter the device they are using.
+the presales should be able to book that demo for a teacher and the Learning Advisor(Academic counselor)
+
+You already know the flow of this system Please deligently work on it and finish up
+when the classes are booked sometimes you don see them in the presales... after a long time or many hours you see it showing.... This can affect our business seeing a student can book a class for the next hour, if the presales dont get it on time the time passes and student has missed the class and lost interest. we have lost that opportunity. things should be realtime and refreshes constanly. suggest and use the best you can to achieve this.
+
+
+I also Wish to change the icon that appears on the tab of the browser I have added an Image in the assets/icon folder. The Image is "Steamnest Icon.png" its should replace the Icon.png.
+
+also our address appears as index.html, Admin-dashboard.html etc. Can we change it home, admin dashboard, etc with the .html showing it makes it more matured.

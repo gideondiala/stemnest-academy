@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Microsoft Clarity -->
+  <script type="text/javascript">
+    (function(c,l,a,r,i,t,y){
+      c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+      t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+      y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    })(window, document, "clarity", "script", "xer20hj8fr");
+  </script>
+  <!-- End Microsoft Clarity -->
+  <!-- TikTok Pixel Code -->
+  <script>
+    !function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var r="https://analytics.tiktok.com/i18n/pixel/events.js",o=n&&n.partner;ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=r,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};n=document.createElement("script");n.type="text/javascript",n.async=!0,n.src=r+"?sdkid="+e+"&lib="+t;e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(n,e)};ttq.load('D8V60AJC77U45FANPDG0');ttq.load('D91PAORC77U4QRO9NQ0G');ttq.page()}(window,document,'ttq');
+  </script>
+  <!-- End TikTok Pixel Code -->
+  <!-- Google Analytics 4 -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-WB62B0P5KG"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-WB62B0P5KG');
+  </script>
+  <!-- End Google Analytics 4 -->
+  <!-- Auth Guard — must be first script in head -->
+  <script>
+    (function(){
+      var t=localStorage.getItem('sn_access_token');
+      var u=null;try{u=JSON.parse(localStorage.getItem('sn_api_user')||'null');}catch(e){}
+      var roles='postsales,admin,super_admin';
+      var allowed=roles?roles.split(',').map(function(r){return r.trim();}):[];
+      var redir='/pages/login.html?redirect='+encodeURIComponent(window.location.pathname+window.location.search);
+      if(!t){document.documentElement.style.visibility='hidden';window.location.replace(redir);return;}
+      try{var p=t.split('.');if(p.length===3){var pl=JSON.parse(atob(p[1].replace(/-/g,'+').replace(/_/g,'/')));if(pl.exp&&pl.exp*1000<Date.now()){localStorage.removeItem('sn_access_token');localStorage.removeItem('sn_api_user');document.documentElement.style.visibility='hidden';window.location.replace(redir);return;}}}catch(e){}
+      if(allowed.length){var role=u&&u.role?u.role:'';if(!role||allowed.indexOf(role)===-1){document.documentElement.style.visibility='hidden';window.location.replace('/pages/login.html?error=unauthorized');return;}}
+      document.documentElement.style.visibility='';
+    })();
+  </script>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" sizes="32x32" href="../assets/icons/icon.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="../assets/icons/icon.png">
+  <link rel="apple-touch-icon" href="../assets/icons/icon.png"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Post-Sales Dashboard – StemNest Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/dashboard.css">
+  <link rel="stylesheet" href="../css/admin-dashboard.css">
+</head>
+<body>
+<nav style="position:sticky;top:0;z-index:200;">
+  <a class="logo" href="../index.html"><img src="../assets/images/logo.png" alt="StemNest Academy" class="logo-img"></a>
+  <ul class="nav-links"><li><a href="../index.html">← Back to Website</a></li></ul>
+  <div class="nav-actions">
+    <span style="font-size:13px;font-weight:700;color:var(--light);"><span class="live-dot"></span> Post-Sales</span>
+    <a href="login.html" class="btn btn-outline" style="font-size:13px;padding:8px 18px;">Log Out</a>
+  </div>
+</nav>
+<div class="dash-wrap">
+  <div class="dash-sidebar">
+    <div class="sidebar-profile">
+      <div class="sidebar-avatar" style="background:linear-gradient(135deg,var(--green),#0694a2);">POS</div>
+      <div class="sidebar-name">Post-Sales</div>
+      <div class="sidebar-role">Finance & Enrolment</div>
+      <div class="sidebar-status"><span class="live-dot"></span> Online</div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="sidebar-section-label">Finance</div>
+      <a class="sidebar-link active" data-tab="students"  onclick="showPOSTab('students')"> <span class="sl-icon">🎓</span> Paid Students <span class="sl-badge" id="posBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="topup"     onclick="showPOSTab('topup')">    <span class="sl-icon">⚠️</span> Needs Top-Up <span class="sl-badge" id="topupBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="scheduled" onclick="showPOSTab('scheduled')"><span class="sl-icon">📅</span> Scheduled Classes</a>
+      <a class="sidebar-link"        data-tab="paylinks"  onclick="showPOSTab('paylinks')"> <span class="sl-icon">🔗</span> Payment Links</a>
+      <a class="sidebar-link"        data-tab="converted" onclick="showPOSTab('converted')"><span class="sl-icon">✅</span> Converted</a>
+      <a class="sidebar-link"        data-tab="website-enquiries" onclick="showPOSTab('website-enquiries')"><span class="sl-icon">🌐</span> Website Enquiries</a>
+      <a class="sidebar-link"        data-tab="enrollment-requests" onclick="showPOSTab('enrollment-requests')"><span class="sl-icon">📋</span> Enrollment Requests <span class="sl-badge" id="enrollReqBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="incoming-referrals" onclick="showPOSTab('incoming-referrals')"><span class="sl-icon">🤝</span> Incoming Referrals <span class="sl-badge" id="posRefBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="promotions" onclick="showPOSTab('promotions')"><span class="sl-icon">🎓</span> Grade Promotions <span class="sl-badge" id="promotionsBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="pause-resume" onclick="showPOSTab('pause-resume')"><span class="sl-icon">⏸️</span> Pause &amp; Resume <span class="sl-badge" id="pauseBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="batches" onclick="showPOSTab('batches')"><span class="sl-icon">👥</span> Group Batches <span class="sl-badge" id="batchesBadge">0</span></a>
+    </div>
+    <div class="sidebar-bottom">
+      <button class="logout-btn" onclick="window.location.href='login.html'">🚪 Log Out</button>
+    </div>
+  </div>
+  <div class="dash-main">
+    <div class="dash-topbar">
+      <div>
+        <div class="dash-greeting">💼 Post-Sales Dashboard</div>
+        <div class="dash-date" id="posDate"></div>
+      </div>
+    </div>
+    <div class="dash-stats">
+      <div class="dstat ds-orange"><div class="dstat-icon di-orange">🎓</div><div class="dstat-val" id="posStat1">0</div><div class="dstat-label">Awaiting Schedule</div><div class="dstat-trend trend-neutral">Paid, not yet booked</div></div>
+      <div class="dstat ds-blue"><div class="dstat-icon di-blue">📅</div><div class="dstat-val" id="posStat2">0</div><div class="dstat-label">Classes Scheduled</div><div class="dstat-trend trend-up">On teacher calendar</div></div>
+      <div class="dstat ds-green"><div class="dstat-icon di-green">✅</div><div class="dstat-val" id="posStat3">0</div><div class="dstat-label">Converted</div><div class="dstat-trend trend-up">Paid</div></div>
+      <div class="dstat ds-purple"><div class="dstat-icon di-purple">💰</div><div class="dstat-val" id="posStat4">£0</div><div class="dstat-label">Revenue Won</div><div class="dstat-trend trend-up">This month</div></div>
+    </div>
+
+    <!-- GROUP BATCHES -->
+    <div id="tab-batches" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">👥 Group Batches</div>
+        <button class="btn btn-primary" style="font-size:13px;" onclick="openCreateBatchModal()">➕ Create Batch</button>
+      </div>
+      <div id="batchesList" style="margin-top:16px;">
+        <div style="text-align:center;padding:32px;color:var(--light);font-weight:700;">Click "Group Batches" in the sidebar to load.</div>
+      </div>
+    </div>
+
+    <!-- PAUSE & RESUME -->
+    <div id="tab-pause-resume" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">⏸️ Pause &amp; Resume Classes</div>
+      </div>
+
+      <!-- Two-section layout: Active students (to pause) + Paused students (to resume) -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:8px;">
+
+        <!-- LEFT: Active students — can be paused -->
+        <div>
+          <div style="font-family:'Fredoka One',cursive;font-size:16px;color:var(--dark);margin-bottom:12px;">
+            🟢 Active Students
+            <span style="font-size:12px;font-weight:700;color:var(--light);font-family:'Nunito',sans-serif;margin-left:8px;">Click Pause to freeze a student's classes</span>
+          </div>
+          <div id="activeStudentsList">
+            <div style="text-align:center;padding:32px;color:var(--light);font-weight:700;">⏳ Loading...</div>
+          </div>
+        </div>
+
+        <!-- RIGHT: Paused students — can be resumed -->
+        <div>
+          <div style="font-family:'Fredoka One',cursive;font-size:16px;color:var(--dark);margin-bottom:12px;">
+            🔴 Paused Students
+            <span style="font-size:12px;font-weight:700;color:var(--light);font-family:'Nunito',sans-serif;margin-left:8px;">Click Resume to restart their classes</span>
+          </div>
+          <div id="pausedStudentsList">
+            <div style="text-align:center;padding:32px;color:var(--light);font-weight:700;">⏳ Loading...</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- PAID STUDENTS -->
+    <div id="tab-students">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🎓 Paid Students</div>
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-primary" style="font-size:13px;" onclick="openManualOnboardModal()">➕ Manual Onboard</button>
+          <button class="btn btn-outline" style="font-size:13px;" onclick="renderPaidStudents()">🔄 Refresh</button>
+        </div>
+      </div>
+      <div style="background:var(--blue-light);border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13px;font-weight:700;color:var(--blue);">
+        💡 Students who came via demo class appear here automatically. For walk-in or referral students, click <strong>Manual Onboard</strong>.
+      </div>
+      <div id="paidStudentsList"></div>
+    </div>
+
+    <!-- STUDENTS NEEDING TOP-UP -->
+    <div id="tab-topup" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">⚠️ Students Needing Top-Up</div>
+        <span style="font-size:13px;font-weight:700;color:var(--light);">Students with 2 or fewer credits remaining</span>
+      </div>
+      <div style="background:#fff3e0;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13px;font-weight:700;color:#e65100;">
+        💡 Generate a payment link for each student and paste it here. The student will see a "Top Up Credits" button linking directly to their payment page.
+      </div>
+      <div id="topupStudentsList"></div>
+    </div>
+
+    <!-- SCHEDULED PAID CLASSES -->
+    <div id="tab-scheduled" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📅 Scheduled Paid Classes</div>
+      </div>
+      <div id="scheduledPaidList"></div>
+    </div>
+
+    <!-- PAYMENT LINKS -->
+    <div id="tab-paylinks" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🔗 Generate Payment Link</div>
+      </div>
+      <div class="add-teacher-form-wrap">
+        <form class="add-teacher-form" onsubmit="return false;">
+          <div class="atf-grid">
+            <div class="atf-field"><label>Student Name <span class="req">*</span></label><input type="text" id="pl-student" placeholder="e.g. James Okafor"></div>
+            <div class="atf-field"><label>Parent Email <span class="req">*</span></label><input type="email" id="pl-email" placeholder="parent@gmail.com"></div>
+            <div class="atf-field"><label>WhatsApp</label><input type="tel" id="pl-whatsapp" placeholder="+44 7700 000000"></div>
+            <div class="atf-field"><label>Course <span class="req">*</span></label><select id="pl-course"><option value="">Select course</option></select></div>
+            <div class="atf-field"><label>Amount <span class="req">*</span></label><input type="number" id="pl-amount" placeholder="e.g. 99" min="0"></div>
+            <div class="atf-field"><label>Credits (classes)</label><input type="number" id="pl-credits" placeholder="e.g. 4" min="1"></div>
+            <div class="atf-field"><label>Currency</label>
+              <select id="pl-currency">
+                <option value="GBP">🇬🇧 GBP (£)</option>
+                <option value="NGN">🇳🇬 NGN (₦)</option>
+                <option value="GHS">🇬🇭 GHS (₵)</option>
+                <option value="USD">🇺🇸 USD ($)</option>
+                <option value="AED">🇦🇪 AED</option>
+                <option value="ZAR">🇿🇦 ZAR (R)</option>
+              </select>
+            </div>
+            <div class="atf-field"><label>Notes</label><input type="text" id="pl-notes" placeholder="e.g. Python for Beginners — 4 sessions"></div>
+          </div>
+          <div class="atf-divider"></div>
+          <div class="atf-actions">
+            <button type="button" class="btn btn-outline" onclick="clearPayLink()">Clear</button>
+            <button type="button" class="btn btn-primary" onclick="generatePaymentLink()">🔗 Generate & Send Link</button>
+          </div>
+          <div id="generatedLinkBox" style="display:none;margin-top:20px;background:var(--green-light);border-radius:14px;padding:16px 20px;">
+            <div style="font-family:'Fredoka One',cursive;font-size:16px;color:var(--green-dark);margin-bottom:8px;">✅ Payment Link Generated</div>
+            <div id="generatedLinkText" style="font-size:13px;color:var(--mid);word-break:break-all;margin-bottom:12px;"></div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <button class="btn btn-green" style="font-size:13px;" onclick="copyPayLink()">📋 Copy Link</button>
+              <button class="btn btn-outline" style="font-size:13px;" onclick="sendPayLinkEmail()">📧 Send via Email</button>
+              <button class="btn btn-outline" style="font-size:13px;" onclick="sendPayLinkWhatsApp()">💬 Send via WhatsApp</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- CONVERTED -->
+    <div id="tab-converted" style="display:none;">
+      <div class="dash-section-header"><div class="dash-section-title">✅ Converted Students</div></div>
+      <div id="posConvertedList"></div>
+    </div>
+
+    <!-- WEBSITE ENQUIRIES -->
+    <div id="tab-website-enquiries" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🌐 Direct Website Enquiries</div>
+        <button class="btn btn-outline" style="font-size:12px;" onclick="renderWebsiteEnquiries()">🔄 Refresh</button>
+      </div>
+      <div style="background:#f0f4ff;border-radius:12px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:#1e40af;font-weight:700;">
+        📋 These are parents who clicked "Enrol Now" on the courses page. Contact them to arrange payment and schedule their first class.
+      </div>
+      <div id="websiteEnquiriesList"></div>
+    </div>
+
+    <!-- ENROLLMENT REQUESTS -->
+    <div id="tab-enrollment-requests" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📋 Enrollment Requests</div>
+        <button class="btn btn-outline" style="font-size:12px;" onclick="renderEnrollmentRequests()">🔄 Refresh</button>
+      </div>
+      <div style="background:#f0f4ff;border-radius:12px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:#1e40af;font-weight:700;">
+        📋 Parents who completed the "Enrol Now" form on the website. Generate a payment link, paste it below, then mark as Received and click Proceed to move them to Paid Students.
+      </div>
+      <div id="enrollmentRequestsList"></div>
+    </div>
+
+    <!-- INCOMING REFERRALS (postsales) -->
+    <div id="tab-incoming-referrals" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🤝 Incoming Referrals</div>
+        <button class="btn btn-outline" style="font-size:12px;" onclick="renderIncomingReferrals()">🔄 Refresh</button>
+      </div>
+      <div style="background:#f0f4ff;border-radius:12px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:#1e40af;font-weight:700;">
+        🤝 Students referred by existing StemNest students and sent here by Pre-Sales. Generate a payment link, send it, mark as Received, then Proceed to enroll them.
+      </div>
+      <div id="posIncomingReferralsList"></div>
+    </div>
+
+    <!-- GRADE PROMOTIONS -->
+    <div id="tab-promotions" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🎓 Grade Promotions</div>
+        <button class="btn btn-outline" style="font-size:12px;" onclick="renderPromotions()">🔄 Refresh</button>
+      </div>
+      <div style="background:#f0fdf4;border-radius:12px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:#065f46;font-weight:700;">
+        🎓 Students who have completed all 72 lessons in their current grade are listed here. Click "Promote" to move them to the next grade.
+      </div>
+      <div id="promotionsList"></div>
+    </div>
+
+    <!-- ── TAB: BATCHES ── -->
+    <div id="tab-batches" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">👥 Group Batches</div>
+        <button class="btn btn-outline" style="font-size:13px;" onclick="loadBatches()">🔄 Refresh</button>
+      </div>
+      <div id="batchesList">
+        <div style="text-align:center;padding:40px;color:var(--light);font-weight:700;">Loading batches…</div>
+      </div>
+    </div>
+
+    <!-- ── BATCH TRANSFER MODAL ── -->
+    <div class="modal-overlay" id="batchTransferOverlay">
+      <div class="modal" style="max-width:560px;">
+        <div class="modal-header">
+          <div class="modal-title">🔄 Transfer Batch</div>
+          <button class="modal-close" onclick="closeBatchTransfer()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div id="batchTransferInfo" style="background:var(--bg);border-radius:12px;padding:14px;margin-bottom:20px;font-size:13px;font-weight:700;color:var(--dark);line-height:1.8;"></div>
+
+          <div class="field">
+            <label>New Tutor <span style="color:var(--orange);">*</span></label>
+            <select id="batchTransferTutor" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
+              <option value="">— Keep current tutor —</option>
+            </select>
+          </div>
+
+          <div class="field" style="margin-top:14px;">
+            <label>Transfer From Date <span style="color:var(--orange);">*</span></label>
+            <input type="date" id="batchTransferDate" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
+            <div style="font-size:11px;color:var(--light);margin-top:4px;font-weight:700;">All bookings from this date onwards will be moved to the new schedule</div>
+          </div>
+
+          <div class="field" style="margin-top:14px;">
+            <label>New Schedule <span style="color:var(--orange);">*</span></label>
+            <div id="batchTransferScheduleRows"></div>
+            <button type="button" onclick="addBatchScheduleRow()" style="background:var(--bg);color:var(--blue);border:2px dashed var(--blue);border-radius:10px;padding:8px 16px;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;width:100%;margin-top:8px;">+ Add Day</button>
+          </div>
+
+          <div class="field" style="margin-top:14px;">
+            <label>Google Meet Link <span style="font-size:11px;color:var(--light);font-weight:600;">(leave blank to keep existing)</span></label>
+            <input type="url" id="batchTransferLink" placeholder="https://meet.google.com/... (optional)" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
+          </div>
+
+          <div id="batchTransferError" style="display:none;margin-top:12px;background:#fde8e8;border-radius:10px;padding:12px 14px;font-size:13px;font-weight:700;color:#c53030;"></div>
+
+          <div class="modal-footer" style="margin-top:20px;">
+            <button class="btn btn-outline" onclick="closeBatchTransfer()">Cancel</button>
+            <button class="btn btn-primary" id="batchTransferBtn" onclick="confirmBatchTransfer()">Confirm Transfer ✦</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end dash-main -->
+</div><!-- end dash-wrap -->
+
+<!-- ═══ SCHEDULE PAID CLASSES MODAL ═══ -->
+<div class="modal-overlay" id="posScheduleModalOverlay">
+  <div class="modal" style="max-width:580px;max-height:90vh;overflow-y:auto;">
+    <div class="modal-header">
+      <div class="modal-title">📅 Schedule Paid Classes</div>
+      <button class="modal-close" onclick="closePOSScheduleModal()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Student info -->
+      <div style="background:var(--green-light);border-radius:12px;padding:14px 16px;margin-bottom:20px;font-size:13px;font-weight:700;color:var(--dark);line-height:1.7;" id="pos-sm-info"></div>
+
+      <!-- Teacher dropdown -->
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">👩‍🏫 Select Teacher <span style="color:#e53e3e;">*</span></label>
+        <select id="pos-sm-teacher" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;background:var(--white);">
+          <option value="">— Select a teacher —</option>
+        </select>
+      </div>
+
+      <!-- Course -->
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">📚 Course / Pathway</label>
+        <select id="pos-sm-course" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;background:var(--white);">
+          <option value="">Select course</option>
+        </select>
+      </div>
+
+      <!-- Pathway + Grade (shown when a pathway is selected) -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:4px;">
+        <div class="pm-field" style="margin-bottom:0;">
+          <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">🗺️ Pathway</label>
+          <select id="pos-sm-pathway" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;background:var(--white);" onchange="onPOSPathwayChange()">
+            <option value="">— Select pathway —</option>
+          </select>
+        </div>
+        <div class="pm-field" style="margin-bottom:0;">
+          <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">🎓 Grade</label>
+          <select id="pos-sm-grade" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;background:var(--white);">
+            <option value="">— Select grade —</option>
+          </select>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--light);font-weight:700;margin-bottom:16px;">Select pathway + grade to automatically link each class to the correct lesson. Leave blank if not applicable.</div>
+
+      <!-- Weekly schedule — multiple days -->
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">🗓️ Weekly Schedule <span style="color:#e53e3e;">*</span></label>
+        <div style="font-size:12px;color:var(--light);font-weight:700;margin-bottom:10px;">Add the recurring days and times (e.g. Mon 6pm + Wed 4pm = 2 classes/week)</div>
+        <div id="pos-schedule-rows"></div>
+        <button type="button" onclick="addPOSScheduleRow()" style="background:var(--bg);color:var(--blue);border:2px dashed var(--blue);border-radius:12px;padding:9px 18px;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;width:100%;margin-top:4px;">+ Add Another Day</button>
+      </div>
+
+      <!-- Start date + Weeks -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
+        <div class="pm-field" style="margin-bottom:0;">
+          <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">📅 Start Date <span style="color:#e53e3e;">*</span></label>
+          <input type="date" id="pos-sm-start" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;">
+        </div>
+        <div class="pm-field" style="margin-bottom:0;">
+          <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">🔁 Number of Weeks <span style="color:#e53e3e;">*</span></label>
+          <input type="number" id="pos-sm-weeks" min="1" max="52" placeholder="e.g. 12"
+            style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;">
+        </div>
+      </div>
+
+      <!-- Class link -->
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">🔗 Class Link (Meet / Zoom) <span style="color:#e53e3e;">*</span></label>
+        <input type="url" id="pos-sm-link" placeholder="https://meet.google.com/xxx-xxxx-xxx"
+          style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:var(--dark);outline:none;">
+      </div>
+
+      <div style="background:#fff8e1;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:12px;font-weight:700;color:#e65100;">
+        ⚠️ All sessions will be added to the teacher's calendar and visible on their dashboard immediately.
+      </div>
+
+      <div style="display:flex;gap:12px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="closePOSScheduleModal()">Cancel</button>
+        <button class="btn btn-green" style="flex:2;" onclick="confirmPOSSchedule()">✅ Schedule All Classes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/api.js"></script>
+<script src="../js/api-sync.js"></script>
+<script src="../js/wa.js"></script>
+<script src="../js/utils.js"></script>
+<script src="../js/postsales-dashboard.js?v=202609181400"></script>
+
+<!-- GREY PAYMENT MODAL -->
+<div class="modal-overlay" id="greyPaymentModalOverlay">
+  <div class="modal" style="max-width:560px;max-height:90vh;overflow-y:auto;">
+    <div class="modal-header">
+      <div class="modal-title">💳 Payment Details — Grey Finance</div>
+      <button class="modal-close" onclick="closeGreyPaymentModal()">✕</button>
+    </div>
+    <div class="modal-body" id="greyPaymentBody">
+      <div style="text-align:center;padding:32px;color:var(--light);font-weight:700;">⏳ Loading...</div>
+    </div>
+  </div>
+</div>
+
+<!-- MANUAL ONBOARD MODAL (walk-in / referral students) -->
+<div class="modal-overlay" id="manualOnboardOverlay">
+  <div class="modal" style="max-width:540px;">
+    <div class="modal-header">
+      <div class="modal-title">➕ Manual Student Onboard</div>
+      <button class="modal-close" onclick="closeManualOnboardModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--orange-light);border-radius:12px;padding:12px 16px;margin-bottom:20px;font-size:13px;font-weight:700;color:var(--orange-dark);">
+        Use this for walk-in students, referrals, or anyone who didn't go through the demo booking flow.
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Full Name *</label><input type="text" id="mob-name" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Email *</label><input type="email" id="mob-email" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Phone / WhatsApp</label><input type="tel" id="mob-phone" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Age</label><input type="text" id="mob-age" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Year Group</label><input type="text" id="mob-grade" placeholder="e.g. Year 9" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Subject</label>
+          <select id="mob-subject" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;background:var(--white);">
+            <option value="Coding">💻 Coding</option>
+            <option value="Maths">📐 Maths</option>
+            <option value="Sciences">🔬 Sciences</option>
+          </select>
+        </div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Course</label><input type="text" id="mob-course" placeholder="e.g. Python for Beginners" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field" style="grid-column:1/-1;">
+          <label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">🚀 Career Pathway (if Tech)</label>
+          <select id="mob-pathway" onchange="onPathwayChange('mob-pathway','mob-pathway-grade')" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;background:var(--white);">
+            <option value="">— Select Pathway (optional) —</option>
+          </select>
+        </div>
+        <div class="pm-field">
+          <label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Grade Level</label>
+          <select id="mob-pathway-grade" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;background:var(--white);">
+            <option value="">— Select Grade —</option>
+          </select>
+        </div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Credits (classes)</label><input type="number" id="mob-credits" min="1" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field">
+          <label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Amount Paid</label>
+          <div style="display:flex;gap:6px;">
+            <select id="mob-currency" style="width:100px;padding:10px 8px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:13px;outline:none;background:var(--white);flex-shrink:0;">
+              <option value="GBP">🇬🇧 GBP £</option>
+              <option value="NGN">🇳🇬 NGN ₦</option>
+              <option value="USD">🇺🇸 USD $</option>
+              <option value="EUR">🇪🇺 EUR €</option>
+              <option value="GHS">🇬🇭 GHS ₵</option>
+              <option value="KES">🇰🇪 KES KSh</option>
+              <option value="ZAR">🇿🇦 ZAR R</option>
+              <option value="CAD">🇨🇦 CAD $</option>
+              <option value="AUD">🇦🇺 AUD $</option>
+              <option value="AED">🇦🇪 AED د.إ</option>
+              <option value="INR">🇮🇳 INR ₹</option>
+              <option value="SGD">🇸🇬 SGD $</option>
+              <option value="MYR">🇲🇾 MYR RM</option>
+              <option value="JPY">🇯🇵 JPY ¥</option>
+              <option value="CNY">🇨🇳 CNY ¥</option>
+              <option value="BRL">🇧🇷 BRL R$</option>
+              <option value="OTHER">🌍 Other</option>
+            </select>
+            <input type="number" id="mob-amount" placeholder="e.g. 99" min="0" step="0.01"
+              style="flex:1;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
+          </div>
+        </div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Login Password *</label>
+          <input type="text" id="mob-password" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
+          <div style="font-size:11px;color:var(--light);font-weight:700;margin-top:4px;">Auto-generated. Student should change on first login.</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:20px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="closeManualOnboardModal()">Cancel</button>
+        <button class="btn btn-primary" style="flex:2;" onclick="confirmManualOnboard()">🎓 Onboard Student</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ONBOARD STUDENT MODAL -->
+<div class="modal-overlay" id="onboardModalOverlay">
+  <div class="modal" style="max-width:540px;">
+    <div class="modal-header">
+      <div class="modal-title">🎓 Onboard Student</div>
+      <button class="modal-close" onclick="closeOnboardModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--blue-light);border-radius:12px;padding:12px 16px;margin-bottom:20px;font-size:13px;font-weight:700;color:var(--blue);">
+        ✅ Confirm the student's details below, then click Onboard. A login credential file will be downloaded and an email will be sent to the parent.
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Full Name *</label><input type="text" id="ob-name" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Email *</label><input type="email" id="ob-email" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Phone / WhatsApp</label><input type="tel" id="ob-phone" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Age</label><input type="text" id="ob-age" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Year Group</label><input type="text" id="ob-grade" placeholder="e.g. Year 9" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Subject</label><input type="text" id="ob-subject" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Course</label><input type="text" id="ob-course" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field" style="grid-column:1/-1;">
+          <label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">🚀 Career Pathway (if Tech)</label>
+          <select id="ob-pathway" onchange="onPathwayChange('ob-pathway','ob-pathway-grade')" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;background:var(--white);">
+            <option value="">— Select Pathway (optional) —</option>
+          </select>
+        </div>
+        <div class="pm-field">
+          <label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Grade Level</label>
+          <select id="ob-pathway-grade" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;background:var(--white);">
+            <option value="">— Select Grade —</option>
+          </select>
+        </div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Credits (classes)</label><input type="number" id="ob-credits" min="1" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Amount Paid</label><input type="text" id="ob-amount" placeholder="e.g. 99" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Login Password *</label>
+          <div style="position:relative;">
+            <input type="text" id="ob-password" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
+          </div>
+          <div style="font-size:11px;color:var(--light);font-weight:700;margin-top:4px;">Auto-generated. Student should change on first login.</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:20px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="closeOnboardModal()">Cancel</button>
+        <button class="btn btn-primary" style="flex:2;" onclick="confirmOnboard()">🎓 Confirm & Onboard Student</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- RESCHEDULE CLASSES MODAL -->
+<div class="modal-overlay" id="rescheduleStudentOverlay">
+  <div class="modal" style="max-width:560px;max-height:90vh;overflow-y:auto;">
+    <div class="modal-header">
+      <div class="modal-title">🔄 Reschedule Classes</div>
+      <button class="modal-close" onclick="closeRescheduleStudentModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--blue-light);border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13px;font-weight:700;color:var(--blue);" id="reschedule-student-info">—</div>
+      <div style="background:#fff3e0;border-radius:12px;padding:12px 16px;margin-bottom:20px;font-size:12px;font-weight:700;color:#e65100;">
+        ⚠️ All future scheduled classes will be cancelled and recreated on the new schedule. Completed classes are not affected.
+      </div>
+
+      <!-- New start date -->
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">📅 Changes Take Effect From *</label>
+        <input type="date" id="rs-start-date" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
+      </div>
+
+      <!-- New schedule rows -->
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">🗓️ New Weekly Schedule *</label>
+        <div style="font-size:12px;color:var(--light);font-weight:700;margin-bottom:10px;">Select new day(s) and time(s)</div>
+        <div id="rs-schedule-rows"></div>
+        <button type="button" onclick="addRSScheduleRow()" style="background:var(--bg);color:var(--blue);border:2px dashed var(--blue);border-radius:12px;padding:9px 18px;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;width:100%;margin-top:4px;">+ Add Another Day</button>
+      </div>
+
+      <!-- Optional: new class link -->
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">🔗 Class Link (leave blank to keep current)</label>
+        <input type="url" id="rs-class-link" placeholder="https://meet.google.com/xxx-xxxx-xxx"
+          style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
+      </div>
+
+      <div style="display:flex;gap:12px;margin-top:8px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="closeRescheduleStudentModal()">Cancel</button>
+        <button class="btn btn-primary" style="flex:2;" onclick="confirmRescheduleStudent()">🔄 Apply New Schedule</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CHANGE TUTOR MODAL -->
+<div class="modal-overlay" id="changeTutorOverlay">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <div class="modal-title">👩‍🏫 Change Tutor</div>
+      <button class="modal-close" onclick="closeChangeTutorModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--blue-light);border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13px;font-weight:700;color:var(--blue);" id="change-tutor-student-info">—</div>
+
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">👩‍🏫 Select New Tutor *</label>
+        <select id="ct-new-tutor" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;background:var(--white);">
+          <option value="">⏳ Loading tutors…</option>
+        </select>
+      </div>
+
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">📅 Transfer From Date (default: today)</label>
+        <input type="date" id="ct-start-date" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
+      </div>
+
+      <div style="background:#f0fdf4;border-radius:12px;padding:12px 16px;margin-bottom:20px;font-size:12px;font-weight:700;color:#065f46;">
+        ✅ All future classes from the selected date will be assigned to the new tutor. The old tutor's calendar will clear those slots automatically.
+      </div>
+
+      <div style="display:flex;gap:12px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="closeChangeTutorModal()">Cancel</button>
+        <button class="btn btn-primary" style="flex:2;" onclick="confirmChangeTutor()">👩‍🏫 Transfer Student</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PAUSE CLASSES MODAL -->
+<div class="modal-overlay" id="pauseModalOverlay">
+  <div class="modal" style="max-width:500px;padding:0;overflow:hidden;border-radius:20px;">
+
+    <!-- Gradient header -->
+    <div style="background:linear-gradient(135deg,#f59e0b,#d97706);padding:24px 28px;display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div style="font-family:'Fredoka One',cursive;font-size:22px;color:#fff;">⏸️ Pause Classes</div>
+        <div style="font-size:13px;color:rgba(255,255,255,.85);font-weight:700;margin-top:3px;">Freeze a student's schedule temporarily</div>
+      </div>
+      <button onclick="closePauseModal()" style="background:rgba(255,255,255,.2);border:none;color:#fff;width:34px;height:34px;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">✕</button>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:28px 28px 24px;">
+
+      <!-- Warning banner -->
+      <div style="background:#fff8e1;border:1.5px solid #f59e0b;border-radius:14px;padding:16px 18px;margin-bottom:22px;font-size:13px;font-weight:700;color:#92400e;line-height:1.7;">
+        ⚠️ You are pausing classes for <strong><span id="pauseStudentName"></span></strong>.<br>
+        All future scheduled sessions will be cancelled. Their dashboard stays active, completed lessons stay accessible, and <strong>credits are fully preserved</strong>.
+      </div>
+
+      <!-- Reason field -->
+      <div style="margin-bottom:22px;">
+        <label style="display:block;font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">
+          Reason for Pause <span style="color:#c53030;">*</span>
+        </label>
+        <textarea id="pauseReason" rows="4"
+          placeholder="e.g. Student has gone back to school and will return in January 2027"
+          style="width:100%;padding:14px 16px;border:2px solid #e8eaf0;border-radius:14px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:600;outline:none;resize:vertical;box-sizing:border-box;line-height:1.6;color:#1a202c;"></textarea>
+        <div style="font-size:11px;color:var(--light);margin-top:6px;font-weight:700;">📝 This reason is saved internally for your team's records.</div>
+      </div>
+
+      <!-- Buttons -->
+      <div style="display:flex;gap:14px;">
+        <button class="btn btn-outline" style="flex:1;padding:13px 0;font-size:14px;" onclick="closePauseModal()">Cancel</button>
+        <button id="pauseConfirmBtn" onclick="confirmPause()"
+          style="flex:2;padding:13px 0;background:#f59e0b;color:#fff;border:none;border-radius:12px;font-family:'Nunito',sans-serif;font-weight:900;font-size:14px;cursor:pointer;">
+          ⏸️ Confirm Pause
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- RESUME CLASSES MODAL -->
+<div class="modal-overlay" id="resumeModalOverlay">
+  <div class="modal" style="max-width:560px;max-height:90vh;overflow-y:auto;">
+    <div class="modal-header">
+      <div class="modal-title">▶️ Resume Classes</div>
+      <button class="modal-close" onclick="closeResumeModal()">✕</button>
+    </div>
+
+    <div style="background:#f0fdf4;border-radius:12px;padding:14px 16px;margin-bottom:18px;font-size:13px;font-weight:700;color:#065f46;">
+      ▶️ Resuming classes for: <span id="resumeStudentName" style="color:var(--dark);font-size:15px;"></span>
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Start Date <span style="color:#c53030;">*</span></label>
+      <input type="date" id="resume-start-date" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Assign Tutor <span style="color:#c53030;">*</span></label>
+      <div id="resumeTutorHint" style="font-size:11px;color:var(--light);margin-bottom:6px;"></div>
+      <select id="resume-tutor-select" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;background:#fff;">
+        <option value="">⏳ Loading tutors…</option>
+      </select>
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Class Link (Google Meet)</label>
+      <input type="url" id="resume-class-link" placeholder="https://meet.google.com/..."
+        style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;box-sizing:border-box;">
+    </div>
+
+    <div style="margin-bottom:20px;">
+      <label style="display:block;font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">New Schedule <span style="color:#c53030;">*</span></label>
+      <div id="resume-schedule-rows"></div>
+      <button type="button" onclick="addRSScheduleRow()" style="background:#f0f4ff;color:var(--blue);border:1.5px solid var(--blue);border-radius:10px;padding:8px 16px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;margin-top:4px;">+ Add Another Day</button>
+    </div>
+
+    <div style="background:#dbeafe;border-radius:12px;padding:12px 16px;margin-bottom:20px;font-size:12px;font-weight:700;color:#1e40af;">
+      ℹ️ New classes will be created from where the student left off. If the selected time clashes with another student on that tutor, you will be shown an error and can choose a different time.
+    </div>
+
+    <div style="display:flex;gap:12px;">
+      <button class="btn btn-outline" style="flex:1;" onclick="closeResumeModal()">Cancel</button>
+      <button class="btn btn-primary" id="resumeConfirmBtn" style="flex:2;" onclick="confirmResume()">▶️ Resume Classes</button>
+    </div>
+  </div>
+</div>
+
+<!-- BATCH DETAIL MODAL -->
+<div class="modal-overlay" id="batchDetailOverlay">
+  <div class="modal" style="max-width:560px;max-height:90vh;overflow-y:auto;">
+    <div class="modal-header">
+      <div class="modal-title">👥 Batch Details</div>
+      <button class="modal-close" onclick="closeBatchDetailModal()">✕</button>
+    </div>
+    <div class="modal-body" id="batchDetailBody">
+      <div style="text-align:center;padding:32px;color:var(--light);font-weight:700;">⏳ Loading...</div>
+    </div>
+  </div>
+</div>
+
+<!-- CREATE BATCH MODAL -->
+<div class="modal-overlay" id="createBatchOverlay">
+  <div class="modal" style="max-width:580px;max-height:92vh;overflow-y:auto;">
+    <div class="modal-header">
+      <div class="modal-title">👥 Create Group Batch</div>
+      <button class="modal-close" onclick="closeCreateBatchModal()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <div style="background:#f0fdf4;border-radius:12px;padding:13px 16px;margin-bottom:18px;font-size:13px;font-weight:700;color:#065f46;">
+        💡 A batch lets 2–3 students learn together with the same teacher at the same time. Each student keeps their own individual credits.
+      </div>
+
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">👩‍🏫 Teacher <span style="color:#e53e3e;">*</span></label>
+        <select id="cb-tutor" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;outline:none;background:#fff;">
+          <option value="">⏳ Loading…</option>
+        </select>
+      </div>
+
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">📚 Pathway (optional)</label>
+        <select id="cb-pathway" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;outline:none;background:#fff;">
+          <option value="">— Select pathway —</option>
+        </select>
+      </div>
+
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">🎓 Grade Number (optional)</label>
+        <input type="number" id="cb-grade" min="1" max="12" placeholder="e.g. 1"
+          style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;outline:none;">
+      </div>
+
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">🔗 Google Meet Link <span style="color:#e53e3e;">*</span></label>
+        <input type="url" id="cb-class-link" placeholder="https://meet.google.com/xxx-xxxx-xxx"
+          style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;outline:none;">
+      </div>
+
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">📅 Start Date <span style="color:#e53e3e;">*</span></label>
+        <input type="date" id="cb-start-date"
+          style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;outline:none;">
+      </div>
+
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">🗓️ Weekly Schedule <span style="color:#e53e3e;">*</span></label>
+        <div id="cb-schedule-rows"></div>
+        <button type="button" onclick="addBatchSchedRow()" style="background:var(--bg);color:var(--blue);border:2px dashed var(--blue);border-radius:12px;padding:9px 18px;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;width:100%;margin-top:4px;">+ Add Another Day</button>
+      </div>
+
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">👩‍🎓 Select Students (2–3) <span style="color:#e53e3e;">*</span></label>
+        <div style="font-size:12px;color:var(--light);font-weight:700;margin-bottom:8px;">All selected students must be onboarded. Credits are loaded separately per student.</div>
+        <div id="cb-students-list" style="max-height:200px;overflow-y:auto;padding:4px 0;">
+          <div style="color:var(--light);font-size:13px;font-weight:700;">⏳ Loading students…</div>
+        </div>
+      </div>
+
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">📝 Notes (optional)</label>
+        <textarea id="cb-notes" rows="2" placeholder="Any notes about this batch..."
+          style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;outline:none;resize:vertical;box-sizing:border-box;"></textarea>
+      </div>
+
+      <div style="background:#fff8e1;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13px;font-weight:700;color:#e65100;">
+        ⚠️ This will create 72 shared class bookings on the teacher's calendar for all batch members.
+      </div>
+
+      <div style="display:flex;gap:12px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="closeCreateBatchModal()">Cancel</button>
+        <button class="btn btn-primary" style="flex:2;" onclick="confirmCreateBatch()">👥 Create Batch</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- BATCH RESCHEDULE MODAL -->
+<div class="modal-overlay" id="batchRescheduleOverlay">
+  <div class="modal" style="max-width:520px;max-height:90vh;overflow-y:auto;">
+    <div class="modal-header">
+      <div class="modal-title" id="batchRescheduleTitle">🔄 Reschedule Batch</div>
+      <button class="modal-close" onclick="closeBatchRescheduleModal()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <div style="background:#fff3e0;border:1.5px solid #f59e0b;border-radius:12px;padding:14px 16px;margin-bottom:20px;font-size:13px;font-weight:700;color:#92400e;line-height:1.7;">
+        ⚠️ All future scheduled classes for this batch will be cancelled and recreated on the new schedule from the chosen start date.<br>
+        Completed classes and lesson sequence are not affected. Clash detection runs before saving.
+      </div>
+
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">📅 Changes Take Effect From <span style="color:#e53e3e;">*</span></label>
+        <input type="date" id="br-start-date" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
+      </div>
+
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">🗓️ New Weekly Schedule <span style="color:#e53e3e;">*</span></label>
+        <div style="font-size:12px;color:var(--light);font-weight:700;margin-bottom:10px;">Set the new recurring days and times for the batch</div>
+        <div id="br-schedule-rows"></div>
+        <button type="button" onclick="addBRScheduleRow()" style="background:var(--bg);color:var(--blue);border:2px dashed var(--blue);border-radius:12px;padding:9px 18px;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;width:100%;margin-top:4px;">+ Add Another Day</button>
+      </div>
+
+      <div class="pm-field">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">🔗 New Class Link (leave blank to keep current)</label>
+        <input type="url" id="br-class-link" placeholder="https://meet.google.com/xxx-xxxx-xxx"
+          style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
+      </div>
+
+      <div style="display:flex;gap:12px;margin-top:8px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="closeBatchRescheduleModal()">Cancel</button>
+        <button id="brConfirmBtn" onclick="confirmBatchReschedule()"
+          style="flex:2;padding:13px;background:#f59e0b;color:#fff;border:none;border-radius:12px;font-family:'Nunito',sans-serif;font-weight:900;font-size:14px;cursor:pointer;">
+          🔄 Apply New Schedule
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<!-- STUDENT TRANSFER MODAL -->
+<div class="modal-overlay" id="studentTransferOverlay">
+  <div class="modal" style="max-width:560px;max-height:92vh;overflow-y:auto;">
+    <div class="modal-header">
+      <div class="modal-title" id="studentTransferTitle">↔ Transfer Student</div>
+      <button class="modal-close" onclick="closeStudentTransferModal()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <div style="background:var(--blue-light);border-radius:12px;padding:13px 16px;margin-bottom:20px;font-size:13px;font-weight:700;color:var(--blue);" id="studentTransferInfo"></div>
+
+      <!-- Tab switcher -->
+      <div style="display:flex;gap:0;border:2px solid #e8eaf0;border-radius:12px;overflow:hidden;margin-bottom:20px;">
+        <button id="stTab1" onclick="switchTransferTab('existing')"
+          style="flex:1;padding:11px;background:var(--blue);color:#fff;border:none;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;">
+          Move to Existing Batch
+        </button>
+        <button id="stTab2" onclick="switchTransferTab('new')"
+          style="flex:1;padding:11px;background:var(--bg);color:var(--mid);border:none;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;">
+          Create New Batch
+        </button>
+      </div>
+
+      <!-- Tab: existing batch -->
+      <div id="stPanelExisting">
+        <div class="pm-field">
+          <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Select Destination Batch</label>
+          <div style="font-size:12px;color:var(--light);font-weight:700;margin-bottom:8px;">Only active batches with space (fewer than 3 students) are shown</div>
+          <select id="st-target-batch" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;outline:none;background:#fff;">
+            <option value="">⏳ Loading batches…</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:12px;margin-top:8px;">
+          <button class="btn btn-outline" style="flex:1;" onclick="closeStudentTransferModal()">Cancel</button>
+          <button onclick="confirmTransferToExisting()" style="flex:2;padding:13px;background:var(--blue);color:#fff;border:none;border-radius:12px;font-family:'Nunito',sans-serif;font-weight:900;font-size:14px;cursor:pointer;" id="stConfirmExistingBtn">
+            ↔ Transfer Student
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab: new batch -->
+      <div id="stPanelNew" style="display:none;">
+
+        <div class="pm-field">
+          <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">👩‍🏫 New Teacher <span style="color:#e53e3e;">*</span></label>
+          <select id="st-new-tutor" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;outline:none;background:#fff;">
+            <option value="">— Select teacher —</option>
+          </select>
+        </div>
+
+        <div class="pm-field">
+          <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">🔗 Google Meet Link <span style="color:#e53e3e;">*</span></label>
+          <input type="url" id="st-new-link" placeholder="https://meet.google.com/xxx-xxxx-xxx"
+            style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;outline:none;">
+        </div>
+
+        <div class="pm-field">
+          <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">📅 New Schedule Starts <span style="color:#e53e3e;">*</span></label>
+          <input type="date" id="st-new-start"
+            style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;outline:none;">
+        </div>
+
+        <div class="pm-field">
+          <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">🗓️ Weekly Schedule <span style="color:#e53e3e;">*</span></label>
+          <div id="st-schedule-rows"></div>
+          <button type="button" onclick="addSTScheduleRow()"
+            style="background:var(--bg);color:var(--blue);border:2px dashed var(--blue);border-radius:12px;padding:9px 18px;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;width:100%;margin-top:4px;">
+            + Add Another Day
+          </button>
+        </div>
+
+        <div style="display:flex;gap:12px;margin-top:8px;">
+          <button class="btn btn-outline" style="flex:1;" onclick="closeStudentTransferModal()">Cancel</button>
+          <button onclick="confirmTransferToNew()" style="flex:2;padding:13px;background:var(--green);color:#fff;border:none;border-radius:12px;font-family:'Nunito',sans-serif;font-weight:900;font-size:14px;cursor:pointer;" id="stConfirmNewBtn">
+            ✨ Create Batch & Transfer
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ADD MEMBER MODAL (replaces prompt-based picker) -->
+<div class="modal-overlay" id="addMemberOverlay">
+  <div class="modal" style="max-width:480px;max-height:88vh;overflow-y:auto;">
+    <div class="modal-header">
+      <div class="modal-title">➕ Add Student to Batch</div>
+      <button class="modal-close" onclick="closeAddMemberModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="margin-bottom:14px;">
+        <input type="text" id="am-search" placeholder="🔍 Search by name or ID…" oninput="filterAMStudents()"
+          style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;box-sizing:border-box;">
+      </div>
+      <div id="am-student-list" style="max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;"></div>
+      <div style="margin-top:16px;display:flex;gap:12px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="closeAddMemberModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,369 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Microsoft Clarity -->
+  <script type="text/javascript">
+    (function(c,l,a,r,i,t,y){
+      c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+      t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+      y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    })(window, document, "clarity", "script", "xer20hj8fr");
+  </script>
+  <!-- End Microsoft Clarity -->
+  <!-- TikTok Pixel Code -->
+  <script>
+    !function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var r="https://analytics.tiktok.com/i18n/pixel/events.js",o=n&&n.partner;ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=r,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};n=document.createElement("script");n.type="text/javascript",n.async=!0,n.src=r+"?sdkid="+e+"&lib="+t;e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(n,e)};ttq.load('D8V60AJC77U45FANPDG0');ttq.load('D91PAORC77U4QRO9NQ0G');ttq.page()}(window,document,'ttq');
+  </script>
+  <!-- End TikTok Pixel Code -->
+  <!-- Google Analytics 4 -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-WB62B0P5KG"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-WB62B0P5KG');
+  </script>
+  <!-- End Google Analytics 4 -->
+  <!-- Auth Guard — must be first script in head -->
+  <script>
+    (function(){
+      var t=localStorage.getItem('sn_access_token');
+      var u=null;try{u=JSON.parse(localStorage.getItem('sn_api_user')||'null');}catch(e){}
+      var roles='super_admin';
+      var allowed=roles?roles.split(',').map(function(r){return r.trim();}):[];
+      var redir='/pages/login.html?redirect='+encodeURIComponent(window.location.pathname+window.location.search);
+      if(!t){document.documentElement.style.visibility='hidden';window.location.replace(redir);return;}
+      try{var p=t.split('.');if(p.length===3){var pl=JSON.parse(atob(p[1].replace(/-/g,'+').replace(/_/g,'/')));if(pl.exp&&pl.exp*1000<Date.now()){localStorage.removeItem('sn_access_token');localStorage.removeItem('sn_api_user');document.documentElement.style.visibility='hidden';window.location.replace(redir);return;}}}catch(e){}
+      if(allowed.length){var role=u&&u.role?u.role:'';if(!role||allowed.indexOf(role)===-1){document.documentElement.style.visibility='hidden';window.location.replace('/pages/login.html?error=unauthorized');return;}}
+      document.documentElement.style.visibility='';
+    })();
+  </script>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" sizes="32x32" href="../assets/icons/icon.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="../assets/icons/icon.png">
+  <link rel="apple-touch-icon" href="../assets/icons/icon.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Super Admin – StemNest Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/dashboard.css">
+  <link rel="stylesheet" href="../css/super-admin.css">
+</head>
+<body>
+
+<nav style="position:sticky;top:0;z-index:200;">
+  <a class="logo" href="../index.html">
+    <img src="../assets/images/logo.png" alt="StemNest Academy" class="logo-img">
+  </a>
+  <ul class="nav-links"><li><a href="../index.html">← Back to Website</a></li></ul>
+  <div class="nav-actions">
+    <span style="font-size:13px;font-weight:700;color:var(--light);"><span class="live-dot"></span> Founder Portal</span>
+    <a href="login.html" class="btn btn-outline" style="font-size:13px;padding:8px 18px;">Log Out</a>
+  </div>
+</nav>
+
+<div class="dash-wrap">
+
+  <!-- SIDEBAR -->
+  <div class="dash-sidebar">
+    <div class="sidebar-profile">
+      <div class="sidebar-avatar" style="background:linear-gradient(135deg,#7c3aed,#fbbf24);">SA</div>
+      <div class="sidebar-name">Super Admin</div>
+      <div class="sidebar-role">Founder Portal</div>
+      <div class="sidebar-status"><span class="live-dot"></span> Online</div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="sidebar-section-label">Reports</div>
+      <a class="sidebar-link active" data-tab="overview"   onclick="showSATab('overview')">  <span class="sl-icon">📊</span> Overview</a>
+      <a class="sidebar-link"        data-tab="sales"      onclick="showSATab('sales')">     <span class="sl-icon">💰</span> Sales Report</a>
+      <a class="sidebar-link"        data-tab="classes"    onclick="showSATab('classes')">   <span class="sl-icon">📡</span> Class Report</a>
+      <a class="sidebar-link"        data-tab="revenue"    onclick="showSATab('revenue')">   <span class="sl-icon">📈</span> Revenue</a>
+      <a class="sidebar-link"        data-tab="expenses"   onclick="showSATab('expenses')">  <span class="sl-icon">💸</span> Expenses</a>
+      <div class="sidebar-section-label">Platform</div>
+      <a class="sidebar-link"        data-tab="teachers"   onclick="showSATab('teachers')">  <span class="sl-icon">👩‍🏫</span> All Teachers</a>
+      <a class="sidebar-link"        data-tab="students"   onclick="showSATab('students')">  <span class="sl-icon">🎓</span> All Students</a>
+      <a class="sidebar-link"        data-tab="settings"   onclick="showSATab('settings')">  <span class="sl-icon">⚙️</span> Settings</a>
+      <a class="sidebar-link"        data-tab="credentials" onclick="showSATab('credentials')"><span class="sl-icon">🔐</span> User Credentials</a>
+      <div class="sidebar-section-label">Communications</div>
+      <a class="sidebar-link"        data-tab="bulk-email"  onclick="showSATab('bulk-email')"> <span class="sl-icon">📧</span> Bulk Email</a>
+      <div class="sidebar-section-label">Quick Links</div>
+      <a class="sidebar-link" href="admin-dashboard.html"    target="_blank"><span class="sl-icon">📋</span> Admin Dashboard</a>
+      <a class="sidebar-link" href="presales-dashboard.html" target="_blank"><span class="sl-icon">📥</span> Pre-Sales</a>
+      <a class="sidebar-link" href="postsales-dashboard.html" target="_blank"><span class="sl-icon">💳</span> Post-Sales</a>
+      <a class="sidebar-link" href="operations-dashboard.html" target="_blank"><span class="sl-icon">⚙️</span> Operations</a>
+      <a class="sidebar-link" href="hr-dashboard.html"       target="_blank"><span class="sl-icon">👥</span> HR</a>
+      <a class="sidebar-link" href="free-trial.html"         target="_blank"><span class="sl-icon">🔗</span> Landing Page</a>
+    </div>
+    <div class="sidebar-bottom">
+      <button class="logout-btn" onclick="window.location.href='login.html'">🚪 Log Out</button>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="dash-main">
+
+    <div class="dash-topbar">
+      <div>
+        <div class="dash-greeting">📊 Founder Dashboard</div>
+        <div class="dash-date" id="saDate"></div>
+      </div>
+      <div class="dash-top-actions">
+        <select id="reportPeriod" class="sa-period-sel" onchange="refreshAllReports()">
+          <option value="today">Today</option>
+          <option value="week">This Week</option>
+          <option value="month" selected>This Month</option>
+          <option value="year">This Year</option>
+          <option value="all">All Time</option>
+        </select>
+        <button class="btn btn-primary" onclick="exportAllCSV()">⬇ Export All</button>
+      </div>
+    </div>
+
+    <!-- ── TAB: OVERVIEW ── -->
+    <div id="tab-overview">
+      <!-- KPI cards -->
+      <div class="sa-kpi-grid" id="kpiGrid"></div>
+
+      <!-- Charts row -->
+      <div class="dash-grid-2" style="margin-top:28px;">
+        <div class="dash-panel">
+          <div class="dash-section-header"><div class="dash-section-title">📡 Demo Classes</div></div>
+          <div id="demoClassChart"></div>
+        </div>
+        <div class="dash-panel">
+          <div class="dash-section-header"><div class="dash-section-title">💰 Revenue Trend</div></div>
+          <div id="revenueChart"></div>
+        </div>
+      </div>
+
+      <!-- Recent activity -->
+      <div class="dash-panel" style="margin-top:24px;">
+        <div class="dash-section-header"><div class="dash-section-title">🕐 Recent Bookings</div></div>
+        <div id="recentBookings"></div>
+      </div>
+    </div>
+
+    <!-- ── TAB: SALES REPORT ── -->
+    <div id="tab-sales" style="display:none;">
+      <div class="dash-section-header"><div class="dash-section-title">💰 Sales Report</div></div>
+      <div class="sa-kpi-grid" id="salesKpiGrid"></div>
+      <div class="dash-panel" style="margin-top:24px;">
+        <div class="dash-section-header"><div class="dash-section-title">Sales Person Performance</div></div>
+        <div id="salesPersonTable"></div>
+      </div>
+      <div class="dash-panel" style="margin-top:24px;">
+        <div class="dash-section-header"><div class="dash-section-title">Conversion Pipeline</div></div>
+        <div id="conversionTable"></div>
+      </div>
+    </div>
+
+    <!-- ── TAB: CLASS REPORT ── -->
+    <div id="tab-classes" style="display:none;">
+      <div class="dash-section-header"><div class="dash-section-title">📡 Class Report</div></div>
+      <div class="sa-kpi-grid" id="classKpiGrid"></div>
+      <div class="dash-panel" style="margin-top:24px;">
+        <div class="dash-section-header"><div class="dash-section-title">Class Breakdown</div></div>
+        <div id="classBreakdownTable"></div>
+      </div>
+    </div>
+
+    <!-- ── TAB: REVENUE ── -->
+    <div id="tab-revenue" style="display:none;">
+      <div class="dash-section-header"><div class="dash-section-title">📈 Revenue Report</div></div>
+      <div class="sa-kpi-grid" id="revenueKpiGrid"></div>
+      <div class="dash-panel" style="margin-top:24px;">
+        <div class="dash-section-header">
+          <div class="dash-section-title">Revenue by Period</div>
+        </div>
+        <div id="revenueTable"></div>
+      </div>
+    </div>
+
+    <!-- ── TAB: EXPENSES ── -->
+    <div id="tab-expenses" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">💸 Expenses & Profit</div>
+        <button class="btn btn-primary" style="font-size:13px;padding:9px 20px;" onclick="openAddExpenseModal()">➕ Add Expense</button>
+      </div>
+      <div class="sa-kpi-grid" id="expenseKpiGrid"></div>
+      <div class="dash-panel" style="margin-top:24px;">
+        <div class="dash-section-header"><div class="dash-section-title">Expense Log</div></div>
+        <div id="expenseTable"></div>
+      </div>
+    </div>
+
+    <!-- ── TAB: TEACHERS ── -->
+    <div id="tab-teachers" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">👩‍🏫 Teachers</div>
+      </div>
+      <!-- KPI row -->
+      <div class="sa-kpi-grid" id="teacherKpiGrid"></div>
+      <!-- Sub-tabs -->
+      <div style="display:flex;gap:8px;margin:20px 0 16px;flex-wrap:wrap;">
+        <button id="teacherSubTab-active" class="sa-subtab sa-subtab-active" onclick="switchTeacherSubTab('active')">✅ Active Teachers</button>
+        <button id="teacherSubTab-discontinued" class="sa-subtab" onclick="switchTeacherSubTab('discontinued')">🚫 Discontinued</button>
+      </div>
+      <!-- Search -->
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+        <input type="text" id="teacherSearch" placeholder="Search by ID, name, email, subject, country…"
+          oninput="renderTeachersReport()"
+          style="flex:1;min-width:220px;padding:10px 16px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
+        <select id="teacherSubjectFilter" onchange="renderTeachersReport()"
+          style="padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;background:var(--white);">
+          <option value="">All Subjects</option>
+          <option value="Coding">💻 Coding</option>
+          <option value="Maths">📐 Maths</option>
+          <option value="Sciences">🔬 Sciences</option>
+        </select>
+      </div>
+      <div id="teacherFullTable"></div>
+    </div>
+
+    <!-- ── TAB: STUDENTS ── -->
+    <div id="tab-students" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🎓 Students</div>
+      </div>
+      <!-- Sub-tabs -->
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+        <button id="studentSubTab-demo" class="sa-subtab sa-subtab-active" onclick="switchStudentSubTab('demo')">🎓 Demo Students</button>
+        <button id="studentSubTab-paid" class="sa-subtab" onclick="switchStudentSubTab('paid')">💳 Paid Students</button>
+        <button id="studentSubTab-discontinued" class="sa-subtab" onclick="switchStudentSubTab('discontinued')">🚫 Discontinued</button>
+      </div>
+      <!-- Search -->
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+        <input type="text" id="studentSearch" placeholder="Search by ID, name, email, country, subject…"
+          oninput="renderStudentsReport()"
+          style="flex:1;min-width:220px;padding:10px 16px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
+        <select id="studentSubjectFilter" onchange="renderStudentsReport()"
+          style="padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;background:var(--white);">
+          <option value="">All Subjects</option>
+          <option value="Coding">💻 Coding</option>
+          <option value="Maths">📐 Maths</option>
+          <option value="Sciences">🔬 Sciences</option>
+        </select>
+      </div>
+      <div id="studentFullTable"></div>
+    </div>
+
+    <!-- ── TAB: SETTINGS ── -->
+    <div id="tab-settings" style="display:none;">
+      <div class="dash-section-header"><div class="dash-section-title">⚙️ Platform Settings</div></div>
+      <div class="sa-settings-grid">
+        <div class="sa-settings-card">
+          <div class="sa-settings-title">🏛️ Company Seal</div>
+          <div class="sa-settings-desc">Upload the official company seal used on student certificates.</div>
+          <div id="sealPreview" style="margin:12px 0;"></div>
+          <input type="file" id="sealUpload" accept="image/*" style="display:none;" onchange="uploadSeal(this)">
+          <button class="btn btn-outline" style="font-size:13px;" onclick="document.getElementById('sealUpload').click()">📷 Upload Seal</button>
+        </div>
+        <div class="sa-settings-card">
+          <div class="sa-settings-title">✍️ Founder Signature</div>
+          <div class="sa-settings-desc">Upload the founder's signature for certificates.</div>
+          <div id="sigPreview" style="margin:12px 0;"></div>
+          <input type="file" id="sigUpload" accept="image/*" style="display:none;" onchange="uploadSignature(this)">
+          <button class="btn btn-outline" style="font-size:13px;" onclick="document.getElementById('sigUpload').click()">✍️ Upload Signature</button>
+        </div>
+        <div class="sa-settings-card">
+          <div class="sa-settings-title">💷 Teacher Pay Rates</div>
+          <div class="sa-settings-desc">Set the amount paid to teachers per class. Applied automatically when a class is marked complete.</div>
+          <div class="pm-field" style="margin-top:10px;">
+            <label>Demo Class Pay (£ per class)</label>
+            <input type="number" id="demoClassPay" placeholder="e.g. 5" min="0" step="0.50"
+              onchange="saveSettings('demoClassPay', this.value)">
+          </div>
+          <div class="pm-field" style="margin-top:8px;">
+            <label>Paid Class Pay (£ per class)</label>
+            <input type="number" id="paidClassPay" placeholder="e.g. 20" min="0" step="0.50"
+              onchange="saveSettings('paidClassPay', this.value)">
+          </div>
+          <button class="btn btn-primary" style="font-size:13px;margin-top:10px;" onclick="savePayRates()">💾 Save Pay Rates</button>
+        </div>
+        <div class="sa-settings-card">
+          <div class="sa-settings-title">🎂 Birthday Message</div>
+          <div class="sa-settings-desc">Customise the birthday message sent to all users.</div>
+          <textarea id="birthdayMsg" style="width:100%;min-height:80px;padding:10px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:13px;margin:10px 0;outline:none;" placeholder="Happy Birthday {name}! 🎉 Wishing you a wonderful day from all of us at StemNest Academy!"></textarea>
+          <button class="btn btn-primary" style="font-size:13px;" onclick="saveBirthdayMsg()">Save Message</button>
+        </div>
+        <div class="sa-settings-card">
+          <div class="sa-settings-title">🔑 Super Admin Access</div>
+          <div class="sa-settings-desc">Manage super admin credentials.</div>
+          <div class="pm-field" style="margin-top:10px;"><label>Email</label><input type="email" id="saEmail" placeholder="founder@stemnestacademy.co.uk"></div>
+          <div class="pm-field" style="margin-top:8px;"><label>New Password</label><input type="password" id="saPassword" placeholder="New password"></div>
+          <div class="pm-field" style="margin-top:8px;"><label>Your Date of Birth</label><input type="date" id="saFounderDob" onchange="saveSettings('founderDob',this.value)" title="Used for birthday greeting"></div>
+          <button class="btn btn-primary" style="font-size:13px;margin-top:10px;" onclick="saveSACredentials()">Update Credentials</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB: USER CREDENTIALS (Founder Only) ── -->
+    <div id="tab-credentials" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">🔐 User Credentials</div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="background:#fde8e8;color:#c53030;font-size:12px;font-weight:900;padding:4px 12px;border-radius:50px;border:1px solid #fca5a5;">🔒 Strictly Confidential — Founder Only</span>
+          <button class="btn btn-outline" style="font-size:13px;" onclick="renderCredentialsChart()">🔄 Refresh</button>
+        </div>
+      </div>
+      <div style="background:#fde8e8;border:1.5px solid #fca5a5;border-radius:12px;padding:14px 18px;margin-bottom:20px;font-size:13px;font-weight:700;color:#c53030;">
+        ⚠️ This page contains all platform user passwords. Do not share, screenshot, or leave unattended. This data is stored locally and is only visible to the Super Admin.
+      </div>
+      <div style="margin-bottom:16px;">
+        <input type="text" id="credSearch" placeholder="Search by name, email or role…" oninput="renderCredentialsChart()"
+          style="width:100%;max-width:360px;padding:10px 16px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
+      </div>
+      <div id="credentialsChart"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ADD EXPENSE MODAL -->
+<div class="modal-overlay" id="expenseModalOverlay">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <div class="modal-title">💸 Add Expense</div>
+      <button class="modal-close" onclick="closeExpenseModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field"><label>Description *</label><input type="text" id="exp-desc" placeholder="e.g. Teacher salary — Sarah Rahman"></div>
+      <div class="field" style="margin-top:12px;"><label>Category *</label>
+        <select id="exp-cat">
+          <option value="salary">💷 Teacher Salary</option>
+          <option value="salary_sales">💷 Sales Staff Salary</option>
+          <option value="salary_ops">💷 Operations Salary</option>
+          <option value="platform">💻 Platform / Software</option>
+          <option value="marketing">📣 Marketing & Ads</option>
+          <option value="admin">📋 Admin & Legal</option>
+          <option value="other">📦 Other</option>
+        </select>
+      </div>
+      <div class="field" style="margin-top:12px;"><label>Amount (£) *</label><input type="number" id="exp-amount" placeholder="e.g. 500" min="0" step="0.01"></div>
+      <div class="field" style="margin-top:12px;"><label>Date *</label><input type="date" id="exp-date"></div>
+      <div class="field" style="margin-top:12px;"><label>Notes</label><textarea id="exp-notes" style="min-height:60px;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;width:100%;outline:none;" placeholder="Optional notes..."></textarea></div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeExpenseModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveExpense()">Save Expense ✦</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/utils.js"></script>
+<script src="../js/super-admin.js"></script>
+<script src="../js/mail-system.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  SA_TABS.push('bulk-email');
+  injectBulkEmailTab(document.querySelector('.dash-main'));
+  const _origSA = window.showSATab;
+  window.showSATab = function(tab) {
+    _origSA(tab);
+    if (tab === 'bulk-email') renderEmailLog();
+  };
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,514 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Microsoft Clarity -->
+  <script type="text/javascript">
+    (function(c,l,a,r,i,t,y){
+      c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+      t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+      y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    })(window, document, "clarity", "script", "xer20hj8fr");
+  </script>
+  <!-- End Microsoft Clarity -->
+  <!-- TikTok Pixel Code -->
+  <script>
+    !function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var r="https://analytics.tiktok.com/i18n/pixel/events.js",o=n&&n.partner;ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=r,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};n=document.createElement("script");n.type="text/javascript",n.async=!0,n.src=r+"?sdkid="+e+"&lib="+t;e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(n,e)};ttq.load('D8V60AJC77U45FANPDG0');ttq.load('D91PAORC77U4QRO9NQ0G');ttq.page()}(window,document,'ttq');
+  </script>
+  <!-- End TikTok Pixel Code -->
+  <!-- Google Analytics 4 -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-WB62B0P5KG"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-WB62B0P5KG');
+  </script>
+  <!-- End Google Analytics 4 -->
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/icon.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/icon.png">
+  <link rel="apple-touch-icon" href="assets/icons/icon.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StemNest Academy – Online Tech Tutoring for Ages 6–17</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/home.css">
+  <link rel="stylesheet" href="css/mobile.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<!-- Meta Pixel Code -->
+<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window, document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init', '705705174881422');fbq('track', 'PageView');</script>
+<noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=705705174881422&ev=PageView&noscript=1"/></noscript>
+<!-- End Meta Pixel Code --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+
+<!-- ═══ NAVBAR ═══ -->
+<nav>
+  <a class="logo" href="index.html">
+    <img src="assets/images/logo.png" alt="StemNest Academy" class="logo-img">
+  </a>
+  <ul class="nav-links">
+    <li><a href="index.html"          data-page="home"    class="active">Home</a></li>
+    <li><a href="pages/courses.html"  data-page="courses">Courses</a></li>
+    <li><a href="pages/blog.html"     data-page="blog">Blog</a></li>
+    <li><a href="pages/about.html"    data-page="">About</a></li>
+    <li><a href="#how"                data-page="">How It Works</a></li>
+    <li><a href="#teachers"           data-page="">Tutors</a></li>
+    <li><a href="pages/faq.html"      data-page="">FAQ</a></li>
+  </ul>
+  <div class="nav-actions">
+    <a href="pages/join-class.html" class="btn btn-outline" style="border-color:var(--green);color:var(--green);"><i class="fa-solid fa-satellite-dish"></i> Join Class</a>
+    <a href="pages/login.html"      class="btn btn-outline">Log In</a>
+    <a href="pages/free-trial.html" class="btn btn-primary">Book a Demo ✦</a>
+  </div>
+  <!-- Mobile hamburger -->
+  <button class="nav-hamburger" id="navHamburger" onclick="toggleMobileNav()" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<!-- Mobile nav drawer -->
+<div class="nav-mobile-drawer" id="navDrawer">
+  <a href="index.html" class="active">Home</a>
+  <a href="pages/courses.html">Courses</a>
+  <a href="pages/blog.html">Blog</a>
+  <a href="pages/about.html">About</a>
+  <a href="pages/faq.html">FAQ</a>
+  <a href="pages/teach-with-us.html">Teach With Us</a>
+  <div class="nav-mobile-actions">
+    <a href="pages/join-class.html" class="btn btn-outline" style="border-color:var(--green);color:var(--green);"><i class="fa-solid fa-satellite-dish"></i> Join Class</a>
+    <a href="pages/login.html"      class="btn btn-outline">Log In</a>
+    <a href="pages/free-trial.html" class="btn btn-primary">Book a Demo ✦</a>
+  </div>
+</div>
+
+<!-- ═══ HERO ═══ -->
+<section class="hero" style="position:relative;overflow:hidden;">
+
+  <!-- Background video container -->
+  <div id="heroBgContainer" style="position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden;background:linear-gradient(160deg,#f0f4ff 0%,#e8f8f2 50%,#fff5ef 100%);">
+    <!-- YouTube player div — controlled by YT API -->
+    <div id="ytBgPlayer" style="position:absolute;top:50%;left:50%;width:177.78vh;min-width:100%;height:56.25vw;min-height:100%;transform:translate(-50%,-50%);opacity:0.55;"></div>
+    <!-- Transparent cover to block all YouTube controls/UI -->
+    <div style="position:absolute;inset:0;z-index:1;"></div>
+    <!-- Gradient overlay — keeps text readable -->
+    <div style="position:absolute;inset:0;z-index:2;background:linear-gradient(160deg,rgba(240,244,255,0.65) 0%,rgba(232,248,242,0.60) 50%,rgba(255,245,239,0.65) 100%);"></div>
+  </div>
+
+  <script>
+    function onYouTubeIframeAPIReady() {
+      new YT.Player('ytBgPlayer', {
+        videoId: 'z5BSxEyiJbU',
+        playerVars: {
+          autoplay: 1, mute: 1, loop: 1, playlist: 'z5BSxEyiJbU',
+          controls: 0, showinfo: 0, rel: 0, modestbranding: 1,
+          playsinline: 1, disablekb: 1, fs: 0, iv_load_policy: 3,
+          cc_load_policy: 0, origin: window.location.origin
+        },
+        events: {
+          onReady: function(e) { e.target.mute(); e.target.playVideo(); },
+          onStateChange: function(e) {
+            if (e.data === YT.PlayerState.ENDED) e.target.playVideo();
+            if (e.data === YT.PlayerState.PAUSED) e.target.playVideo();
+          }
+        }
+      });
+    }
+    (function() {
+      var tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      document.head.appendChild(tag);
+    })();
+  </script>
+
+  <div class="hero-left" style="position:relative;z-index:1;">
+    <div class="hero-badge"><div class="dot"></div>Now enrolling. Ages 6 to 17</div>
+    <h1>Where Kids<br><span class="word-rotate">Code</span><br>Their Future</h1>
+    <p>Expert 1-on-1 online tutoring in <strong>Coding</strong> and <strong>Tech</strong> tailored for every child aged 6 to 17. Based in the UK. Available everywhere.</p>
+    <div class="hero-ctas">
+      <a href="pages/free-trial.html" class="btn btn-primary"><i class="fa-solid fa-graduation-cap"></i> Book a Demo</a>
+      <a href="pages/courses.html"    class="btn btn-outline">Explore Courses →</a>
+    </div>
+    <div class="hero-trust">
+      <div class="trust-item"><div class="trust-icon ti-blue"><i class="fa-solid fa-shield-halved"></i></div>UK-Based & Certified</div>
+      <div class="trust-item"><div class="trust-icon ti-green"><i class="fa-solid fa-check"></i></div>Safeguarding First</div>
+      <div class="trust-item"><div class="trust-icon ti-orange"><i class="fa-solid fa-bolt"></i></div>Live 1-on-1 Sessions</div>
+    </div>
+  </div>
+  <div class="hero-right" style="position:relative;z-index:1;">
+    <div class="float-card card-stat">
+      <div class="stat-num">53</div>
+      <div class="stat-label">Happy Students</div>
+    </div>
+    <div class="float-card card-course2">
+      <i class="fa-solid fa-laptop-code" style="font-size:32px;color:var(--blue);display:block;margin-bottom:8px;"></i>
+      <div class="fc-title">Coding</div>
+      <div class="fc-sub">Python · Scratch · Web</div>
+    </div>
+    <div class="float-card card-main">
+      <div class="fc-top">
+        <div>
+          <div class="fc-label" style="color:var(--blue);">Live Class</div>
+          <div class="fc-title">1-on-1 Session</div>
+        </div>
+        <div style="font-size:28px;"><i class="fa-solid fa-satellite-dish" style="font-size:28px;color:var(--blue);"></i></div>
+      </div>
+      <div style="background:var(--green-light);border-radius:10px;padding:10px;margin-top:8px;">
+        <div style="font-size:12px;font-weight:800;color:var(--green-dark);"><span class="live-dot"></span> Emeka is online</div>
+        <div style="font-size:11px;color:var(--green);margin-top:2px;font-weight:600;">Game Dev · Age 12</div>
+      </div>
+    </div>
+    <div class="float-card card-course1">
+      <i class="fa-solid fa-gamepad" style="font-size:32px;color:var(--orange);display:block;margin-bottom:8px;"></i>
+      <div class="fc-title">Game Dev</div>
+      <div class="fc-sub">Scratch · Python · Unity</div>
+    </div>
+    <div class="float-card card-pathway">
+      <div style="font-size:12px;font-weight:800;color:var(--blue);margin-bottom:6px;">5 Tech Pathways</div>
+      <div style="font-size:11px;color:var(--mid);font-weight:600;">Ages 6 to 17</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ STATS BAR ═══ -->
+<div class="stats-bar">
+  <div class="stat-item stat-accent-blue"><div class="stat-num">53</div><div class="stat-label">Happy Students</div></div>
+  <div class="stat-item stat-accent-green"><div class="stat-num">5</div><div class="stat-label">Tech Career Pathways</div></div>
+  <div class="stat-item stat-accent-orange"><div class="stat-num">100%</div><div class="stat-label">Online &amp; 1-on-1</div></div>
+  <div class="stat-item"><div class="stat-num">6–17</div><div class="stat-label">Age Range</div></div>
+</div>
+
+<!-- ═══ COURSES PREVIEW ═══ -->
+<section class="courses-section" id="courses">
+  <div class="section-label">Our Programmes</div>
+  <h2 class="section-title">Skills That Shape Futures</h2>
+  <p class="section-sub">Engaging, project-based tech programmes delivered live one-on-one. Built for every learner aged 6 to 17.</p>
+  <div class="courses-grid-home">
+
+    <!-- Pathway 1: Website Development -->
+    <div class="course-card-home card-coding reveal">
+      <div class="course-header-home">🌐</div>
+      <div class="course-body-home">
+        <div class="course-tag tag-blue">Tech Pathway</div>
+        <div class="course-name">Website Development</div>
+        <div class="course-desc">Your child learns to design and build real websites using HTML, CSS and JavaScript. From first webpage to full portfolio projects.</div>
+        <ul class="course-features">
+          <li><div class="check check-blue"><i class="fa-solid fa-check"></i></div>HTML, CSS and JavaScript</li>
+          <li><div class="check check-blue"><i class="fa-solid fa-check"></i></div>Real project builds</li>
+          <li><div class="check check-blue"><i class="fa-solid fa-check"></i></div>Ages 6 to 17</li>
+        </ul>
+        <a href="pages/courses.html?pathway=website-development" class="course-link-home link-blue">Explore Pathway →</a>
+      </div>
+    </div>
+
+    <!-- Pathway 2: Mobile App Development -->
+    <div class="course-card-home card-maths reveal">
+      <div class="course-header-home">📱</div>
+      <div class="course-body-home">
+        <div class="course-tag tag-green">Tech Pathway</div>
+        <div class="course-name">Mobile App Development</div>
+        <div class="course-desc">Students build working mobile apps they can use and share. Covers app logic, UI design and publishing basics.</div>
+        <ul class="course-features">
+          <li><div class="check check-green"><i class="fa-solid fa-check"></i></div>App design and logic</li>
+          <li><div class="check check-green"><i class="fa-solid fa-check"></i></div>Build and test real apps</li>
+          <li><div class="check check-green"><i class="fa-solid fa-check"></i></div>Ages 8 to 17</li>
+        </ul>
+        <a href="pages/courses.html?pathway=mobile-app-development" class="course-link-home link-green">Explore Pathway →</a>
+      </div>
+    </div>
+
+    <!-- Pathway 3: Game Development -->
+    <div class="course-card-home card-sciences reveal">
+      <div class="course-header-home">🎮</div>
+      <div class="course-body-home">
+        <div class="course-tag tag-orange">Tech Pathway</div>
+        <div class="course-name">Game Development</div>
+        <div class="course-desc">From Scratch games to 2D adventures in Python and Unity. Kids build games they are proud to show off.</div>
+        <ul class="course-features">
+          <li><div class="check check-orange"><i class="fa-solid fa-check"></i></div>Scratch, Python and Unity</li>
+          <li><div class="check check-orange"><i class="fa-solid fa-check"></i></div>Build complete playable games</li>
+          <li><div class="check check-orange"><i class="fa-solid fa-check"></i></div>Ages 6 to 17</li>
+        </ul>
+        <a href="pages/courses.html?pathway=game-development" class="course-link-home link-orange">Explore Pathway →</a>
+      </div>
+    </div>
+
+    <!-- Pathway 4: AI and Automation -->
+    <div class="course-card-home card-coding reveal" style="--card-accent:#7c3aed;">
+      <div class="course-header-home" style="background:linear-gradient(135deg,rgba(124,58,237,.12),rgba(124,58,237,.25));">🤖</div>
+      <div class="course-body-home">
+        <div class="course-tag" style="background:rgba(124,58,237,.12);color:#7c3aed;">Tech Pathway</div>
+        <div class="course-name">AI and Automation</div>
+        <div class="course-desc">Students explore how AI works, build smart programs and learn automation skills that define the future of every career.</div>
+        <ul class="course-features">
+          <li><div class="check" style="background:#7c3aed;"><i class="fa-solid fa-check"></i></div>Python and AI fundamentals</li>
+          <li><div class="check" style="background:#7c3aed;"><i class="fa-solid fa-check"></i></div>Build smart automations</li>
+          <li><div class="check" style="background:#7c3aed;"><i class="fa-solid fa-check"></i></div>Ages 10 to 17</li>
+        </ul>
+        <a href="pages/courses.html?pathway=ai-and-automation" class="course-link-home" style="color:#7c3aed;">Explore Pathway →</a>
+      </div>
+    </div>
+
+    <!-- Pathway 5: Data Science and Analytics -->
+    <div class="course-card-home card-maths reveal" style="--card-accent:#0694a2;">
+      <div class="course-header-home" style="background:linear-gradient(135deg,rgba(6,148,162,.12),rgba(6,148,162,.25));">📊</div>
+      <div class="course-body-home">
+        <div class="course-tag" style="background:rgba(6,148,162,.12);color:#0694a2;">Tech Pathway</div>
+        <div class="course-name">Data Science and Analytics</div>
+        <div class="course-desc">Young learners explore real data, spot patterns and create visualisations. The skill behind every major company decision today.</div>
+        <ul class="course-features">
+          <li><div class="check" style="background:#0694a2;"><i class="fa-solid fa-check"></i></div>Python and data tools</li>
+          <li><div class="check" style="background:#0694a2;"><i class="fa-solid fa-check"></i></div>Charts, trends and insights</li>
+          <li><div class="check" style="background:#0694a2;"><i class="fa-solid fa-check"></i></div>Ages 11 to 17</li>
+        </ul>
+        <a href="pages/courses.html?pathway=data-science-analytics" class="course-link-home" style="color:#0694a2;">Explore Pathway →</a>
+      </div>
+    </div>
+
+  </div>
+  <div class="text-center" style="margin-top:36px;">
+    <a href="pages/courses.html" class="btn btn-blue">View All Tech Pathways →</a>
+  </div>
+</section>
+
+<!-- ═══ HOW IT WORKS ═══ -->
+<section class="how-section" id="how">
+  <div class="text-center">
+    <div class="section-label mx-auto" style="display:block;width:fit-content;margin:0 auto 16px;">How It Works</div>
+    <h2 class="section-title">Your Child's Learning Roadmap</h2>
+    <p class="section-sub mx-auto">From first contact to graduation, here is exactly what the journey looks like.</p>
+  </div>
+  <div class="roadmap-grid reveal">
+
+    <div class="roadmap-card">
+      <div class="roadmap-num" style="background:var(--blue);">1</div>
+      <div class="roadmap-emoji"><i class="fa-regular fa-calendar"></i></div>
+      <div class="roadmap-title">Book a Free Demo</div>
+      <div class="roadmap-desc">Pick a time that works for your family. The demo session is completely free with no commitment needed.</div>
+    </div>
+
+    <div class="roadmap-arrow">→</div>
+
+    <div class="roadmap-card">
+      <div class="roadmap-num" style="background:var(--green);">2</div>
+      <div class="roadmap-emoji"><i class="fa-solid fa-magnifying-glass"></i></div>
+      <div class="roadmap-title">Child Assessed by Expert Tutor</div>
+      <div class="roadmap-desc">Your child is assessed by one of our specialist tutors to understand their level, strengths and learning style.</div>
+    </div>
+
+    <div class="roadmap-arrow">→</div>
+
+    <div class="roadmap-card">
+      <div class="roadmap-num" style="background:var(--orange);">3</div>
+      <div class="roadmap-emoji"><i class="fa-solid fa-map"></i></div>
+      <div class="roadmap-title">Enrol in a Tech Pathway</div>
+      <div class="roadmap-desc">Based on the assessment, your child is enrolled in the right tech pathway built around their goals and interests.</div>
+    </div>
+
+    <div class="roadmap-arrow">→</div>
+
+    <div class="roadmap-card">
+      <div class="roadmap-num" style="background:#7c3aed;">4</div>
+      <div class="roadmap-emoji"><i class="fa-solid fa-screwdriver-wrench"></i></div>
+      <div class="roadmap-title">Hands-on Learning</div>
+      <div class="roadmap-desc">Weekly live 1-on-1 sessions with real project work. Your child builds things they can show family and friends.</div>
+    </div>
+
+    <div class="roadmap-arrow">→</div>
+
+    <div class="roadmap-card">
+      <div class="roadmap-num" style="background:#0694a2;">5</div>
+      <div class="roadmap-emoji"><i class="fa-solid fa-graduation-cap"></i></div>
+      <div class="roadmap-title">Graduate and Get Certified</div>
+      <div class="roadmap-desc">On completing the pathway your child receives a StemNest certificate and a portfolio of real projects they built.</div>
+    </div>
+
+  </div>
+  <div class="text-center" style="margin-top:48px;">
+    <a href="pages/free-trial.html" class="btn btn-primary" style="font-size:17px;padding:14px 36px;"><i class="fa-solid fa-graduation-cap"></i> Book Your Free Demo Today</a>
+  </div>
+</section>
+
+<!-- ═══ WHY STEMNEST ═══ -->
+<section class="why-section" id="about">
+
+  <!-- Decorative orbs -->
+  <div class="why-orb why-orb-1"></div>
+  <div class="why-orb why-orb-2"></div>
+  <div class="why-orb why-orb-3"></div>
+
+  <div class="why-inner">
+
+    <!-- TOP: headline centred -->
+    <div class="why-header">
+      <div class="why-eyebrow">Why StemNest</div>
+      <h2 class="why-headline">Built for Every Child.<br>Built Around Results.</h2>
+      <p class="why-sub">We are not a one-size-fits-all platform. Every session is crafted around your child, their goals, their pace and their potential. UK-based, globally trusted.</p>
+    </div>
+
+    <!-- MIDDLE: 3-column feature cards -->
+    <div class="why-cards-grid">
+      <div class="why-card wc-blue">
+        <div class="wc-icon-wrap"><i class="fa-solid fa-bullseye"></i></div>
+        <div class="wc-title">Pure 1-on-1 Teaching</div>
+        <div class="wc-desc">No group sessions, no compromise. Every class is 100% focused on your child and their goals.</div>
+      </div>
+      <div class="why-card wc-green">
+        <div class="wc-icon-wrap"><i class="fa-solid fa-shield-halved"></i></div>
+        <div class="wc-title">UK-Based & Trusted</div>
+        <div class="wc-desc">Founded in the UK with rigorous safeguarding, DBS-checked tutors and parent-approved standards.</div>
+      </div>
+      <div class="why-card wc-orange">
+        <div class="wc-icon-wrap"><i class="fa-solid fa-globe"></i></div>
+        <div class="wc-title">Truly Global Access</div>
+        <div class="wc-desc">Fully online. Your child learns from world-class UK tutors wherever you are in the world.</div>
+      </div>
+      <div class="why-card wc-purple">
+        <div class="wc-icon-wrap"><i class="fa-solid fa-chart-line"></i></div>
+        <div class="wc-title">Progress You Can See</div>
+        <div class="wc-desc">Regular reports, milestone tracking and parent check-ins every step of the journey.</div>
+      </div>
+      <div class="why-card wc-teal">
+        <div class="wc-icon-wrap"><i class="fa-solid fa-trophy"></i></div>
+        <div class="wc-title">Ages 6 to 17</div>
+        <div class="wc-desc">From curious 6-year-olds to 17-year-olds building their tech portfolio. We have a pathway for every stage.</div>
+      </div>
+      <div class="why-card wc-pink">
+        <div class="wc-icon-wrap"><i class="fa-solid fa-lightbulb"></i></div>
+        <div class="wc-title">Mentorship Mindset</div>
+        <div class="wc-desc">Beyond lessons. Our tutors inspire, guide and mentor your child to think bigger.</div>
+      </div>
+    </div>
+
+    <!-- BOTTOM: stats row + CTA -->
+    <div class="why-bottom">
+      <div class="why-stats-row">
+        <div class="why-stat">
+          <div class="why-stat-num">53</div>
+          <div class="why-stat-label">Happy Students</div>
+        </div>
+        <div class="why-stat-divider"></div>
+        <div class="why-stat">
+          <div class="why-stat-num">5</div>
+          <div class="why-stat-label">Tech Pathways</div>
+        </div>
+        <div class="why-stat-divider"></div>
+        <div class="why-stat">
+          <div class="why-stat-num">100%</div>
+          <div class="why-stat-label">Live &amp; 1-on-1</div>
+        </div>
+        <div class="why-stat-divider"></div>
+        <div class="why-stat">
+          <div class="why-stat-num">6–17</div>
+          <div class="why-stat-label">Age Range</div>
+        </div>
+      </div>
+      <a href="pages/free-trial.html" class="why-cta-btn"><i class="fa-solid fa-graduation-cap"></i> Book a Free Demo</a>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══ TEACHERS ═══ -->
+<section class="teachers-section" id="teachers">
+  <div class="text-center">
+    <div class="section-label mx-auto" style="display:block;width:fit-content;margin:0 auto 16px;">Our Tutors</div>
+    <h2 class="section-title">Meet Some of Our Team</h2>
+    <p class="section-sub mx-auto">Every StemNest tutor is rigorously vetted, DBS-checked, and passionate about helping young people thrive.</p>
+  </div>
+  <div class="teachers-grid reveal">
+    <div class="teacher-card"><div class="teacher-avatar avatar-blue">SR</div><div class="teacher-name">Sarah Rahman</div><div class="teacher-subject">Coding & Computer Science</div><div class="teacher-bio">Former software engineer turned educator. 6+ years helping young people fall in love with coding.</div><div class="teacher-tags"><span class="teacher-tag">Python</span><span class="teacher-tag">Web Dev</span><span class="teacher-tag">Scratch</span></div></div>
+    <div class="teacher-card"><div class="teacher-avatar avatar-green">JO</div><div class="teacher-name">James Okafor</div><div class="teacher-subject">Mathematics</div><div class="teacher-bio">PGCE-qualified Maths specialist. Helped 150+ students achieve their target GCSE and A-Level grades.</div><div class="teacher-tags"><span class="teacher-tag">GCSE</span><span class="teacher-tag">A-Level</span><span class="teacher-tag">KS2/3</span></div></div>
+    <div class="teacher-card"><div class="teacher-avatar avatar-orange">LP</div><div class="teacher-name">Lisa Patel</div><div class="teacher-subject">Sciences</div><div class="teacher-bio">Biology & Chemistry graduate from UCL with a talent for making complex science click.</div><div class="teacher-tags"><span class="teacher-tag">Biology</span><span class="teacher-tag">Chemistry</span><span class="teacher-tag">Physics</span></div></div>
+    <div class="teacher-card"><div class="teacher-avatar" style="background:linear-gradient(135deg,#7c3aed,#a78bfa);">MK</div><div class="teacher-name">Marcus King</div><div class="teacher-subject">Coding & AI Literacy</div><div class="teacher-bio">Tech innovator passionate about preparing the next generation for an AI-first world.</div><div class="teacher-tags"><span class="teacher-tag">AI / ML</span><span class="teacher-tag">JavaScript</span><span class="teacher-tag">Apps</span></div></div>
+  </div>
+  <div class="text-center" style="margin-top:40px;">
+    <a href="pages/teach-with-us.html" class="btn btn-blue">Join as a Tutor →</a>
+  </div>
+</section>
+
+<!-- ═══ REVIEWS ═══ -->
+<section class="reviews-section" id="reviews">
+  <div class="text-center">
+    <div class="section-label mx-auto" style="display:block;width:fit-content;margin:0 auto 16px;">Reviews</div>
+    <h2 class="section-title">What Families Are Saying</h2>
+    <p class="section-sub mx-auto">Real results. Real families. See how StemNest is making a difference across the UK and beyond.</p>
+  </div>
+  <div class="reviews-grid reveal">
+    <div class="review-card"><div class="review-stars">★★★★★</div><p class="review-text">"My 11-year-old went from dreading Maths to actually asking for extra sessions. James has been absolutely brilliant."</p><div class="reviewer"><div class="reviewer-avatar" style="background:var(--blue);">AM</div><div><div class="reviewer-name">Amara M.</div><div class="reviewer-info">Parent · London, UK · Maths</div></div></div></div>
+    <div class="review-card"><div class="review-stars">★★★★★</div><p class="review-text">"Sarah taught my daughter Python from scratch and within 3 months she'd built her own game. The 1-on-1 format makes all the difference."</p><div class="reviewer"><div class="reviewer-avatar" style="background:var(--green);">RT</div><div><div class="reviewer-name">Richard T.</div><div class="reviewer-info">Parent · Manchester, UK · Coding</div></div></div></div>
+    <div class="review-card"><div class="review-stars">★★★★★</div><p class="review-text">"We're based in Lagos and the online setup is seamless. Our son got an A* in GCSE Biology. StemNest is genuinely exceptional."</p><div class="reviewer"><div class="reviewer-avatar" style="background:var(--orange);">FK</div><div><div class="reviewer-name">Folake K.</div><div class="reviewer-info">Parent · Lagos, Nigeria · Sciences</div></div></div></div>
+  </div>
+</section>
+
+<!-- ═══ CTA ═══ -->
+<section class="cta-section" id="cta">
+  <h2 class="section-title">Your Child's Potential<br>is Waiting to be Unlocked</h2>
+  <p class="cta-sub">Book a completely free demo session. No payment required, no commitment. Just great learning.</p>
+  <div class="cta-btns">
+    <a href="pages/free-trial.html" class="btn btn-primary" style="font-size:17px;padding:14px 36px;"><i class="fa-solid fa-graduation-cap"></i> Book a Demo Now</a>
+    <a href="pages/join-class.html" class="btn" style="background:rgba(255,255,255,.12);color:#fff;border:1.5px solid rgba(255,255,255,.3);font-size:17px;padding:14px 36px;"><i class="fa-solid fa-satellite-dish"></i> Join My Class</a>
+  </div>
+</section>
+
+<!-- ═══ FOOTER ═══ -->
+<footer>
+  <div class="footer-top">
+    <div class="footer-brand">
+      <a class="logo" href="index.html">
+        <img src="assets/images/logo2.png" alt="StemNest Academy" class="logo-img">
+      </a>
+      <p>Expert 1-on-1 online tutoring in Tech and Coding for students aged 6 to 17. UK-based, globally trusted.</p>
+      <div class="social-links" style="margin-top:20px;">
+        <a class="social-link" href="https://x.com/StemNestAcademy">𝕏</a>
+        <a class="social-link" href="https://www.linkedin.com/company/stemnest-academy">in</a>
+        <a class="social-link" href="https://web.facebook.com/profile.php?id=61582023473392">f</a>
+        <a class="social-link" href="https://www.instagram.com/stemnestacademy">▶</a>
+      </div>
+    </div>
+    <div class="footer-col">
+      <h4>Courses</h4>
+      <a href="pages/courses.html">Coding</a>
+      <a href="pages/courses.html">Mathematics</a>
+      <a href="pages/courses.html">Science</a>
+      <a href="pages/courses.html">All Programmes</a>
+    </div>
+    <div class="footer-col">
+      <h4>Company</h4>
+      <a href="pages/blog.html">Blog</a>
+      <a href="pages/about.html">About Us</a>
+      <a href="pages/team.html">Our Team</a>
+      <a href="pages/teach-with-us.html">Teach With Us</a>
+      <a href="pages/faq.html">FAQ</a>
+    </div>
+    <div class="footer-col">
+      <h4>Account</h4>
+      <a href="pages/login.html">Tutor Login</a>
+      <a href="pages/login.html">Student Login</a>
+      <a href="pages/free-trial.html">Book a Demo</a>
+      <a href="pages/join-class.html">Join My Class</a>
+    </div>
+    <div class="footer-col">
+      <h4>Legal</h4>
+      <a href="pages/legal/privacy-policy.html">Privacy Policy</a>
+      <a href="pages/legal/terms-of-use.html">Terms of Use</a>
+      <a href="pages/legal/refund-policy.html">Refund &amp; Cancellation</a>
+      <a href="pages/legal/disclaimer.html">Disclaimer</a>
+      <a href="pages/legal/payment-policy.html">Payment Policy</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="footer-copy">© 2026 StemNest Academy Ltd. Registered in England & Wales. All rights reserved.</div>
+    <div class="footer-badges">
+      <div class="footer-badge"><i class="fa-solid fa-shield-halved"></i> UK Based</div>
+      <div class="footer-badge"><i class="fa-solid fa-lock"></i> Safeguarding First</div>
+      <div class="footer-badge">✦ DBS Checked Tutors</div>
+    </div>
+  </div>
+</footer>
+
+<script src="js/utils.js"></script>
+<script src="js/home.js"></script>
+</body>
+</html>

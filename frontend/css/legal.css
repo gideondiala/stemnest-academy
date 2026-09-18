@@ -1,0 +1,164 @@
+/* ═══════════════════════════════════════════════════════
+   STEMNEST ACADEMY — LEGAL PAGES SHARED STYLES
+   Used by: privacy-policy, terms-of-use, refund-policy,
+            disclaimer, payment-policy
+═══════════════════════════════════════════════════════ */
+
+/* ── PAGE HERO ── */
+.legal-hero {
+  background: linear-gradient(135deg, #0d1117 0%, #1a3a6b 100%);
+  padding: 60px 5% 50px;
+  position: relative; overflow: hidden;
+}
+.legal-hero::before {
+  content: ''; position: absolute; top: -80px; right: -80px;
+  width: 300px; height: 300px;
+  background: radial-gradient(circle, rgba(26,86,219,.2) 0%, transparent 70%);
+  border-radius: 50%;
+}
+.legal-hero-inner { position: relative; z-index: 1; max-width: 860px; }
+.legal-breadcrumb {
+  font-size: 13px; font-weight: 700; color: rgba(255,255,255,.5);
+  margin-bottom: 16px;
+}
+.legal-breadcrumb a { color: rgba(255,255,255,.6); text-decoration: none; }
+.legal-breadcrumb a:hover { color: #fff; }
+.legal-hero h1 {
+  font-family: 'Fredoka One', cursive;
+  font-size: clamp(32px, 4vw, 48px);
+  color: #fff; margin-bottom: 8px;
+}
+.legal-hero p {
+  font-size: 14px; font-weight: 700;
+  color: rgba(255,255,255,.5);
+}
+
+/* ── LAYOUT ── */
+.legal-wrap {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 48px;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 60px 5% 80px;
+  align-items: start;
+}
+
+/* ── TABLE OF CONTENTS (sidebar) ── */
+.legal-toc {
+  position: sticky;
+  top: 90px;
+  background: var(--bg);
+  border-radius: 16px;
+  padding: 24px 20px;
+  border: 1.5px solid #e8eaf0;
+}
+.toc-title {
+  font-family: 'Fredoka One', cursive;
+  font-size: 15px; color: var(--dark);
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1.5px solid #e8eaf0;
+}
+.legal-toc a {
+  display: block;
+  font-size: 13px; font-weight: 700; color: var(--mid);
+  text-decoration: none; padding: 5px 0;
+  border-left: 2px solid transparent;
+  padding-left: 10px;
+  transition: color .2s, border-color .2s;
+  line-height: 1.5;
+}
+.legal-toc a:hover { color: var(--blue); border-left-color: var(--blue); }
+
+/* ── CONTENT ── */
+.legal-content { min-width: 0; }
+
+.legal-content section {
+  margin-bottom: 48px;
+  padding-bottom: 40px;
+  border-bottom: 1px solid #f0f2f8;
+}
+.legal-content section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.legal-content h2 {
+  font-family: 'Fredoka One', cursive;
+  font-size: 24px; color: var(--dark);
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--blue-light);
+}
+
+.legal-content h3 {
+  font-family: 'Fredoka One', cursive;
+  font-size: 17px; color: var(--dark);
+  margin: 20px 0 10px;
+}
+
+.legal-content p {
+  font-size: 15px; color: var(--mid);
+  line-height: 1.8; margin-bottom: 14px;
+}
+
+.legal-content ul, .legal-content ol {
+  padding-left: 22px; margin-bottom: 14px;
+}
+.legal-content li {
+  font-size: 15px; color: var(--mid);
+  line-height: 1.8; margin-bottom: 6px;
+}
+
+.legal-content a {
+  color: var(--blue); font-weight: 700; text-decoration: none;
+}
+.legal-content a:hover { text-decoration: underline; }
+
+.legal-content strong { color: var(--dark); }
+
+/* ── CONTACT BOX ── */
+.legal-contact-box {
+  background: var(--bg);
+  border: 1.5px solid #e8eaf0;
+  border-radius: 14px;
+  padding: 20px 24px;
+  font-size: 14px; color: var(--mid);
+  line-height: 2;
+  margin-top: 12px;
+}
+.legal-contact-box a { color: var(--blue); font-weight: 700; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 900px) {
+  .legal-wrap { grid-template-columns: 1fr; }
+  .legal-toc  { position: static; }
+}
+@media (max-width: 600px) {
+  .legal-wrap { padding: 40px 5%; }
+}
+
+/* ── HIGHLIGHT BOX (used in refund policy tables) ── */
+.legal-highlight-box {
+  border: 1.5px solid #e8eaf0;
+  border-radius: 14px;
+  overflow: hidden;
+  margin: 16px 0 20px;
+}
+.lhb-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 14px 20px;
+  border-bottom: 1px solid #f0f2f8;
+  font-size: 14px;
+}
+.lhb-row:last-child { border-bottom: none; }
+.lhb-row:nth-child(odd)  { background: var(--bg); }
+.lhb-row:nth-child(even) { background: var(--white); }
+.lhb-label {
+  font-weight: 800; color: var(--dark);
+  min-width: 200px; flex-shrink: 0;
+}
+.lhb-value { color: var(--mid); line-height: 1.6; }

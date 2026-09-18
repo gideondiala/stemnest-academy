@@ -1,0 +1,40 @@
+{
+  "Changes": [
+    {
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "stemnestacademy.co.uk",
+        "Type": "MX",
+        "TTL": 300,
+        "ResourceRecords": [
+          { "Value": "10 mx.zoho.com" },
+          { "Value": "20 mx2.zoho.com" },
+          { "Value": "50 mx3.zoho.com" }
+        ]
+      }
+    },
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "stemnestacademy.co.uk",
+        "Type": "TXT",
+        "TTL": 300,
+        "ResourceRecords": [
+          { "Value": "\"zoho-verification=zb51423542.zmverify.zoho.com\"" },
+          { "Value": "\"v=spf1 include:zohomail.com ~all\"" }
+        ]
+      }
+    },
+    {
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "zmail._domainkey.stemnestacademy.co.uk",
+        "Type": "TXT",
+        "TTL": 300,
+        "ResourceRecords": [
+          { "Value": "\"v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCn5D05+A2u2XnJonShxBSJyGvrShusZ8SAXhtk1BCq9bbjjrFE0eDAppVk5yDWiBWadjW3TSd9hyJgsvpbZwt2kbOG5VFtrcG1KtJpyAyehrdP6AkRs5I1CMXNdwzjOPXtj7ge7nIqBTRIqxhfHjA0iR/E/zYK2zmzTC0Zaf25hQIDAQAB\"" }
+        ]
+      }
+    }
+  ]
+}

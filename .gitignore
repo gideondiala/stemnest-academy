@@ -1,0 +1,70 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor folders
+.vscode/
+.idea/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log
+
+# Environment & secrets
+.env
+.env.local
+.env.production
+credentials.json
+token.json
+
+# Build output
+/dist
+/build
+frontend/dist
+backend/dist
+
+# Agent workflow intermediates (always regenerated)
+.tmp/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Logs
+*.log
+logs/
+
+# Debug scripts
+backend/check-*.js
+backend/test-*.js
+backend/run-*.js
+backend/restore-*.js
+backend/fix-*.js
+backend/patch-*.js
+backend/src/db/add-*.sql
+test_smtp2.js
+add-clarity.py
+add-tiktok.py
+add_enrollment_tables.js
+audit.ps1
+openapi.json
+Conversation.txt
+STEMNEST_SYSTEM_BREAKDOWN.md
+STUDENT_JOURNEY.md
+LESSON_SCHEDULING_SPEC.md
+ads-guide.md
+Task.txt
+Task2.txt
+TEST_CREDENTIALS.txt
+Certificate of Completion BG.png
+Country Prefix example.PNG
+Finalizing Student Onboarding Integration.md
+Problem pix.png
+STEMNEST V2 SYSTEM.md
+backend/deactivate-test-students.sql
+backend/new-routes.txt
