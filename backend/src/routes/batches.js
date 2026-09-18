@@ -188,8 +188,8 @@ router.get('/:id', requireAuth, requireRole('admin','super_admin','postsales','t
       SELECT bm.id, bm.status, bm.joined_at AS "joinedAt", bm.removal_reason AS "removalReason",
              u.id AS "studentId", u.name AS "studentName", u.email,
              u.phone, u.whatsapp, u.staff_id AS "staffId",
-             u.parent_name AS "parentName", u.grade AS "userGrade",
-             COALESCE(sp.grade, u.grade) AS grade,
+             sp.parent_name AS "parentName",
+             COALESCE(sp.grade, '') AS grade,
              sp.credits, sp.credits_suspended AS "creditsSuspended"
       FROM batch_members bm
       JOIN users u ON u.id = bm.student_id

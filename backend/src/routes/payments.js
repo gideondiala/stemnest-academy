@@ -651,38 +651,33 @@ router.post('/enquiry', async (req, res, next) => {
 router.get('/', requireAuth, requireRole('admin','super_admin','postsales'), async (req, res, next) => {
   try {
     const { status } = req.query;
-    /* Pull course/subject from:
-       1. payments.course_id → courses.name (if set)
-       2. student's most recent non-demo booking subject (most reliable fallback)
-       3. student user profile subject field */
     let query = `
       SELECT p.*,
-             u_s.name    AS student_name,
-             u_s.email   AS student_email,
-             u_s.phone   AS student_phone,
-             u_s.whatsapp AS student_whatsapp,
-             u_sp.name   AS sales_name,
+             u_s.name         AS student_name,
+             u_s.email        AS student_email,
+             u_s.phone        AS student_phone,
+             u_s.whatsapp     AS student_whatsapp,
+             u_s.staff_id     AS student_staff_id,
+             u_s.date_of_birth AS student_dob,
+             u_sp.name        AS sales_name,
+             sp.grade         AS student_grade,
+             sp.age           AS student_age,
+             sp.parent_name   AS student_parent_name,
+             sp.enrolled_at   AS student_enrolled_at,
              COALESCE(
                c.name,
                (SELECT b.subject FROM bookings b
                 WHERE b.student_id = p.student_id
                   AND b.is_demo = FALSE
                   AND b.subject IS NOT NULL
-                  AND b.subject != ''
-                ORDER BY b.booked_at DESC LIMIT 1),
-               u_s.subject
-             ) AS course_name,
-             COALESCE(
-               (SELECT b.grade FROM bookings b
-                WHERE b.student_id = p.student_id
-                  AND b.is_demo = FALSE
-                ORDER BY b.booked_at DESC LIMIT 1),
-               u_s.grade
-             ) AS student_grade
+                  AND b.subject <> ''
+                ORDER BY b.booked_at DESC LIMIT 1)
+             ) AS course_name
       FROM payments p
-      LEFT JOIN users u_s  ON u_s.id  = p.student_id
-      LEFT JOIN users u_sp ON u_sp.id = p.sales_id
-      LEFT JOIN courses c  ON c.id    = p.course_id`;
+      LEFT JOIN users u_s         ON u_s.id   = p.student_id
+      LEFT JOIN users u_sp        ON u_sp.id  = p.sales_id
+      LEFT JOIN courses c         ON c.id     = p.course_id
+      LEFT JOIN student_profiles sp ON sp.user_id = p.student_id`;
     const params = [];
     if (status) { params.push(status); query += ` WHERE p.status = $1`; }
     query += ` ORDER BY p.created_at DESC LIMIT 500`;
