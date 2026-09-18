@@ -325,155 +325,151 @@ router.get('/dashboard/:role', requireAuth, async (req, res, next) => {
     }
 
     if (role === 'postsales') {
-      const [payments, students, scheduled, converted, pipelineConverted] = await Promise.all([
-        /* All payments — used for payment links tab */
-        pool.query(`SELECT p.*, u_s.name AS student_name, u_s.email AS student_email,
-                           c.name AS course_name
-                    FROM payments p
-                    LEFT JOIN users u_s ON u_s.id = p.student_id
-                    LEFT JOIN courses c ON c.id   = p.course_id
-                    ORDER BY p.created_at DESC LIMIT 500`),
+      /* Run each query independently — one failure must NOT kill the whole response */
+      let paymentsRows = [], studentsRows = [], scheduledRows = [], convertedRows = [];
 
-        /* Paid Students — full details including pathway, amount, DOB */
-        pool.query(`
+      /* All payments */
+      try {
+        const r = await pool.query(`
+          SELECT p.*, u_s.name AS student_name, u_s.email AS student_email,
+                 c.name AS course_name
+          FROM payments p
+          LEFT JOIN users u_s ON u_s.id = p.student_id
+          LEFT JOIN courses c ON c.id   = p.course_id
+          ORDER BY p.created_at DESC LIMIT 500`);
+        paymentsRows = r.rows;
+      } catch(e) { logger.error('[SYNC postsales] payments query failed:', e.message); }
+
+      /* Paid Students — all onboarded students with their pathway and last payment */
+      try {
+        const r = await pool.query(`
           SELECT
-            u.id                                AS "studentId",
-            u.staff_id                          AS "staffId",
-            u.name                              AS "studentName",
+            u.id                                                            AS "studentId",
+            u.staff_id                                                      AS "staffId",
+            u.name                                                          AS "studentName",
             u.email,
             u.phone,
             u.whatsapp,
-            u.date_of_birth                     AS "dateOfBirth",
-            u.created_at                        AS "createdAt",
+            u.date_of_birth                                                 AS "dateOfBirth",
+            u.created_at                                                    AS "createdAt",
             sp.grade,
             sp.age,
             sp.credits,
-            sp.credits_suspended                AS "creditsSuspended",
-            sp.class_paused                     AS "classPaused",
-            sp.enrolled_at                      AS "enrolledAt",
-            sp.parent_name                      AS "parentName",
-            sp.parent_email                     AS "parentEmail",
-            p.name                              AS "pathwayName",
-            pg.grade_number                     AS "gradeNumber",
-            e.current_grade                     AS "currentGrade",
-            e.lessons_completed                 AS "lessonsCompleted",
-            e.status                            AS "enrolmentStatus",
-            u_t.name                            AS "tutorName",
-            (SELECT pm.amount FROM payments pm
-               WHERE pm.student_id = u.id
-               ORDER BY pm.created_at DESC LIMIT 1)   AS "amountPaid",
-            (SELECT pm.currency FROM payments pm
-               WHERE pm.student_id = u.id
-               ORDER BY pm.created_at DESC LIMIT 1)   AS "amountCurrency"
+            sp.credits_suspended                                            AS "creditsSuspended",
+            sp.class_paused                                                 AS "classPaused",
+            sp.enrolled_at                                                  AS "enrolledAt",
+            sp.parent_name                                                  AS "parentName",
+            sp.parent_email                                                 AS "parentEmail",
+            pw.name                                                         AS "pathwayName",
+            e.current_grade                                                 AS "currentGrade",
+            e.lessons_completed                                             AS "lessonsCompleted",
+            e.status                                                        AS "enrolmentStatus",
+            u_t.name                                                        AS "tutorName",
+            (SELECT pm.amount   FROM payments pm WHERE pm.student_id = u.id ORDER BY pm.created_at DESC LIMIT 1) AS "amountPaid",
+            (SELECT pm.currency FROM payments pm WHERE pm.student_id = u.id ORDER BY pm.created_at DESC LIMIT 1) AS "amountCurrency"
           FROM users u
-          LEFT JOIN student_profiles sp ON sp.user_id = u.id
+          LEFT JOIN student_profiles sp ON sp.user_id  = u.id
           LEFT JOIN enrolments e        ON e.student_id = u.id
                                        AND e.status IN ('active','paused')
-          LEFT JOIN pathways p          ON p.id = e.pathway_id
-          LEFT JOIN pathway_grades pg   ON pg.pathway_id = e.pathway_id
-                                       AND pg.grade_number = e.current_grade
+          LEFT JOIN pathways pw         ON pw.id = e.pathway_id
           LEFT JOIN users u_t           ON u_t.id = e.tutor_id
           WHERE u.role = 'student'
             AND u.is_active = TRUE
           ORDER BY COALESCE(sp.enrolled_at, u.created_at) DESC
-        `),
+        `);
+        studentsRows = r.rows;
+      } catch(e) { logger.error('[SYNC postsales] students query failed:', e.message); }
 
-        /* Scheduled students — one row per student with future paid classes */
-        pool.query(`
+      /* Scheduled students */
+      try {
+        const r = await pool.query(`
           SELECT
-            b.student_id                                        AS "studentId",
-            u_s.name                                            AS "studentName",
+            b.student_id                                                    AS "studentId",
+            u_s.name                                                        AS "studentName",
             u_s.email,
-            b.subject                                           AS course,
-            COALESCE(p.name, b.subject)                         AS pathway,
-            u_t.name                                            AS "tutorName",
-            u_t.id                                              AS "tutorId",
-            MIN(b.date)                                         AS "nextDate",
+            b.subject                                                       AS course,
+            COALESCE(pw.name, b.subject)                                    AS pathway,
+            u_t.name                                                        AS "tutorName",
+            u_t.id                                                          AS "tutorId",
+            MIN(b.date)                                                     AS "nextDate",
             (SELECT bx.time FROM bookings bx
                WHERE bx.student_id = b.student_id
                  AND bx.status = 'scheduled' AND bx.is_demo = FALSE
-                 AND bx.date = MIN(b.date) LIMIT 1)             AS "nextTime",
-            COUNT(*)                                            AS "remainingCount",
-            MAX(b.class_link)                                   AS "classLink",
+                 AND bx.date = MIN(b.date) LIMIT 1)                         AS "nextTime",
+            COUNT(*)                                                        AS "remainingCount",
+            MAX(b.class_link)                                               AS "classLink",
             (SELECT MIN(bf.date) FROM bookings bf
                WHERE bf.student_id = b.student_id
-                 AND bf.is_demo = FALSE
-                 AND bf.status != 'cancelled')                  AS "firstClassDate",
+                 AND bf.is_demo = FALSE AND bf.status != 'cancelled')       AS "firstClassDate",
             (SELECT bf2.time FROM bookings bf2
                WHERE bf2.student_id = b.student_id
                  AND bf2.is_demo = FALSE AND bf2.status != 'cancelled'
-               ORDER BY bf2.date ASC LIMIT 1)                   AS "firstClassTime"
+               ORDER BY bf2.date ASC LIMIT 1)                               AS "firstClassTime"
           FROM bookings b
-          LEFT JOIN users u_s          ON u_s.id = b.student_id
-          LEFT JOIN users u_t          ON u_t.id = b.tutor_id
-          LEFT JOIN pathway_lessons pl ON pl.id  = b.pathway_lesson_id
-          LEFT JOIN pathway_grades  pg ON pg.id  = pl.grade_id
-          LEFT JOIN pathways        p  ON p.id   = pg.pathway_id
+          LEFT JOIN users u_s           ON u_s.id = b.student_id
+          LEFT JOIN users u_t           ON u_t.id = b.tutor_id
+          LEFT JOIN pathway_lessons pl  ON pl.id  = b.pathway_lesson_id
+          LEFT JOIN pathway_grades  pg  ON pg.id  = pl.grade_id
+          LEFT JOIN pathways        pw  ON pw.id  = pg.pathway_id
           WHERE b.status = 'scheduled'
             AND b.is_demo = FALSE
             AND b.student_id IS NOT NULL
             AND b.date >= CURRENT_DATE
-          GROUP BY b.student_id, u_s.name, u_s.email, b.subject, u_t.name, u_t.id, p.name
+          GROUP BY b.student_id, u_s.name, u_s.email, b.subject, u_t.name, u_t.id, pw.name
           ORDER BY MIN(b.date) ASC
-        `),
+        `);
+        scheduledRows = r.rows;
+      } catch(e) { logger.error('[SYNC postsales] scheduled query failed:', e.message); }
 
-        /* Converted students — from pipeline where status = 'converted'/'paid' */
-        pool.query(`
+      /* Converted students from pipeline */
+      try {
+        const r = await pool.query(`
           SELECT
-            pl.id                           AS "pipelineId",
-            pl.booking_id                   AS "bookingId",
-            pl.student_name                 AS "studentName",
-            pl.course_pitched               AS "coursePitched",
-            pl.payment_amount               AS "paymentAmount",
+            pl.id                                                           AS "pipelineId",
+            pl.booking_id                                                   AS "bookingId",
+            pl.student_name                                                 AS "studentName",
+            pl.course_pitched                                               AS "coursePitched",
+            pl.payment_amount                                               AS "paymentAmount",
             pl.notes,
             pl.status,
-            pl.created_at                   AS "convertedAt",
-            u_s.id                          AS "studentId",
-            u_s.email                       AS "studentEmail",
-            u_s.phone                       AS "studentPhone",
-            u_s.date_of_birth               AS "dateOfBirth",
-            u_s.staff_id                    AS "staffId",
+            pl.created_at                                                   AS "convertedAt",
+            u_s.id                                                          AS "studentId",
+            u_s.email                                                       AS "studentEmail",
+            u_s.phone                                                       AS "studentPhone",
+            u_s.date_of_birth                                               AS "dateOfBirth",
+            u_s.staff_id                                                    AS "staffId",
             sp.grade,
             sp.age,
-            sp.parent_name                  AS "parentName",
+            sp.parent_name                                                  AS "parentName",
             sp.credits,
-            sp2.name                        AS "salesPersonName",
+            sp2.name                                                        AS "salesPersonName",
             b.subject,
-            b.date                          AS "demoDate",
-            COALESCE(n.notes->>'country','') AS country,
-            COALESCE(n.notes->>'city','')   AS city,
-            COALESCE(n.notes->>'gender','') AS gender,
-            pw.name                         AS "pathwayName",
-            e.schedule                      AS "learningSchedule",
-            u_t.name                        AS "tutorName",
-            cr.student_interest             AS "studentInterest",
-            cr.purchasing_power             AS "purchasingPower"
+            b.date                                                          AS "demoDate",
+            pw.name                                                         AS "pathwayName",
+            e.schedule                                                      AS "learningSchedule",
+            u_t.name                                                        AS "tutorName",
+            cr.student_interest                                             AS "studentInterest",
+            cr.purchasing_power                                             AS "purchasingPower"
           FROM pipeline pl
-          LEFT JOIN bookings b        ON b.id = pl.booking_id
-          LEFT JOIN users u_s         ON u_s.id = b.student_id
-          LEFT JOIN student_profiles sp ON sp.user_id = u_s.id
-          LEFT JOIN users sp2          ON sp2.id = pl.sales_id
-          LEFT JOIN enrolments e      ON e.student_id = u_s.id AND e.status IN ('active','paused')
-          LEFT JOIN pathways pw       ON pw.id = e.pathway_id
-          LEFT JOIN users u_t         ON u_t.id = e.tutor_id
-          LEFT JOIN class_reports cr  ON cr.booking_id = pl.booking_id
-          LEFT JOIN LATERAL (
-            SELECT CASE WHEN b2.notes IS NOT NULL THEN b2.notes::jsonb ELSE '{}'::jsonb END AS notes
-            FROM bookings b2 WHERE b2.id = pl.booking_id LIMIT 1
-          ) n ON true
+          LEFT JOIN bookings b              ON b.id   = pl.booking_id
+          LEFT JOIN users u_s               ON u_s.id = b.student_id
+          LEFT JOIN student_profiles sp     ON sp.user_id = u_s.id
+          LEFT JOIN users sp2               ON sp2.id = pl.sales_id
+          LEFT JOIN enrolments e            ON e.student_id = u_s.id AND e.status IN ('active','paused')
+          LEFT JOIN pathways pw             ON pw.id = e.pathway_id
+          LEFT JOIN users u_t               ON u_t.id = e.tutor_id
+          LEFT JOIN class_reports cr        ON cr.booking_id = pl.booking_id
           WHERE pl.status IN ('converted','paid')
           ORDER BY pl.created_at DESC
           LIMIT 500
-        `),
+        `);
+        convertedRows = r.rows;
+      } catch(e) { logger.error('[SYNC postsales] converted query failed:', e.message); }
 
-        /* Pipeline converted — for badge count */
-        pool.query(`SELECT COUNT(*) AS cnt FROM pipeline WHERE status IN ('converted','paid')`),
-      ]);
-
-      result.payments         = payments.rows;
-      result.students         = students.rows;
-      result.scheduledStudents = scheduled.rows;
-      result.convertedStudents = converted.rows;
+      result.payments          = paymentsRows;
+      result.students          = studentsRows;
+      result.scheduledStudents = scheduledRows;
+      result.convertedStudents = convertedRows;
     }
 
     if (role === 'hr') {
