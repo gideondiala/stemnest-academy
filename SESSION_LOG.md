@@ -110,3 +110,70 @@ Power outage caused the Kiro IDE session to drop. The previous session had been 
 
 *This log should be updated at the end of every development session.*
 *Format: one entry per session, describing what was done, what files changed, and any known issues.*
+
+---
+
+## Session: 30 September 2026
+
+**Started:** ~09:00 WAT
+**Completed:** ~13:00 WAT
+
+### Context
+New PC — old PC was lost. Project pulled fresh from GitHub. Previous session had been mid-way through migrating the database from Neon to Supabase when the PC was lost.
+
+### What Was Done
+
+#### 1. Supabase project restored
+- Project `stemnest-academy` (ID: `foentsgwrcazaehkbdqv`) was paused due to 7 days inactivity
+- Restored from Supabase dashboard
+
+#### 2. Fresh Supabase schema applied
+- Created `backend/src/db/supabase-setup.sql` — full schema for all tables
+- Created `backend/src/db/supabase-seed.sql` — staff accounts using pgcrypto
+- Both run via Supabase SQL Editor (Run without RLS)
+
+#### 3. Full data migration from Neon → Supabase
+- Neon had: 56 users, 3,002 bookings, 36 students, 11 tutors, 13 payments + more
+- Installed Node.js v24, ran `npm ci` on backend
+- Created `backend/migrate-to-supabase.js` — automated migration script
+- Used Supabase **Session Pooler** connection (IPv4) since direct connection is IPv6 only
+- Migration result: **4,945 rows inserted** across 25 tables
+- 50 bookings skipped (orphaned foreign keys in Neon — already corrupted data)
+
+#### 4. EC2 server updated to point to Supabase
+- Installed AWS CLI v2 on new PC
+- Created new IAM access keys: `AKIAVDCNUQZQS547F73V`
+- Created new EC2 key pair `stemnest-key-new` saved at `C:\Users\Diala\stemnest-key-new.pem`
+- Used EC2 Instance Connect (browser terminal) to access server
+- Updated `DATABASE_URL` in `/home/ubuntu/stemnest-academy/backend/.env`
+- New URL: `postgresql://postgres.foentsgwrcazaehkbdqv:***@aws-1-eu-west-1.pooler.supabase.com:5432/postgres`
+- Ran `pm2 reload stemnest-api --update-env` — both instances reloaded successfully
+
+#### 5. Verified working
+- `GET /api/health` → `{"success":true,"message":"StemNest API is running 🚀"}`
+- `POST /api/auth/login` with presales credentials → JWT token returned from Supabase ✅
+
+### Files Created/Modified
+| File | Change |
+|---|---|
+| `backend/src/db/supabase-setup.sql` | New — full Supabase schema |
+| `backend/src/db/supabase-seed.sql` | New — staff seed using pgcrypto |
+| `backend/migrate-to-supabase.js` | New — Neon→Supabase migration script |
+
+### Current Database
+- **Provider:** Supabase (project ID: `foentsgwrcazaehkbdqv`)
+- **Connection:** Session pooler (IPv4) — `aws-1-eu-west-1.pooler.supabase.com:5432`
+- **Free tier:** 500MB (was on Neon 5MB — now 100x more space)
+
+### Important Notes
+- SSH key for EC2 is now `C:\Users\Diala\stemnest-key-new.pem`
+- EC2 IP is currently `13.40.169.73` (may change on restart — consider Elastic IP)
+- Supabase project will pause again after 7 days inactivity on free tier
+  - **To prevent:** log into Supabase dashboard at least once a week, OR upgrade to Pro ($25/month)
+- AWS access keys stored in AWS CLI config on this PC
+
+### Open Items
+1. Supabase auto-pause risk — set a reminder to log in weekly or upgrade to Pro
+2. EC2 IP is not static — add an Elastic IP to prevent it changing on restart
+3. `tutor_earnings_log`, `batch_members`, `referrals` tables exist in Neon but not in Supabase schema yet — add if needed
+4. Test all dashboards end-to-end now that DB is on Supabase

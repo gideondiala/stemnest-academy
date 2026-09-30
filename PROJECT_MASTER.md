@@ -1,5 +1,5 @@
 # StemNest Academy — Project Master Reference
-## Last Updated: May 2026 | Built with Kiro AI
+## Last Updated: September 2026 | Built with Kiro AI
 
 ---
 
@@ -27,7 +27,7 @@ StemNest Academy is a UK-registered EdTech company providing live 1-on-1 online 
 
 ### Backend
 - **Node.js + Express.js** (already scaffolded)
-- **PostgreSQL** on AWS RDS
+- **PostgreSQL** on **Supabase** (migrated from Neon — Sep 30, 2026)
 - **PM2** cluster mode (zero-downtime restarts)
 - **Nginx** reverse proxy on EC2
 - **SSL** via Let's Encrypt (Certbot) — auto-renews
@@ -40,8 +40,8 @@ StemNest Academy is a UK-registered EdTech company providing live 1-on-1 online 
 ### Infrastructure (AWS)
 | Service | Details |
 |---|---|
-| EC2 | `i-0f713df9b0b3a93e4` · t3.small · Ubuntu 24.04 · `13.40.64.172` |
-| RDS | `stemnest-db.cfk6s86i4abg.eu-west-2.rds.amazonaws.com` · PostgreSQL 16.13 |
+| EC2 | `i-0f713df9b0b3a93e4` · t3.small · Ubuntu 24.04 · `13.40.169.73` |
+| Supabase | Project ID: `foentsgwrcazaehkbdqv` · Session pooler: `aws-1-eu-west-1.pooler.supabase.com:5432` · 500MB free |
 | S3 | `stemnest-site` (eu-west-2) |
 | CloudFront | `E3TA4L9WKURJAP` · `d3a06a39b96tdt.cloudfront.net` |
 | Route 53 | Hosted Zone `Z08476331L9X7QC8ZGOKS` |
@@ -58,7 +58,7 @@ StemNest Academy is a UK-registered EdTech company providing live 1-on-1 online 
 
 ### Connect to server:
 ```bash
-ssh -i C:\Users\hp\stemnest-key.pem ubuntu@13.40.64.172
+ssh -i C:\Users\Diala\stemnest-key-new.pem ubuntu@13.40.169.73
 ```
 
 ### Deploy frontend:
@@ -246,9 +246,11 @@ stemnest-academy/
 The frontend is fully real-time and communicates directly with the API:
 
 ```
-API (PostgreSQL) ←→ api.js ←→ Dashboard JS
+Supabase (PostgreSQL) ←→ Node.js API (EC2) ←→ api.js ←→ Dashboard JS
 ```
 
+- **Database:** Supabase — `foentsgwrcazaehkbdqv` (migrated from Neon Sep 30, 2026)
+- **Connection:** Session pooler `aws-1-eu-west-1.pooler.supabase.com:5432` (IPv4)
 - **On page load:** Dashboards fetch data directly from the backend via `api.js`.
 - **Every 30 seconds:** Dashboards quietly re-fetch their relevant data to stay live.
 - **On write:** Dashboards send the action to the API immediately and await success.
@@ -322,13 +324,15 @@ A CloudFront Function (`stemnest-url-rewrite`) handles clean URLs:
 
 ## 13. PENDING / TODO
 
-### Immediate
-- [ ] AWS SES production access — appeal submitted, awaiting approval
-- [ ] Test booking confirmation email end-to-end after Zoho SMTP fix
-- [ ] Verify paid class sessions appear on teacher dashboard after postsales scheduling
+### Immediate (as of Sep 30, 2026)
+- [ ] Test all dashboards end-to-end on live site after Supabase migration
+- [ ] Delete Neon project (no longer needed — data fully migrated to Supabase)
+- [ ] Add Elastic IP to EC2 so IP doesn't change on server restart
+- [ ] Add `tutor_earnings_log`, `batch_members`, `referrals` tables to Supabase schema
 
 ### Short Term
 - [ ] Connect Stripe for real payment links (add `STRIPE_SECRET_KEY` to `.env`)
+- [ ] Upgrade Supabase to Pro ($25/month) when daily traffic is consistent
 - [ ] Set up Namecheap email MX records for `stemnestacademy.com` (separate domain)
 - [ ] Upgrade Node.js on EC2 to v22 (warning in logs)
 
@@ -339,7 +343,6 @@ A CloudFront Function (`stemnest-url-rewrite`) handles clean URLs:
 - [ ] GitHub Actions CI/CD (auto-deploy on push to main)
 
 ### Long Term
-- [ ] Connect all remaining localStorage features to real API
 - [ ] Mobile app (React Native)
 - [ ] Parent portal
 
