@@ -11,6 +11,7 @@
 
 const express = require('express');
 const { z }   = require('zod');
+const rateLimit = require('express-rate-limit');
 
 const pool     = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/auth');
@@ -308,18 +309,32 @@ router.put('/:id/edit-fields', requireAuth, requireRole('admin','super_admin','p
    Used by the join-class page so students can find their booking
    without needing to log in.
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
-router.get('/lookup', async (req, res, next) => {
+const lookupLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many searches — please try again in 15 minutes' },
+});
+
+/* Last 10 digits, so "+234 803 123 4567" and "08031234567" match */
+function _phoneKey(s) {
+  const digits = String(s || '').replace(/\D/g, '');
+  return digits.length >= 9 ? digits.slice(-10) : null;
+}
+
+router.get('/lookup', lookupLimiter, async (req, res, next) => {
   try {
-    const { q } = req.query;
-    if (!q || q.trim().length < 5) {
-      return res.status(400).json({ success: false, error: 'Query too short' });
+    const raw = String(req.query.q || '').trim();
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw);
+    const phoneKey = isEmail ? null : _phoneKey(raw);
+    if (!isEmail && !phoneKey) {
+      return res.status(400).json({ success: false, error: 'Enter the full email address or WhatsApp number used when booking' });
     }
 
-    const search = q.trim().toLowerCase();
-    /* Normalise phone: strip spaces, dashes, brackets, leading + */
-    const phoneNorm = search.replace(/[\s\-\(\)\+]/g, '');
-
-    /* Search inside the notes JSON column for email or whatsapp */
+    /* Rough pre-filter in SQL (works whether notes is JSONB or text);
+       the exact match is done below so a partial value like "gmail"
+       can never return other families' bookings. */
     const result = await pool.query(
       `SELECT b.id, b.subject, b.grade, b.date, b.time, b.status,
               b.class_link, b.notes, b.booked_at, b.lesson_name,
@@ -327,16 +342,36 @@ router.get('/lookup', async (req, res, next) => {
        FROM bookings b
        LEFT JOIN users u_t ON u_t.id = b.tutor_id
        WHERE b.is_demo = TRUE
-         AND (
-           LOWER(b.notes::text) LIKE $1
-           OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(b.notes::text,' ',''),'-',''),'(',''),')',''),'+','') LIKE $2
-         )
+         AND ${isEmail
+           ? `LOWER(b.notes::text) LIKE $1`
+           : `REGEXP_REPLACE(b.notes::text, '[^0-9]', '', 'g') LIKE $1`}
        ORDER BY b.booked_at DESC
-       LIMIT 20`,
-      ['%' + search + '%', '%' + phoneNorm + '%']
+       LIMIT 50`,
+      [isEmail ? '%' + raw.toLowerCase() + '%' : '%' + phoneKey + '%']
     );
 
-    res.json({ success: true, bookings: result.rows });
+    const bookings = [];
+    for (const b of result.rows) {
+      let notes = {};
+      try { notes = typeof b.notes === 'string' ? JSON.parse(b.notes || '{}') : (b.notes || {}); } catch { continue; }
+      const match = isEmail
+        ? String(notes.email || '').trim().toLowerCase() === raw.toLowerCase()
+        : _phoneKey(notes.whatsapp) === phoneKey;
+      if (!match) continue;
+      /* Only the fields the join-class page needs */
+      bookings.push({
+        id: b.id, subject: b.subject, grade: b.grade, date: b.date, time: b.time,
+        status: b.status, class_link: b.class_link, booked_at: b.booked_at,
+        lesson_name: b.lesson_name, tutor_name: b.tutor_name,
+        notes: {
+          studentName: notes.studentName, age: notes.age, grade: notes.grade,
+          email: notes.email, whatsapp: notes.whatsapp, time: notes.time, timezone: notes.timezone,
+        },
+      });
+      if (bookings.length >= 10) break;
+    }
+
+    res.json({ success: true, bookings });
   } catch (err) { next(err); }
 });
 
@@ -1259,6 +1294,7 @@ router.post('/:id/report', requireAuth, requireRole('tutor'), async (req, res, n
         });
         await client.query(`UPDATE bookings SET status = 'scheduled', completed_at = NULL WHERE id = $1`, [booking.id]);
         await client.query('COMMIT');
+        rescheduleSvc.clearReminders(moves.map(m => m.id));
         logger.info(`[INCOMPLETE-SHIFT] Booking ${booking.id} moved to ${moves[0].to.d} ${moves[0].to.t}; ${moves.length - 1} later lesson(s) shifted for student ${booking.student_id}`);
       } catch (shiftErr) {
         await client.query('ROLLBACK').catch(() => {});
@@ -1947,7 +1983,9 @@ router.put('/:id/move', requireAuth, requireRole('admin','super_admin','tutor','
   const main = moves[0];
   logger.info(`[MOVE] Booking ${main.id} (${mode}) moved from ${main.from.d} ${main.from.t} to ${main.to.d} ${main.to.t}; ${moves.length - 1} later lesson(s) shifted — by ${req.user.email}`);
 
-  /* Email tutor + parent(s) in the background — never blocks or fails the response */
+  /* Re-arm reminders for the new times, then email tutor + parent(s) —
+     both in the background, never blocking or failing the response */
+  rescheduleSvc.clearReminders(moves.map(m => m.id));
   rescheduleSvc.notifyReschedule({
     bookingId: main.id,
     moves,

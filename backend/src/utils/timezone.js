@@ -29,10 +29,15 @@ function isValidTimeZone(tz) {
   catch { return false; }
 }
 
-/** Normalise a DB/JS date value to 'YYYY-MM-DD'. */
+/** Normalise a DB/JS date value to 'YYYY-MM-DD'.
+    pg returns DATE columns as local-midnight Date objects, so read the
+    local components — correct whatever timezone the server runs in. */
 function toDateStr(date) {
   if (!date) return null;
-  if (date instanceof Date) return date.toISOString().split('T')[0];
+  if (date instanceof Date) {
+    if (isNaN(date)) return null;
+    return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+  }
   return String(date).split('T')[0];
 }
 

@@ -223,6 +223,16 @@ async function shiftSeriesForward(client, booking, { reason, actorLabel } = {}) 
   return { moves: moves.map(({ id, from, to }) => ({ id, from, to })) };
 }
 
+/**
+ * Forget reminders already sent for moved bookings so each is reminded
+ * again at its new time. Run after the move is committed; never throws.
+ */
+async function clearReminders(bookingIds) {
+  if (!bookingIds || !bookingIds.length) return;
+  await pool.query('DELETE FROM reminders_sent WHERE booking_id = ANY($1::uuid[])', [bookingIds])
+    .catch(e => logger.warn('[RESCHEDULE] Could not clear reminders: ' + e.message));
+}
+
 /* ══════════════════════════════════════════════════════
    EMAIL NOTIFICATIONS
 ══════════════════════════════════════════════════════ */
@@ -330,5 +340,6 @@ module.exports = {
   findTutorClash,
   previewNextSlot,
   shiftSeriesForward,
+  clearReminders,
   notifyReschedule,
 };

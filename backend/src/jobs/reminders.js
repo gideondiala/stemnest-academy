@@ -1,12 +1,14 @@
 /**
  * StemNest Academy — Class Reminder Job
  *
- * Runs every 15 minutes via setInterval.
- * Sends reminder emails to parents before upcoming classes:
- *   - 24 hours before class → email to parent
- *   - 30 minutes before class → email to parent
+ * Runs every 2 minutes via setInterval.
+ * Sends reminder emails to parents (demo, 1-on-1 and batch classes):
+ *   - 24 hours before class
+ *   - 30 minutes before class
+ *   - 10 minutes before class
  *
- * Tracks sent reminders in a DB table to prevent duplicates.
+ * Tracks sent reminders in a DB table to prevent duplicates. Rescheduling
+ * a booking clears its rows so it is reminded again at the new time.
  */
 
 const pool   = require('../config/db');
@@ -27,105 +29,150 @@ async function ensureRemindersTable() {
   `).catch(e => logger.warn('[REMINDERS] Table create warning:', e.message));
 }
 
+/* Reminder windows (minutes before class). The job runs every
+   CHECK_EVERY_MINS, so each window is wider than that interval and no
+   class can slip between two checks. */
+const CHECK_EVERY_MINS = 2;
+const WINDOWS = [
+  { type: '24h',   from: 23 * 60, to: 25 * 60 },
+  { type: '30min', from: 25,      to: 35 },
+  { type: '10min', from: 5,       to: 12 },
+];
+
 /* ── Main reminder check ── */
 async function runReminderCheck() {
   try {
-    const emailSvc = require('../services/emailService');
-    const now      = new Date();
+    const now = new Date();
 
-    /* Fetch all upcoming scheduled bookings with parent contact */
+    /* Upcoming scheduled classes (demo, 1-on-1 and batch) */
     const result = await pool.query(`
       SELECT b.id, b.date, b.time, b.subject, b.class_link, b.is_demo,
-             b.notes, b.student_id,
-             u_t.name AS tutor_name
+             b.notes, b.student_id, b.batch_id,
+             u_t.name AS tutor_name,
+             u_s.name AS student_name, u_s.email AS student_email,
+             sp.parent_name, sp.parent_email,
+             COALESCE(sp.class_paused, FALSE)      AS class_paused,
+             COALESCE(sp.credits_suspended, FALSE) AS credits_suspended
       FROM bookings b
-      LEFT JOIN users u_t ON u_t.id = b.tutor_id
+      LEFT JOIN users u_t            ON u_t.id = b.tutor_id
+      LEFT JOIN users u_s            ON u_s.id = b.student_id
+      LEFT JOIN student_profiles sp  ON sp.user_id = b.student_id
       WHERE b.status = 'scheduled'
-        AND b.date >= CURRENT_DATE
-        AND b.date <= CURRENT_DATE + INTERVAL '2 days'
-        /* Skip paused students — no reminders while classes are on hold */
-        AND (b.student_id IS NULL OR b.student_id NOT IN (
-          SELECT user_id FROM student_profiles WHERE class_paused = TRUE
-        ))
+        AND b.date >= CURRENT_DATE - 1
+        AND b.date <= CURRENT_DATE + 2
       ORDER BY b.date ASC, b.time ASC
-      LIMIT 200
+      LIMIT 2000
     `);
 
     for (const booking of result.rows) {
       /* Booking date/time are stored in WAT — convert to the real instant */
       const classDateTime = platformToInstant(booking.date, booking.time);
       if (!classDateTime) continue;
+      const minsUntil = (classDateTime - now) / 60000;
 
-      const msUntilClass = classDateTime - now;
-      const minsUntil    = msUntilClass / 60000;
+      const win = WINDOWS.find(w => minsUntil >= w.from && minsUntil <= w.to);
+      if (!win) continue;
 
-      /* Parse parent contact from booking notes */
-      let notes = {};
-      try { notes = typeof booking.notes === 'string' ? JSON.parse(booking.notes || '{}') : (booking.notes || {}); } catch {}
+      /* No reminders while classes are paused or credits are suspended */
+      if (booking.class_paused || booking.credits_suspended) continue;
 
-      const parentEmail = notes.email || '';
-      const parentName  = notes.parentName || '';
-      const studentName = notes.studentName || 'your child';
-      const classLink   = booking.class_link || '';
-      const tutorName   = booking.tutor_name || 'your StemNest tutor';
-      const subject     = booking.subject || 'class';
+      const recipients = await _recipients(booking);
+      if (!recipients.length) continue;
 
-      if (!parentEmail) continue;
+      /* Claim this reminder atomically so the cluster's other instance
+         (and the next check) can never send it twice */
+      if (!(await _claim(booking.id, win.type))) continue;
 
-      /* Only format (and look up timezone) when a reminder window is open */
-      const inWindow = (minsUntil >= 23 * 60 && minsUntil <= 25 * 60) ||
-                       (minsUntil >= 28 && minsUntil <= 32) ||
-                       (minsUntil >= 8 && minsUntil <= 12);
-      if (!inWindow) continue;
-
-      /* Show the time in the parent's own timezone */
-      const parentTz = isValidTimeZone(notes.timezone)
-        ? notes.timezone
-        : await resolveUserTimeZone(booking.student_id, parentEmail);
-      const local = formatForTimeZone(booking.date, booking.time, parentTz);
-      const formattedDate = local.date;
-      const formattedTime = `${local.time} ${local.abbr}`.trim();
-
-      /* ── 24-hour reminder: 23h to 25h before class ── */
-      if (minsUntil >= 23 * 60 && minsUntil <= 25 * 60) {
-        const alreadySent = await _checkSent(booking.id, '24h');
-        if (!alreadySent) {
-          await emailSvc.sendClassReminderEmail({
-            to:          parentEmail,
-            name:        parentName || 'there',
-            studentName,
-            subject,
-            time:        `${formattedDate} at ${formattedTime}`,
-            classLink,
-          }).catch(e => logger.warn(`[REMINDERS] 24h email failed for ${booking.id}:`, e.message));
-
-          await _markSent(booking.id, '24h');
-          logger.info(`[REMINDERS] 24h reminder sent: booking=${booking.id} parent=${parentEmail}`);
+      let sentAny = false;
+      for (const r of recipients) {
+        try {
+          await _sendReminder(win.type, booking, r);
+          sentAny = true;
+          logger.info(`[REMINDERS] ${win.type} reminder sent: booking=${booking.id} to=${r.email}`);
+        } catch (e) {
+          logger.warn(`[REMINDERS] ${win.type} email failed for ${booking.id} (${r.email}): ${e.message}`);
         }
       }
+      /* Nothing went out — release the claim so the next check retries */
+      if (!sentAny) await _unclaim(booking.id, win.type);
+    }
+  } catch (err) {
+    logger.error('[REMINDERS] Job error:', err.message);
+  }
+}
 
-      /* ── 30-minute reminder: 28 to 32 mins before class ── */
-      if (minsUntil >= 28 && minsUntil <= 32) {
-        const alreadySent = await _checkSent(booking.id, '30min');
-        if (!alreadySent) {
-          await emailSvc.sendEmail({
-            to:      parentEmail,
-            subject: `⏰ Class in 30 minutes — ${studentName}`,
-            html:    _build30MinEmail({ parentName, studentName, subject, formattedTime, formattedDate, classLink, tutorName }),
-            template: 'reminder_30min',
-          }).catch(e => logger.warn(`[REMINDERS] 30min email failed for ${booking.id}:`, e.message));
+/** Parent(s) to remind for a booking: 1-on-1 student, batch members, or demo contact. */
+async function _recipients(booking) {
+  let notes = {};
+  try { notes = typeof booking.notes === 'string' ? JSON.parse(booking.notes || '{}') : (booking.notes || {}); } catch {}
 
-          await _markSent(booking.id, '30min');
-          logger.info(`[REMINDERS] 30min reminder sent: booking=${booking.id} parent=${parentEmail}`);
-        }
-      }
+  if (booking.student_id) {
+    const email = booking.parent_email || booking.student_email || notes.email;
+    if (!email) return [];
+    return [{
+      userId: booking.student_id, email,
+      name: booking.parent_name || notes.parentName || '',
+      studentName: booking.student_name || notes.studentName || 'your child',
+      timezone: notes.timezone,
+    }];
+  }
 
-      /* ── 10-minute reminder: 8 to 12 mins before class ── */
-      if (minsUntil >= 8 && minsUntil <= 12) {
-        const alreadySent = await _checkSent(booking.id, '10min');
-        if (!alreadySent) {
-          const urgentSubject = `🚨 Class starts in 10 minutes — ${studentName}`;
-          const urgentHtml = `<!DOCTYPE html>
+  if (booking.batch_id) {
+    const m = await pool.query(
+      `SELECT u.id, u.name, u.email, sp.parent_name, sp.parent_email
+       FROM batch_members bm
+       JOIN users u ON u.id = bm.student_id
+       LEFT JOIN student_profiles sp ON sp.user_id = u.id
+       WHERE bm.batch_id = $1 AND bm.status = 'active'
+         AND COALESCE(sp.class_paused, FALSE) = FALSE
+         AND COALESCE(sp.credits_suspended, FALSE) = FALSE`,
+      [booking.batch_id]
+    ).catch(() => ({ rows: [] }));
+    return m.rows
+      .filter(s => s.parent_email || s.email)
+      .map(s => ({ userId: s.id, email: s.parent_email || s.email, name: s.parent_name || '', studentName: s.name || 'your child' }));
+  }
+
+  /* Demo booking without a student account */
+  if (!notes.email) return [];
+  return [{ userId: null, email: notes.email, name: notes.parentName || '', studentName: notes.studentName || 'your child', timezone: notes.timezone }];
+}
+
+/** Send one reminder, with the time shown in the recipient's own timezone. */
+async function _sendReminder(type, booking, r) {
+  const emailSvc = require('../services/emailService');
+  const tz = isValidTimeZone(r.timezone) ? r.timezone : await resolveUserTimeZone(r.userId, r.email);
+  const local = formatForTimeZone(booking.date, booking.time, tz);
+  const ctx = {
+    parentName:    r.name,
+    studentName:   r.studentName,
+    subject:       booking.subject || 'class',
+    classLink:     booking.class_link || '',
+    tutorName:     booking.tutor_name || 'your StemNest tutor',
+    formattedDate: local.date,
+    formattedTime: `${local.time} ${local.abbr}`.trim(),
+  };
+
+  if (type === '24h') {
+    return emailSvc.sendClassReminderEmail({
+      to: r.email, name: ctx.parentName || 'there', studentName: ctx.studentName,
+      subject: ctx.subject, time: `${ctx.formattedDate} at ${ctx.formattedTime}`, classLink: ctx.classLink,
+    });
+  }
+  if (type === '30min') {
+    return emailSvc.sendEmail({
+      to: r.email, subject: `⏰ Class in 30 minutes — ${ctx.studentName}`,
+      html: _build30MinEmail(ctx), template: 'reminder_30min',
+    });
+  }
+  return emailSvc.sendEmail({
+    to: r.email, subject: `🚨 Class starts in 10 minutes — ${ctx.studentName}`,
+    html: _build10MinEmail(ctx), template: 'reminder_10min',
+  });
+}
+
+function _build10MinEmail({ parentName, studentName, subject, formattedTime, formattedDate, classLink, tutorName }) {
+  return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8">
 <style>
   body{font-family:'Helvetica Neue',Arial,sans-serif;background:#f4f6fb;margin:0;padding:0;}
@@ -150,22 +197,6 @@ async function runReminderCheck() {
     <div class="footer">© ${new Date().getFullYear()} StemNest Academy Ltd · <a href="${process.env.APP_URL || 'https://stemnestacademy.co.uk'}" style="color:#1a56db;">stemnestacademy.co.uk</a></div>
   </div>
 </body></html>`;
-
-          await emailSvc.sendEmail({
-            to:      parentEmail,
-            subject: urgentSubject,
-            html:    urgentHtml,
-            template: 'reminder_10min',
-          }).catch(e => logger.warn(`[REMINDERS] 10min email failed for ${booking.id}:`, e.message));
-
-          await _markSent(booking.id, '10min');
-          logger.info(`[REMINDERS] 10min reminder sent: booking=${booking.id} parent=${parentEmail}`);
-        }
-      }
-    }
-  } catch (err) {
-    logger.error('[REMINDERS] Job error:', err.message);
-  }
 }
 
 function _build30MinEmail({ parentName, studentName, subject, formattedTime, formattedDate, classLink, tutorName }) {
@@ -217,34 +248,32 @@ function _build30MinEmail({ parentName, studentName, subject, formattedTime, for
 </html>`;
 }
 
-async function _checkSent(bookingId, type) {
+/** Atomically record a reminder; true only for the caller that inserted it. */
+async function _claim(bookingId, type) {
   try {
     const r = await pool.query(
-      'SELECT id FROM reminders_sent WHERE booking_id = $1 AND type = $2',
+      'INSERT INTO reminders_sent (booking_id, type) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING id',
       [bookingId, type]
     );
     return r.rows.length > 0;
   } catch { return false; }
 }
 
-async function _markSent(bookingId, type) {
-  await pool.query(
-    'INSERT INTO reminders_sent (booking_id, type) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-    [bookingId, type]
-  ).catch(() => {});
+async function _unclaim(bookingId, type) {
+  await pool.query('DELETE FROM reminders_sent WHERE booking_id = $1 AND type = $2', [bookingId, type]).catch(() => {});
 }
 
 /* ── Start the job ── */
 function startReminderJob() {
-  const INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
+  const INTERVAL_MS = CHECK_EVERY_MINS * 60 * 1000;
 
   ensureRemindersTable().then(() => {
-    logger.info('[REMINDERS] Job started — checking every 15 minutes');
+    logger.info(`[REMINDERS] Job started — checking every ${CHECK_EVERY_MINS} minutes`);
 
-    /* Run immediately on startup, then every 15 mins */
+    /* Run immediately on startup, then every CHECK_EVERY_MINS */
     runReminderCheck();
     setInterval(runReminderCheck, INTERVAL_MS);
   }).catch(e => logger.error('[REMINDERS] Failed to start:', e.message));
 }
 
-module.exports = { startReminderJob };
+module.exports = { startReminderJob, runReminderCheck };

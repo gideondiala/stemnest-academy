@@ -22,11 +22,16 @@ async function findClass() {
   if (btn) btn.textContent = 'Searching...';
 
   try {
-    /* Fetch all bookings from the API — no auth needed for public lookup */
+    /* Public lookup — exact email or WhatsApp number only */
     const res = await fetch('https://api.stemnestacademy.co.uk/api/bookings/lookup?q=' + encodeURIComponent(raw));
     const data = await res.json();
 
     if (btn) btn.textContent = 'Find My Class';
+
+    if (!res.ok) {
+      showToast(data.error || 'Could not search right now. Please try again.', 'error');
+      return;
+    }
 
     const allBookings = (data.bookings || []).map(b => {
       let notes = {};
@@ -51,11 +56,8 @@ async function findClass() {
       };
     });
 
-    const normalise = s => s.replace(/[\s\-\(\)\+]/g, '').toLowerCase();
-    const matches = allBookings.filter(b =>
-      b.email?.toLowerCase() === query ||
-      normalise(b.whatsapp || '') === normalise(raw)
-    );
+    /* The server only returns exact email / WhatsApp matches */
+    const matches = allBookings;
 
     if (matches.length === 0) {
       document.getElementById('notFoundQuery').textContent = raw;
