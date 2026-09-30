@@ -15,6 +15,7 @@ const { z }   = require('zod');
 const pool     = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const notify   = require('../services/notificationService');
+const rescheduleSvc = require('../services/rescheduleService');
 const logger   = require('../utils/logger');
 
 const router = express.Router();
@@ -1229,7 +1230,8 @@ router.post('/:id/report', requireAuth, requireRole('tutor'), async (req, res, n
     const booking = bResult.rows[0];
     let bNotesObj = {};
     if (booking.notes) {
-      try { bNotesObj = JSON.parse(booking.notes); } catch(e) {}
+      /* notes is JSONB (already an object) on most rows; older rows may hold a JSON string */
+      try { bNotesObj = typeof booking.notes === 'string' ? JSON.parse(booking.notes) : { ...booking.notes }; } catch(e) {}
     }
     /* bookingNotes is used by post-class emails below */
     const bookingNotes = bNotesObj;
@@ -1243,97 +1245,26 @@ router.post('/:id/report', requireAuth, requireRole('tutor'), async (req, res, n
       [data.outcome, req.params.id, Object.keys(bNotesObj).length > 0 ? JSON.stringify(bNotesObj) : null]
     );
 
-    /* ── Auto-shift on incomplete: move this booking to next learning day
-       and shift all subsequent bookings forward by one slot ── */
+    /* ── Auto-shift on incomplete: the lesson is redone in the next slot and
+       every later lesson in the series moves back by one slot
+       (same logic as the tutor's "next learning day" reschedule). ── */
     if (data.outcome === 'incomplete' && booking.student_id && !booking.is_demo) {
+      const client = await pool.connect();
       try {
-        /* Find the student's next learning day after this booking */
-        const nextDayRes = await pool.query(
-          `SELECT id, date, time FROM bookings
-           WHERE student_id = $1
-             AND id != $2
-             AND status = 'scheduled'
-             AND is_demo = FALSE
-             AND (date > $3 OR (date = $3 AND time > $4))
-           ORDER BY date ASC, time ASC
-           LIMIT 1`,
-          [booking.student_id, booking.id, booking.date, booking.time]
-        );
-
-        if (nextDayRes.rows.length) {
-          const nextSlot = nextDayRes.rows[0];
-          const nextDate = nextSlot.date instanceof Date ? nextSlot.date.toISOString().split('T')[0] : String(nextSlot.date).split('T')[0];
-          const nextTime = String(nextSlot.time).replace(/^(\d{2}:\d{2}):\d{2}$/, '$1');
-
-          /* Get the weekly pattern from the student's enrolment */
-          const enrolRes = await pool.query(
-            `SELECT schedule FROM enrolments
-             WHERE student_id = $1 AND status = 'active'
-             ORDER BY created_at DESC LIMIT 1`,
-            [booking.student_id]
-          );
-          const schedule = enrolRes.rows[0]?.schedule || null;
-
-          /* Move the incomplete booking to the next learning day */
-          await pool.query(
-            `UPDATE bookings
-             SET date = $1::date, time = $2::time,
-                 status = 'scheduled',
-                 rescheduled_from = $4::date,
-                 rescheduled_at = NOW()
-             WHERE id = $3`,
-            [nextDate, nextTime, booking.id, booking.date instanceof Date ? booking.date.toISOString().split('T')[0] : String(booking.date).split('T')[0]]
-          );
-
-          /* Shift all subsequent scheduled bookings for this student forward
-             by finding each one and moving it to the next occurrence after itself */
-          if (schedule) {
-            const futureRes = await pool.query(
-              `SELECT id, date, time FROM bookings
-               WHERE student_id = $1
-                 AND id != $2
-                 AND status = 'scheduled'
-                 AND is_demo = FALSE
-                 AND date >= $3
-               ORDER BY date ASC, time ASC`,
-              [booking.student_id, booking.id, nextDate]
-            );
-
-            /* Build schedule weekday/time pairs */
-            const scheduleSlots = Array.isArray(schedule) ? schedule : JSON.parse(schedule);
-
-            /* Shift each booking one slot forward using the schedule pattern */
-            for (const fb of futureRes.rows) {
-              const fbDate = fb.date instanceof Date ? fb.date.toISOString().split('T')[0] : String(fb.date).split('T')[0];
-              const fbTime = String(fb.time).replace(/^(\d{2}:\d{2}):\d{2}$/, '$1');
-              const fbDt   = new Date(fbDate + 'T12:00:00');
-
-              /* Find next occurrence in schedule after this booking's date */
-              let cursor = new Date(fbDt);
-              cursor.setDate(cursor.getDate() + 1);
-              let found = null;
-              for (let d = 0; d < 14; d++) {
-                const dow = cursor.getDay();
-                const slot = scheduleSlots.find(s => Number(s.weekday) === dow);
-                if (slot) { found = { date: cursor.toISOString().split('T')[0], time: slot.time }; break; }
-                cursor.setDate(cursor.getDate() + 1);
-              }
-
-              if (found) {
-                await pool.query(
-                  `UPDATE bookings SET date = $1::date, time = $2::time,
-                   rescheduled_from = $4::date, rescheduled_at = NOW()
-                   WHERE id = $3`,
-                  [found.date, found.time, fb.id, fbDate]
-                );
-              }
-            }
-          }
-
-          logger.info(`[INCOMPLETE-SHIFT] Booking ${booking.id} and ${nextDayRes.rows.length} subsequent bookings shifted forward for student ${booking.student_id}`);
-        }
+        await client.query('BEGIN');
+        const b = await rescheduleSvc.loadBooking(client, booking.id);
+        const { moves } = await rescheduleSvc.shiftSeriesForward(client, b, {
+          reason: 'Class incomplete' + (data.incompleteReason ? ' — ' + data.incompleteReason : ''),
+          actorLabel: 'tutor',
+        });
+        await client.query(`UPDATE bookings SET status = 'scheduled', completed_at = NULL WHERE id = $1`, [booking.id]);
+        await client.query('COMMIT');
+        logger.info(`[INCOMPLETE-SHIFT] Booking ${booking.id} moved to ${moves[0].to.d} ${moves[0].to.t}; ${moves.length - 1} later lesson(s) shifted for student ${booking.student_id}`);
       } catch (shiftErr) {
+        await client.query('ROLLBACK').catch(() => {});
         logger.warn('[INCOMPLETE-SHIFT] Auto-shift failed (non-fatal):', shiftErr.message);
+      } finally {
+        client.release();
       }
     }
 
@@ -1917,157 +1848,132 @@ router.delete('/:id', requireAuth, requireRole('admin','super_admin','presales')
 
 /* ══════════════════════════════════════════════════════
    PUT /api/bookings/:id/move
-   Move a single booking to a new date/time.
-   Supports two modes via body.mode:
-     "next"   — shift to the student's next learning day
-     "custom" — shift to a specific date/time
-   
+   Reschedule a booking. body.mode:
+     "next"   — push the series back by one slot: this lesson takes the
+                next lesson's slot, each later lesson takes the slot after
+                it, and the last lesson gets a new slot from the weekly
+                pattern (see services/rescheduleService.js)
+     "custom" — move only this booking to body.date / body.time (WAT)
+
    Validation:
-   - Clash check: reject if tutor has another booking at target time
-   - Boundary check (custom only): reject if target time is after
-     the student's next scheduled booking beyond this one
+   - Tutors may only move their own bookings
+   - Custom: must be before the student's next scheduled class and must
+     not overlap another of the tutor's classes
+   - Next: the new last slot must not overlap another of the tutor's
+     classes (later free pattern slots are tried automatically)
+
+   The tutor and parent(s) are emailed after a successful move.
 ══════════════════════════════════════════════════════ */
 router.put('/:id/move', requireAuth, requireRole('admin','super_admin','tutor','presales','postsales'), async (req, res, next) => {
+  const { mode, date: newDate, time: newTime, reason } = req.body;
+  if (!mode || !['next', 'custom'].includes(mode)) {
+    return res.status(400).json({ success: false, error: 'mode must be "next" or "custom"' });
+  }
+  if (mode === 'custom' && (!newDate || !newTime)) {
+    return res.status(400).json({ success: false, error: 'date and time required for custom mode' });
+  }
+
+  const client = await pool.connect();
+  let moves;
   try {
-    const { mode, date: newDate, time: newTime, reason } = req.body;
-    if (!mode || !['next', 'custom'].includes(mode)) {
-      return res.status(400).json({ success: false, error: 'mode must be "next" or "custom"' });
-    }
-    if (mode === 'custom' && (!newDate || !newTime)) {
-      return res.status(400).json({ success: false, error: 'date and time required for custom mode' });
-    }
+    await client.query('BEGIN');
 
-    /* Load the booking */
-    const bRes = await pool.query(
-      `SELECT b.*, e.schedule AS enrolment_schedule
-       FROM bookings b
-       LEFT JOIN enrolments e ON e.id = b.enrolment_id
-       WHERE b.id = $1`,
-      [req.params.id]
-    );
-    if (!bRes.rows.length) return res.status(404).json({ success: false, error: 'Booking not found' });
-    const booking = bRes.rows[0];
-
-    if (!['scheduled'].includes(booking.status)) {
+    const booking = await rescheduleSvc.loadBooking(client, req.params.id);
+    if (!booking) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, error: 'Booking not found' });
+    }
+    if (req.user.role === 'tutor' && booking.tutor_id !== req.user.id) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ success: false, error: 'You can only reschedule your own classes' });
+    }
+    if (booking.status !== 'scheduled') {
+      await client.query('ROLLBACK');
       return res.status(400).json({ success: false, error: 'Only scheduled bookings can be moved' });
     }
 
-    let targetDate, targetTime, nextBookingId = null;
-
     if (mode === 'next') {
-      /* Shift to next week — same weekday and time, +7 days.
-         Simple, predictable, no dependency on other bookings. */
-      const bookingDate = booking.date instanceof Date ? booking.date : new Date(booking.date);
-      const nextWeek = new Date(bookingDate);
-      nextWeek.setUTCDate(nextWeek.getUTCDate() + 7);
-      targetDate = nextWeek.toISOString().split('T')[0];
-      targetTime = String(booking.time).replace(/^(\d{2}:\d{2}):\d{2}$/, '$1');
+      ({ moves } = await rescheduleSvc.shiftSeriesForward(client, booking, { reason, actorLabel: req.user.role }));
     } else {
-      /* Custom mode */
-      targetDate = newDate;
-      targetTime = newTime;
+      const target = { d: String(newDate).slice(0, 10), t: String(newTime).slice(0, 5) };
 
-      /* Boundary check: custom target must not be after the student's next booking */
-      const nextRes = await pool.query(
-        `SELECT date, time FROM bookings
-         WHERE student_id = $1
-           AND id != $2
-           AND status = 'scheduled'
-           AND is_demo = FALSE
-           AND (date > $3 OR (date = $3 AND time > $4))
-         ORDER BY date ASC, time ASC
-         LIMIT 1`,
-        [booking.student_id, booking.id, booking.date, booking.time]
-      );
-      if (nextRes.rows.length) {
-        const nextBooking = nextRes.rows[0];
-        const nextDateStr = nextBooking.date instanceof Date ? nextBooking.date.toISOString().split('T')[0] : String(nextBooking.date).split('T')[0];
-        const nextTimeStr = String(nextBooking.time).replace(/^(\d{2}:\d{2}):\d{2}$/, '$1');
-        const targetDT = new Date(targetDate + 'T' + targetTime + ':00');
-        const nextDT   = new Date(nextDateStr  + 'T' + nextTimeStr  + ':00');
-        if (targetDT >= nextDT) {
-          return res.status(400).json({
-            success: false,
-            error: `Custom time cannot be at or after the student's next scheduled class (${nextDateStr} at ${nextTimeStr}). Choose an earlier time.`
-          });
-        }
+      /* Boundary check: custom target must be before the student's next booking */
+      const series = await rescheduleSvc.loadSeriesFrom(client, booking);
+      const nextBooking = series[1];
+      if (nextBooking && (target.d + ' ' + target.t) >= (nextBooking.d + ' ' + nextBooking.t)) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          success: false,
+          error: `Custom time cannot be at or after the student's next scheduled class (${nextBooking.d} at ${nextBooking.t}). Choose an earlier time.`
+        });
       }
+
+      /* Clash check: does this overlap another of the tutor's classes? */
+      const clash = await rescheduleSvc.findTutorClash(client, booking.tutor_id, [booking.id], target, booking.duration_mins);
+      if (clash) {
+        await client.query('ROLLBACK');
+        const type = clash.is_demo ? 'Demo' : 'Paid';
+        return res.status(409).json({
+          success: false,
+          error: `Time clash — you already have a ${type} class with ${clash.student_name} at ${clash.t} on ${clash.d}. Please choose a different time.`,
+          clash: { date: clash.d, time: clash.t, studentName: clash.student_name, classType: type }
+        });
+      }
+
+      let notesObj = {};
+      try { notesObj = typeof booking.notes === 'string' ? JSON.parse(booking.notes || '{}') : (booking.notes || {}); } catch (e) { notesObj = {}; }
+      Object.assign(notesObj, { rescheduleReason: reason || ('Moved by ' + req.user.role), movedFrom: booking.d + ' ' + booking.t, movedAt: new Date().toISOString() });
+
+      await client.query(
+        `UPDATE bookings
+         SET date = $1::date, time = $2::time,
+             rescheduled_from = $3::date, rescheduled_at = NOW(),
+             notes = $5
+         WHERE id = $4`,
+        [target.d, target.t, booking.d, booking.id, JSON.stringify(notesObj)]
+      );
+      moves = [{ id: booking.id, from: { d: booking.d, t: booking.t }, to: target }];
     }
 
-    /* Clash check: does the tutor have another booking at this exact date+time? */
-    const clashParams = [booking.tutor_id, booking.id, targetDate, targetTime + '%'];
-    let clashQuery = `SELECT b.id, u.name AS student_name, b.is_demo
-       FROM bookings b
-       JOIN users u ON u.id = b.student_id
-       WHERE b.tutor_id = $1
-         AND b.id != $2
-         AND b.status = 'scheduled'
-         AND b.date::text = $3
-         AND b.time::text LIKE $4`;
-    if (nextBookingId) {
-      clashParams.push(nextBookingId);
-      clashQuery += ` AND b.id != $${clashParams.length}`;
-    }
-    const clashRes = await pool.query(clashQuery, clashParams);
-    if (clashRes.rows.length) {
-      const clash = clashRes.rows[0];
-      const type  = clash.is_demo ? 'Demo' : 'Paid';
-      return res.status(409).json({
-        success: false,
-        error: `Time clash — you already have a ${type} class with ${clash.student_name} at ${targetTime} on ${targetDate}. Please choose a different time.`,
-        clash: { date: targetDate, time: targetTime, studentName: clash.student_name, classType: type }
-      });
-    }
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    client.release();
+    if (err.status) return res.status(err.status).json({ success: false, error: err.message });
+    return next(err);
+  }
+  client.release();
 
-    /* Apply the move */
-    const oldDate = booking.date instanceof Date ? booking.date.toISOString().split('T')[0] : String(booking.date).split('T')[0];
-    const oldTime = String(booking.time).replace(/^(\d{2}:\d{2}):\d{2}$/, '$1');
-    let notesObj = {};
-    try { notesObj = typeof booking.notes === "string" ? JSON.parse(booking.notes || "{}") : (booking.notes || {}); } catch(e) { notesObj = {}; }
-    Object.assign(notesObj, { rescheduleReason: reason || ("Moved by " + req.user.role), movedFrom: oldDate + " " + oldTime, movedAt: new Date().toISOString() });
+  const main = moves[0];
+  logger.info(`[MOVE] Booking ${main.id} (${mode}) moved from ${main.from.d} ${main.from.t} to ${main.to.d} ${main.to.t}; ${moves.length - 1} later lesson(s) shifted — by ${req.user.email}`);
 
-    await pool.query(
-      `UPDATE bookings
-       SET date = $1::date,
-           time = $2::time,
-           rescheduled_from = $3::date,
-           rescheduled_at = NOW(),
-           notes = $5
-       WHERE id = $4`,
-      [
-        targetDate,
-        targetTime,
-        oldDate,
-        booking.id,
-        JSON.stringify(notesObj)
-      ]
-    );
+  /* Email tutor + parent(s) in the background — never blocks or fails the response */
+  rescheduleSvc.notifyReschedule({
+    bookingId: main.id,
+    moves,
+    reason,
+    actorName: req.user.name ? `${req.user.name} (${req.user.role})` : req.user.role,
+  });
 
-    logger.info(`[MOVE] Booking ${booking.id} moved from ${oldDate} ${oldTime} to ${targetDate} ${targetTime} by ${req.user.email}`);
-    res.json({ success: true, booking: { id: booking.id, date: targetDate, time: targetTime } });
-
-  } catch (err) { next(err); }
+  res.json({
+    success: true,
+    booking: { id: main.id, date: main.to.d, time: main.to.t },
+    shifted: moves.length - 1,
+    lastLesson: moves.length > 1 ? { date: moves[moves.length - 1].to.d, time: moves[moves.length - 1].to.t } : null,
+  });
 });
 
 /* ══════════════════════════════════════════════════════
    GET /api/bookings/:id/next-learning-day
-   Returns the next learning day = this booking's date + 7 days, same time.
-   This is always predictable and works even if the student has no other bookings.
+   Where a "next learning day" reschedule would move this booking:
+   the slot of the next lesson in the series, or the next slot in the
+   weekly pattern if it is the last lesson. Changes nothing.
 ══════════════════════════════════════════════════════ */
 router.get('/:id/next-learning-day', requireAuth, requireRole('admin','super_admin','tutor','presales','postsales'), async (req, res, next) => {
   try {
-    const bRes = await pool.query('SELECT id, date, time FROM bookings WHERE id = $1', [req.params.id]);
-    if (!bRes.rows.length) return res.status(404).json({ success: false, error: 'Booking not found' });
-    const booking = bRes.rows[0];
-
-    /* Next learning day = same weekday & time, one week later */
-    const bookingDate = booking.date instanceof Date ? booking.date : new Date(booking.date);
-    const nextWeek = new Date(bookingDate);
-    nextWeek.setUTCDate(nextWeek.getUTCDate() + 7);
-    const dateStr = nextWeek.toISOString().split('T')[0];
-    const timeStr = String(booking.time).replace(/^(\d{2}:\d{2}):\d{2}$/, '$1');
-
-    res.json({ success: true, nextLearningDay: { date: dateStr, time: timeStr } });
+    const slot = await rescheduleSvc.previewNextSlot(req.params.id);
+    if (!slot) return res.status(404).json({ success: false, error: 'Booking not found' });
+    res.json({ success: true, nextLearningDay: slot });
   } catch (err) { next(err); }
 });
 

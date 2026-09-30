@@ -33,6 +33,7 @@ const logger             = require('./utils/logger');
 const { startReminderJob }          = require('./jobs/reminders');
 const { startRetentionJob }         = require('./jobs/retention');
 const { startBookingExtensionJob }  = require('./jobs/bookingExtension');
+const { ensureSchema }              = require('./db/ensureSchema');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -149,7 +150,8 @@ app.use(errorHandler);
 ══════════════════════════════════════════════ */
 const server = app.listen(PORT, () => {
   logger.info(`✅ StemNest API running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
-  /* Start background jobs */
+  /* Apply idempotent schema additions, then start background jobs */
+  ensureSchema().catch(e => logger.warn('[SCHEMA] ensureSchema failed: ' + e.message));
   startReminderJob();
   startRetentionJob();
   startBookingExtensionJob();

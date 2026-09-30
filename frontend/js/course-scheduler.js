@@ -550,13 +550,14 @@ function openRescheduleModal(bookingId) {
       var hintEl = document.getElementById('reschedule-next-day-hint');
       if (hintEl && d.success && d.nextLearningDay) {
         var nd = d.nextLearningDay;
-        var dateDisplay = new Date(nd.date + 'T12:00:00').toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
-        hintEl.textContent = 'Moves to: ' + dateDisplay + ' at ' + nd.time;
+        var local = window.SNTime ? SNTime.formatClassTime(nd.date, nd.time) : null;
+        var when = local ? local.shortDate + ' at ' + local.timeWithZone : nd.date + ' at ' + nd.time;
+        hintEl.textContent = 'Moves to: ' + when +
+          (nd.shifted ? ' — the ' + nd.shifted + ' later lesson' + (nd.shifted === 1 ? '' : 's') + ' each move back one slot' : '');
         hintEl.style.color = '';
         var cb2 = document.getElementById('reschedule-confirm-btn'); if (cb2) cb2.disabled = false;
       } else if (hintEl) {
-        /* Fallback: API didn't return a next day (shouldn't happen with +7 logic) */
-        hintEl.textContent = 'Shifts to next week (same time).';
+        hintEl.textContent = "Moves to the student's next class slot; later lessons each move back one slot.";
         hintEl.style.color = '';
       }
     }).catch(function() {});
@@ -627,8 +628,10 @@ async function confirmRescheduleNew() {
       if (typeof showToast === 'function') showToast('Please select both a date and time.', 'error');
       return;
     }
-    payload.date = customDate;
-    payload.time = customTime;
+    /* The tutor types their own local time; bookings are stored in WAT */
+    var wat = window.SNTime ? SNTime.localToPlatform(customDate, customTime) : null;
+    payload.date = wat ? wat.date : customDate;
+    payload.time = wat ? wat.time : customTime;
   }
 
   /* Disable button during request */
@@ -661,7 +664,12 @@ async function confirmRescheduleNew() {
       }
 
       closeRescheduleModal();
-      if (typeof showToast === 'function') showToast('Class rescheduled successfully.', 'success');
+      if (typeof showToast === 'function') {
+        var moved = data.booking && window.SNTime ? SNTime.formatClassTime(data.booking.date, data.booking.time) : null;
+        var msg = 'Class rescheduled' + (moved ? ' to ' + moved.shortDate + ' at ' + moved.timeWithZone : '') + '.';
+        if (data.shifted) msg += ' ' + data.shifted + ' later lesson' + (data.shifted === 1 ? '' : 's') + ' moved back one slot.';
+        showToast(msg + ' Tutor and parent have been emailed.', 'success');
+      }
 
       /* Refresh dashboard data */
       if (typeof _loadTutorFromAPI === 'function') {

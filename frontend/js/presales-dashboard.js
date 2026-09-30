@@ -384,25 +384,23 @@ function openScheduleModal(bookingId) {
     <strong>${b.studentName}</strong> · ${b.grade || '—'} · Age ${b.age || '—'}<br>
     📚 ${b.subject} &nbsp;·&nbsp; 📧 ${b.email} &nbsp;·&nbsp; 📱 ${b.whatsapp || '—'}`;
 
+  // Pre-fill date + time in WAT. A pending request holds the parent's
+  // local time, so convert it; once scheduled, the stored time is already WAT.
+  let wat = null;
+  if (b.date && /^\d{4}-\d{2}-\d{2}$/.test(b.date) && b.time && window.SNTime) {
+    const tzOfTime = (b.status === 'pending' && SNTime.isValidTimeZone(b.timezone)) ? b.timezone : SNTime.PLATFORM_TZ;
+    wat = SNTime.localToPlatform(b.date, b.time, tzOfTime);
+  }
+
   // Set date min to today
   const dateEl = document.getElementById('sm-date');
   if (dateEl) {
     dateEl.min = new Date().toISOString().split('T')[0];
-    dateEl.value = b.date && /^\d{4}-\d{2}-\d{2}$/.test(b.date) ? b.date : '';
+    dateEl.value = wat ? wat.date : '';
   }
 
-  // Set time if available
   const timeEl = document.getElementById('sm-time');
-  if (timeEl && b.time) {
-    // Convert "11:00 AM" → "11:00"
-    const m = b.time.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-    if (m) {
-      let h = parseInt(m[1]);
-      if (m[3].toUpperCase() === 'PM' && h !== 12) h += 12;
-      if (m[3].toUpperCase() === 'AM' && h === 12) h = 0;
-      timeEl.value = String(h).padStart(2,'0') + ':' + m[2];
-    }
-  }
+  if (timeEl) timeEl.value = wat ? wat.time : '';
 
   // Populate teacher dropdown filtered by subject
   populateTeacherDropdown(b.subject);

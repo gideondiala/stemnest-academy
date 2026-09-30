@@ -18,6 +18,7 @@ const pool   = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const emailSvc = require('../services/emailService');
 const logger   = require('../utils/logger');
+const { isValidTimeZone } = require('../utils/timezone');
 
 const router = express.Router();
 
@@ -79,6 +80,20 @@ router.put('/me/notifications/:id/read', requireAuth, async (req, res, next) => 
       [req.params.id, req.user.id]
     );
     res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+/* ── PUT /api/users/me/timezone — save the caller's IANA timezone ── */
+router.put('/me/timezone', requireAuth, async (req, res, next) => {
+  try {
+    const { timezone } = req.body || {};
+    if (!isValidTimeZone(timezone)) {
+      return res.status(400).json({ success: false, error: 'Invalid timezone' });
+    }
+    /* An admin viewing a dashboard as someone else must not overwrite their timezone */
+    if (req.user.impersonatedBy) return res.json({ success: true, skipped: true });
+    await pool.query('UPDATE users SET timezone = $1 WHERE id = $2', [timezone, req.user.id]);
+    res.json({ success: true, timezone });
   } catch (err) { next(err); }
 });
 

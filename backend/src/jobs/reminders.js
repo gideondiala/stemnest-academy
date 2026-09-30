@@ -11,6 +11,8 @@
 
 const pool   = require('../config/db');
 const logger = require('../utils/logger');
+const { platformToInstant, formatForTimeZone, isValidTimeZone } = require('../utils/timezone');
+const { resolveUserTimeZone } = require('../services/timezoneService');
 
 /* ── Ensure the reminders_sent table exists ── */
 async function ensureRemindersTable() {
@@ -34,7 +36,7 @@ async function runReminderCheck() {
     /* Fetch all upcoming scheduled bookings with parent contact */
     const result = await pool.query(`
       SELECT b.id, b.date, b.time, b.subject, b.class_link, b.is_demo,
-             b.notes,
+             b.notes, b.student_id,
              u_t.name AS tutor_name
       FROM bookings b
       LEFT JOIN users u_t ON u_t.id = b.tutor_id
@@ -42,23 +44,17 @@ async function runReminderCheck() {
         AND b.date >= CURRENT_DATE
         AND b.date <= CURRENT_DATE + INTERVAL '2 days'
         /* Skip paused students — no reminders while classes are on hold */
-        AND b.student_id NOT IN (
+        AND (b.student_id IS NULL OR b.student_id NOT IN (
           SELECT user_id FROM student_profiles WHERE class_paused = TRUE
-        )
+        ))
       ORDER BY b.date ASC, b.time ASC
       LIMIT 200
     `);
 
     for (const booking of result.rows) {
-      /* Parse booking datetime */
-      const dateStr = booking.date instanceof Date
-        ? booking.date.toISOString().split('T')[0]
-        : String(booking.date).split('T')[0];
-
-      const rawTime = String(booking.time || '00:00').replace(/^(\d{1,2}:\d{2}):\d{2}$/, '$1');
-      const classDateTime = new Date(`${dateStr}T${rawTime.padStart(5,'0')}:00`);
-
-      if (isNaN(classDateTime)) continue;
+      /* Booking date/time are stored in WAT — convert to the real instant */
+      const classDateTime = platformToInstant(booking.date, booking.time);
+      if (!classDateTime) continue;
 
       const msUntilClass = classDateTime - now;
       const minsUntil    = msUntilClass / 60000;
@@ -74,14 +70,21 @@ async function runReminderCheck() {
       const tutorName   = booking.tutor_name || 'your StemNest tutor';
       const subject     = booking.subject || 'class';
 
-      const formattedDate = classDateTime.toLocaleDateString('en-GB', {
-        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-      });
-      const formattedTime = classDateTime.toLocaleTimeString('en-GB', {
-        hour: '2-digit', minute: '2-digit'
-      });
-
       if (!parentEmail) continue;
+
+      /* Only format (and look up timezone) when a reminder window is open */
+      const inWindow = (minsUntil >= 23 * 60 && minsUntil <= 25 * 60) ||
+                       (minsUntil >= 28 && minsUntil <= 32) ||
+                       (minsUntil >= 8 && minsUntil <= 12);
+      if (!inWindow) continue;
+
+      /* Show the time in the parent's own timezone */
+      const parentTz = isValidTimeZone(notes.timezone)
+        ? notes.timezone
+        : await resolveUserTimeZone(booking.student_id, parentEmail);
+      const local = formatForTimeZone(booking.date, booking.time, parentTz);
+      const formattedDate = local.date;
+      const formattedTime = `${local.time} ${local.abbr}`.trim();
 
       /* ── 24-hour reminder: 23h to 25h before class ── */
       if (minsUntil >= 23 * 60 && minsUntil <= 25 * 60) {

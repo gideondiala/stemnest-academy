@@ -523,8 +523,9 @@ router.get('/dashboard/:role', requireAuth, async (req, res, next) => {
     }
 
     if (role === 'student') {
-      const [bookings, topups, courses, students, projects, enrolments, quizAttempts, certificates] = await Promise.all([
-        pool.query(`SELECT b.*,
+      /* Upcoming and past bookings are fetched separately so a long
+         history can never push upcoming classes out of the result. */
+      const studentBookingsSql = (dateFilter, order, limit) => `SELECT b.*,
                            u_t.name AS tutor_name, u_t.photo_url AS tutor_photo,
                            pl.title AS pathway_lesson_title,
                            pl.unit_id AS unit_id,
@@ -538,12 +539,16 @@ router.get('/dashboard/:role', requireAuth, async (req, res, next) => {
                     FROM bookings b
                     LEFT JOIN users u_t ON u_t.id = b.tutor_id
                     LEFT JOIN pathway_lessons pl ON pl.id = b.pathway_lesson_id
-                    WHERE b.student_id = $1
+                    WHERE (b.student_id = $1
                        OR b.batch_id IN (
                          SELECT bm.batch_id FROM batch_members bm
                          WHERE bm.student_id = $1 AND bm.status = 'active'
-                       )
-                    ORDER BY b.date ASC LIMIT 200`, [userId]),
+                       ))
+                      AND ${dateFilter}
+                    ORDER BY ${order} LIMIT ${limit}`;
+      const [upcomingBookings, pastBookings, topups, courses, students, projects, enrolments, quizAttempts, certificates] = await Promise.all([
+        pool.query(studentBookingsSql(`b.date >= CURRENT_DATE - 1`, 'b.date ASC, b.time ASC', 200), [userId]),
+        pool.query(studentBookingsSql(`b.date <  CURRENT_DATE - 1`, 'b.date DESC, b.time DESC', 300), [userId]),
         pool.query(`SELECT * FROM payments WHERE student_id = $1 ORDER BY created_at DESC LIMIT 100`, [userId]),
         pool.query(`SELECT c.* FROM courses c
                     JOIN enrolments e ON e.course_id = c.id
@@ -588,7 +593,7 @@ router.get('/dashboard/:role', requireAuth, async (req, res, next) => {
                     WHERE c.student_id = $1
                     ORDER BY c.issued_at DESC`, [userId]).catch(() => ({ rows: [] })),
       ]);
-      result.bookings      = bookings.rows;
+      result.bookings      = pastBookings.rows.reverse().concat(upcomingBookings.rows);
       result.payments      = topups.rows;
       result.topups        = topups.rows;
       result.courses       = courses.rows;

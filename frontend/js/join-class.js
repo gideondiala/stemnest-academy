@@ -31,6 +31,9 @@ async function findClass() {
     const allBookings = (data.bookings || []).map(b => {
       let notes = {};
       try { notes = typeof b.notes === 'string' ? JSON.parse(b.notes) : (b.notes || {}); } catch {}
+      /* Once scheduled, date/time are stored in WAT — show them in the viewer's timezone.
+         Pending requests still hold the parent's own requested local time. */
+      const local = (b.status !== 'pending' && window.SNTime) ? SNTime.formatClassTime(b.date, b.time) : null;
       return {
         id:              b.id,
         studentName:     b.lesson_name || notes.studentName || '—',
@@ -39,8 +42,8 @@ async function findClass() {
         email:           b.student_email || notes.email || '—',
         whatsapp:        notes.whatsapp || '—',
         subject:         b.subject || '—',
-        date:            b.date ? b.date.split('T')[0] : '—',
-        time:            notes.time || b.time || '—',
+        date:            local ? local.dateKey : (b.date ? b.date.split('T')[0] : '—'),
+        time:            local ? local.timeWithZone : (notes.time || b.time || '—'),
         status:          b.status,
         assignedTutor:   b.tutor_name || '—',
         classLink:       b.class_link || '',

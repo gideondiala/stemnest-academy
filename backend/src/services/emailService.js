@@ -286,6 +286,46 @@ async function sendClassReminderEmail({ to, name, studentName, subject, time, cl
   return sendEmail({ to, subject: `⏰ Class tomorrow — ${studentName} · ${subject}`, html, template: 'class_reminder_24h' });
 }
 
+function _esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/**
+ * Class rescheduled — sent to the tutor and to the parent.
+ * All times must already be formatted in the recipient's own timezone.
+ *   upcoming  — optional list of the next few (shifted) class times
+ *   finalWhen — optional new time of the last lesson in the series
+ */
+async function sendClassRescheduledEmail({ to, recipientName, audience, studentName, subject, lessonName, oldWhen, newWhen, reason, rescheduledBy, upcoming, finalWhen, classLink }) {
+  const isTutor = audience === 'tutor';
+  const html = _wrap(`
+    <h2>📅 Class Rescheduled</h2>
+    <p>Hi ${_esc(recipientName || 'there')},</p>
+    <p>${isTutor
+      ? `Your class with <strong>${_esc(studentName)}</strong> has been rescheduled.`
+      : `<strong>${_esc(studentName)}</strong>'s class has been rescheduled.`}</p>
+    <div class="info-box">
+      ${subject ? `<strong>Subject:</strong> ${_esc(subject)}<br>` : ''}
+      ${lessonName ? `<strong>Lesson:</strong> ${_esc(lessonName)}<br>` : ''}
+      <strong>Was:</strong> <span style="text-decoration:line-through;color:#718096;">${_esc(oldWhen)}</span><br>
+      <strong>Now:</strong> ${_esc(newWhen)}<br>
+      ${reason ? `<strong>Reason:</strong> ${_esc(reason)}<br>` : ''}
+      ${rescheduledBy ? `<strong>Rescheduled by:</strong> ${_esc(rescheduledBy)}` : ''}
+    </div>
+    ${upcoming && upcoming.length ? `
+    <p style="margin-bottom:6px;">The following classes have each moved forward by one slot. Updated schedule:</p>
+    <ul style="margin-top:0;padding-left:20px;font-size:14px;">
+      ${upcoming.map(u => `<li>${_esc(u)}</li>`).join('')}
+    </ul>
+    ${finalWhen ? `<p style="font-size:14px;">The last lesson in the series is now on <strong>${_esc(finalWhen)}</strong>.</p>` : ''}` : ''}
+    <p style="font-size:13px;color:#718096;">All times are shown in your local timezone.</p>
+    ${classLink ? `<a href="${classLink}" class="btn">🔗 Class Link →</a>` : ''}
+    <a href="${process.env.APP_URL || 'https://stemnestacademy.co.uk'}/pages/${isTutor ? 'tutor' : 'student'}-dashboard.html" class="btn" style="background:#0e9f6e;">View Dashboard →</a>
+  `);
+  return sendEmail({ to, subject: `📅 Class rescheduled — ${studentName} · now ${newWhen}`, html, template: isTutor ? 'class_rescheduled_tutor' : 'class_rescheduled_parent' });
+}
+
 async function sendPaymentLinkEmail({ to, studentName, course, amount, currency, paymentUrl }) {
   const html = _wrap(`
     <h2>Your Payment Link 💳</h2>
@@ -455,6 +495,7 @@ module.exports = {
   sendDemoScheduledParentEmail,
   sendClassAssignedEmail,
   sendClassReminderEmail,
+  sendClassRescheduledEmail,
   sendPostClassSummaryEmail,
   sendClassFeedbackEmail,
   sendPaymentLinkEmail,

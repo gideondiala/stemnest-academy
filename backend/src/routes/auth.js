@@ -120,6 +120,7 @@ router.post('/login', authLimiter, async (req, res, next) => {
         role:    user.role,
         staffId: user.staff_id,
         photo:   user.photo_url,
+        timezone: user.timezone || null,
       },
     });
   } catch (err) {
@@ -344,7 +345,8 @@ router.get('/me', requireAuth, async (req, res, next) => {
     const result = await pool.query(
       `SELECT u.id, u.name, u.email, u.role, u.staff_id, u.phone,
               u.whatsapp, u.photo_url, u.bio, u.date_of_birth,
-              u.email_verified, u.last_login_at, u.created_at
+              u.email_verified, u.last_login_at, u.created_at,
+              u.timezone
        FROM users u
        WHERE u.id = $1`,
       [req.user.id]

@@ -100,14 +100,11 @@ async function _loadStudentFromAPI() {
 
       // Map API bookings to UI LESSONS — include both scheduled and completed
       LESSONS = (data.bookings || []).map(b => {
-        let dateStr = '—';
-        let timeStr = (b.time || '—').replace(/^(\d{1,2}:\d{2}):\d{2}$/, '$1');
-        try {
-          if (b.date) {
-            const d = new Date(b.date);
-            dateStr = d.toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
-          }
-        } catch(e) {}
+        /* Stored times are WAT — show them in the viewer's own timezone */
+        const local       = window.SNTime ? SNTime.formatClassTime(b.date, b.time) : null;
+        const durationMin = b.duration_mins || 60;
+        const dateStr     = local ? local.date : '—';
+        const timeStr     = local ? local.timeWithZone : (b.time || '—').replace(/^(\d{1,2}:\d{2}):\d{2}$/, '$1');
         return {
           id:              b.id,
           title:           b.pathway_lesson_title || b.lesson_name_full || b.lesson_title_full || b.lesson_name || b.subject || 'Class',
@@ -119,14 +116,18 @@ async function _loadStudentFromAPI() {
           date:            dateStr,
           rawDate:         b.date || '',
           time:            timeStr,
+          startsAt:        local ? local.instant : null,
+          endsAt:          local ? new Date(local.instant.getTime() + durationMin * 60000) : null,
           tutor:           b.tutor_name || 'Tutor',
           subject:         b.subject || '',
-          duration:        (b.duration_mins || 60) + ' mins',
+          duration:        durationMin + ' mins',
           status:          b.status || 'scheduled',
           classLink:       b.class_link || '',
           modules:         []
         };
       });
+      /* Chronological order by real start time */
+      LESSONS.sort((a, b) => (a.startsAt ? a.startsAt.getTime() : 0) - (b.startsAt ? b.startsAt.getTime() : 0));
 
       // Map API projects to UI project arrays
       pendingProjects   = [];
@@ -600,17 +601,42 @@ function renderProgressBars() {
   `).join('');
 }
 
+/* ── UPCOMING / LIVE HELPERS ──
+   A class stays "upcoming" until it has ended, so the Join button is
+   still there while it is running. Past classes that were never closed
+   by the tutor are skipped. */
+function getUpcomingLessons() {
+  const now = Date.now();
+  return LESSONS.filter(l => l.status === 'scheduled' && (!l.endsAt || l.endsAt.getTime() > now));
+}
+
+function isLessonLive(l) {
+  if (!l || !l.startsAt || !l.endsAt) return false;
+  const now = Date.now();
+  return now >= l.startsAt.getTime() && now < l.endsAt.getTime();
+}
+
+function startsInText(l) {
+  if (!l || !l.startsAt) return '';
+  const mins = Math.round((l.startsAt.getTime() - Date.now()) / 60000);
+  if (mins <= 0)  return 'Class is live — join now';
+  if (mins < 60)  return 'Starts in ' + mins + ' min';
+  if (mins < 24 * 60) return 'Starts in ' + Math.floor(mins / 60) + 'h ' + (mins % 60) + 'm';
+  return 'Starts ' + l.date + ' at ' + l.time;
+}
+
 /* ── OVERVIEW — JOIN CLASS CARD + UPCOMING PREVIEW (first 3 lessons) ── */
 function renderUpcomingPreview() {
-  /* Populate the join class card */
+  const upcomingOnly = getUpcomingLessons();
+
+  /* Populate the join class card — the next class always has a Join button */
   const cardEl = document.getElementById('joinClassCard');
   if (cardEl) {
-    const upcomingOnly = LESSONS.filter(l => l.status === 'scheduled');
     if (upcomingOnly.length === 0) {
       cardEl.innerHTML = '';  /* hide entirely when no classes */
     } else {
       const next = upcomingOnly[0];
-      const isLive = next.status === 'live';
+      const isLive = isLessonLive(next);
       const isSuspended = window._studentCreditsSuspended === true;
       const isPaused    = window._studentClassPaused === true;
       cardEl.className = 'join-class-card';
@@ -639,25 +665,24 @@ function renderUpcomingPreview() {
                <div class="jc-note">Contact us to resume your schedule</div>`
             : `<button class="join-class-btn" onclick="joinClass('${next.classLink || ''}')"
                 ${isSuspended ? 'disabled style="opacity:.5;cursor:not-allowed;"' : ''}>
-                🚀 ${isSuspended ? 'Classes Paused' : isLive ? 'Join Class Now' : 'Join When Live'}
+                🚀 ${isSuspended ? 'Classes Paused' : isLive ? 'Join Class Now' : 'Join Class'}
                </button>
-               <div class="jc-note">${isSuspended ? 'Top up credits to resume' : 'Link opens in a new tab'}</div>`}
+               <div class="jc-note">${isSuspended ? 'Top up credits to resume' : startsInText(next)}</div>`}
         </div>`;
     }
   }
 
   const el = document.getElementById('upcomingPreview');
   if (!el) return;
-  const upcomingOnly = LESSONS.filter(l => l.status === 'scheduled');
   if (upcomingOnly.length === 0) {
     el.innerHTML = '<div style="color:var(--light);font-size:14px;padding:20px;">No upcoming lessons.</div>';
     return;
   }
-  el.innerHTML = upcomingOnly.slice(0, 3).map(l => buildSessionItem(l)).join('');
+  el.innerHTML = upcomingOnly.slice(0, 3).map((l, i) => buildSessionItem(l, i === 0)).join('');
 }
 
-function buildSessionItem(l) {
-  const isLive      = l.status === 'live';
+function buildSessionItem(l, isNext) {
+  const isLive      = isLessonLive(l);
   const isSuspended = window._studentCreditsSuspended === true;
   const isPaused    = window._studentClassPaused === true;
   let badgeHtml;
@@ -667,14 +692,18 @@ function buildSessionItem(l) {
     badgeHtml = `<span style="background:#f5f3ff;color:#7c3aed;font-size:11px;font-weight:900;padding:4px 10px;border-radius:50px;">🔒 Paused</span>`;
   } else if (isLive) {
     badgeHtml = `<span class="sess-badge sb-live">🔴 Live Now</span><button class="join-btn" onclick="joinClass('${l.classLink || ''}')">Join →</button>`;
+  } else if (isNext) {
+    badgeHtml = `<span class="sess-badge sb-upcoming">Next</span><button class="join-btn" onclick="joinClass('${l.classLink || ''}')">Join →</button>`;
   } else {
     badgeHtml = `<span class="sess-badge sb-upcoming">Upcoming</span>`;
   }
+  /* "7:00 PM EAT" → value "7:00", label "PM EAT" */
+  const timeParts = String(l.time || '').split(' ');
   return `
     <div class="session-item${isLive && !isSuspended ? ' live' : ''}">
       <div class="sess-time">
-        <div class="sess-time-val">${l.time.split(' ')[0]}</div>
-        <div class="sess-time-label">${l.time.split(' ')[1] || ''}</div>
+        <div class="sess-time-val">${timeParts[0] || '—'}</div>
+        <div class="sess-time-label">${timeParts.slice(1).join(' ')}</div>
       </div>
       <div class="sess-divider"></div>
       <div class="sess-info">
@@ -686,7 +715,6 @@ function buildSessionItem(l) {
 }
 
 function joinClass(classLink) {
-  const link = classLink || 'https://meet.google.com';
   if (window._studentClassPaused) {
     showToast('⏸️ Your classes are currently on a break. Contact us to resume.', 'error');
     return;
@@ -695,8 +723,18 @@ function joinClass(classLink) {
     showToast('🔒 Your live classes are paused. Please top up your credits to rejoin.', 'error');
     return;
   }
+  if (!classLink) {
+    showToast('Your class link has not been added yet. Please contact us and we will send it right away.', 'error');
+    return;
+  }
+  /* Open immediately — a delayed window.open is blocked as a pop-up (notably Safari on iPhone/iPad) */
+  const win = window.open(classLink, '_blank');
+  if (!win) {
+    /* Pop-up blocked — navigate in this tab instead */
+    window.location.href = classLink;
+    return;
+  }
   showToast('🚀 Opening your live class...', 'info');
-  setTimeout(() => window.open(link, '_blank'), 800);
 }
 
 /* ══════════════════════════════════════════════════════
@@ -711,7 +749,7 @@ function renderLessons(tab) {
   const el = document.getElementById('lessonsList');
   if (!el) return;
 
-  const upcoming  = LESSONS.filter(l => l.status === 'scheduled');
+  const upcoming  = getUpcomingLessons();
   const completed = LESSONS.filter(l => l.status === 'completed' || l.status === 'partially_completed');
 
   /* ── Tab toggle header ── */
@@ -740,8 +778,10 @@ function renderLessons(tab) {
     /* Show _upcomingLessonsShown lessons, with See More button */
     var visibleUpcoming = upcoming.slice(0, _upcomingLessonsShown);
     var cardsHtml = visibleUpcoming.map(function(l, i) {
-      var isLive      = l.status === 'live';
+      var isLive      = isLessonLive(l);
+      var isNext      = i === 0;
       var isSuspended = window._studentCreditsSuspended === true;
+      var isPaused    = window._studentClassPaused === true;
       var lessonLabel = l.lessonNumber ? 'Lesson ' + l.lessonNumber + (l.totalLessons ? ' of ' + l.totalLessons : '') : '';
       return '<div class="lesson-card' + (isLive ? ' lesson-live' : '') + '" style="margin-bottom:10px;">' +
         '<div class="lesson-card-left">' +
@@ -753,8 +793,8 @@ function renderLessons(tab) {
           '</div>' +
         '</div>' +
         '<div class="lesson-card-right">' +
-          (isLive
-            ? '<button class="join-btn" onclick="event.stopPropagation();joinClass(\'' + (l.classLink || '') + '\')">🚀 Join</button>'
+          ((isLive || isNext) && !isSuspended && !isPaused
+            ? '<button class="join-btn" onclick="event.stopPropagation();joinClass(\'' + (l.classLink || '') + '\')">🚀 ' + (isLive ? 'Join Now' : 'Join') + '</button>'
             : isSuspended
               ? '<span style="background:#f5f3ff;color:#7c3aed;font-size:11px;font-weight:900;padding:3px 8px;border-radius:50px;">🔒 Paused</span>'
               : '<span class="sess-badge sb-upcoming">Upcoming</span>') +
