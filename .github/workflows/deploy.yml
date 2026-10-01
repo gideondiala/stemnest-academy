@@ -8,6 +8,12 @@ permissions:
   contents: read
   deployments: write
 
+# Never run two deploys at once — overlapping `npm ci` + `pm2 reload` on the
+# server left node_modules half-installed and took the API down (1 Oct 2026).
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
 jobs:
   deploy-frontend:
     name: Deploy Frontend to Cloudflare Pages
