@@ -11,7 +11,7 @@
  * A "series" is:
  *   - all bookings of the same batch (group class), else
  *   - all bookings of the same enrolment, else
- *   - all paid bookings for the same student + tutor.
+ *   - all paid bookings for the same student + tutor + class link (course).
  *
  * Booking date/time are WAT (see utils/timezone.js).
  */
@@ -51,9 +51,12 @@ async function loadBooking(client, bookingId) {
 function _seriesScope(booking, startIdx) {
   if (booking.batch_id)     return { sql: `batch_id = $${startIdx}`,     params: [booking.batch_id] };
   if (booking.enrolment_id) return { sql: `enrolment_id = $${startIdx}`, params: [booking.enrolment_id] };
+  /* A student can take two courses with the same tutor; each course has its
+     own class link (course ids are not stored consistently on bookings). */
   return {
-    sql: `student_id = $${startIdx} AND tutor_id = $${startIdx + 1} AND is_demo = FALSE`,
-    params: [booking.student_id, booking.tutor_id],
+    sql: `student_id = $${startIdx} AND tutor_id = $${startIdx + 1} AND is_demo = FALSE
+          AND COALESCE(class_link, '') = $${startIdx + 2}`,
+    params: [booking.student_id, booking.tutor_id, booking.class_link || ''],
   };
 }
 
@@ -134,7 +137,7 @@ async function findTutorClash(client, tutorId, excludeIds, slot, durationMins) {
   if (!tutorId) return null;
   const r = await client.query(
     `SELECT b.id, b.is_demo, to_char(b.date, 'YYYY-MM-DD') AS d, to_char(b.time, 'HH24:MI') AS t,
-            COALESCE(u.name, b.lesson_name, 'another student') AS student_name
+            COALESCE(u.name, b.notes->>'batchRef', b.lesson_name, 'another student') AS student_name
      FROM bookings b
      LEFT JOIN users u ON u.id = b.student_id
      WHERE b.tutor_id = $1

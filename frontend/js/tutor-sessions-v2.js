@@ -538,6 +538,7 @@ function _handlePaidOutcome(bookingId, booking, outcome, rates) {
     if (completedRadio) { completedRadio.checked = true; if (typeof toggleOutcomeFields === 'function') toggleOutcomeFields(); }
     /* Store the booking ID so submitEndClassReport knows which booking */
     window.activeEndClassId = bookingId;
+    if (typeof loadEndClassAttendance === 'function') loadEndClassAttendance(bookingId, booking);
     if (modalOverlay) modalOverlay.classList.add('open');
     return;
 
@@ -721,6 +722,7 @@ function _handleDemoOutcome(bookingId, booking, outcome, rates) {
     var completedRadio = document.querySelector('input[name="classOutcome"][value="completed"]');
     if (completedRadio) { completedRadio.checked = true; if (typeof toggleOutcomeFields === 'function') toggleOutcomeFields(); }
     window.activeEndClassId = bookingId;
+    if (typeof loadEndClassAttendance === 'function') loadEndClassAttendance(bookingId, booking);
     if (modalOverlay) modalOverlay.classList.add('open');
     return;
 

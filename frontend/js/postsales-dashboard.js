@@ -843,10 +843,10 @@ async function renderPauseResume() {
           <div style="background:var(--white);border:1.5px solid #fde8d8;border-radius:14px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
             <div>
               <div style="font-weight:900;font-size:14px;color:var(--dark);">${s.studentName}</div>
-              <div style="font-size:12px;color:var(--mid);font-weight:700;margin-top:2px;">${s.pathwayName||'No pathway'} · Grade ${s.currentGrade||'—'} · Lesson ${s.lastLesson||0} paused</div>
+              <div style="font-size:12px;color:var(--mid);font-weight:700;margin-top:2px;">${s.pathwayName||'No pathway'} · Grade ${s.currentGrade||'—'} · ${s.pausedClasses ? s.pausedClasses + ' lessons on hold' : 'paused'}${s.pausedAt ? ' since ' + fmtDateShort(s.pausedAt) : ''}</div>
               <div style="font-size:11px;color:#c53030;margin-top:2px;">${s.pausedReason||'No reason given'}</div>
             </div>
-            <button onclick="openResumeModal('${s.studentId}','${(s.studentName||'').replace(/'/g,'')}','${s.classLink||''}','${s.lastTutorId||''}')"
+            <button onclick="openResumeModal('${s.studentId}','${(s.studentName||'').replace(/'/g,'')}','${s.classLink||''}','${s.lastTutorId||''}',${s.pausedClasses||0})"
               style="background:var(--green);color:#fff;border:none;border-radius:10px;padding:9px 18px;font-family:'Nunito',sans-serif;font-weight:900;font-size:13px;cursor:pointer;flex-shrink:0;">
               ▶️ Resume
             </button>
@@ -901,9 +901,17 @@ async function confirmPause() {
 }
 
 /* ─── RESUME MODAL ─── */
-function openResumeModal(studentId, studentName, classLink, lastTutorId) {
+function openResumeModal(studentId, studentName, classLink, lastTutorId, pausedClasses) {
   _resumeStudentId = studentId;
   document.getElementById('resumeStudentName').textContent = studentName;
+
+  const keep = document.getElementById('resume-keep-schedule');
+  if (keep) keep.checked = true;
+  const hint = document.getElementById('resume-keep-hint');
+  if (hint) hint.textContent = pausedClasses
+    ? `${pausedClasses} lessons are on hold and will be moved forward to start from the date above.`
+    : 'Their cancelled lessons will be moved forward to start from the date above.';
+  toggleResumeFields();
 
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('resume-start-date').value = today;
@@ -933,15 +941,22 @@ function closeResumeModal() {
   document.getElementById('resumeModalOverlay').classList.remove('open');
 }
 
+function toggleResumeFields() {
+  const keep = document.getElementById('resume-keep-schedule')?.checked !== false;
+  const el = document.getElementById('resume-custom-fields');
+  if (el) el.style.display = keep ? 'none' : 'block';
+}
+
 async function confirmResume() {
   const startDate = document.getElementById('resume-start-date').value;
   const tutorId   = document.getElementById('resume-tutor-select').value;
   const classLink = document.getElementById('resume-class-link')?.value || '';
 
+  const keepSchedule = document.getElementById('resume-keep-schedule')?.checked !== false;
   const schedule = collectScheduleRows('resume-schedule-rows');
   if (!startDate) { showToast('Please select a start date.','warning'); return; }
-  if (!tutorId)   { showToast('Please select a teacher.','warning'); return; }
-  if (!schedule.length) { showToast('Please add at least one schedule day.','warning'); return; }
+  if (!keepSchedule && !tutorId)   { showToast('Please select a teacher.','warning'); return; }
+  if (!keepSchedule && !schedule.length) { showToast('Please add at least one schedule day.','warning'); return; }
 
   const btn = document.getElementById('resumeConfirmBtn');
   btn.disabled = true; btn.textContent = '⏳ Resuming…';
@@ -951,11 +966,14 @@ async function confirmResume() {
     const res  = await fetch(`${API}/api/enrollments/students/${_resumeStudentId}/resume`, {
       method: 'PUT',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tutorId, schedule, startDate, classLink }),
+      body: JSON.stringify(keepSchedule
+        ? { startDate, keepSchedule: true, tutorId: tutorId || undefined }
+        : { startDate, keepSchedule: false, tutorId, schedule, classLink }),
     });
     const data = await res.json();
     if (data.success) {
-      showToast(`✅ ${data.studentName}'s classes resumed from Lesson ${data.resumedFromLesson}. ${data.bookingsCreated} classes created.`);
+      const first = data.firstClass ? ` First class: ${fmtDateShort(data.firstClass.date)} at ${fmtTime(data.firstClass.time)} WAT.` : '';
+      showToast(`✅ ${data.studentName}'s classes resumed — ${data.classes} classes ${data.mode === 'created' ? 'created' : 'back on the calendar'}.${first}`, 'success', 8000);
       closeResumeModal();
       await loadDashboard();
       renderPauseResume();
@@ -1588,74 +1606,89 @@ function copyGreyDetails(ref) {
 
 /* ═══════════════════════════════════════════════════════════════
    GROUP BATCHES
+   A batch = 2–3 students, one teacher, one class link, shared classes.
+   Each student keeps their own credits (charged per attended class).
 ═══════════════════════════════════════════════════════════════ */
+let _batchesCache = [];
+
+function _bEsc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function _bJs(s) { return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+
+async function _batchApi(path, method, body) {
+  const token = localStorage.getItem('sn_access_token');
+  const res = await fetch(`${API}/api/batches${path}`, {
+    method: method || 'GET',
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  let data = {};
+  try { data = await res.json(); } catch (e) { data = { success: false, error: 'Server error (' + res.status + ')' }; }
+  if (!res.ok && data.success !== false) data.success = false;
+  return data;
+}
+
 async function loadBatches() {
   const el = document.getElementById('batchesList');
   if (!el) return;
   el.innerHTML = '<div style="text-align:center;padding:32px;color:var(--light);font-weight:700;">⏳ Loading batches…</div>';
 
-  const token = localStorage.getItem('sn_access_token');
   try {
-    const res  = await fetch(`${API}/api/batches`, { headers: { 'Authorization': 'Bearer ' + token } });
-    const data = await res.json();
+    const data = await _batchApi('');
+    if (!data.success) {
+      el.innerHTML = `<div style="padding:24px;color:#c53030;font-weight:700;">⚠️ Could not load batches: ${_bEsc(data.error || 'Unknown error')}</div>`;
+      return;
+    }
     const batches = data.batches || [];
-
+    _batchesCache = batches;
     setText('batchesBadge', batches.filter(b => b.status === 'active').length);
 
     if (!batches.length) {
-      el.innerHTML = emptyState('👥','No batches yet','Create a batch to group 2-3 students with one teacher.');
+      el.innerHTML = emptyState('👥', 'No batches yet', 'Click "➕ Create Batch" to group 2–3 students with one teacher.');
       return;
     }
 
     el.innerHTML = batches.map(b => {
       const statusColor = b.status === 'active' ? '#065f46' : (b.status === 'paused' ? '#92400e' : '#6b7280');
       const statusBg    = b.status === 'active' ? '#d4f8e8' : (b.status === 'paused' ? '#fff3e0' : '#f3f4f6');
-      const schedStr    = formatBatchSchedule(b.schedule);
       const nextDate    = b.nextClassDate ? fmtDateShort(b.nextClassDate) : '—';
+      const ref = _bJs(b.batchRef);
+      const btn = (bg, color, onclick, label) =>
+        `<button onclick="${onclick}" style="background:${bg};color:${color};border:none;border-radius:10px;padding:8px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;">${label}</button>`;
 
       return `<div style="background:var(--white);border:1.5px solid #e8eaf0;border-radius:16px;padding:18px 20px;margin-bottom:12px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-          <div>
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <div style="min-width:220px;">
             <div style="font-family:'Fredoka One',cursive;font-size:17px;color:var(--dark);">
-              👥 ${b.batchRef}
-              <span style="background:${statusBg};color:${statusColor};font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;margin-left:8px;font-family:'Nunito',sans-serif;">${b.status}</span>
+              👥 ${_bEsc(b.batchRef)}
+              <span style="background:${statusBg};color:${statusColor};font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;margin-left:8px;font-family:'Nunito',sans-serif;">${_bEsc(b.status)}</span>
             </div>
             <div style="font-size:13px;font-weight:700;color:var(--mid);margin-top:4px;">
-              👩‍🏫 ${b.tutorName || '—'} · ${b.pathwayName || 'No pathway'} · ${b.memberCount || 0} students
+              👩‍🏫 ${_bEsc(b.tutorName || '—')} · ${_bEsc(b.pathwayName || 'No pathway')}${b.gradeNumber ? ' · Grade ' + b.gradeNumber : ''}
+            </div>
+            <div style="font-size:12px;color:var(--dark);font-weight:700;margin-top:4px;">
+              👩‍🎓 ${b.memberCount || 0} student${b.memberCount == 1 ? '' : 's'}${b.memberNames ? ': ' + _bEsc(b.memberNames) : ''}
+              ${!b.memberCount && b.status === 'active' ? '<span style="color:#c53030;"> — no students, add some or pause/delete</span>' : ''}
             </div>
             <div style="font-size:12px;color:var(--light);font-weight:700;margin-top:2px;">
-              🗓️ ${schedStr} · Next: ${nextDate}
+              🗓️ ${formatBatchSchedule(b.schedule)} (WAT) · Next: ${nextDate} · ${b.remainingClasses || 0} classes left
             </div>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button onclick="openBatchDetail('${b.id}')"
-              style="background:var(--blue);color:#fff;border:none;border-radius:10px;padding:8px 16px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;">
-              👁️ Details
-            </button>
-            <button onclick="openBatchRescheduleModal('${b.id}','${b.batchRef}')"
-              style="background:var(--orange);color:#fff;border:none;border-radius:10px;padding:8px 16px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;">
-              🔄 Reschedule
-            </button>
-            ${b.status === 'active' ? `
-              <button onclick="pauseBatch('${b.id}','${b.batchRef}')"
-                style="background:#f59e0b;color:#fff;border:none;border-radius:10px;padding:8px 16px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;">
-                ⏸️ Pause
-              </button>` : `
-              <button onclick="resumeBatch('${b.id}','${b.batchRef}')"
-                style="background:var(--green);color:#fff;border:none;border-radius:10px;padding:8px 16px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;">
-                ▶️ Resume
-              </button>`}
-            <button onclick="deleteBatch('${b.id}','${b.batchRef}')"
-              style="background:#fed7d7;color:#c53030;border:none;border-radius:10px;padding:8px 16px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;">
-              🗑️
-            </button>
+            ${btn('var(--blue)', '#fff', `openBatchDetail('${b.id}')`, '👁️ Details')}
+            ${b.status !== 'closed' ? btn('var(--orange)', '#fff', `openBatchRescheduleModal('${b.id}','${ref}')`, '🔄 Reschedule') : ''}
+            ${b.status !== 'closed' ? btn('#ede9fe', '#5b21b6', `openBatchTransfer('${b.id}','${ref}')`, '👩‍🏫 Change Teacher') : ''}
+            ${b.status === 'active' ? btn('#f59e0b', '#fff', `pauseBatch('${b.id}','${ref}')`, '⏸️ Pause') : ''}
+            ${b.status === 'paused' ? btn('var(--green)', '#fff', `resumeBatch('${b.id}','${ref}')`, '▶️ Resume') : ''}
+            ${btn('#fed7d7', '#c53030', `deleteBatch('${b.id}','${ref}')`, '🗑️')}
           </div>
         </div>
       </div>`;
     }).join('');
 
   } catch (err) {
-    el.innerHTML = `<div style="padding:24px;color:var(--orange);font-weight:700;">⚠️ Error: ${err.message}</div>`;
+    el.innerHTML = `<div style="padding:24px;color:var(--orange);font-weight:700;">⚠️ Error: ${_bEsc(err.message)}</div>`;
   }
 }
 
@@ -1664,51 +1697,72 @@ function formatBatchSchedule(schedule) {
   try {
     const s = typeof schedule === 'string' ? JSON.parse(schedule) : schedule;
     const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-    return s.map(sl => `${days[sl.weekday]} ${fmtTime(sl.time)}`).join(', ');
+    return s.map(sl => `${days[sl.weekday]} ${fmtTime(sl.time)}`).join(', ') || '—';
   } catch { return '—'; }
 }
 
+/* ─── Batch detail ─── */
+let _batchDetailId = null;
+
 async function openBatchDetail(batchId) {
+  _batchDetailId = batchId;
   document.getElementById('batchDetailOverlay').classList.add('open');
   const body = document.getElementById('batchDetailBody');
   body.innerHTML = '<div style="text-align:center;padding:32px;color:var(--light);font-weight:700;">⏳ Loading…</div>';
 
-  const token = localStorage.getItem('sn_access_token');
   try {
-    const res  = await fetch(`${API}/api/batches/${batchId}`, { headers: { 'Authorization': 'Bearer ' + token } });
-    const data = await res.json();
-    const b    = data.batch || {};
+    const data = await _batchApi('/' + batchId);
+    if (!data.success) { body.innerHTML = `<div style="padding:24px;color:#c53030;font-weight:700;">⚠️ ${_bEsc(data.error)}</div>`; return; }
+    const b = data.batch || {};
     const members = data.members || [];
+    const active  = members.filter(m => m.status === 'active');
+    const past    = members.filter(m => m.status !== 'active');
+    const ref     = _bJs(b.batch_ref);
+
+    const memberCard = (m) => `
+      <div style="background:var(--white);border:1.5px solid #e8eaf0;border-radius:12px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <div>
+          <div style="font-weight:900;font-size:13px;">${_bEsc(m.studentName)}
+            ${m.classPaused ? '<span style="background:#fff3e0;color:#92400e;font-size:10px;font-weight:900;padding:2px 8px;border-radius:50px;margin-left:6px;">paused</span>' : ''}
+            ${m.creditsSuspended ? '<span style="background:#f5f3ff;color:#5b21b6;font-size:10px;font-weight:900;padding:2px 8px;border-radius:50px;margin-left:6px;">credits suspended</span>' : ''}
+          </div>
+          <div style="font-size:11px;color:var(--mid);font-weight:700;">${_bEsc(m.email || '—')} · ${m.credits ?? 0} credits${m.grade ? ' · ' + _bEsc(m.grade) : ''}</div>
+          ${m.status !== 'active' && m.removalReason ? `<div style="font-size:11px;color:var(--light);font-weight:700;">${_bEsc(m.status)}: ${_bEsc(m.removalReason)}</div>` : ''}
+        </div>
+        ${m.status === 'active' ? `<div style="display:flex;gap:6px;">
+          <button onclick="openStudentTransferModal('${batchId}','${ref}','${m.studentId}','${_bJs(m.studentName)}')"
+            style="background:var(--blue-light);color:var(--blue);border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;">↔ Move</button>
+          <button onclick="removeBatchMember('${batchId}','${m.studentId}','${_bJs(m.studentName)}')"
+            style="background:#fed7d7;color:#c53030;border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;">Remove</button>
+        </div>` : `<span style="background:#f3f4f6;color:#6b7280;font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">${_bEsc(m.status)}</span>`}
+      </div>`;
+
+    const nextList = (data.nextClasses || []).map(c =>
+      `<div style="display:flex;justify-content:space-between;gap:10px;font-size:12px;font-weight:700;padding:6px 0;border-bottom:1px solid #f1f3f8;">
+         <span>${fmtDateShort(c.date)} · ${fmtTime(c.time)} WAT</span>
+         <span style="color:var(--mid);">${c.lessonNumber ? 'L' + c.lessonNumber + ' · ' : ''}${_bEsc(c.lessonName || '')}</span>
+       </div>`).join('');
 
     body.innerHTML = `
       <div style="background:var(--bg);border-radius:12px;padding:14px;margin-bottom:20px;font-size:13px;font-weight:700;color:var(--dark);line-height:1.9;">
-        <strong>Ref:</strong> ${b.batch_ref || b.batchRef} · <strong>Status:</strong> ${b.status}<br>
-        <strong>Teacher:</strong> ${b.tutorName || '—'} · <strong>Pathway:</strong> ${b.pathwayName || '—'}<br>
-        <strong>Schedule:</strong> ${formatBatchSchedule(b.schedule)}<br>
+        <strong>Ref:</strong> ${_bEsc(b.batch_ref)} · <strong>Status:</strong> ${_bEsc(b.status)}<br>
+        <strong>Teacher:</strong> ${_bEsc(b.tutorName || '—')} · <strong>Pathway:</strong> ${_bEsc(b.pathwayName || '—')}${b.grade_number ? ' · Grade ' + b.grade_number : ''}<br>
+        <strong>Schedule:</strong> ${formatBatchSchedule(b.schedule)} (WAT)<br>
         <strong>Classes Remaining:</strong> ${data.remainingClasses || 0}<br>
-        <strong>Class Link:</strong> ${b.class_link ? `<a href="${b.class_link}" target="_blank" style="color:var(--blue);">🔗 Open</a>` : '—'}
+        <strong>Class Link:</strong> ${b.class_link ? `<a href="${_bEsc(b.class_link)}" target="_blank" style="color:var(--blue);">🔗 Open</a>` : '—'}
+        <button onclick="editBatchLink('${batchId}','${_bJs(b.class_link || '')}')" style="margin-left:8px;background:none;border:1.5px solid var(--blue);color:var(--blue);border-radius:8px;padding:2px 10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;">✏️ Edit link</button>
       </div>
-      <div style="font-family:'Fredoka One',cursive;font-size:15px;color:var(--dark);margin-bottom:12px;">👩‍🎓 Members (${members.length})</div>
-      ${members.map(m => `
-        <div style="background:var(--white);border:1.5px solid #e8eaf0;border-radius:12px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
-          <div>
-            <div style="font-weight:900;font-size:13px;">${m.studentName}</div>
-            <div style="font-size:11px;color:var(--mid);font-weight:700;">${m.email || '—'} · ${m.credits || 0} credits</div>
-          </div>
-          <div style="display:flex;gap:8px;">
-            <span style="background:${m.status==='active'?'#d4f8e8':'#fed7d7'};color:${m.status==='active'?'#065f46':'#c53030'};font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">${m.status}</span>
-            ${m.status==='active' ? `<button onclick="removeBatchMember('${batchId}','${m.studentId}','${m.studentName.replace(/'/g,'')}')"
-              style="background:#fed7d7;color:#c53030;border:none;border-radius:8px;padding:5px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;">Remove</button>` : ''}
-          </div>
-        </div>`).join('')}
-      <div style="margin-top:16px;">
-        <button onclick="addStudentToBatch('${batchId}')"
-          style="background:var(--green);color:#fff;border:none;border-radius:10px;padding:9px 18px;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;">
+      <div style="font-family:'Fredoka One',cursive;font-size:15px;color:var(--dark);margin-bottom:12px;">👩‍🎓 Students (${active.length}/3)</div>
+      ${active.length ? active.map(memberCard).join('') : '<div style="font-size:13px;color:var(--light);font-weight:700;margin-bottom:8px;">No students in this batch.</div>'}
+      ${active.length < 3 && b.status !== 'closed' ? `
+        <button onclick="openAddMemberModal('${batchId}')"
+          style="background:var(--green);color:#fff;border:none;border-radius:10px;padding:9px 18px;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;margin:4px 0 16px;">
           ➕ Add Student
-        </button>
-      </div>`;
+        </button>` : ''}
+      ${nextList ? `<div style="font-family:'Fredoka One',cursive;font-size:15px;color:var(--dark);margin:12px 0 6px;">📅 Next classes</div>${nextList}` : ''}
+      ${past.length ? `<div style="font-family:'Fredoka One',cursive;font-size:14px;color:var(--mid);margin:18px 0 8px;">Previous students</div>${past.map(memberCard).join('')}` : ''}`;
   } catch (err) {
-    body.innerHTML = `<div style="padding:24px;color:var(--orange);font-weight:700;">⚠️ ${err.message}</div>`;
+    body.innerHTML = `<div style="padding:24px;color:var(--orange);font-weight:700;">⚠️ ${_bEsc(err.message)}</div>`;
   }
 }
 
@@ -1716,129 +1770,198 @@ function closeBatchDetailModal() {
   document.getElementById('batchDetailOverlay').classList.remove('open');
 }
 
+async function editBatchLink(batchId, current) {
+  const link = prompt('New class link for this batch (all upcoming classes will use it):', current || '');
+  if (link === null) return;
+  if (!link.trim()) { showToast('The class link cannot be empty.', 'warning'); return; }
+  const data = await _batchApi('/' + batchId, 'PUT', { classLink: link.trim() });
+  if (data.success) { showToast('✅ Class link updated for all upcoming classes.'); openBatchDetail(batchId); loadBatches(); }
+  else showToast('Error: ' + (data.error || 'Unknown'), 'error');
+}
+
 async function removeBatchMember(batchId, studentId, studentName) {
-  const reason = prompt(`Remove ${studentName} from this batch?\n\nProvide a reason:`);
-  if (!reason) return;
-  const token = localStorage.getItem('sn_access_token');
-  try {
-    const res  = await fetch(`${API}/api/batches/${batchId}/members/${studentId}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason }),
-    });
-    const data = await res.json();
-    if (data.success) { showToast(`✅ ${studentName} removed from batch.`); openBatchDetail(batchId); }
-    else showToast('Error: ' + (data.error || 'Unknown'), 'error');
-  } catch (err) { showToast('Error: ' + err.message, 'error'); }
+  const reason = prompt(`Remove ${studentName} from this batch?\n\nThey will no longer attend its classes. Provide a reason:`);
+  if (reason === null) return;
+  if (!reason.trim()) { showToast('A reason is required.', 'warning'); return; }
+  const data = await _batchApi(`/${batchId}/members/${studentId}`, 'DELETE', { reason: reason.trim() });
+  if (data.success) {
+    showToast(`✅ ${studentName} removed from batch.`);
+    if (data.warning) showToast('⚠️ ' + data.warning, 'warning', 8000);
+    openBatchDetail(batchId); loadBatches();
+  } else showToast('Error: ' + (data.error || 'Unknown'), 'error');
 }
 
-async function addStudentToBatch(batchId) {
-  const name = prompt('Enter student name or ID to search:');
-  if (!name) return;
-  const student = _allStudents.find(s => s.studentName.toLowerCase().includes(name.toLowerCase()) || s.staffId === name);
-  if (!student) { showToast('Student not found. Check the name or ID.','warning'); return; }
-  if (!confirm(`Add ${student.studentName} to this batch?`)) return;
+/* ─── Add student (searchable list) ─── */
+let _addMemberBatchId = null;
 
-  const token = localStorage.getItem('sn_access_token');
-  try {
-    const res  = await fetch(`${API}/api/batches/${batchId}/members`, {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studentId: student.studentId }),
-    });
-    const data = await res.json();
-    if (data.success) { showToast(`✅ ${student.studentName} added to batch.`); openBatchDetail(batchId); }
-    else showToast('Error: ' + (data.error || 'Unknown'), 'error');
-  } catch (err) { showToast('Error: ' + err.message, 'error'); }
+function openAddMemberModal(batchId) {
+  _addMemberBatchId = batchId;
+  const search = document.getElementById('am-search');
+  if (search) search.value = '';
+  filterAMStudents();
+  document.getElementById('addMemberOverlay').classList.add('open');
 }
 
+function closeAddMemberModal() {
+  document.getElementById('addMemberOverlay').classList.remove('open');
+  _addMemberBatchId = null;
+}
+
+function filterAMStudents() {
+  const q = (document.getElementById('am-search')?.value || '').trim().toLowerCase();
+  const listEl = document.getElementById('am-student-list');
+  if (!listEl) return;
+  const matches = _allStudents.filter(s =>
+    !q || String(s.studentName || '').toLowerCase().includes(q) || String(s.staffId || '').toLowerCase().includes(q)
+  ).slice(0, 50);
+  listEl.innerHTML = matches.length ? matches.map(s => `
+    <button onclick="confirmAddMember('${s.studentId}','${_bJs(s.studentName)}')"
+      style="display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;background:var(--white);border:1.5px solid #e8eaf0;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;color:var(--dark);cursor:pointer;">
+      <span>${_bEsc(s.studentName)} <span style="color:var(--light);font-size:11px;">${_bEsc(s.staffId || '')}</span></span>
+      <span style="color:var(--mid);font-size:11px;">${s.credits || 0} credits</span>
+    </button>`).join('')
+    : '<div style="color:var(--light);font-size:13px;font-weight:700;padding:8px;">No matching students.</div>';
+}
+
+async function confirmAddMember(studentId, studentName) {
+  if (!_addMemberBatchId) return;
+  const batchId = _addMemberBatchId;
+  const data = await _batchApi(`/${batchId}/members`, 'POST', { studentId });
+  if (data.success) {
+    showToast(`✅ ${studentName} added to the batch.`);
+    closeAddMemberModal(); openBatchDetail(batchId); loadBatches();
+  } else showToast('Error: ' + (data.error || 'Unknown'), 'error', 8000);
+}
+
+/* ─── Move a student (existing batch, or split into a new one) ─── */
+let _stSourceBatchId = null, _stStudentId = null, _stStudentName = '';
+
+function openStudentTransferModal(batchId, batchRef, studentId, studentName) {
+  _stSourceBatchId = batchId; _stStudentId = studentId; _stStudentName = studentName;
+  document.getElementById('studentTransferTitle').textContent = `↔ Move ${studentName}`;
+  document.getElementById('studentTransferInfo').innerHTML =
+    `Moving <strong>${_bEsc(studentName)}</strong> out of <strong>${_bEsc(batchRef)}</strong>. The other students keep their classes unchanged.`;
+
+  const sel = document.getElementById('st-target-batch');
+  const options = _batchesCache.filter(b => b.id !== batchId && b.status !== 'closed' && (b.memberCount || 0) < 3);
+  sel.innerHTML = options.length
+    ? '<option value="">— Select a batch —</option>' + options.map(b =>
+        `<option value="${b.id}">${_bEsc(b.batchRef)} · ${_bEsc(b.tutorName || '')} · ${formatBatchSchedule(b.schedule)} · ${b.memberCount || 0}/3</option>`).join('')
+    : '<option value="">No other batch has space</option>';
+
+  const tutorSel = document.getElementById('st-new-tutor');
+  tutorSel.innerHTML = '<option value="">— Select teacher —</option>' +
+    _allTutors.map(t => `<option value="${t.id}">${_bEsc(t.name)}${t.staff_id ? ' (' + _bEsc(t.staff_id) + ')' : ''}</option>`).join('');
+  document.getElementById('st-new-link').value = '';
+  document.getElementById('st-new-start').value = new Date().toISOString().split('T')[0];
+  document.getElementById('st-schedule-rows').innerHTML = '';
+  addSTScheduleRow();
+
+  switchTransferTab('existing');
+  closeBatchDetailModal();
+  document.getElementById('studentTransferOverlay').classList.add('open');
+}
+
+function closeStudentTransferModal() {
+  document.getElementById('studentTransferOverlay').classList.remove('open');
+}
+
+function switchTransferTab(tab) {
+  const isNew = tab === 'new';
+  document.getElementById('stPanelExisting').style.display = isNew ? 'none' : 'block';
+  document.getElementById('stPanelNew').style.display      = isNew ? 'block' : 'none';
+  const t1 = document.getElementById('stTab1'), t2 = document.getElementById('stTab2');
+  t1.style.background = isNew ? 'var(--bg)' : 'var(--blue)'; t1.style.color = isNew ? 'var(--mid)' : '#fff';
+  t2.style.background = isNew ? 'var(--blue)' : 'var(--bg)'; t2.style.color = isNew ? '#fff' : 'var(--mid)';
+}
+
+function addSTScheduleRow() { addRSScheduleRow('st-schedule-rows'); }
+
+async function _doStudentTransfer(body, btnId, idleLabel) {
+  const btn = document.getElementById(btnId);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Moving…'; }
+  try {
+    const data = await _batchApi(`/${_stSourceBatchId}/transfer-member`, 'POST', { studentId: _stStudentId, ...body });
+    if (data.success) {
+      showToast(`✅ ${data.message}`);
+      if (data.warning) showToast('⚠️ ' + data.warning, 'warning', 8000);
+      closeStudentTransferModal(); loadBatches();
+    } else showToast('Error: ' + (data.error || 'Unknown'), 'error', 8000);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = idleLabel; }
+  }
+}
+
+function confirmTransferToExisting() {
+  const targetBatchId = document.getElementById('st-target-batch').value;
+  if (!targetBatchId) { showToast('Please select a batch.', 'warning'); return; }
+  _doStudentTransfer({ targetBatchId }, 'stConfirmExistingBtn', '↔ Transfer Student');
+}
+
+function confirmTransferToNew() {
+  const tutorId   = document.getElementById('st-new-tutor').value;
+  const classLink = document.getElementById('st-new-link').value.trim();
+  const startDate = document.getElementById('st-new-start').value;
+  const schedule  = collectScheduleRows('st-schedule-rows');
+  if (!tutorId)         { showToast('Please select a teacher.', 'warning'); return; }
+  if (!classLink)       { showToast('Please enter the class link.', 'warning'); return; }
+  if (!startDate)       { showToast('Please select a start date.', 'warning'); return; }
+  if (!schedule.length) { showToast('Please add at least one day.', 'warning'); return; }
+  _doStudentTransfer({ newBatch: { tutorId, classLink, startDate, schedule } }, 'stConfirmNewBtn', '✨ Create Batch & Transfer');
+}
+
+/* ─── Pause / resume / delete ─── */
 async function pauseBatch(batchId, batchRef) {
-  if (!confirm(`Pause batch ${batchRef}? No classes will run until resumed.`)) return;
-  const token = localStorage.getItem('sn_access_token');
-  try {
-    const res = await fetch(`${API}/api/batches/${batchId}/status`, {
-      method: 'PUT',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'paused' }),
-    });
-    const data = await res.json();
-    if (data.success) { showToast(`✅ Batch ${batchRef} paused.`); loadBatches(); }
-    else showToast('Error: ' + data.error, 'error');
-  } catch (err) { showToast('Error: ' + err.message, 'error'); }
+  if (!confirm(`Pause batch ${batchRef}?\n\nAll its upcoming classes will be taken off the calendar. When you resume, they come back on the same days and times, starting from today.`)) return;
+  const data = await _batchApi(`/${batchId}/status`, 'PUT', { status: 'paused' });
+  if (data.success) { showToast(`✅ Batch ${batchRef} paused (${data.classesAffected} classes on hold).`); loadBatches(); }
+  else showToast('Error: ' + (data.error || 'Unknown'), 'error');
 }
 
 async function resumeBatch(batchId, batchRef) {
-  if (!confirm(`Resume batch ${batchRef}?`)) return;
-  const token = localStorage.getItem('sn_access_token');
-  try {
-    const res = await fetch(`${API}/api/batches/${batchId}/status`, {
-      method: 'PUT',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'active' }),
-    });
-    const data = await res.json();
-    if (data.success) { showToast(`✅ Batch ${batchRef} resumed.`); loadBatches(); }
-    else showToast('Error: ' + data.error, 'error');
-  } catch (err) { showToast('Error: ' + err.message, 'error'); }
+  if (!confirm(`Resume batch ${batchRef} on its usual days and times?\n\n(To resume on a different schedule, use 🔄 Reschedule instead.)`)) return;
+  const data = await _batchApi(`/${batchId}/status`, 'PUT', { status: 'active' });
+  if (data.success) { showToast(`✅ Batch ${batchRef} resumed — ${data.classesAffected} classes back on the calendar.`); loadBatches(); }
+  else if (data.clash) {
+    showToast('⚠️ ' + data.error + ' Use 🔄 Reschedule to resume on a different schedule.', 'error', 10000);
+  } else showToast('Error: ' + (data.error || 'Unknown'), 'error');
 }
 
 async function deleteBatch(batchId, batchRef) {
-  if (!confirm(`DELETE batch ${batchRef}?\n\nAll future bookings will be cancelled. This cannot be undone.`)) return;
-  const token = localStorage.getItem('sn_access_token');
-  try {
-    const res = await fetch(`${API}/api/batches/${batchId}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': 'Bearer ' + token },
-    });
-    const data = await res.json();
-    if (data.success) { showToast(`✅ Batch ${batchRef} deleted.`); loadBatches(); }
-    else showToast('Error: ' + data.error, 'error');
-  } catch (err) { showToast('Error: ' + err.message, 'error'); }
+  if (!confirm(`DELETE batch ${batchRef}?\n\nAll its upcoming classes will be cancelled and the students removed from it. Past classes stay in the history. This cannot be undone.`)) return;
+  const data = await _batchApi('/' + batchId, 'DELETE');
+  if (data.success) { showToast(`✅ Batch ${batchRef} deleted (${data.cancelledBookings} upcoming classes cancelled).`); loadBatches(); }
+  else showToast('Error: ' + (data.error || 'Unknown'), 'error');
 }
 
 /* ─── Create Batch Modal ─── */
 function openCreateBatchModal() {
-  // Populate tutor dropdown
   const tutorSel = document.getElementById('cb-tutor');
   if (tutorSel) {
-    tutorSel.innerHTML = '<option value="">— Select teacher —</option>';
-    _allTutors.forEach(t => {
-      const opt = document.createElement('option');
-      opt.value = t.id; opt.textContent = t.name + (t.staff_id ? ' (' + t.staff_id + ')' : '');
-      tutorSel.appendChild(opt);
-    });
+    tutorSel.innerHTML = '<option value="">— Select teacher —</option>' +
+      _allTutors.map(t => `<option value="${t.id}">${_bEsc(t.name)}${t.staff_id ? ' (' + _bEsc(t.staff_id) + ')' : ''}</option>`).join('');
   }
 
-  // Populate pathway dropdown
   const pathSel = document.getElementById('cb-pathway');
   if (pathSel) {
-    pathSel.innerHTML = '<option value="">— Select pathway —</option>';
-    _allPathways.forEach(p => {
-      const opt = document.createElement('option');
-      opt.value = p.id; opt.textContent = (p.emoji || '') + ' ' + p.name;
-      pathSel.appendChild(opt);
-    });
+    pathSel.innerHTML = '<option value="">— Select pathway —</option>' +
+      _allPathways.map(p => `<option value="${p.id}">${_bEsc((p.emoji || '') + ' ' + p.name)}</option>`).join('');
   }
 
-  // Populate students checklist
   const studentsEl = document.getElementById('cb-students-list');
   if (studentsEl) {
-    if (!_allStudents.length) {
-      studentsEl.innerHTML = '<div style="color:var(--light);font-size:13px;font-weight:700;">No students onboarded yet.</div>';
-    } else {
-      studentsEl.innerHTML = _allStudents.map(s => `
+    studentsEl.innerHTML = !_allStudents.length
+      ? '<div style="color:var(--light);font-size:13px;font-weight:700;">No students onboarded yet.</div>'
+      : _allStudents.map(s => `
         <label style="display:flex;align-items:center;gap:10px;padding:8px 6px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:700;color:var(--dark);">
           <input type="checkbox" value="${s.studentId}" style="width:16px;height:16px;cursor:pointer;">
-          ${s.studentName} <span style="color:var(--light);font-size:11px;">${s.staffId || ''} · ${s.credits || 0} credits</span>
+          ${_bEsc(s.studentName)} <span style="color:var(--light);font-size:11px;">${_bEsc(s.staffId || '')} · ${s.credits || 0} credits</span>
         </label>`).join('');
-    }
   }
 
-  // Default start date
   const startEl = document.getElementById('cb-start-date');
   if (startEl) startEl.value = new Date().toISOString().split('T')[0];
 
-  // Reset schedule rows
   const schedEl = document.getElementById('cb-schedule-rows');
   if (schedEl) schedEl.innerHTML = '';
   addBatchSchedRow();
@@ -1850,33 +1973,17 @@ function closeCreateBatchModal() {
   document.getElementById('createBatchOverlay').classList.remove('open');
 }
 
-function addBatchSchedRow() {
-  const rowsEl = document.getElementById('cb-schedule-rows');
-  if (!rowsEl) return;
-  const div = document.createElement('div');
-  div.style.cssText = 'display:flex;gap:8px;margin-bottom:8px;align-items:center;';
-  div.innerHTML = `
-    <select style="flex:1;padding:10px 12px;border:2px solid #e8eaf0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;outline:none;background:#fff;">
-      <option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option>
-      <option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option><option value="0">Sunday</option>
-    </select>
-    <input type="time" style="flex:1;padding:10px 12px;border:2px solid #e8eaf0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;outline:none;" value="16:00">
-    <button type="button" onclick="this.parentElement.remove()" style="background:#fed7d7;color:#c53030;border:none;border-radius:8px;width:32px;height:36px;font-size:16px;cursor:pointer;flex-shrink:0;">×</button>`;
-  rowsEl.appendChild(div);
-}
+function addBatchSchedRow() { addRSScheduleRow('cb-schedule-rows'); }
 
 async function confirmCreateBatch() {
   const tutorId   = document.getElementById('cb-tutor')?.value;
   const pathwayId = document.getElementById('cb-pathway')?.value || null;
   const gradeNum  = parseInt(document.getElementById('cb-grade')?.value) || null;
-  const classLink = document.getElementById('cb-class-link')?.value;
+  const classLink = (document.getElementById('cb-class-link')?.value || '').trim();
   const startDate = document.getElementById('cb-start-date')?.value;
   const notes     = document.getElementById('cb-notes')?.value;
   const schedule  = collectScheduleRows('cb-schedule-rows');
-
-  const studentIds = Array.from(
-    document.querySelectorAll('#cb-students-list input[type="checkbox"]:checked')
-  ).map(cb => cb.value);
+  const studentIds = Array.from(document.querySelectorAll('#cb-students-list input[type="checkbox"]:checked')).map(cb => cb.value);
 
   if (!tutorId)    { showToast('Please select a teacher.','warning'); return; }
   if (!classLink)  { showToast('Please enter a Google Meet link.','warning'); return; }
@@ -1884,24 +1991,18 @@ async function confirmCreateBatch() {
   if (!schedule.length) { showToast('Please add at least one schedule day.','warning'); return; }
   if (studentIds.length < 2) { showToast('Please select at least 2 students.','warning'); return; }
   if (studentIds.length > 3) { showToast('Maximum 3 students per batch.','warning'); return; }
+  if (pathwayId && !gradeNum) { showToast('Please enter the grade number for the pathway.','warning'); return; }
 
   const btn = document.querySelector('#createBatchOverlay .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Creating…'; }
-
-  const token = localStorage.getItem('sn_access_token');
   try {
-    const res  = await fetch(`${API}/api/batches`, {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tutorId, pathwayId, gradeNumber: gradeNum, classLink, schedule, startDate, studentIds, notes }),
-    });
-    const data = await res.json();
+    const data = await _batchApi('', 'POST', { tutorId, pathwayId, gradeNumber: gradeNum, classLink, schedule, startDate, studentIds, notes });
     if (data.success) {
-      showToast(`✅ Batch ${data.batchRef} created with ${data.bookingsCreated} classes!`);
+      showToast(`✅ Batch ${data.batchRef} created with ${data.bookingsCreated} classes — first class ${fmtDateShort(data.firstClass?.d)} at ${fmtTime(data.firstClass?.t)} WAT.`);
       closeCreateBatchModal();
       loadBatches();
     } else {
-      showToast('Error: ' + (data.error || 'Unknown'), 'error');
+      showToast('Error: ' + (data.error || 'Unknown'), 'error', 8000);
     }
   } catch (err) {
     showToast('Error: ' + err.message, 'error');
@@ -1917,16 +2018,13 @@ function openBatchRescheduleModal(batchId, batchRef) {
   _batchRescheduleId = batchId;
   const titleEl = document.getElementById('batchRescheduleTitle');
   if (titleEl) titleEl.textContent = `🔄 Reschedule Batch ${batchRef}`;
-
-  const today = new Date().toISOString().split('T')[0];
   const dateEl = document.getElementById('br-start-date');
-  if (dateEl) dateEl.value = today;
-
-  // Reset schedule rows
+  if (dateEl) dateEl.value = new Date().toISOString().split('T')[0];
+  const linkEl = document.getElementById('br-class-link');
+  if (linkEl) linkEl.value = '';
   const rowsEl = document.getElementById('br-schedule-rows');
   if (rowsEl) rowsEl.innerHTML = '';
   addBRScheduleRow();
-
   document.getElementById('batchRescheduleOverlay').classList.add('open');
 }
 
@@ -1939,64 +2037,64 @@ function addBRScheduleRow() { addRSScheduleRow('br-schedule-rows'); }
 
 async function confirmBatchReschedule() {
   const startDate = document.getElementById('br-start-date')?.value;
-  const classLink = document.getElementById('br-class-link')?.value || undefined;
+  const classLink = (document.getElementById('br-class-link')?.value || '').trim();
   const schedule  = collectScheduleRows('br-schedule-rows');
-
   if (!startDate)       { showToast('Please select a start date.','warning'); return; }
   if (!schedule.length) { showToast('Please add at least one schedule day.','warning'); return; }
 
   const btn = document.getElementById('brConfirmBtn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Rescheduling…'; }
-
-  const token = localStorage.getItem('sn_access_token');
   try {
     const body = { startDate, schedule };
     if (classLink) body.classLink = classLink;
-
-    const res  = await fetch(`${API}/api/batches/${_batchRescheduleId}/reschedule`, {
-      method: 'PUT',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
+    const data = await _batchApi(`/${_batchRescheduleId}/reschedule`, 'PUT', body);
     if (data.success) {
-      showToast(`✅ Batch rescheduled: ${data.cancelled} cancelled, ${data.created} recreated.`);
+      showToast(`✅ ${data.moved} classes moved to the new schedule — first class ${fmtDateShort(data.firstClass?.d)} at ${fmtTime(data.firstClass?.t)} WAT.`);
       closeBatchRescheduleModal();
       loadBatches();
     } else {
-      showToast('Error: ' + (data.error || 'Unknown'), 'error');
+      showToast('Error: ' + (data.error || 'Unknown'), 'error', 8000);
     }
   } catch (err) {
     showToast('Error: ' + err.message, 'error');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '🔄 Confirm Reschedule'; }
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Apply New Schedule'; }
   }
 }
 
-/* ─── Batch Transfer Modal (stub — handled by batchTransferOverlay in HTML) ─── */
+/* ─── Change teacher (whole batch) — _batchTransferBatchId is declared at the top of this file ─── */
+
 function openBatchTransfer(batchId, batchRef) {
   _batchTransferBatchId = batchId;
   const info = document.getElementById('batchTransferInfo');
-  if (info) info.textContent = `Transferring batch: ${batchRef}`;
+  if (info) info.textContent = `Changing the teacher of ${batchRef}. Set the schedule the new teacher will teach (it can stay the same).`;
 
   const tutorSel = document.getElementById('batchTransferTutor');
   if (tutorSel) {
-    tutorSel.innerHTML = '<option value="">— Keep current tutor —</option>';
-    _allTutors.forEach(t => {
-      const opt = document.createElement('option');
-      opt.value = t.id; opt.textContent = t.name;
-      tutorSel.appendChild(opt);
-    });
+    tutorSel.innerHTML = '<option value="">— Keep current teacher —</option>' +
+      _allTutors.map(t => `<option value="${t.id}">${_bEsc(t.name)}</option>`).join('');
   }
-
-  const today = new Date().toISOString().split('T')[0];
   const dateEl = document.getElementById('batchTransferDate');
-  if (dateEl) dateEl.value = today;
+  if (dateEl) dateEl.value = new Date().toISOString().split('T')[0];
+  const linkEl = document.getElementById('batchTransferLink');
+  if (linkEl) linkEl.value = '';
 
+  /* Pre-fill the batch's current schedule */
   const rowsEl = document.getElementById('batchTransferScheduleRows');
   if (rowsEl) rowsEl.innerHTML = '';
-  addBatchScheduleRow();
+  const b = _batchesCache.find(x => x.id === batchId);
+  let sched = [];
+  try { sched = typeof b?.schedule === 'string' ? JSON.parse(b.schedule) : (b?.schedule || []); } catch (e) {}
+  if (!sched.length) addBatchScheduleRow();
+  sched.forEach(s => {
+    addBatchScheduleRow();
+    const row = rowsEl.lastElementChild;
+    row.querySelector('select').value = String(s.weekday);
+    row.querySelector('input[type="time"]').value = String(s.time).slice(0, 5);
+  });
 
+  const errEl = document.getElementById('batchTransferError');
+  if (errEl) errEl.style.display = 'none';
   document.getElementById('batchTransferOverlay').classList.add('open');
 }
 
@@ -2004,43 +2102,32 @@ function closeBatchTransfer() {
   document.getElementById('batchTransferOverlay').classList.remove('open');
 }
 
-function addBatchScheduleRow() {
-  addRSScheduleRow('batchTransferScheduleRows');
-}
+function addBatchScheduleRow() { addRSScheduleRow('batchTransferScheduleRows'); }
 
 async function confirmBatchTransfer() {
   const newTutorId = document.getElementById('batchTransferTutor')?.value || undefined;
   const startDate  = document.getElementById('batchTransferDate')?.value;
-  const classLink  = document.getElementById('batchTransferLink')?.value || undefined;
+  const classLink  = (document.getElementById('batchTransferLink')?.value || '').trim();
   const schedule   = collectScheduleRows('batchTransferScheduleRows');
 
   const errEl = document.getElementById('batchTransferError');
   if (errEl) errEl.style.display = 'none';
-
   if (!startDate)       { showToast('Please select a start date.','warning'); return; }
   if (!schedule.length) { showToast('Please add at least one schedule day.','warning'); return; }
 
   const btn = document.getElementById('batchTransferBtn');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Transferring…'; }
-
-  const token = localStorage.getItem('sn_access_token');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Saving…'; }
   try {
     const body = { startDate, schedule };
     if (newTutorId) body.newTutorId = newTutorId;
     if (classLink)  body.classLink  = classLink;
-
-    const res  = await fetch(`${API}/api/batches/${_batchTransferBatchId}/reschedule`, {
-      method: 'PUT',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
+    const data = await _batchApi(`/${_batchTransferBatchId}/reschedule`, 'PUT', body);
     if (data.success) {
-      showToast(`✅ Batch transferred: ${data.created} classes created.`);
+      showToast(`✅ ${data.moved} classes now with ${data.tutorName} — first class ${fmtDateShort(data.firstClass?.d)}.`);
       closeBatchTransfer();
       loadBatches();
-    } else {
-      if (errEl) { errEl.style.display = 'block'; errEl.textContent = data.error || 'Unknown error'; }
+    } else if (errEl) {
+      errEl.style.display = 'block'; errEl.textContent = data.error || 'Unknown error';
     }
   } catch (err) {
     if (errEl) { errEl.style.display = 'block'; errEl.textContent = err.message; }

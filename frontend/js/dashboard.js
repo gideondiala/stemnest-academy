@@ -1106,6 +1106,42 @@ function formatDateSimple(dateStr) {
 ══════════════════════════════════════════════════════ */
 let activeEndClassId = null;
 
+/* Batch class: attendance list in the End Class form — only ticked students
+   are charged a credit. Called by every flow that opens the form. */
+function loadEndClassAttendance(bookingId, b) {
+  const infoEl = document.getElementById('endClassBookingInfo');
+  let attEl = document.getElementById('endClassAttendance');
+  if (!attEl && infoEl) {
+    attEl = document.createElement('div');
+    attEl.id = 'endClassAttendance';
+    attEl.style.cssText = 'margin:0 0 16px;';
+    infoEl.insertAdjacentElement('afterend', attEl);
+  }
+  if (attEl) {
+    attEl.innerHTML = '';
+    attEl.style.display = 'none';
+    attEl.dataset.bookingId = bookingId;
+    if (b && b.isBatchClass && b.batchId) {
+      attEl.style.display = 'block';
+      attEl.innerHTML = '<div style="font-size:12px;color:var(--light);font-weight:700;">⏳ Loading students…</div>';
+      fetch('https://api.stemnestacademy.co.uk/api/batches/' + b.batchId, {
+        headers: { 'Authorization': 'Bearer ' + localStorage.getItem('sn_access_token') }
+      }).then(r => r.json()).then(data => {
+        const members = (data.members || []).filter(m => m.status === 'active');
+        if (attEl.dataset.bookingId !== String(bookingId)) return;  /* form reopened for another class */
+        attEl.innerHTML =
+          '<div style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;">👩‍🎓 Attendance — untick anyone who was absent</div>' +
+          (members.length ? members.map(m =>
+            '<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1.5px solid #e8eaf0;border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:13px;font-weight:800;color:var(--dark);">' +
+              '<input type="checkbox" class="endClassAttendee" value="' + m.studentId + '" checked style="width:16px;height:16px;"> ' +
+              String(m.studentName || '').replace(/</g, '&lt;') +
+            '</label>').join('')
+            : '<div style="font-size:12px;color:var(--light);font-weight:700;">No students in this batch.</div>');
+      }).catch(() => { attEl.innerHTML = '<div style="font-size:12px;color:#c53030;font-weight:700;">Could not load the student list — all students will be marked present.</div>'; });
+    }
+  }
+}
+
 function openEndClassModal(bookingId) {
   activeEndClassId = bookingId;
 
@@ -1119,6 +1155,8 @@ function openEndClassModal(bookingId) {
       ? `🎓 <strong>${b.studentName}</strong> (${b.grade}) · 📚 <strong>${b.subject}</strong> · 📅 ${b.date} at ${b.time}`
       : `Session ID: ${bookingId}`;
   }
+
+  loadEndClassAttendance(bookingId, b);
 
   // Reset form
   document.querySelectorAll('input[name="classOutcome"]').forEach(r => r.checked = false);
@@ -1163,6 +1201,14 @@ function submitEndClassReport() {
     notes:            outcome === 'completed'  ? (document.getElementById('classNotes')?.value.trim() || '') : '',
     recordingLink:    document.getElementById('recordingLink')?.value.trim() || '',
   };
+
+  /* Batch class: send who attended (only they are charged a credit) */
+  const attEl = document.getElementById('endClassAttendance');
+  const attendeeBoxes = attEl && attEl.style.display !== 'none' && attEl.dataset.bookingId === String(bookingId)
+    ? attEl.querySelectorAll('input.endClassAttendee') : [];
+  if (attendeeBoxes.length) {
+    payload.attendees = Array.from(attendeeBoxes).filter(cb => cb.checked).map(cb => cb.value);
+  }
 
   if (!bookingId || bookingId === 'null') {
     showToast('⚠️ Unable to identify the booking. Please close and try again.', 'error');

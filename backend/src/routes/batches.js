@@ -1,169 +1,295 @@
 /**
- * Batches routes — Group Classes
+ * Batches routes — Group Classes (2–3 students, one tutor, one class link)
  *
- * POST   /api/batches                          — create a batch
+ * POST   /api/batches                          — create a batch + its class bookings
  * GET    /api/batches                          — list all batches (admin/postsales)
- * GET    /api/batches/:id                      — get batch detail + members
- * PUT    /api/batches/:id                      — edit batch (schedule/link/teacher)
- * PUT    /api/batches/:id/status               — pause or close a batch
- * POST   /api/batches/:id/members              — add a student to a batch
- * DELETE /api/batches/:id/members/:studentId   — remove a student from a batch
+ * GET    /api/batches/:id                      — batch detail + members + next classes
+ * PUT    /api/batches/:id                      — edit class link / notes
+ * PUT    /api/batches/:id/status               — pause / resume / close
+ * PUT    /api/batches/:id/reschedule           — new schedule (optionally new tutor/link)
+ * POST   /api/batches/:id/members              — add a student
+ * DELETE /api/batches/:id/members/:studentId   — remove a student
+ * POST   /api/batches/:id/transfer-member      — move a student to another / a new batch
+ * DELETE /api/batches/:id                      — delete batch, cancel future classes
  *
- * NOTE: The end-class report for batch bookings is handled in bookings.js
- * (POST /api/bookings/:id/report) — it already accepts attendees/absentees arrays.
+ * Model: each class is ONE booking with batch_id set and student_id NULL.
+ * Members are in batch_members; each member keeps their own credits, which
+ * are charged per attending student when the tutor ends the class
+ * (POST /api/bookings/:id/report with attendees).
+ *
+ * Booking date/time are WAT (see utils/timezone.js). Every route runs in a
+ * single transaction — a failed check rolls back everything.
  */
 
 const express = require('express');
 const pool    = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const logger  = require('../utils/logger');
+const rescheduleSvc = require('../services/rescheduleService');
 
 const router = express.Router();
+const MAX_MEMBERS = 3;
+const STAFF = ['admin', 'super_admin', 'postsales'];
 
-/* ── Helper: generate next batch_ref e.g. BATCH-001 ── */
-async function generateBatchRef() {
-  /* Use MAX to find the highest existing batch number.
-     This ensures numbering continues correctly even after deletions. */
-  const result = await pool.query(
-    `SELECT batch_ref FROM batches ORDER BY CAST(REPLACE(batch_ref, 'BATCH-', '') AS INTEGER) DESC LIMIT 1`
+/* ══════════════════════════════════════════════
+   HELPERS
+══════════════════════════════════════════════ */
+class HttpError extends Error {
+  constructor(status, message, extra) { super(message); this.status = status; this.extra = extra; }
+}
+
+/** Run `fn(client, req)` in a transaction; it returns the JSON body. */
+function tx(fn) {
+  return async (req, res, next) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const body = await fn(client, req);
+      await client.query('COMMIT');
+      res.status(body && body._status ? body._status : 200).json(body);
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      if (err instanceof HttpError) {
+        return res.status(err.status).json({ success: false, error: err.message, ...(err.extra || {}) });
+      }
+      next(err);
+    } finally {
+      client.release();
+    }
+  };
+}
+
+function _addDays(dateStr, n) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+}
+function _weekday(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+function _todayWAT() {
+  return new Date(Date.now() + 60 * 60000).toISOString().slice(0, 10);
+}
+
+/** Validate + normalise [{weekday, time}] → [{weekday: 0-6, time: 'HH:MM'}] */
+function normaliseSchedule(schedule) {
+  if (!Array.isArray(schedule) || !schedule.length) throw new HttpError(400, 'Add at least one weekly day and time');
+  const out = schedule.map(s => {
+    const weekday = Number(s.weekday);
+    const m = String(s.time || '').match(/^(\d{1,2}):(\d{2})/);
+    if (!(weekday >= 0 && weekday <= 6) || !m) throw new HttpError(400, 'Each schedule row needs a day and a time');
+    return { weekday, time: m[1].padStart(2, '0') + ':' + m[2] };
+  });
+  const keys = new Set(out.map(s => s.weekday + '|' + s.time));
+  if (keys.size !== out.length) throw new HttpError(400, 'The schedule has the same day and time twice');
+  return out;
+}
+
+/** `count` class slots on the weekly schedule, from startDate (inclusive). */
+function generateDates(startDate, schedule, count) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(startDate || ''))) throw new HttpError(400, 'A valid start date is required');
+  const slots = [...schedule].sort((a, b) => a.weekday - b.weekday || a.time.localeCompare(b.time));
+  const out = [];
+  for (let day = 0; out.length < count && day < 366 * 6; day++) {
+    const d  = _addDays(startDate, day);
+    const wd = _weekday(d);
+    for (const s of slots) {
+      if (s.weekday === wd && out.length < count) out.push({ d, t: s.time });
+    }
+  }
+  return out;
+}
+
+/** First clash between `slots` and the tutor's (or the students') other classes. */
+async function findClash(client, { tutorId, slots, excludeBatchId = null, studentIds = [] }) {
+  if (!slots.length) return null;
+  const r = await client.query(
+    `SELECT s.d::text AS d, s.t AS t,
+            COALESCE(u.name, b.notes->>'batchRef', b.lesson_name, 'another class') AS who,
+            (b.tutor_id = $1) AS tutor_clash
+     FROM unnest($2::date[], $3::text[]) AS s(d, t)
+     JOIN bookings b
+       ON b.status = 'scheduled'
+      AND (b.batch_id IS DISTINCT FROM $4::uuid)
+      AND (b.tutor_id = $1 OR b.student_id = ANY($5::uuid[]))
+      AND (b.date + b.time) < (s.d + s.t::time) + INTERVAL '60 minutes'
+      AND (s.d + s.t::time) < (b.date + b.time) + make_interval(mins => COALESCE(b.duration_mins, 60))
+     LEFT JOIN users u ON u.id = b.student_id
+     ORDER BY s.d, s.t
+     LIMIT 1`,
+    [tutorId, slots.map(s => s.d), slots.map(s => s.t), excludeBatchId, studentIds]
   );
-  if (!result.rows.length) return 'BATCH-001';
-  const last = result.rows[0].batch_ref; // e.g. BATCH-004
-  const num  = parseInt(last.replace('BATCH-', '')) + 1;
-  return 'BATCH-' + String(num).padStart(3, '0');
+  return r.rows[0] || null;
+}
+
+function clashError(c) {
+  const who = c.tutor_clash ? `the teacher already has a class with ${c.who}` : `${c.who} already has a class then`;
+  return new HttpError(409, `Schedule clash on ${c.d} at ${c.t} — ${who}. Please choose a different day/time.`, { clash: c });
+}
+
+/** Pathway lessons for a grade, from lesson `fromLesson` onward. */
+async function pathwayLessons(client, pathwayId, gradeNumber, fromLesson = 1) {
+  if (!pathwayId || !gradeNumber) return [];
+  const g = await client.query(
+    `SELECT id FROM pathway_grades WHERE pathway_id = $1 AND grade_number = $2 AND is_active = TRUE LIMIT 1`,
+    [pathwayId, parseInt(gradeNumber, 10)]
+  );
+  if (!g.rows.length) return [];
+  const l = await client.query(
+    `SELECT id AS pathway_lesson_id, lesson_number AS lesson_number_in_grade, title AS lesson_name
+     FROM pathway_lessons WHERE grade_id = $1 AND is_active = TRUE AND lesson_number >= $2
+     ORDER BY lesson_number ASC`,
+    [g.rows[0].id, fromLesson]
+  );
+  return l.rows;
+}
+
+/** Next BATCH-NNN, continuing after any ref ever used (incl. pre-migration classes). */
+async function nextBatchRef(client) {
+  await client.query(`SELECT pg_advisory_xact_lock(hashtext('batch_ref'))`);
+  const r = await client.query(`
+    SELECT COALESCE(MAX(n), 0) AS n FROM (
+      SELECT CAST(substring(batch_ref FROM '^BATCH-([0-9]+)$') AS INT) AS n FROM batches
+      UNION ALL
+      SELECT CAST(substring(notes->>'batchRef' FROM '^BATCH-([0-9]+)$') AS INT) FROM bookings
+       WHERE notes->>'batchRef' IS NOT NULL
+    ) x`);
+  return 'BATCH-' + String(Number(r.rows[0].n) + 1).padStart(3, '0');
+}
+
+async function loadBatch(client, batchId, { lock = false } = {}) {
+  const r = await client.query(
+    `SELECT b.*, u.name AS tutor_name FROM batches b LEFT JOIN users u ON u.id = b.tutor_id
+     WHERE b.id = $1 ${lock ? 'FOR UPDATE OF b' : ''}`,
+    [batchId]
+  );
+  if (!r.rows.length) throw new HttpError(404, 'Batch not found');
+  return r.rows[0];
+}
+
+async function loadTutor(client, tutorId) {
+  const r = await client.query(`SELECT id, name FROM users WHERE id = $1 AND role = 'tutor' AND is_active = TRUE`, [tutorId]);
+  if (!r.rows.length) throw new HttpError(404, 'Teacher not found');
+  return r.rows[0];
+}
+
+async function activeMemberIds(client, batchId) {
+  const r = await client.query(`SELECT student_id FROM batch_members WHERE batch_id = $1 AND status = 'active'`, [batchId]);
+  return r.rows.map(x => x.student_id);
+}
+
+/** Students must exist, be students, and not already be in another live batch. */
+async function checkStudentsAvailable(client, studentIds, exceptBatchId = null) {
+  const s = await client.query(`SELECT id, name FROM users WHERE id = ANY($1::uuid[]) AND role = 'student'`, [studentIds]);
+  if (s.rows.length !== new Set(studentIds).size) throw new HttpError(404, 'One or more students were not found');
+  const busy = await client.query(
+    `SELECT u.name, b.batch_ref FROM batch_members bm
+     JOIN batches b ON b.id = bm.batch_id JOIN users u ON u.id = bm.student_id
+     WHERE bm.student_id = ANY($1::uuid[]) AND bm.status = 'active'
+       AND b.status IN ('active','paused') AND ($2::uuid IS NULL OR b.id <> $2::uuid)
+     LIMIT 1`,
+    [studentIds, exceptBatchId]
+  );
+  if (busy.rows.length) throw new HttpError(400, `${busy.rows[0].name} is already in ${busy.rows[0].batch_ref}. Remove or move them from that batch first.`);
+  return s.rows;
+}
+
+/** Insert one shared booking per slot, carrying lesson rows in order. */
+async function insertBatchBookings(client, { batch, tutorId, tutorName, classLink, dates, lessons }) {
+  const gradeLabel = batch.grade_number ? `Grade ${batch.grade_number}` : 'Group';
+  for (let i = 0; i < dates.length; i++) {
+    const l = lessons[i] || {};
+    const lessonNum = l.lesson_number_in_grade || (i + 1);
+    await client.query(
+      `INSERT INTO bookings
+         (subject, grade, date, time, class_link, status, is_demo,
+          tutor_id, student_id, batch_id, lesson_name, notes,
+          booked_at, scheduled_at, pathway_lesson_id, lesson_number_in_grade)
+       VALUES ('Coding', $1, $2::date, $3::time, $4, 'scheduled', FALSE,
+               $5, NULL, $6, $7, $8, NOW(), NOW(), $9, $10)`,
+      [l.grade || gradeLabel, dates[i].d, dates[i].t, classLink, tutorId, batch.id,
+       l.lesson_name || `Lesson ${lessonNum}`,
+       JSON.stringify({ batchRef: batch.batch_ref, tutorName, classLink, isBatchClass: true }),
+       l.pathway_lesson_id || null, lessonNum]
+    );
+  }
+}
+
+/** Remaining scheduled classes of a batch (lesson data in order), optionally locked. */
+async function futureClasses(client, batchId, fromDate, { lock = false } = {}) {
+  const r = await client.query(
+    `SELECT id, to_char(date,'YYYY-MM-DD') AS d, to_char(time,'HH24:MI') AS t,
+            pathway_lesson_id, lesson_number_in_grade, lesson_name, grade
+     FROM bookings
+     WHERE batch_id = $1 AND status = 'scheduled' AND date >= $2::date
+     ORDER BY date, time ${lock ? 'FOR UPDATE' : ''}`,
+    [batchId, fromDate]
+  );
+  return r.rows;
 }
 
 /* ══════════════════════════════════════════════
-   POST /api/batches — create a batch
-   Body: { tutorId, pathwayId, gradeNumber, classLink,
-           schedule: [{weekday,time}], startDate,
-           studentIds: [uuid, uuid, uuid], notes? }
+   POST /api/batches — create
+   Body: { tutorId, pathwayId?, gradeNumber?, startingLesson?, classLink,
+           schedule: [{weekday,time}], startDate, studentIds: [2–3], notes? }
 ══════════════════════════════════════════════ */
-router.post('/', requireAuth, requireRole('admin','super_admin','postsales'), async (req, res, next) => {
-  try {
-    const { tutorId, pathwayId, gradeNumber, classLink, schedule, startDate, studentIds, notes } = req.body;
+router.post('/', requireAuth, requireRole(...STAFF), tx(async (client, req) => {
+  const { tutorId, pathwayId, gradeNumber, startingLesson, classLink, startDate, studentIds, notes } = req.body;
+  if (!tutorId)   throw new HttpError(400, 'Please select a teacher');
+  if (!classLink) throw new HttpError(400, 'Please enter the class link');
+  if (!Array.isArray(studentIds) || studentIds.length < 2) throw new HttpError(400, 'Select at least 2 students');
+  if (studentIds.length > MAX_MEMBERS) throw new HttpError(400, `Maximum ${MAX_MEMBERS} students per batch`);
+  const schedule = normaliseSchedule(req.body.schedule);
 
-    if (!tutorId)                                   return res.status(400).json({ success: false, error: 'tutorId required' });
-    if (!classLink)                                 return res.status(400).json({ success: false, error: 'classLink required' });
-    if (!Array.isArray(schedule) || !schedule.length) return res.status(400).json({ success: false, error: 'schedule required' });
-    if (!startDate)                                 return res.status(400).json({ success: false, error: 'startDate required' });
-    if (!Array.isArray(studentIds) || studentIds.length < 2) return res.status(400).json({ success: false, error: 'At least 2 students required' });
-    if (studentIds.length > 3)                      return res.status(400).json({ success: false, error: 'Maximum 3 students per batch' });
+  const tutor = await loadTutor(client, tutorId);
+  await checkStudentsAvailable(client, studentIds);
 
-    /* Verify tutor */
-    const tutorRes = await pool.query('SELECT id, name FROM users WHERE id = $1', [tutorId]);
-    if (!tutorRes.rows.length) return res.status(404).json({ success: false, error: 'Tutor not found' });
-    const tutorName = tutorRes.rows[0].name;
+  const lessons = await pathwayLessons(client, pathwayId, gradeNumber, parseInt(startingLesson, 10) || 1);
+  const dates   = generateDates(startDate, schedule, lessons.length || 72);
 
-    /* Generate batch ref */
-    const batchRef = await generateBatchRef();
+  const clash = await findClash(client, { tutorId, slots: dates, studentIds });
+  if (clash) throw clashError(clash);
 
-    /* Create batch record */
-    const batchResult = await pool.query(
-      `INSERT INTO batches (batch_ref, tutor_id, pathway_id, grade_number, class_link, schedule, notes, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
-      [batchRef, tutorId, pathwayId||null, gradeNumber||null,
-       classLink, JSON.stringify(schedule), notes||null, req.user.id]
-    );
-    const batchId = batchResult.rows[0].id;
+  const batchRef = await nextBatchRef(client);
+  const b = await client.query(
+    `INSERT INTO batches (batch_ref, name, tutor_id, pathway_id, grade_number, class_link, schedule, start_date, notes, created_by)
+     VALUES ($1, $1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+    [batchRef, tutorId, pathwayId || null, gradeNumber ? parseInt(gradeNumber, 10) : null,
+     classLink, JSON.stringify(schedule), startDate, notes || null, req.user.id]
+  );
+  const batch = b.rows[0];
 
-    /* Add each student as a batch member */
-    for (const studentId of studentIds) {
-      await pool.query(
-        `INSERT INTO batch_members (batch_id, student_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-        [batchId, studentId]
-      );
-    }
+  for (const sid of studentIds) {
+    await client.query(`INSERT INTO batch_members (batch_id, student_id) VALUES ($1, $2)`, [batch.id, sid]);
+  }
+  await insertBatchBookings(client, { batch, tutorId, tutorName: tutor.name, classLink, dates, lessons });
 
-    /* Get pathway lessons if pathwayId + gradeNumber provided */
-    let orderedLessons = [];
-    if (pathwayId && gradeNumber) {
-      const gradeRes = await pool.query(
-        `SELECT id FROM pathway_grades WHERE pathway_id = $1 AND grade_number = $2 AND is_active = TRUE LIMIT 1`,
-        [pathwayId, parseInt(gradeNumber)]
-      );
-      if (gradeRes.rows.length) {
-        const lessonsRes = await pool.query(
-          `SELECT id, lesson_number, title FROM pathway_lessons
-           WHERE grade_id = $1 AND is_active = TRUE ORDER BY lesson_number ASC`,
-          [gradeRes.rows[0].id]
-        );
-        orderedLessons = lessonsRes.rows;
-      }
-    }
-
-    const totalLessons = orderedLessons.length || 72;
-
-    /* Generate 72 booking dates from schedule */
-    const newDates = [];
-    const start    = new Date(startDate + 'T12:00:00Z');
-    const slotStarts = schedule.map(slot => {
-      const d = new Date(start);
-      const dayDiff = (slot.weekday - d.getDay() + 7) % 7;
-      d.setDate(d.getDate() + dayDiff);
-      return { ...slot, next: new Date(d) };
-    });
-    while (newDates.length < totalLessons) {
-      slotStarts.sort((a, b) => a.next - b.next);
-      const slot = slotStarts[0];
-      newDates.push({ date: slot.next.toISOString().split('T')[0], time: slot.time });
-      const nextOcc = new Date(slot.next);
-      nextOcc.setDate(nextOcc.getDate() + 7);
-      slotStarts[0].next = nextOcc;
-    }
-
-    /* Create one booking per lesson — student_id NULL (batch owns it) */
-    const createdIds = [];
-    for (let i = 0; i < newDates.length; i++) {
-      const nd      = newDates[i];
-      const lesson  = orderedLessons[i] || null;
-      const lessonNum = lesson ? lesson.lesson_number : (i + 1);
-      const r = await pool.query(
-        `INSERT INTO bookings
-           (subject, grade, date, time, class_link, status, is_demo,
-            tutor_id, student_id, batch_id, lesson_name, notes,
-            booked_at, scheduled_at, pathway_lesson_id, lesson_number_in_grade)
-         VALUES ($1,$2,$3::date,$4::time,$5,'scheduled',FALSE,
-                 $6,NULL,$7,$8,$9,NOW(),NOW(),$10,$11)
-         RETURNING id`,
-        [
-          'Coding',
-          gradeNumber ? `Grade ${gradeNumber}` : 'Group',
-          nd.date,
-          nd.time.substring(0, 5),
-          classLink,
-          tutorId,
-          batchId,
-          lesson ? lesson.title : `Lesson ${lessonNum}`,
-          JSON.stringify({ batchRef, tutorName, classLink, isBatchClass: true }),
-          lesson ? lesson.id : null,
-          lessonNum,
-        ]
-      );
-      createdIds.push(r.rows[0].id);
-    }
-
-    logger.info(`[BATCH] Created ${batchRef} with ${studentIds.length} students, ${createdIds.length} bookings`);
-    res.status(201).json({ success: true, batchId, batchRef, bookingsCreated: createdIds.length });
-  } catch (err) { next(err); }
-});
+  logger.info(`[BATCH] Created ${batchRef} (${studentIds.length} students, ${dates.length} classes) by ${req.user.email}`);
+  return { _status: 201, success: true, batchId: batch.id, batchRef, bookingsCreated: dates.length, firstClass: dates[0] };
+}));
 
 /* ══════════════════════════════════════════════
-   GET /api/batches — list all batches
+   GET /api/batches — list
 ══════════════════════════════════════════════ */
-router.get('/', requireAuth, requireRole('admin','super_admin','postsales'), async (req, res, next) => {
+router.get('/', requireAuth, requireRole(...STAFF), async (req, res, next) => {
   try {
     const result = await pool.query(`
       SELECT
         b.id, b.batch_ref AS "batchRef", b.status, b.class_link AS "classLink",
         b.grade_number AS "gradeNumber", b.schedule, b.created_at AS "createdAt",
-        u_t.name   AS "tutorName",   u_t.id AS "tutorId",
-        p.name     AS "pathwayName",
-        (SELECT COUNT(*) FROM batch_members WHERE batch_id = b.id AND status = 'active') AS "memberCount",
-        (SELECT MIN(date) FROM bookings WHERE batch_id = b.id AND status = 'scheduled' AND date >= CURRENT_DATE) AS "nextClassDate"
+        u_t.name AS "tutorName", u_t.id AS "tutorId",
+        p.name   AS "pathwayName", b.pathway_id AS "pathwayId",
+        (SELECT COUNT(*)::int FROM batch_members WHERE batch_id = b.id AND status = 'active') AS "memberCount",
+        (SELECT string_agg(u.name, ', ' ORDER BY bm.joined_at) FROM batch_members bm
+           JOIN users u ON u.id = bm.student_id WHERE bm.batch_id = b.id AND bm.status = 'active') AS "memberNames",
+        (SELECT to_char(MIN(date), 'YYYY-MM-DD') FROM bookings
+           WHERE batch_id = b.id AND status = 'scheduled' AND date >= CURRENT_DATE) AS "nextClassDate",
+        (SELECT COUNT(*)::int FROM bookings
+           WHERE batch_id = b.id AND status = 'scheduled' AND date >= CURRENT_DATE) AS "remainingClasses"
       FROM batches b
       LEFT JOIN users u_t ON u_t.id = b.tutor_id
-      LEFT JOIN pathways p ON p.id  = b.pathway_id
+      LEFT JOIN pathways p ON p.id = b.pathway_id
+      WHERE b.batch_ref IS NOT NULL
       ORDER BY b.created_at DESC
     `);
     res.json({ success: true, batches: result.rows });
@@ -171,9 +297,9 @@ router.get('/', requireAuth, requireRole('admin','super_admin','postsales'), asy
 });
 
 /* ══════════════════════════════════════════════
-   GET /api/batches/:id — batch detail + members
+   GET /api/batches/:id — detail
 ══════════════════════════════════════════════ */
-router.get('/:id', requireAuth, requireRole('admin','super_admin','postsales','tutor'), async (req, res, next) => {
+router.get('/:id', requireAuth, requireRole(...STAFF, 'tutor'), async (req, res, next) => {
   try {
     const batchRes = await pool.query(`
       SELECT b.*, u_t.name AS "tutorName", p.name AS "pathwayName"
@@ -183,763 +309,341 @@ router.get('/:id', requireAuth, requireRole('admin','super_admin','postsales','t
       WHERE b.id = $1`, [req.params.id]
     );
     if (!batchRes.rows.length) return res.status(404).json({ success: false, error: 'Batch not found' });
+    const batch = batchRes.rows[0];
+    if (req.user.role === 'tutor' && batch.tutor_id !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'Not your batch' });
+    }
 
     const membersRes = await pool.query(`
-      SELECT bm.id, bm.status, bm.joined_at AS "joinedAt", bm.removal_reason AS "removalReason",
+      SELECT bm.id, bm.status, bm.joined_at AS "joinedAt", bm.removed_at AS "removedAt",
+             bm.removal_reason AS "removalReason",
              u.id AS "studentId", u.name AS "studentName", u.email,
              u.phone, u.whatsapp, u.staff_id AS "staffId",
              sp.parent_name AS "parentName",
              COALESCE(sp.grade, '') AS grade,
-             sp.credits, sp.credits_suspended AS "creditsSuspended"
+             sp.credits, sp.credits_suspended AS "creditsSuspended", sp.class_paused AS "classPaused"
       FROM batch_members bm
       JOIN users u ON u.id = bm.student_id
       LEFT JOIN student_profiles sp ON sp.user_id = u.id
       WHERE bm.batch_id = $1
-      ORDER BY bm.joined_at ASC`, [req.params.id]
+      ORDER BY (bm.status = 'active') DESC, bm.joined_at ASC`, [req.params.id]
     );
 
-    const upcomingRes = await pool.query(
-      `SELECT COUNT(*) AS cnt FROM bookings
-       WHERE batch_id = $1 AND status = 'scheduled' AND date >= CURRENT_DATE`,
+    const next5 = await pool.query(
+      `SELECT id, to_char(date,'YYYY-MM-DD') AS date, to_char(time,'HH24:MI') AS time,
+              lesson_name AS "lessonName", lesson_number_in_grade AS "lessonNumber"
+       FROM bookings WHERE batch_id = $1 AND status = 'scheduled' AND date >= CURRENT_DATE
+       ORDER BY date, time LIMIT 5`, [req.params.id]
+    );
+    const remaining = await pool.query(
+      `SELECT COUNT(*)::int AS cnt FROM bookings WHERE batch_id = $1 AND status = 'scheduled' AND date >= CURRENT_DATE`,
       [req.params.id]
     );
 
     res.json({
       success: true,
-      batch:   batchRes.rows[0],
+      batch,
       members: membersRes.rows,
-      remainingClasses: parseInt(upcomingRes.rows[0].cnt),
+      nextClasses: next5.rows,
+      remainingClasses: remaining.rows[0].cnt,
     });
   } catch (err) { next(err); }
 });
 
 /* ══════════════════════════════════════════════
-   PUT /api/batches/:id — edit schedule/link/teacher
-   Body: { classLink?, schedule?, tutorId? }
+   PUT /api/batches/:id — edit class link / notes
+   (teacher and schedule changes go through /reschedule)
 ══════════════════════════════════════════════ */
-router.put('/:id', requireAuth, requireRole('admin','super_admin','postsales'), async (req, res, next) => {
-  try {
-    const { classLink, schedule, tutorId } = req.body;
-    const fields = [], values = [];
-    let i = 1;
-    if (classLink !== undefined) { fields.push(`class_link = $${i++}`);  values.push(classLink); }
-    if (schedule  !== undefined) { fields.push(`schedule = $${i++}`);    values.push(JSON.stringify(schedule)); }
-    if (tutorId   !== undefined) { fields.push(`tutor_id = $${i++}`);    values.push(tutorId); }
-    if (!fields.length) return res.status(400).json({ success: false, error: 'Nothing to update' });
-    fields.push(`updated_at = NOW()`);
-    values.push(req.params.id);
-    await pool.query(`UPDATE batches SET ${fields.join(', ')} WHERE id = $${i}`, values);
-    logger.info(`[BATCH] ${req.params.id} updated by ${req.user.email}`);
-    res.json({ success: true });
-  } catch (err) { next(err); }
-});
+router.put('/:id', requireAuth, requireRole(...STAFF), tx(async (client, req) => {
+  const { classLink, notes } = req.body;
+  const batch = await loadBatch(client, req.params.id, { lock: true });
+  if (classLink === undefined && notes === undefined) throw new HttpError(400, 'Nothing to update');
+
+  if (classLink !== undefined) {
+    if (!classLink) throw new HttpError(400, 'Class link cannot be empty');
+    await client.query(`UPDATE batches SET class_link = $1, updated_at = NOW() WHERE id = $2`, [classLink, batch.id]);
+    await client.query(
+      `UPDATE bookings SET class_link = $1,
+              notes = COALESCE(notes, '{}'::jsonb) || jsonb_build_object('classLink', $1::text)
+       WHERE batch_id = $2 AND status = 'scheduled' AND date >= CURRENT_DATE`,
+      [classLink, batch.id]
+    );
+  }
+  if (notes !== undefined) {
+    await client.query(`UPDATE batches SET notes = $1, updated_at = NOW() WHERE id = $2`, [notes || null, batch.id]);
+  }
+  logger.info(`[BATCH] ${batch.batch_ref} edited by ${req.user.email}`);
+  return { success: true };
+}));
 
 /* ══════════════════════════════════════════════
-   PUT /api/batches/:id/status — pause or close
-   Body: { status: 'paused'|'closed' }
+   PUT /api/batches/:id/status — { status: 'paused' | 'active' | 'closed' }
+   paused  → future classes are cancelled and tagged so they can be restored
+   active  → paused classes come back, moved forward by whole weeks so the
+             first one is today or later (same weekdays and times)
+   closed  → future classes are cancelled
 ══════════════════════════════════════════════ */
-router.put('/:id/status', requireAuth, requireRole('admin','super_admin','postsales'), async (req, res, next) => {
-  try {
-    const { status } = req.body;
-    if (!['active','paused','closed'].includes(status)) {
-      return res.status(400).json({ success: false, error: 'Invalid status' });
-    }
-    await pool.query(
-      `UPDATE batches SET status = $1, updated_at = NOW() WHERE id = $2`,
-      [status, req.params.id]
+router.put('/:id/status', requireAuth, requireRole(...STAFF), tx(async (client, req) => {
+  const { status } = req.body;
+  if (!['active', 'paused', 'closed'].includes(status)) throw new HttpError(400, 'Invalid status');
+  const batch = await loadBatch(client, req.params.id, { lock: true });
+  const today = _todayWAT();
+  let affected = 0;
+
+  if (status === 'paused') {
+    if (batch.status !== 'active') throw new HttpError(400, 'Only an active batch can be paused');
+    const r = await client.query(
+      `UPDATE bookings SET status = 'cancelled',
+              notes = COALESCE(notes, '{}'::jsonb) || '{"pausedBatch": true}'::jsonb
+       WHERE batch_id = $1 AND status = 'scheduled' AND date >= $2::date RETURNING id`,
+      [batch.id, today]
     );
-    /* If closing, cancel all future batch bookings */
-    if (status === 'closed') {
-      const result = await pool.query(
-        `UPDATE bookings SET status = 'cancelled'
-         WHERE batch_id = $1 AND status = 'scheduled' AND date >= CURRENT_DATE
-         RETURNING id`,
-        [req.params.id]
+    affected = r.rows.length;
+  }
+
+  if (status === 'active') {
+    if (batch.status === 'active') throw new HttpError(400, 'Batch is already active');
+    if (batch.status === 'closed') throw new HttpError(400, 'A closed batch cannot be resumed');
+    const paused = await client.query(
+      `SELECT id, to_char(date,'YYYY-MM-DD') AS d, to_char(time,'HH24:MI') AS t FROM bookings
+       WHERE batch_id = $1 AND status = 'cancelled' AND notes->>'pausedBatch' = 'true'
+       ORDER BY date, time FOR UPDATE`,
+      [batch.id]
+    );
+    const rows = paused.rows;
+    let weeks = 0;
+    if (rows.length && rows[0].d < today) {
+      const [y1, m1, d1] = rows[0].d.split('-').map(Number), [y2, m2, d2] = today.split('-').map(Number);
+      weeks = Math.ceil((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / (7 * 86400000));
+    }
+    const slots = rows.map(r => ({ id: r.id, d: _addDays(r.d, weeks * 7), t: r.t }));
+    const clash = await findClash(client, { tutorId: batch.tutor_id, slots, excludeBatchId: batch.id, studentIds: await activeMemberIds(client, batch.id) });
+    if (clash) throw clashError(clash);
+    for (const s of slots) {
+      await client.query(
+        `UPDATE bookings SET status = 'scheduled', date = $1::date, notes = notes - 'pausedBatch' WHERE id = $2`,
+        [s.d, s.id]
       );
-      logger.info(`[BATCH] ${req.params.id} closed. ${result.rows.length} future bookings cancelled.`);
     }
-    res.json({ success: true });
-  } catch (err) { next(err); }
-});
+    affected = slots.length;
+    await rescheduleSvc.clearReminders(slots.map(s => s.id));
+  }
 
-/* ══════════════════════════════════════════════
-   POST /api/batches/:id/members — add a student
-   Body: { studentId }
-══════════════════════════════════════════════ */
-router.post('/:id/members', requireAuth, requireRole('admin','super_admin','postsales'), async (req, res, next) => {
-  try {
-    const { studentId } = req.body;
-    if (!studentId) return res.status(400).json({ success: false, error: 'studentId required' });
-
-    /* Check batch exists and is active */
-    const batchRes = await pool.query('SELECT * FROM batches WHERE id = $1', [req.params.id]);
-    if (!batchRes.rows.length) return res.status(404).json({ success: false, error: 'Batch not found' });
-    if (batchRes.rows[0].status !== 'active') return res.status(400).json({ success: false, error: 'Batch is not active' });
-
-    /* Check not already a member */
-    const existing = await pool.query(
-      `SELECT id FROM batch_members WHERE batch_id = $1 AND student_id = $2 AND status = 'active'`,
-      [req.params.id, studentId]
+  if (status === 'closed') {
+    const r = await client.query(
+      `UPDATE bookings SET status = 'cancelled'
+       WHERE batch_id = $1 AND status = 'scheduled' AND date >= $2::date RETURNING id`,
+      [batch.id, today]
     );
-    if (existing.rows.length) return res.status(400).json({ success: false, error: 'Student is already in this batch' });
+    affected = r.rows.length;
+  }
 
-    /* Check max 3 members */
-    const countRes = await pool.query(
-      `SELECT COUNT(*) AS cnt FROM batch_members WHERE batch_id = $1 AND status = 'active'`,
-      [req.params.id]
-    );
-    if (parseInt(countRes.rows[0].cnt) >= 3) {
-      return res.status(400).json({ success: false, error: 'Batch already has 3 active members (maximum)' });
-    }
-
-    /* Add member */
-    await pool.query(
-      `INSERT INTO batch_members (batch_id, student_id)
-       VALUES ($1, $2)
-       ON CONFLICT (batch_id, student_id)
-       DO UPDATE SET status = 'active', removed_at = NULL, removal_reason = NULL`,
-      [req.params.id, studentId]
-    );
-
-    const stuRes = await pool.query('SELECT name FROM users WHERE id = $1', [studentId]);
-    const studentName = stuRes.rows[0]?.name || studentId;
-
-    logger.info(`[BATCH] Student ${studentName} added to batch ${batchRes.rows[0].batch_ref}`);
-    res.json({ success: true, message: `${studentName} added to batch` });
-  } catch (err) { next(err); }
-});
-
-/* ══════════════════════════════════════════════
-   DELETE /api/batches/:id/members/:studentId
-   Body: { reason }
-══════════════════════════════════════════════ */
-router.delete('/:id/members/:studentId', requireAuth, requireRole('admin','super_admin','postsales'), async (req, res, next) => {
-  try {
-    const { reason } = req.body;
-    if (!reason || !reason.trim()) {
-      return res.status(400).json({ success: false, error: 'A removal reason is required' });
-    }
-
-    const result = await pool.query(
-      `UPDATE batch_members
-       SET status = 'removed', removed_at = NOW(), removal_reason = $3
-       WHERE batch_id = $1 AND student_id = $2 AND status = 'active'
-       RETURNING id`,
-      [req.params.id, req.params.studentId, reason.trim()]
-    );
-    if (!result.rows.length) {
-      return res.status(404).json({ success: false, error: 'Member not found in this batch' });
-    }
-
-    const stuRes = await pool.query('SELECT name FROM users WHERE id = $1', [req.params.studentId]);
-    const studentName = stuRes.rows[0]?.name || req.params.studentId;
-
-    logger.info(`[BATCH] Student ${studentName} removed from batch ${req.params.id}. Reason: ${reason}`);
-    res.json({ success: true, message: `${studentName} removed from batch` });
-  } catch (err) { next(err); }
-});
+  await client.query(`UPDATE batches SET status = $1, updated_at = NOW() WHERE id = $2`, [status, batch.id]);
+  logger.info(`[BATCH] ${batch.batch_ref} → ${status} (${affected} classes) by ${req.user.email}`);
+  return { success: true, status, classesAffected: affected };
+}));
 
 /* ══════════════════════════════════════════════
    PUT /api/batches/:id/reschedule
-   Reschedules all future bookings for a batch.
-   - Runs clash detection on new schedule
-   - Cancels all future batch bookings from startDate
-   - Regenerates bookings on new schedule preserving lesson sequence
-   - Updates batch record with new schedule
-   Body: { startDate, schedule: [{weekday,time}], classLink? }
+   Body: { startDate, schedule: [{weekday,time}], classLink?, newTutorId? }
+   Moves the remaining classes (lesson order kept) onto the new schedule from
+   startDate. A paused batch is resumed onto the new schedule.
 ══════════════════════════════════════════════ */
-router.put('/:id/reschedule', requireAuth, requireRole('admin','super_admin','postsales'), async (req, res, next) => {
-  try {
-    const { startDate, schedule, classLink, newTutorId } = req.body;
+router.put('/:id/reschedule', requireAuth, requireRole(...STAFF), tx(async (client, req) => {
+  const { startDate, classLink, newTutorId } = req.body;
+  const schedule = normaliseSchedule(req.body.schedule);
+  const batch = await loadBatch(client, req.params.id, { lock: true });
+  if (batch.status === 'closed') throw new HttpError(400, 'A closed batch cannot be rescheduled');
 
-    if (!startDate)                                     return res.status(400).json({ success: false, error: 'startDate required' });
-    if (!Array.isArray(schedule) || !schedule.length)   return res.status(400).json({ success: false, error: 'schedule required (array of {weekday,time})' });
+  let tutorId = batch.tutor_id, tutorName = batch.tutor_name;
+  if (newTutorId && newTutorId !== batch.tutor_id) {
+    const t = await loadTutor(client, newTutorId);
+    tutorId = t.id; tutorName = t.name;
+  }
+  const link = classLink || batch.class_link || '';
 
-    /* Get batch */
-    const batchRes = await pool.query(
-      `SELECT b.*, u_t.name AS tutor_name FROM batches b LEFT JOIN users u_t ON u_t.id = b.tutor_id WHERE b.id = $1`,
-      [req.params.id]
+  /* Remaining classes: scheduled from today on, or the paused ones */
+  const today = _todayWAT();
+  const rows = batch.status === 'paused'
+    ? (await client.query(
+        `SELECT id FROM bookings WHERE batch_id = $1 AND status = 'cancelled' AND notes->>'pausedBatch' = 'true'
+         ORDER BY date, time FOR UPDATE`, [batch.id])).rows
+    : await futureClasses(client, batch.id, today, { lock: true });
+  if (!rows.length) throw new HttpError(400, 'This batch has no remaining classes to reschedule');
+
+  const dates = generateDates(startDate, schedule, rows.length);
+  const clash = await findClash(client, { tutorId, slots: dates, excludeBatchId: batch.id, studentIds: await activeMemberIds(client, batch.id) });
+  if (clash) throw clashError(clash);
+
+  for (let i = 0; i < rows.length; i++) {
+    await client.query(
+      `UPDATE bookings SET date = $1::date, time = $2::time, status = 'scheduled',
+              tutor_id = $3, class_link = $4, rescheduled_at = NOW(),
+              notes = (COALESCE(notes, '{}'::jsonb) - 'pausedBatch')
+                      || jsonb_build_object('tutorName', $5::text, 'classLink', $4::text)
+       WHERE id = $6`,
+      [dates[i].d, dates[i].t, tutorId, link, tutorName, rows[i].id]
     );
-    if (!batchRes.rows.length) return res.status(404).json({ success: false, error: 'Batch not found' });
-    const batch = batchRes.rows[0];
-    if (batch.status === 'closed')   return res.status(400).json({ success: false, error: 'Batch is closed and cannot be rescheduled' });
+  }
+  await client.query(
+    `UPDATE batches SET schedule = $1, class_link = $2, tutor_id = $3, status = 'active', updated_at = NOW() WHERE id = $4`,
+    [JSON.stringify(schedule), link, tutorId, batch.id]
+  );
+  await rescheduleSvc.clearReminders(rows.map(r => r.id));
 
-    /* If newTutorId provided, use the new tutor; otherwise keep existing */
-    let tutorId   = batch.tutor_id;
-    let tutorName = batch.tutor_name;
-    if (newTutorId && newTutorId !== batch.tutor_id) {
-      const newTutorRes = await pool.query('SELECT id, name FROM users WHERE id = $1 AND role = $2', [newTutorId, 'tutor']);
-      if (!newTutorRes.rows.length) return res.status(404).json({ success: false, error: 'New tutor not found' });
-      tutorId   = newTutorRes.rows[0].id;
-      tutorName = newTutorRes.rows[0].name;
-    }
-    const resolvedLink = classLink || batch.class_link || '';
-
-    /* ── Clash detection: check new schedule against tutor's other bookings ──
-       Exclude this batch's own bookings from the check (they will be cancelled) */
-    for (const slot of schedule) {
-      const start = new Date(startDate + 'T12:00:00Z');
-      const dayDiff = (slot.weekday - start.getDay() + 7) % 7;
-      start.setDate(start.getDate() + dayDiff);
-
-      /* Check first 4 occurrences of each slot */
-      for (let w = 0; w < 4; w++) {
-        const d = new Date(start);
-        d.setDate(d.getDate() + w * 7);
-        const dateStr  = d.toISOString().split('T')[0];
-        const timeNorm = slot.time.substring(0, 5);
-
-        const clash = await pool.query(
-          `SELECT b.date, b.time, u_s.name AS student_name
-           FROM bookings b
-           LEFT JOIN users u_s ON u_s.id = b.student_id
-           WHERE b.tutor_id = $1
-             AND b.status = 'scheduled'
-             AND b.date = $2::date
-             AND b.time = $3::time
-             AND (b.batch_id IS NULL OR b.batch_id != $4::uuid)
-           LIMIT 1`,
-          [tutorId, dateStr, timeNorm, req.params.id]
-        );
-
-        if (clash.rows.length) {
-          const c = clash.rows[0];
-          const fd = new Date(c.date).toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
-          return res.status(409).json({
-            success: false,
-            error: `Schedule clash: ${fd} at ${timeNorm} is already booked for ${c.student_name || 'another student'} with this tutor. Please choose a different time.`,
-            clash: { date: dateStr, time: timeNorm, studentName: c.student_name },
-          });
-        }
-      }
-    }
-
-    /* ── Get future batch bookings ordered by date to preserve lesson sequence ── */
-    const existingRes = await pool.query(
-      `SELECT id, pathway_lesson_id, lesson_number_in_grade, lesson_name, grade
-       FROM bookings
-       WHERE batch_id = $1 AND status = 'scheduled' AND date >= $2::date
-       ORDER BY date ASC, time ASC`,
-      [req.params.id, startDate]
-    );
-    const existingBookings = existingRes.rows;
-
-    if (!existingBookings.length) {
-      return res.status(404).json({ success: false, error: 'No future scheduled bookings found for this batch from the given start date' });
-    }
-
-    const totalToReschedule = existingBookings.length;
-
-    /* ── Generate new dates from the new schedule ── */
-    const newDates = [];
-    const start    = new Date(startDate + 'T12:00:00Z');
-    const slotStarts = schedule.map(slot => {
-      const d = new Date(start);
-      const dayDiff = (slot.weekday - d.getDay() + 7) % 7;
-      d.setDate(d.getDate() + dayDiff);
-      return { ...slot, next: new Date(d) };
-    });
-
-    while (newDates.length < totalToReschedule) {
-      slotStarts.sort((a, b) => a.next - b.next);
-      const slot = slotStarts[0];
-      newDates.push({ date: slot.next.toISOString().split('T')[0], time: slot.time });
-      const nextOcc = new Date(slot.next);
-      nextOcc.setDate(nextOcc.getDate() + 7);
-      slotStarts[0].next = nextOcc;
-    }
-
-    /* ── Cancel existing future batch bookings ── */
-    await pool.query(
-      `UPDATE bookings SET status = 'cancelled'
-       WHERE batch_id = $1 AND status = 'scheduled' AND date >= $2::date`,
-      [req.params.id, startDate]
-    );
-
-    /* ── Create new bookings preserving lesson sequence ── */
-    const createdIds = [];
-    for (let i = 0; i < newDates.length; i++) {
-      const nd  = newDates[i];
-      const old = existingBookings[i];
-
-      const r = await pool.query(
-        `INSERT INTO bookings
-           (subject, grade, date, time, class_link, status, is_demo,
-            tutor_id, student_id, batch_id, lesson_name, notes,
-            booked_at, scheduled_at, pathway_lesson_id, lesson_number_in_grade)
-         VALUES ($1,$2,$3::date,$4::time,$5,'scheduled',FALSE,
-                 $6,NULL,$7,$8,$9,NOW(),NOW(),$10,$11)
-         RETURNING id`,
-        [
-          'Coding',
-          old.grade || (batch.grade_number ? `Grade ${batch.grade_number}` : 'Group'),
-          nd.date,
-          nd.time.substring(0, 5),
-          resolvedLink,
-          tutorId,
-          req.params.id,
-          old.lesson_name || `Lesson ${old.lesson_number_in_grade || (i + 1)}`,
-          JSON.stringify({
-            batchRef:   batch.batch_ref,
-            tutorName,
-            classLink:  resolvedLink,
-            isBatchClass: true,
-            rescheduled:  true,
-            rescheduledAt: new Date().toISOString(),
-          }),
-          old.pathway_lesson_id || null,
-          old.lesson_number_in_grade || (i + 1),
-        ]
-      );
-      createdIds.push(r.rows[0].id);
-    }
-
-    /* ── Update batch record with new schedule and class link ── */
-    await pool.query(
-      `UPDATE batches SET schedule = $1, class_link = $2, tutor_id = $3, updated_at = NOW() WHERE id = $4`,
-      [JSON.stringify(schedule), resolvedLink, tutorId, req.params.id]
-    );
-
-    logger.info(`[BATCH RESCHEDULE] ${batch.batch_ref}: cancelled ${totalToReschedule}, created ${createdIds.length} from ${startDate}`);
-
-    res.json({
-      success: true,
-      batchRef: batch.batch_ref,
-      cancelled: totalToReschedule,
-      created: createdIds.length,
-      newSchedule: schedule,
-    });
-  } catch (err) { next(err); }
-});
+  logger.info(`[BATCH] ${batch.batch_ref} rescheduled: ${rows.length} classes from ${startDate} by ${req.user.email}`);
+  return { success: true, batchRef: batch.batch_ref, moved: rows.length, firstClass: dates[0], tutorName };
+}));
 
 /* ══════════════════════════════════════════════
-   DELETE /api/batches/:id
-   Deletes a batch and all its future scheduled bookings.
-   Past/completed bookings are kept for records.
-   Batch numbering continues from highest remaining number.
+   POST /api/batches/:id/members — add a student { studentId }
 ══════════════════════════════════════════════ */
-router.delete('/:id', requireAuth, requireRole('admin','super_admin','postsales'), async (req, res, next) => {
-  try {
-    /* Verify batch exists */
-    const batchRes = await pool.query('SELECT id, batch_ref FROM batches WHERE id = $1', [req.params.id]);
-    if (!batchRes.rows.length) return res.status(404).json({ success: false, error: 'Batch not found' });
-    const batch = batchRes.rows[0];
+router.post('/:id/members', requireAuth, requireRole(...STAFF), tx(async (client, req) => {
+  const { studentId } = req.body;
+  if (!studentId) throw new HttpError(400, 'studentId required');
+  const batch = await loadBatch(client, req.params.id, { lock: true });
+  if (batch.status === 'closed') throw new HttpError(400, 'Batch is closed');
 
-    /* Cancel all future scheduled bookings for this batch */
-    const cancelRes = await pool.query(
-      `UPDATE bookings SET status = 'cancelled'
-       WHERE batch_id = $1 AND status = 'scheduled' AND date >= CURRENT_DATE
-       RETURNING id`,
-      [req.params.id]
-    );
+  const members = await activeMemberIds(client, batch.id);
+  if (members.includes(studentId)) throw new HttpError(400, 'Student is already in this batch');
+  if (members.length >= MAX_MEMBERS) throw new HttpError(400, `Batch already has ${MAX_MEMBERS} students (maximum)`);
+  const [student] = await checkStudentsAvailable(client, [studentId], batch.id);
 
-    /* Null out batch_id on past/completed bookings so the FK constraint
-       does not block deleting the batch record */
-    await pool.query(
-      `UPDATE bookings SET batch_id = NULL
-       WHERE batch_id = $1`,
-      [req.params.id]
-    );
+  /* The student's own 1-on-1 classes must not overlap the batch's */
+  const slots = (await futureClasses(client, batch.id, _todayWAT())).map(r => ({ d: r.d, t: r.t }));
+  const clash = await findClash(client, { tutorId: null, slots, excludeBatchId: batch.id, studentIds: [studentId] });
+  if (clash) throw clashError(clash);
 
-    /* Remove batch members */
-    await pool.query('DELETE FROM batch_members WHERE batch_id = $1', [req.params.id]);
+  await client.query(
+    `INSERT INTO batch_members (batch_id, student_id) VALUES ($1, $2)
+     ON CONFLICT (batch_id, student_id)
+     DO UPDATE SET status = 'active', joined_at = NOW(), removed_at = NULL, removal_reason = NULL, transferred_at = NULL`,
+    [batch.id, studentId]
+  );
+  logger.info(`[BATCH] ${student.name} added to ${batch.batch_ref} by ${req.user.email}`);
+  return { success: true, message: `${student.name} added to ${batch.batch_ref}` };
+}));
 
-    /* Delete the batch record */
-    await pool.query('DELETE FROM batches WHERE id = $1', [req.params.id]);
+/* ══════════════════════════════════════════════
+   DELETE /api/batches/:id/members/:studentId — remove { reason }
+══════════════════════════════════════════════ */
+router.delete('/:id/members/:studentId', requireAuth, requireRole(...STAFF), tx(async (client, req) => {
+  const reason = String((req.body && req.body.reason) || '').trim();
+  if (!reason) throw new HttpError(400, 'A removal reason is required');
+  const batch = await loadBatch(client, req.params.id, { lock: true });
 
-    logger.info(`[BATCH DELETE] ${batch.batch_ref} deleted by ${req.user.email}. ${cancelRes.rows.length} future bookings cancelled.`);
+  const r = await client.query(
+    `UPDATE batch_members SET status = 'removed', removed_at = NOW(), removal_reason = $3
+     WHERE batch_id = $1 AND student_id = $2 AND status = 'active' RETURNING id`,
+    [batch.id, req.params.studentId, reason]
+  );
+  if (!r.rows.length) throw new HttpError(404, 'Student is not an active member of this batch');
 
-    res.json({
-      success: true,
-      message: `Batch ${batch.batch_ref} deleted successfully`,
-      cancelledBookings: cancelRes.rows.length,
-    });
-  } catch (err) { next(err); }
-});
+  const name = (await client.query('SELECT name FROM users WHERE id = $1', [req.params.studentId])).rows[0]?.name || 'Student';
+  const remaining = (await activeMemberIds(client, batch.id)).length;
+  logger.info(`[BATCH] ${name} removed from ${batch.batch_ref} by ${req.user.email}. Reason: ${reason}`);
+  return {
+    success: true,
+    message: `${name} removed from ${batch.batch_ref}`,
+    remainingMembers: remaining,
+    warning: remaining === 0 ? 'This batch has no students left — its classes are still on the teacher\'s calendar. Add students, pause or delete it.' : null,
+  };
+}));
 
 /* ══════════════════════════════════════════════
    POST /api/batches/:id/transfer-member
-   Move a student from this batch to another batch.
-
-   Mode 1 — move to existing batch:
-     Body: { studentId, targetBatchId }
-     The student inherits the target batch's tutor/schedule/link.
-
-   Mode 2 — move to a NEW batch (created inline):
-     Body: { studentId, newBatch: { tutorId, classLink, schedule,
-             startDate, pathwayId?, gradeNumber?, notes? } }
-     Creates the new batch (single student is allowed here), transfers student.
-
-   In both modes:
-   - Student is soft-removed from source batch (status='transferred')
-   - Student is added to target batch
-   - Remaining future bookings from source batch are cancelled
-   - New bookings are generated on the target schedule
+   Move a student out of this batch.
+     { studentId, targetBatchId }             → join an existing batch (its classes)
+     { studentId, newBatch: { tutorId, classLink, schedule, startDate } }
+                                              → split: a new batch continuing from
+                                                this batch's next lesson
+   The students who stay keep their classes unchanged.
 ══════════════════════════════════════════════ */
-router.post('/:id/transfer-member', requireAuth, requireRole('admin','super_admin','postsales'), async (req, res, next) => {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
+router.post('/:id/transfer-member', requireAuth, requireRole(...STAFF), tx(async (client, req) => {
+  const { studentId, targetBatchId, newBatch } = req.body;
+  if (!studentId) throw new HttpError(400, 'studentId required');
+  if (!targetBatchId && !newBatch) throw new HttpError(400, 'Choose a batch to move to, or set up a new one');
 
-    const { studentId, targetBatchId, newBatch } = req.body;
-    if (!studentId) return res.status(400).json({ success: false, error: 'studentId required' });
-    if (!targetBatchId && !newBatch) return res.status(400).json({ success: false, error: 'targetBatchId or newBatch required' });
-
-    /* ── Verify student is active member of source batch ── */
-    const memberRes = await client.query(
-      `SELECT bm.id FROM batch_members bm
-       WHERE bm.batch_id = $1 AND bm.student_id = $2 AND bm.status = 'active'`,
-      [req.params.id, studentId]
-    );
-    if (!memberRes.rows.length) {
-      return res.status(404).json({ success: false, error: 'Student is not an active member of this batch' });
-    }
-
-    const stuRes = await client.query('SELECT name FROM users WHERE id = $1', [studentId]);
-    const studentName = stuRes.rows[0]?.name || studentId;
-
-    /* ── Resolve target batch ── */
-    let destBatchId, destBatchRef, destTutorId, destTutorName, destClassLink, destSchedule;
-
-    if (targetBatchId) {
-      /* Mode 1: existing batch */
-      const destRes = await client.query(
-        `SELECT b.id, b.batch_ref, b.tutor_id, b.class_link, b.schedule, b.status,
-                u.name AS tutor_name
-         FROM batches b LEFT JOIN users u ON u.id = b.tutor_id
-         WHERE b.id = $1`,
-        [targetBatchId]
-      );
-      if (!destRes.rows.length) return res.status(404).json({ success: false, error: 'Target batch not found' });
-      const dest = destRes.rows[0];
-      if (dest.status === 'closed') return res.status(400).json({ success: false, error: 'Target batch is closed' });
-
-      /* Check target has room */
-      const countRes = await client.query(
-        `SELECT COUNT(*) AS cnt FROM batch_members WHERE batch_id = $1 AND status = 'active'`,
-        [targetBatchId]
-      );
-      if (parseInt(countRes.rows[0].cnt) >= 3) {
-        return res.status(400).json({ success: false, error: 'Target batch is full (max 3 students)' });
-      }
-
-      destBatchId   = dest.id;
-      destBatchRef  = dest.batch_ref;
-      destTutorId   = dest.tutor_id;
-      destTutorName = dest.tutor_name;
-      destClassLink = dest.class_link;
-      destSchedule  = Array.isArray(dest.schedule) ? dest.schedule : JSON.parse(dest.schedule || '[]');
-    } else {
-      /* Mode 2: create a new batch inline */
-      const { tutorId, classLink, schedule, startDate, pathwayId, gradeNumber, notes } = newBatch;
-      if (!tutorId)                                      return res.status(400).json({ success: false, error: 'newBatch.tutorId required' });
-      if (!classLink)                                    return res.status(400).json({ success: false, error: 'newBatch.classLink required' });
-      if (!Array.isArray(schedule) || !schedule.length)  return res.status(400).json({ success: false, error: 'newBatch.schedule required' });
-      if (!startDate)                                    return res.status(400).json({ success: false, error: 'newBatch.startDate required' });
-
-      const newTutorRes = await client.query('SELECT id, name FROM users WHERE id = $1', [tutorId]);
-      if (!newTutorRes.rows.length) return res.status(404).json({ success: false, error: 'New tutor not found' });
-
-      const batchRef = await generateBatchRef();
-      const batchResult = await client.query(
-        `INSERT INTO batches (batch_ref, tutor_id, pathway_id, grade_number, class_link, schedule, notes, created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
-        [batchRef, tutorId, pathwayId || null, gradeNumber || null,
-         classLink, JSON.stringify(schedule), notes || null, req.user.id]
-      );
-
-      destBatchId   = batchResult.rows[0].id;
-      destBatchRef  = batchRef;
-      destTutorId   = tutorId;
-      destTutorName = newTutorRes.rows[0].name;
-      destClassLink = classLink;
-      destSchedule  = schedule;
-    }
-
-    /* ── Get source batch info ── */
-    const srcRes = await client.query(
-      `SELECT batch_ref, grade_number, pathway_id FROM batches WHERE id = $1`,
-      [req.params.id]
-    );
-    const srcBatch = srcRes.rows[0];
-
-
-
-    /* ── Cancel remaining future bookings for this student in source batch ── */
-    const cancelRes = await client.query(
-      `UPDATE bookings
-       SET status = 'cancelled'
-       WHERE batch_id = $1
-         AND status = 'scheduled'
-         AND date >= CURRENT_DATE
-       RETURNING id, lesson_name, lesson_number_in_grade, pathway_lesson_id, grade`,
-      [req.params.id]
-    );
-    const cancelledBookings = cancelRes.rows;
-
-    /* ── Soft-remove student from source batch ── */
-    await client.query(
-      `UPDATE batch_members SET status = 'removed', removed_at = NOW(),
-       removal_reason = $3
-       WHERE batch_id = $1 AND student_id = $2 AND status = 'active'`,
-      [req.params.id, studentId, `Transferred to ${destBatchRef} by ${req.user.email}`]
-    );
-
-    /* ── Add student to destination batch ── */
-    await client.query(
-      `INSERT INTO batch_members (batch_id, student_id)
-       VALUES ($1, $2)
-       ON CONFLICT (batch_id, student_id)
-       DO UPDATE SET status = 'active', removed_at = NULL, removal_reason = NULL`,
-      [destBatchId, studentId]
-    );
-
-    /* ── Generate new bookings for student on destination schedule ──
-       Use the cancelled bookings' lesson data to preserve sequence.
-       If no cancelled bookings exist (batch was already finished), generate fresh. */
-    const lessonsToSchedule = cancelledBookings.length || 0;
-    let createdCount = 0;
-
-    if (lessonsToSchedule > 0) {
-      /* Generate dates from destination schedule */
-      const startDateStr = new Date().toISOString().split('T')[0]; // from today
-      const newDates = [];
-      const start = new Date(startDateStr + 'T12:00:00Z');
-      const slotStarts = destSchedule.map(slot => {
-        const d = new Date(start);
-        const dayDiff = (slot.weekday - d.getDay() + 7) % 7 || 7; // always go to next occurrence
-        d.setDate(d.getDate() + dayDiff);
-        return { ...slot, next: new Date(d) };
-      });
-
-      while (newDates.length < lessonsToSchedule) {
-        slotStarts.sort((a, b) => a.next - b.next);
-        const slot = slotStarts[0];
-        newDates.push({ date: slot.next.toISOString().split('T')[0], time: slot.time });
-        const nextOcc = new Date(slot.next);
-        nextOcc.setDate(nextOcc.getDate() + 7);
-        slotStarts[0].next = nextOcc;
-      }
-
-      for (let i = 0; i < cancelledBookings.length; i++) {
-        const nd  = newDates[i];
-        const old = cancelledBookings[i];
-        await client.query(
-          `INSERT INTO bookings
-             (subject, grade, date, time, class_link, status, is_demo,
-              tutor_id, student_id, batch_id, lesson_name, notes,
-              booked_at, scheduled_at, pathway_lesson_id, lesson_number_in_grade)
-           VALUES ($1,$2,$3::date,$4::time,$5,'scheduled',FALSE,
-                   $6,$7,$8,$9,$10,NOW(),NOW(),$11,$12)`,
-          [
-            'Coding',
-            old.grade || (srcBatch.grade_number ? `Grade ${srcBatch.grade_number}` : 'Group'),
-            nd.date,
-            nd.time.substring(0, 5),
-            destClassLink,
-            destTutorId,
-            studentId,
-            destBatchId,
-            old.lesson_name || `Lesson ${old.lesson_number_in_grade || (i + 1)}`,
-            JSON.stringify({
-              batchRef: destBatchRef, tutorName: destTutorName,
-              classLink: destClassLink, isBatchClass: true,
-              transferredFrom: srcBatch.batch_ref,
-              transferredAt: new Date().toISOString(),
-            }),
-            old.pathway_lesson_id || null,
-            old.lesson_number_in_grade || (i + 1),
-          ]
-        );
-        createdCount++;
-      }
-    }
-
-    await client.query('COMMIT');
-    logger.info(`[BATCH TRANSFER] ${studentName} transferred from ${srcBatch.batch_ref} to ${destBatchRef} by ${req.user.email}. ${cancelledBookings.length} cancelled, ${createdCount} created.`);
-
-    res.json({
-      success: true,
-      message: `${studentName} transferred from ${srcBatch.batch_ref} to ${destBatchRef}`,
-      studentName,
-      sourceBatch:  srcBatch.batch_ref,
-      destBatch:    destBatchRef,
-      destBatchId,
-      cancelled:    cancelledBookings.length,
-      created:      createdCount,
-    });
-  } catch (err) {
-    await client.query('ROLLBACK');
-    next(err);
-  } finally {
-    client.release();
+  const src = await loadBatch(client, req.params.id, { lock: true });
+  if (!(await activeMemberIds(client, src.id)).includes(studentId)) {
+    throw new HttpError(404, 'Student is not an active member of this batch');
   }
-});
+  const name = (await client.query('SELECT name FROM users WHERE id = $1', [studentId])).rows[0]?.name || 'Student';
+
+  let dest;
+  if (targetBatchId) {
+    if (targetBatchId === src.id) throw new HttpError(400, 'Student is already in this batch');
+    dest = await loadBatch(client, targetBatchId, { lock: true });
+    if (dest.status === 'closed') throw new HttpError(400, 'Target batch is closed');
+    if ((await activeMemberIds(client, dest.id)).length >= MAX_MEMBERS) throw new HttpError(400, `${dest.batch_ref} is full (${MAX_MEMBERS} students)`);
+
+    const slots = (await futureClasses(client, dest.id, _todayWAT())).map(r => ({ d: r.d, t: r.t }));
+    const clash = await findClash(client, { tutorId: null, slots, excludeBatchId: dest.id, studentIds: [studentId] });
+    if (clash) throw clashError(clash);
+  } else {
+    const { tutorId, classLink, startDate } = newBatch;
+    if (!tutorId)   throw new HttpError(400, 'Please select a teacher for the new batch');
+    if (!classLink) throw new HttpError(400, 'Please enter the class link for the new batch');
+    const schedule = normaliseSchedule(newBatch.schedule);
+    const tutor = await loadTutor(client, tutorId);
+
+    /* Continue the lesson sequence from this batch's next class */
+    let lessons = (await futureClasses(client, src.id, _todayWAT()));
+    if (!lessons.length) lessons = await pathwayLessons(client, src.pathway_id, src.grade_number);
+    const dates = generateDates(startDate, schedule, lessons.length || 72);
+
+    const clash = await findClash(client, { tutorId, slots: dates, studentIds: [studentId] });
+    if (clash) throw clashError(clash);
+
+    const ref = await nextBatchRef(client);
+    dest = (await client.query(
+      `INSERT INTO batches (batch_ref, name, tutor_id, pathway_id, grade_number, class_link, schedule, start_date, notes, created_by)
+       VALUES ($1, $1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [ref, tutorId, src.pathway_id, src.grade_number, classLink, JSON.stringify(schedule), startDate,
+       `Split from ${src.batch_ref}`, req.user.id]
+    )).rows[0];
+    await insertBatchBookings(client, { batch: dest, tutorId, tutorName: tutor.name, classLink, dates, lessons });
+  }
+
+  await client.query(
+    `UPDATE batch_members SET status = 'transferred', transferred_at = NOW(), removed_at = NOW(), removal_reason = $3
+     WHERE batch_id = $1 AND student_id = $2 AND status = 'active'`,
+    [src.id, studentId, `Moved to ${dest.batch_ref} by ${req.user.email}`]
+  );
+  await client.query(
+    `INSERT INTO batch_members (batch_id, student_id) VALUES ($1, $2)
+     ON CONFLICT (batch_id, student_id)
+     DO UPDATE SET status = 'active', joined_at = NOW(), removed_at = NULL, removal_reason = NULL, transferred_at = NULL`,
+    [dest.id, studentId]
+  );
+
+  const remaining = (await activeMemberIds(client, src.id)).length;
+  logger.info(`[BATCH] ${name} moved ${src.batch_ref} → ${dest.batch_ref} by ${req.user.email}`);
+  return {
+    success: true,
+    message: `${name} moved to ${dest.batch_ref}`,
+    destBatchId: dest.id, destBatch: dest.batch_ref, sourceBatch: src.batch_ref,
+    sourceRemainingMembers: remaining,
+    warning: remaining === 0 ? `${src.batch_ref} has no students left — pause or delete it.` : null,
+  };
+}));
 
 /* ══════════════════════════════════════════════
-   POST /api/batches/:id/transfer-member
-   Move a student from this batch to another batch.
+   DELETE /api/batches/:id — cancel future classes and delete the batch.
+   Past classes stay in the booking history.
+══════════════════════════════════════════════ */
+router.delete('/:id', requireAuth, requireRole(...STAFF), tx(async (client, req) => {
+  const batch = await loadBatch(client, req.params.id, { lock: true });
+  const cancelled = await client.query(
+    `UPDATE bookings SET status = 'cancelled'
+     WHERE batch_id = $1 AND status = 'scheduled' AND date >= $2::date RETURNING id`,
+    [batch.id, _todayWAT()]
+  );
+  /* bookings.batch_id is ON DELETE SET NULL; members cascade */
+  await client.query('DELETE FROM batches WHERE id = $1', [batch.id]);
+  logger.info(`[BATCH] ${batch.batch_ref} deleted by ${req.user.email}. ${cancelled.rows.length} future classes cancelled.`);
+  return { success: true, message: `Batch ${batch.batch_ref} deleted`, cancelledBookings: cancelled.rows.length };
+}));
 
-   Mode 1 - move to existing batch:
-     Body: { studentId, targetBatchId }
-
-   Mode 2 - move to a NEW batch (created inline):
-     Body: { studentId, newBatch: { tutorId, classLink, schedule, startDate,
-             pathwayId?, gradeNumber?, notes? } }
-
-   In both modes:
-   - Student is soft-removed from source (status='transferred')
-   - Student is added to destination batch
-   - Future bookings on source are cancelled
-   - New bookings generated on destination schedule
-   All in a single DB transaction.
-============================================== */
-router.post('/:id/transfer-member', requireAuth, requireRole('admin','super_admin','postsales'), async (req, res, next) => {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-
-    const { studentId, targetBatchId, newBatch } = req.body;
-    if (!studentId) return res.status(400).json({ success: false, error: 'studentId required' });
-    if (!targetBatchId && !newBatch) return res.status(400).json({ success: false, error: 'targetBatchId or newBatch required' });
-
-    /* Verify student is active in source batch */
-    const memberRes = await client.query(
-      'SELECT id FROM batch_members WHERE batch_id = $1 AND student_id = $2 AND status = $$active$$',
-      [req.params.id, studentId]
-    );
-    if (!memberRes.rows.length)
-      return res.status(404).json({ success: false, error: 'Student is not an active member of this batch' });
-
-    const stuRes = await client.query('SELECT name FROM users WHERE id = $1', [studentId]);
-    const studentName = stuRes.rows[0] ? stuRes.rows[0].name : studentId;
-
-    /* Resolve destination batch */
-    var destBatchId, destBatchRef, destTutorId, destTutorName, destClassLink, destSchedule;
-
-    if (targetBatchId) {
-      const destRes = await client.query(
-        'SELECT b.id, b.batch_ref, b.tutor_id, b.class_link, b.schedule, b.status, u.name AS tutor_name FROM batches b LEFT JOIN users u ON u.id = b.tutor_id WHERE b.id = $1',
-        [targetBatchId]
-      );
-      if (!destRes.rows.length) return res.status(404).json({ success: false, error: 'Target batch not found' });
-      const dest = destRes.rows[0];
-      if (dest.status === 'closed') return res.status(400).json({ success: false, error: 'Target batch is closed' });
-
-      const countRes = await client.query(
-        'SELECT COUNT(*) AS cnt FROM batch_members WHERE batch_id = $1 AND status = $$active$$',
-        [targetBatchId]
-      );
-      if (parseInt(countRes.rows[0].cnt) >= 3)
-        return res.status(400).json({ success: false, error: 'Target batch is full (max 3 students)' });
-
-      destBatchId   = dest.id;
-      destBatchRef  = dest.batch_ref;
-      destTutorId   = dest.tutor_id;
-      destTutorName = dest.tutor_name;
-      destClassLink = dest.class_link;
-      destSchedule  = Array.isArray(dest.schedule) ? dest.schedule : JSON.parse(dest.schedule || '[]');
-    } else {
-      const nb = newBatch;
-      if (!nb.tutorId)                                 return res.status(400).json({ success: false, error: 'newBatch.tutorId required' });
-      if (!nb.classLink)                               return res.status(400).json({ success: false, error: 'newBatch.classLink required' });
-      if (!Array.isArray(nb.schedule) || !nb.schedule.length) return res.status(400).json({ success: false, error: 'newBatch.schedule required' });
-      if (!nb.startDate)                               return res.status(400).json({ success: false, error: 'newBatch.startDate required' });
-
-      const newTutorRes = await client.query('SELECT id, name FROM users WHERE id = $1', [nb.tutorId]);
-      if (!newTutorRes.rows.length) return res.status(404).json({ success: false, error: 'Tutor not found' });
-
-      const batchRef = await generateBatchRef();
-      const batchResult = await client.query(
-        'INSERT INTO batches (batch_ref, tutor_id, pathway_id, grade_number, class_link, schedule, notes, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
-        [batchRef, nb.tutorId, nb.pathwayId || null, nb.gradeNumber || null, nb.classLink, JSON.stringify(nb.schedule), nb.notes || null, req.user.id]
-      );
-
-      destBatchId   = batchResult.rows[0].id;
-      destBatchRef  = batchRef;
-      destTutorId   = nb.tutorId;
-      destTutorName = newTutorRes.rows[0].name;
-      destClassLink = nb.classLink;
-      destSchedule  = nb.schedule;
-    }
-
-    /* Source batch info */
-    const srcRes = await client.query('SELECT batch_ref, grade_number FROM batches WHERE id = $1', [req.params.id]);
-    const srcBatch = srcRes.rows[0];
-
-    /* Cancel remaining future batch bookings */
-    const cancelRes = await client.query(
-      'UPDATE bookings SET status = $$cancelled$$ WHERE batch_id = $1 AND status = $$scheduled$$ AND date >= CURRENT_DATE RETURNING id, lesson_name, lesson_number_in_grade, pathway_lesson_id, grade',
-      [req.params.id]
-    );
-    const cancelledBookings = cancelRes.rows;
-
-    /* Soft-remove from source batch */
-    await client.query(
-      'UPDATE batch_members SET status = $$transferred$$, removed_at = NOW(), removal_reason = $3 WHERE batch_id = $1 AND student_id = $2 AND status = $$active$$',
-      [req.params.id, studentId, 'Transferred to ' + destBatchRef + ' by ' + req.user.email]
-    );
-
-    /* Add to destination batch */
-    await client.query(
-      'INSERT INTO batch_members (batch_id, student_id) VALUES ($1, $2) ON CONFLICT (batch_id, student_id) DO UPDATE SET status = $$active$$, removed_at = NULL, removal_reason = NULL',
-      [destBatchId, studentId]
-    );
-
-    /* Generate new bookings on destination schedule */
-    var createdCount = 0;
-    if (cancelledBookings.length > 0) {
-      const startStr = new Date().toISOString().split('T')[0];
-      const newDates = [];
-      const startD = new Date(startStr + 'T12:00:00Z');
-      const slots = destSchedule.map(function(slot) {
-        const d = new Date(startD);
-        var diff = (slot.weekday - d.getDay() + 7) % 7;
-        if (diff === 0) diff = 7; /* always at least 1 day ahead */
-        d.setDate(d.getDate() + diff);
-        return Object.assign({}, slot, { next: new Date(d) });
-      });
-      while (newDates.length < cancelledBookings.length) {
-        slots.sort(function(a, b) { return a.next - b.next; });
-        newDates.push({ date: slots[0].next.toISOString().split('T')[0], time: slots[0].time });
-        var n = new Date(slots[0].next);
-        n.setDate(n.getDate() + 7);
-        slots[0].next = n;
-      }
-      for (var i = 0; i < cancelledBookings.length; i++) {
-        var nd  = newDates[i];
-        var old = cancelledBookings[i];
-        await client.query(
-          'INSERT INTO bookings (subject, grade, date, time, class_link, status, is_demo, tutor_id, student_id, batch_id, lesson_name, notes, booked_at, scheduled_at, pathway_lesson_id, lesson_number_in_grade) VALUES ($1,$2,$3::date,$4::time,$5,$$scheduled$$,FALSE,$6,$7,$8,$9,$10,NOW(),NOW(),$11,$12)',
-          [
-            'Coding',
-            old.grade || (srcBatch.grade_number ? 'Grade ' + srcBatch.grade_number : 'Group'),
-            nd.date, nd.time.substring(0, 5), destClassLink,
-            destTutorId, studentId, destBatchId,
-            old.lesson_name || ('Lesson ' + (old.lesson_number_in_grade || (i + 1))),
-            JSON.stringify({ batchRef: destBatchRef, tutorName: destTutorName, classLink: destClassLink, isBatchClass: true, transferredFrom: srcBatch.batch_ref }),
-            old.pathway_lesson_id || null,
-            old.lesson_number_in_grade || (i + 1),
-          ]
-        );
-        createdCount++;
-      }
-    }
-
-    await client.query('COMMIT');
-    logger.info('[BATCH TRANSFER] ' + studentName + ' transferred from ' + srcBatch.batch_ref + ' to ' + destBatchRef + ' by ' + req.user.email + '. Cancelled: ' + cancelledBookings.length + ', Created: ' + createdCount);
-
-    res.json({
-      success: true,
-      message: studentName + ' transferred to ' + destBatchRef,
-      studentName, sourceBatch: srcBatch.batch_ref, destBatch: destBatchRef, destBatchId,
-      cancelled: cancelledBookings.length, created: createdCount,
-    });
-  } catch (err) {
-    await client.query('ROLLBACK');
-    next(err);
-  } finally {
-    client.release();
-  }
-});
 module.exports = router;
+module.exports._test = { normaliseSchedule, generateDates };

@@ -151,10 +151,13 @@ app.use(errorHandler);
 const server = app.listen(PORT, () => {
   logger.info(`✅ StemNest API running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
   /* Apply idempotent schema additions, then start background jobs */
-  ensureSchema().catch(e => logger.warn('[SCHEMA] ensureSchema failed: ' + e.message));
-  startReminderJob();
-  startRetentionJob();
-  startBookingExtensionJob();
+  ensureSchema()
+    .catch(e => logger.warn('[SCHEMA] ensureSchema failed: ' + e.message))
+    .then(() => {
+      startReminderJob();
+      startRetentionJob();
+      startBookingExtensionJob();
+    });
 });
 
 /* Graceful shutdown */

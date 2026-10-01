@@ -57,6 +57,8 @@ const reportSchema = z.object({
   incompleteReason: z.string().optional(),
   notes:            z.string().optional(),
   recordingLink:    z.string().url().optional().or(z.literal('')),
+  /* Batch classes: ids of the members who attended (absent members are not charged) */
+  attendees:        z.array(z.string().uuid()).optional(),
 });
 
 const cancelSchema = z.object({
@@ -1225,6 +1227,276 @@ router.put('/:id/status', requireAuth, requireRole('admin','super_admin','tutor'
   } catch (err) { next(err); }
 });
 
+/**
+ * Record a completed class for one student: lesson progress (and the
+ * certificate when a grade is finished), 1 credit deducted, and the
+ * low-credit emails. Used for 1-on-1 classes and for each attending
+ * member of a batch class.
+ */
+async function chargeStudentForClass(studentId, booking, bookingNotes) {
+  /* â”€â”€ Track lesson completion â”€â”€ */
+  try {
+    /* Find the student's active enrolment for this pathway */
+    const enrolResult = await pool.query(
+      `SELECT e.id, e.pathway_id, e.current_grade, e.lessons_completed,
+              pg.total_lessons
+       FROM enrolments e
+       LEFT JOIN pathway_grades pg ON pg.pathway_id = e.pathway_id
+                                  AND pg.grade_number = e.current_grade
+       WHERE e.student_id = $1 AND e.status = 'active'
+       ORDER BY e.created_at DESC LIMIT 1`,
+      [studentId]
+    );
+    const enrolment = enrolResult.rows[0];
+
+    if (enrolment) {
+      /* Insert lesson completion record (ignore if already exists) */
+      await pool.query(
+        `INSERT INTO lesson_completions
+           (student_id, enrolment_id, booking_id, pathway_id, grade_number, lesson_number)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (student_id, booking_id) DO NOTHING`,
+        [studentId, enrolment.id, booking.id,
+         enrolment.pathway_id, enrolment.current_grade,
+         (booking.lesson_number_in_grade || null)]
+      );
+
+      /* Increment lessons_completed on enrolment */
+      await pool.query(
+        `UPDATE enrolments SET lessons_completed = COALESCE(lessons_completed, 0) + 1
+         WHERE id = $1`,
+        [enrolment.id]
+      );
+
+      const newLessonsCompleted = (enrolment.lessons_completed || 0) + 1;
+      const totalLessons = enrolment.total_lessons || 72;
+
+      logger.info(`[PROGRESS] Student ${studentId} lesson ${newLessonsCompleted}/${totalLessons}`);
+
+      /* Auto-award certificate when grade is fully completed */
+      if (newLessonsCompleted >= totalLessons) {
+        try {
+          const pathwayResult = await pool.query(
+            `SELECT p.name, pg.name AS grade_name
+             FROM pathways p
+             LEFT JOIN pathway_grades pg ON pg.pathway_id = p.id
+                                        AND pg.grade_number = $2
+             WHERE p.id = $1`,
+            [enrolment.pathway_id, enrolment.current_grade]
+          );
+          const pathway = pathwayResult.rows[0];
+
+          /* Upsert certificate */
+          const certResult = await pool.query(
+            `INSERT INTO certificates
+               (student_id, enrolment_id, pathway_id, pathway_name,
+                grade_number, grade_name)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             ON CONFLICT (student_id, pathway_id, grade_number) DO NOTHING
+             RETURNING id`,
+            [studentId, enrolment.id, enrolment.pathway_id,
+             pathway?.name || 'STEMNest Pathway',
+             enrolment.current_grade,
+             pathway?.grade_name || `Grade ${enrolment.current_grade}`]
+          );
+
+          if (certResult.rows.length > 0) {
+            logger.info(`[CERT] Auto-awarded to ${studentId} for ${pathway?.name} Grade ${enrolment.current_grade}`);
+
+            /* Send certificate email */
+            const emailSvc = require('../services/emailService');
+            const sResult = await pool.query(
+              `SELECT u.name, u.email, sp.parent_email, sp.parent_name
+               FROM users u LEFT JOIN student_profiles sp ON sp.user_id = u.id
+               WHERE u.id = $1`,
+              [studentId]
+            );
+            const sData = sResult.rows[0];
+            if (sData) {
+              const recipientEmail = sData.parent_email || sData.email;
+              const appUrl = process.env.APP_URL || 'https://stemnestacademy.co.uk';
+              emailSvc.sendEmail({
+                to:      recipientEmail,
+                subject: `ðŸŽ“ ${sData.name} has earned a StemNest Certificate!`,
+                html: `<div style="font-family:Arial,sans-serif;max-width:500px;padding:24px;text-align:center;">
+                  <h1 style="color:#0e9f6e;">ðŸ† Certificate of Completion</h1>
+                  <p><strong>${sData.name}</strong> has successfully completed<br>
+                  <strong>${pathway?.name || 'STEMNest Pathway'} â€” Grade ${enrolment.current_grade}</strong></p>
+                  <a href="${appUrl}/pages/student-dashboard.html"
+                     style="display:inline-block;margin-top:16px;background:#1a56db;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;">
+                    View Certificate â†’
+                  </a>
+                </div>`,
+                template: 'certificate_awarded',
+              }).catch(() => {});
+            }
+          }
+        } catch (certErr) {
+          logger.warn('[CERT] Auto-award failed:', certErr.message);
+        }
+      }
+    }
+  } catch (progressErr) {
+    logger.warn('[PROGRESS] Lesson tracking failed (non-fatal):', progressErr.message);
+  }
+
+  /* Fetch current credits before deduction */
+  const credBefore = await pool.query(
+    `SELECT sp.credits, sp.credits_suspended, u.email, u.phone, u.name,
+            sp.parent_email, sp.parent_name
+     FROM student_profiles sp JOIN users u ON u.id = sp.user_id
+     WHERE sp.user_id = $1`,
+    [studentId]
+  );
+  const student = credBefore.rows[0];
+  const currentCredits = student ? parseInt(student.credits || 0) : 0;
+  const newCredits     = currentCredits - 1;
+
+  /* Deduct credit (allow going negative) */
+  await pool.query(
+    `UPDATE student_profiles SET credits = credits - 1 WHERE user_id = $1`,
+    [studentId]
+  );
+  await pool.query(
+    `INSERT INTO credit_transactions (student_id, type, amount, description, booking_id)
+     VALUES ($1, 'class_deduction', -1, 'Class completed â€” 1 credit used', $2)`,
+    [studentId, booking.id]
+  );
+
+  /* Apply suspension at -2 */
+  if (newCredits <= -2) {
+    await pool.query(
+      `UPDATE student_profiles SET credits_suspended = TRUE WHERE user_id = $1`,
+      [studentId]
+    );
+  }
+
+  logger.info(`[CREDITS] Student ${studentId}: ${currentCredits} â†’ ${newCredits}`);
+
+  /* â”€â”€ Credit threshold notifications â”€â”€ */
+  if (student) {
+    const emailSvc   = require('../services/emailService');
+    const recipientEmail = student.parent_email || student.email;
+    const recipientName  = student.parent_name  || student.name;
+    const studentName    = student.name;
+    const appUrl = process.env.APP_URL || 'https://stemnestacademy.co.uk';
+    const topUpUrl = `${appUrl}/pages/student-dashboard.html?topup=1`;
+
+    /* 3 credits remaining â€” soft nudge */
+    if (newCredits === 3) {
+      emailSvc.sendEmail({
+        to:      recipientEmail,
+        subject: `ðŸ“š ${studentName} has 3 classes left â€” top up soon`,
+        html: emailSvc._buildCreditNudgeEmail({
+          parentName: recipientName, studentName, credits: 3,
+          urgency: 'soft', topUpUrl,
+          message: `${studentName} has <strong>3 class credits remaining</strong>. Top up now to keep the learning momentum going!`
+        }),
+        template: 'credit_nudge_3',
+      }).catch(e => logger.warn('[CREDITS] Email (3) failed:', e.message));
+
+      /* â”€â”€ Alert the assigned Learning Advisor at 2 credits (triggers at 3 to give them time) â”€â”€ */
+      try {
+        const assignedSalesResult = await pool.query(
+          `SELECT u.id, u.name, u.email FROM users u
+           JOIN bookings b ON b.sales_id = u.id
+           WHERE b.student_id = $1 AND b.status IN ('scheduled','completed')
+           ORDER BY b.scheduled_at DESC LIMIT 1`,
+          [studentId]
+        );
+        const la = assignedSalesResult.rows[0];
+        if (la && la.email) {
+          const appUrl = process.env.APP_URL || 'https://stemnestacademy.co.uk';
+          emailSvc.sendEmail({
+            to:      la.email,
+            subject: `ðŸ”” ${studentName} has 3 credits left â€” time to discuss renewal`,
+            html: `<div style="font-family:Arial,sans-serif;max-width:500px;padding:24px;">
+              <h2 style="color:#1a56db;">Retention Alert ðŸ””</h2>
+              <p>Hi ${la.name},</p>
+              <p><strong>${studentName}</strong> now has <strong>3 class credits remaining</strong>. This is your signal to reach out and discuss renewal before classes run out.</p>
+              <p><strong>Action:</strong> Contact the parent now and generate a renewal payment link from your dashboard.</p>
+              <a href="${appUrl}/pages/sales-dashboard.html" style="display:inline-block;margin-top:12px;background:#1a56db;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:700;">Open Sales Dashboard â†’</a>
+            </div>`,
+            template: 'la_retention_alert',
+          }).catch(e => logger.warn('[CREDITS] LA alert email failed:', e.message));
+        }
+      } catch (laErr) {
+        logger.warn('[CREDITS] LA alert lookup failed:', laErr.message);
+      }
+
+      /* â”€â”€ Save renewal follow-up record for automated sequence â”€â”€ */
+      await pool.query(
+        `INSERT INTO renewal_followups (student_id, student_name, credits_at_trigger, triggered_at)
+         VALUES ($1, $2, $3, NOW())
+         ON CONFLICT (student_id) DO UPDATE SET
+           credits_at_trigger = $3,
+           triggered_at = NOW(),
+           day3_sent = FALSE,
+           day7_sent = FALSE,
+           day14_sent = FALSE,
+           renewed = FALSE`,
+        [studentId, bookingNotes.studentName || student.name, 3]
+      ).catch(e => logger.warn('[CREDITS] Renewal followup record failed:', e.message));
+    }
+
+    /* 1 credit remaining â€” urgent nudge */
+    if (newCredits === 1) {
+      emailSvc.sendEmail({
+        to:      recipientEmail,
+        subject: `âš ï¸ Only 1 class left for ${studentName} â€” top up now`,
+        html: emailSvc._buildCreditNudgeEmail({
+          parentName: recipientName, studentName, credits: 1,
+          urgency: 'urgent', topUpUrl,
+          message: `${studentName} has only <strong>1 class credit left</strong>. Please top up to avoid any interruption to their learning.`
+        }),
+        template: 'credit_nudge_1',
+      }).catch(e => logger.warn('[CREDITS] Email (1) failed:', e.message));
+    }
+
+    /* 0 credits â€” warning, existing classes still honoured */
+    if (newCredits === 0) {
+      emailSvc.sendEmail({
+        to:      recipientEmail,
+        subject: `ðŸ”´ ${studentName}'s credits have run out â€” action needed`,
+        html: emailSvc._buildCreditNudgeEmail({
+          parentName: recipientName, studentName, credits: 0,
+          urgency: 'critical', topUpUrl,
+          message: `${studentName}'s class credits have run out. <strong>Existing scheduled classes will still take place</strong>, but no new sessions can be booked until you top up.`
+        }),
+        template: 'credit_nudge_0',
+      }).catch(e => logger.warn('[CREDITS] Email (0) failed:', e.message));
+    }
+
+    /* -1 credits â€” discontinuation warning */
+    if (newCredits === -1) {
+      emailSvc.sendEmail({
+        to:      recipientEmail,
+        subject: `ðŸš¨ ${studentName}'s classes will be discontinued soon`,
+        html: emailSvc._buildCreditNudgeEmail({
+          parentName: recipientName, studentName, credits: -1,
+          urgency: 'critical', topUpUrl,
+          message: `${studentName}'s account is now in negative credit. <strong>Classes will be paused</strong> if not topped up urgently. Please top up to keep their sessions active.`
+        }),
+        template: 'credit_nudge_negative',
+      }).catch(e => logger.warn('[CREDITS] Email (-1) failed:', e.message));
+    }
+
+    /* -2 credits â€” suspended notification */
+    if (newCredits <= -2) {
+      emailSvc.sendEmail({
+        to:      recipientEmail,
+        subject: `ðŸ”’ ${studentName}'s classes have been paused`,
+        html: emailSvc._buildCreditNudgeEmail({
+          parentName: recipientName, studentName, credits: newCredits,
+          urgency: 'suspended', topUpUrl,
+          message: `${studentName}'s live class access has been <strong>temporarily paused</strong> due to insufficient credits. ${studentName} can still access all previous lesson materials and complete assignments, but cannot join new live sessions until credits are topped up.`
+        }),
+        template: 'credit_suspended',
+      }).catch(e => logger.warn('[CREDITS] Email (suspended) failed:', e.message));
+    }
+  }
+}
+
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    POST /api/bookings/:id/report  (tutor)
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
@@ -1283,7 +1555,7 @@ router.post('/:id/report', requireAuth, requireRole('tutor'), async (req, res, n
     /* ── Auto-shift on incomplete: the lesson is redone in the next slot and
        every later lesson in the series moves back by one slot
        (same logic as the tutor's "next learning day" reschedule). ── */
-    if (data.outcome === 'incomplete' && booking.student_id && !booking.is_demo) {
+    if (data.outcome === 'incomplete' && (booking.student_id || booking.batch_id) && !booking.is_demo) {
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
@@ -1304,270 +1576,29 @@ router.post('/:id/report', requireAuth, requireRole('tutor'), async (req, res, n
       }
     }
 
-    /* Deduct student credit if completed */
+    /* Deduct credit(s) if completed — the student, or each attending batch member */
     if (data.outcome === 'completed' || data.outcome === 'partially_completed') {
       if (booking.student_id) {
-        /* â”€â”€ Track lesson completion â”€â”€ */
-        try {
-          /* Find the student's active enrolment for this pathway */
-          const enrolResult = await pool.query(
-            `SELECT e.id, e.pathway_id, e.current_grade, e.lessons_completed,
-                    pg.total_lessons
-             FROM enrolments e
-             LEFT JOIN pathway_grades pg ON pg.pathway_id = e.pathway_id
-                                        AND pg.grade_number = e.current_grade
-             WHERE e.student_id = $1 AND e.status = 'active'
-             ORDER BY e.created_at DESC LIMIT 1`,
-            [booking.student_id]
-          );
-          const enrolment = enrolResult.rows[0];
-
-          if (enrolment) {
-            /* Insert lesson completion record (ignore if already exists) */
-            await pool.query(
-              `INSERT INTO lesson_completions
-                 (student_id, enrolment_id, booking_id, pathway_id, grade_number, lesson_number)
-               VALUES ($1, $2, $3, $4, $5, $6)
-               ON CONFLICT (student_id, booking_id) DO NOTHING`,
-              [booking.student_id, enrolment.id, booking.id,
-               enrolment.pathway_id, enrolment.current_grade,
-               (booking.lesson_number_in_grade || null)]
-            );
-
-            /* Increment lessons_completed on enrolment */
-            await pool.query(
-              `UPDATE enrolments SET lessons_completed = COALESCE(lessons_completed, 0) + 1
-               WHERE id = $1`,
-              [enrolment.id]
-            );
-
-            const newLessonsCompleted = (enrolment.lessons_completed || 0) + 1;
-            const totalLessons = enrolment.total_lessons || 72;
-
-            logger.info(`[PROGRESS] Student ${booking.student_id} lesson ${newLessonsCompleted}/${totalLessons}`);
-
-            /* Auto-award certificate when grade is fully completed */
-            if (newLessonsCompleted >= totalLessons) {
-              try {
-                const pathwayResult = await pool.query(
-                  `SELECT p.name, pg.name AS grade_name
-                   FROM pathways p
-                   LEFT JOIN pathway_grades pg ON pg.pathway_id = p.id
-                                              AND pg.grade_number = $2
-                   WHERE p.id = $1`,
-                  [enrolment.pathway_id, enrolment.current_grade]
-                );
-                const pathway = pathwayResult.rows[0];
-
-                /* Upsert certificate */
-                const certResult = await pool.query(
-                  `INSERT INTO certificates
-                     (student_id, enrolment_id, pathway_id, pathway_name,
-                      grade_number, grade_name)
-                   VALUES ($1, $2, $3, $4, $5, $6)
-                   ON CONFLICT (student_id, pathway_id, grade_number) DO NOTHING
-                   RETURNING id`,
-                  [booking.student_id, enrolment.id, enrolment.pathway_id,
-                   pathway?.name || 'STEMNest Pathway',
-                   enrolment.current_grade,
-                   pathway?.grade_name || `Grade ${enrolment.current_grade}`]
-                );
-
-                if (certResult.rows.length > 0) {
-                  logger.info(`[CERT] Auto-awarded to ${booking.student_id} for ${pathway?.name} Grade ${enrolment.current_grade}`);
-
-                  /* Send certificate email */
-                  const emailSvc = require('../services/emailService');
-                  const sResult = await pool.query(
-                    `SELECT u.name, u.email, sp.parent_email, sp.parent_name
-                     FROM users u LEFT JOIN student_profiles sp ON sp.user_id = u.id
-                     WHERE u.id = $1`,
-                    [booking.student_id]
-                  );
-                  const sData = sResult.rows[0];
-                  if (sData) {
-                    const recipientEmail = sData.parent_email || sData.email;
-                    const appUrl = process.env.APP_URL || 'https://stemnestacademy.co.uk';
-                    emailSvc.sendEmail({
-                      to:      recipientEmail,
-                      subject: `ðŸŽ“ ${sData.name} has earned a StemNest Certificate!`,
-                      html: `<div style="font-family:Arial,sans-serif;max-width:500px;padding:24px;text-align:center;">
-                        <h1 style="color:#0e9f6e;">ðŸ† Certificate of Completion</h1>
-                        <p><strong>${sData.name}</strong> has successfully completed<br>
-                        <strong>${pathway?.name || 'STEMNest Pathway'} â€” Grade ${enrolment.current_grade}</strong></p>
-                        <a href="${appUrl}/pages/student-dashboard.html"
-                           style="display:inline-block;margin-top:16px;background:#1a56db;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;">
-                          View Certificate â†’
-                        </a>
-                      </div>`,
-                      template: 'certificate_awarded',
-                    }).catch(() => {});
-                  }
-                }
-              } catch (certErr) {
-                logger.warn('[CERT] Auto-award failed:', certErr.message);
-              }
-            }
-          }
-        } catch (progressErr) {
-          logger.warn('[PROGRESS] Lesson tracking failed (non-fatal):', progressErr.message);
-        }
-
-        /* Fetch current credits before deduction */
-        const credBefore = await pool.query(
-          `SELECT sp.credits, sp.credits_suspended, u.email, u.phone, u.name,
-                  sp.parent_email, sp.parent_name
-           FROM student_profiles sp JOIN users u ON u.id = sp.user_id
-           WHERE sp.user_id = $1`,
-          [booking.student_id]
+        await chargeStudentForClass(booking.student_id, booking, bookingNotes);
+      } else if (booking.batch_id) {
+        const members = await pool.query(
+          `SELECT student_id FROM batch_members WHERE batch_id = $1 AND status = 'active'`,
+          [booking.batch_id]
         );
-        const student = credBefore.rows[0];
-        const currentCredits = student ? parseInt(student.credits || 0) : 0;
-        const newCredits     = currentCredits - 1;
-
-        /* Deduct credit (allow going negative) */
+        const memberIds = members.rows.map(r => r.student_id);
+        /* Default: everyone attended. The tutor unticks absent students. */
+        const attendees = Array.isArray(data.attendees)
+          ? memberIds.filter(id => data.attendees.includes(id))
+          : memberIds;
+        for (const sid of attendees) {
+          try { await chargeStudentForClass(sid, booking, bookingNotes); }
+          catch (e) { logger.warn(`[CREDITS] Batch charge failed for ${sid}: ${e.message}`); }
+        }
         await pool.query(
-          `UPDATE student_profiles SET credits = credits - 1 WHERE user_id = $1`,
-          [booking.student_id]
+          `UPDATE bookings SET notes = COALESCE(notes, '{}'::jsonb) || jsonb_build_object('attendees', $1::jsonb, 'absentees', $2::jsonb) WHERE id = $3`,
+          [JSON.stringify(attendees), JSON.stringify(memberIds.filter(id => !attendees.includes(id))), booking.id]
         );
-        await pool.query(
-          `INSERT INTO credit_transactions (student_id, type, amount, description, booking_id)
-           VALUES ($1, 'class_deduction', -1, 'Class completed â€” 1 credit used', $2)`,
-          [booking.student_id, req.params.id]
-        );
-
-        /* Apply suspension at -2 */
-        if (newCredits <= -2) {
-          await pool.query(
-            `UPDATE student_profiles SET credits_suspended = TRUE WHERE user_id = $1`,
-            [booking.student_id]
-          );
-        }
-
-        logger.info(`[CREDITS] Student ${booking.student_id}: ${currentCredits} â†’ ${newCredits}`);
-
-        /* â”€â”€ Credit threshold notifications â”€â”€ */
-        if (student) {
-          const emailSvc   = require('../services/emailService');
-          const recipientEmail = student.parent_email || student.email;
-          const recipientName  = student.parent_name  || student.name;
-          const studentName    = student.name;
-          const appUrl = process.env.APP_URL || 'https://stemnestacademy.co.uk';
-          const topUpUrl = `${appUrl}/pages/student-dashboard.html?topup=1`;
-
-          /* 3 credits remaining â€” soft nudge */
-          if (newCredits === 3) {
-            emailSvc.sendEmail({
-              to:      recipientEmail,
-              subject: `ðŸ“š ${studentName} has 3 classes left â€” top up soon`,
-              html: emailSvc._buildCreditNudgeEmail({
-                parentName: recipientName, studentName, credits: 3,
-                urgency: 'soft', topUpUrl,
-                message: `${studentName} has <strong>3 class credits remaining</strong>. Top up now to keep the learning momentum going!`
-              }),
-              template: 'credit_nudge_3',
-            }).catch(e => logger.warn('[CREDITS] Email (3) failed:', e.message));
-
-            /* â”€â”€ Alert the assigned Learning Advisor at 2 credits (triggers at 3 to give them time) â”€â”€ */
-            try {
-              const assignedSalesResult = await pool.query(
-                `SELECT u.id, u.name, u.email FROM users u
-                 JOIN bookings b ON b.sales_id = u.id
-                 WHERE b.student_id = $1 AND b.status IN ('scheduled','completed')
-                 ORDER BY b.scheduled_at DESC LIMIT 1`,
-                [booking.student_id]
-              );
-              const la = assignedSalesResult.rows[0];
-              if (la && la.email) {
-                const appUrl = process.env.APP_URL || 'https://stemnestacademy.co.uk';
-                emailSvc.sendEmail({
-                  to:      la.email,
-                  subject: `ðŸ”” ${studentName} has 3 credits left â€” time to discuss renewal`,
-                  html: `<div style="font-family:Arial,sans-serif;max-width:500px;padding:24px;">
-                    <h2 style="color:#1a56db;">Retention Alert ðŸ””</h2>
-                    <p>Hi ${la.name},</p>
-                    <p><strong>${studentName}</strong> now has <strong>3 class credits remaining</strong>. This is your signal to reach out and discuss renewal before classes run out.</p>
-                    <p><strong>Action:</strong> Contact the parent now and generate a renewal payment link from your dashboard.</p>
-                    <a href="${appUrl}/pages/sales-dashboard.html" style="display:inline-block;margin-top:12px;background:#1a56db;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:700;">Open Sales Dashboard â†’</a>
-                  </div>`,
-                  template: 'la_retention_alert',
-                }).catch(e => logger.warn('[CREDITS] LA alert email failed:', e.message));
-              }
-            } catch (laErr) {
-              logger.warn('[CREDITS] LA alert lookup failed:', laErr.message);
-            }
-
-            /* â”€â”€ Save renewal follow-up record for automated sequence â”€â”€ */
-            await pool.query(
-              `INSERT INTO renewal_followups (student_id, student_name, credits_at_trigger, triggered_at)
-               VALUES ($1, $2, $3, NOW())
-               ON CONFLICT (student_id) DO UPDATE SET
-                 credits_at_trigger = $3,
-                 triggered_at = NOW(),
-                 day3_sent = FALSE,
-                 day7_sent = FALSE,
-                 day14_sent = FALSE,
-                 renewed = FALSE`,
-              [booking.student_id, bookingNotes.studentName || student.name, 3]
-            ).catch(e => logger.warn('[CREDITS] Renewal followup record failed:', e.message));
-          }
-
-          /* 1 credit remaining â€” urgent nudge */
-          if (newCredits === 1) {
-            emailSvc.sendEmail({
-              to:      recipientEmail,
-              subject: `âš ï¸ Only 1 class left for ${studentName} â€” top up now`,
-              html: emailSvc._buildCreditNudgeEmail({
-                parentName: recipientName, studentName, credits: 1,
-                urgency: 'urgent', topUpUrl,
-                message: `${studentName} has only <strong>1 class credit left</strong>. Please top up to avoid any interruption to their learning.`
-              }),
-              template: 'credit_nudge_1',
-            }).catch(e => logger.warn('[CREDITS] Email (1) failed:', e.message));
-          }
-
-          /* 0 credits â€” warning, existing classes still honoured */
-          if (newCredits === 0) {
-            emailSvc.sendEmail({
-              to:      recipientEmail,
-              subject: `ðŸ”´ ${studentName}'s credits have run out â€” action needed`,
-              html: emailSvc._buildCreditNudgeEmail({
-                parentName: recipientName, studentName, credits: 0,
-                urgency: 'critical', topUpUrl,
-                message: `${studentName}'s class credits have run out. <strong>Existing scheduled classes will still take place</strong>, but no new sessions can be booked until you top up.`
-              }),
-              template: 'credit_nudge_0',
-            }).catch(e => logger.warn('[CREDITS] Email (0) failed:', e.message));
-          }
-
-          /* -1 credits â€” discontinuation warning */
-          if (newCredits === -1) {
-            emailSvc.sendEmail({
-              to:      recipientEmail,
-              subject: `ðŸš¨ ${studentName}'s classes will be discontinued soon`,
-              html: emailSvc._buildCreditNudgeEmail({
-                parentName: recipientName, studentName, credits: -1,
-                urgency: 'critical', topUpUrl,
-                message: `${studentName}'s account is now in negative credit. <strong>Classes will be paused</strong> if not topped up urgently. Please top up to keep their sessions active.`
-              }),
-              template: 'credit_nudge_negative',
-            }).catch(e => logger.warn('[CREDITS] Email (-1) failed:', e.message));
-          }
-
-          /* -2 credits â€” suspended notification */
-          if (newCredits <= -2) {
-            emailSvc.sendEmail({
-              to:      recipientEmail,
-              subject: `ðŸ”’ ${studentName}'s classes have been paused`,
-              html: emailSvc._buildCreditNudgeEmail({
-                parentName: recipientName, studentName, credits: newCredits,
-                urgency: 'suspended', topUpUrl,
-                message: `${studentName}'s live class access has been <strong>temporarily paused</strong> due to insufficient credits. ${studentName} can still access all previous lesson materials and complete assignments, but cannot join new live sessions until credits are topped up.`
-              }),
-              template: 'credit_suspended',
-            }).catch(e => logger.warn('[CREDITS] Email (suspended) failed:', e.message));
-          }
-        }
+        logger.info(`[BATCH CLASS] ${booking.id}: ${attendees.length}/${memberIds.length} attended and charged`);
       }
     }
 
