@@ -72,6 +72,7 @@
       <a class="sidebar-link"        data-tab="students"  onclick="showPOSTab('students')"> <span class="sl-icon">🎓</span> Paid Students <span class="sl-badge" id="posBadge">0</span></a>
       <a class="sidebar-link"        data-tab="topup"     onclick="showPOSTab('topup')">    <span class="sl-icon">⚠️</span> Needs Top-Up <span class="sl-badge" id="topupBadge">0</span></a>
       <a class="sidebar-link"        data-tab="scheduled" onclick="showPOSTab('scheduled')"><span class="sl-icon">📅</span> Scheduled Classes</a>
+      <a class="sidebar-link"        data-tab="reschedule-tool" onclick="showPOSTab('reschedule-tool')"><span class="sl-icon">🔄</span> Reschedule Tool</a>
       <a class="sidebar-link"        data-tab="paylinks"  onclick="showPOSTab('paylinks')"> <span class="sl-icon">🔗</span> Payment Links</a>
       <a class="sidebar-link"        data-tab="converted" onclick="showPOSTab('converted')"><span class="sl-icon">✅</span> Converted</a>
       <a class="sidebar-link"        data-tab="website-enquiries" onclick="showPOSTab('website-enquiries')"><span class="sl-icon">🌐</span> Website Enquiries</a>
@@ -153,6 +154,12 @@
       </div>
       <div id="overviewCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px;"></div>
       <div id="overviewList"></div>
+    </div>
+
+    <!-- RESCHEDULE TOOL -->
+    <div id="tab-reschedule-tool" style="display:none;">
+      <div class="dash-section-header"><div class="dash-section-title">🔄 Reschedule Tool</div></div>
+      <div id="rescheduleToolRoot"></div>
     </div>
 
     <!-- FAMILIES -->
@@ -437,7 +444,8 @@
 <script src="../js/api-sync.js"></script>
 <script src="../js/wa.js"></script>
 <script src="../js/utils.js"></script>
-<script src="../js/postsales-dashboard.js?v=202609181400"></script>
+<script src="../js/postsales-dashboard.js?v=202610021200"></script>
+<script src="../js/reschedule-tool.js?v=202610021200"></script>
 
 <!-- GREY PAYMENT MODAL -->
 <div class="modal-overlay" id="greyPaymentModalOverlay">

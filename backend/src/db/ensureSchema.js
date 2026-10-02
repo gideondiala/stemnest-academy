@@ -113,6 +113,25 @@ const STATEMENTS = [
      created_at   TIMESTAMPTZ DEFAULT NOW()
    )`,
 
+  /* ── Reschedule tool: who asked, why, and what changed ── */
+  `CREATE TABLE IF NOT EXISTS reschedule_log (
+     id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     student_id     UUID REFERENCES users(id) ON DELETE CASCADE,
+     enrolment_id   UUID REFERENCES enrolments(id) ON DELETE SET NULL,
+     requested_by   VARCHAR(20),
+     reason         TEXT,
+     old_schedule   JSONB,
+     new_schedule   JSONB,
+     old_tutor_id   UUID REFERENCES users(id),
+     new_tutor_id   UUID REFERENCES users(id),
+     start_date     DATE,
+     classes_moved  INTEGER,
+     classes_added  INTEGER,
+     performed_by   UUID REFERENCES users(id),
+     created_at     TIMESTAMPTZ DEFAULT NOW()
+   )`,
+  `CREATE INDEX IF NOT EXISTS idx_reschedule_log_student ON reschedule_log(student_id)`,
+
   /* ── Referrals ── */
   `CREATE TABLE IF NOT EXISTS referrals (
      id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),

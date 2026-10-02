@@ -21,10 +21,10 @@ function isAliasEmail(email) {
   return typeof email === 'string' && email.toLowerCase().endsWith('@' + CHILD_LOGIN_DOMAIN);
 }
 
-/** Normalise a phone number to its last 10 digits (how families are matched). */
+/** Normalise a phone number to its last 9 digits — the same with or without country code or leading 0. */
 function phoneKey(phone) {
   const d = String(phone || '').replace(/\D/g, '');
-  return d.length >= 7 ? d.slice(-10) : null;
+  return d.length >= 7 ? d.slice(-9) : null;
 }
 
 /**

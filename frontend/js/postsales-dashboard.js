@@ -157,6 +157,7 @@ function renderCurrentTab() {
   switch (_activeTab) {
     case 'overview':            renderOverview();              break;
     case 'families':            renderFamilies();              break;
+    case 'reschedule-tool':     if (window.RescheduleTool) RescheduleTool.init(); break;
     case 'students':            renderPaidStudents();          break;
     case 'topup':               renderTopUp();                 break;
     case 'scheduled':           renderScheduledClasses();      break;
@@ -391,7 +392,7 @@ function renderScheduledClasses() {
       <td style="${tdS};text-align:center;">${classLink}</td>
       <td style="${tdS};text-align:center;">
         <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">
-          <button onclick="openRescheduleStudentModal('${s.studentId}','${(s.studentName||'').replace(/'/g,'')}','${s.email||''}')"
+          <button onclick="openRescheduleTool('${s.studentId}')"
             style="background:var(--orange);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;white-space:nowrap;">
             🔄 Reschedule
           </button>
@@ -2335,6 +2336,7 @@ function renderOverviewList() {
     let action = '';
     if (s.stage === 'awaiting_schedule') action = `<button onclick="openPOSScheduleModal('${s.studentId}','${nm}','${em}')" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;">📅 Schedule</button>`;
     else if (s.stage === 'paused') action = `<button onclick="showPOSTab('pause-resume')" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;">▶️ Resume</button>`;
+    else if (s.stage === 'active') action = `<button onclick="openRescheduleTool('${s.studentId}')" style="background:var(--orange);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;margin-right:4px;">🔄 Reschedule</button><button onclick="openManualTopUp('${s.studentId}','${nm}','${em}')" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;">💳 Payment</button>`;
     else action = `<button onclick="openManualTopUp('${s.studentId}','${nm}','${em}')" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;">💳 Confirm Payment</button>`;
     return `<tr>
       <td style="${tdS};font-weight:900;color:var(--blue);">${_escH(s.staffId || '—')}</td>
