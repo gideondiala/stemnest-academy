@@ -15,7 +15,7 @@ let   _allPathways  = [];           // cached pathways list
 let   _allGrades    = [];           // cached grades of every pathway [{pathway_id, grade_number, name, lesson_count}]
 let   _allTutors    = [];           // cached tutors list
 let   _allStudents  = [];           // cached paid students (for batch selector)
-let   _activeTab    = 'students';   // current sidebar tab
+let   _activeTab    = 'overview';   // current sidebar tab
 
 /* ─── schedule a modal rows state ─── */
 let   _scheduleRows = [];   // pos-schedule modal
@@ -155,6 +155,8 @@ function showPOSTab(tab) {
 
 function renderCurrentTab() {
   switch (_activeTab) {
+    case 'overview':            renderOverview();              break;
+    case 'families':            renderFamilies();              break;
     case 'students':            renderPaidStudents();          break;
     case 'topup':               renderTopUp();                 break;
     case 'scheduled':           renderScheduledClasses();      break;
@@ -896,7 +898,7 @@ async function renderPauseResume() {
             <div>
               <div style="font-weight:900;font-size:14px;color:var(--dark);">${s.studentName}</div>
               <div style="font-size:12px;color:var(--mid);font-weight:700;margin-top:2px;">${s.pathwayName||'No pathway'} · Grade ${s.currentGrade||'—'} · ${s.pausedClasses ? s.pausedClasses + ' lessons on hold' : 'paused'}${s.pausedAt ? ' since ' + fmtDateShort(s.pausedAt) : ''}</div>
-              <div style="font-size:11px;color:#c53030;margin-top:2px;">${s.pausedReason||'No reason given'}</div>
+              <div style="font-size:11px;color:#c53030;margin-top:2px;">${s.pauseKind === 'credits' ? '<span style="background:#fed7d7;border-radius:50px;padding:1px 7px;font-weight:900;margin-right:4px;">Out of credits</span>' : ''}${s.pausedReason||'No reason given'}</div>
             </div>
             <button onclick="openResumeModal('${s.studentId}','${(s.studentName||'').replace(/'/g,'')}','${s.classLink||''}','${s.lastTutorId||''}',${s.pausedClasses||0})"
               style="background:var(--green);color:#fff;border:none;border-radius:10px;padding:9px 18px;font-family:'Nunito',sans-serif;font-weight:900;font-size:13px;cursor:pointer;flex-shrink:0;">
@@ -1435,7 +1437,7 @@ function onPathwayChange(pathwaySelId, gradeSelId) {
   fillGradeSelect(pathwayId, document.getElementById(gradeSelId), '— Select Grade —');
 }
 
-async function confirmManualOnboard() {
+async function confirmManualOnboard(joinFamily) {
   const v = id => (document.getElementById(id)?.value || '').trim();
   const name       = v('mob-name');
   const email      = v('mob-email');
@@ -1484,10 +1486,19 @@ async function confirmManualOnboard() {
           paymentReference: paymentRef || null,
           timezone: timezone || null,
           enrollmentRequestId: _onboardSource?.type === 'request' ? _onboardSource.id : null,
+          joinFamily: joinFamily === true,
         }
       }),
     });
     const data = await res.json();
+    if (res.status === 409 && data.family && joinFamily !== true) {
+      const q = data.family.type === 'parent'
+        ? `${email} is already the family login of ${data.family.name}.\n\nAdd ${name} to that family? ${name} will log in with their student ID.`
+        : `${email} is already the login of ${data.family.name}.\n\nAre they siblings? Click OK to create a family login for ${parentName || 'the parent'} with both children.\n\n${data.family.name} will then log in with their student ID (same password), and the parent gets one login for both.`;
+      if (data.family.type === 'student' && !parentName) { showToast("Enter the parent's name first — it is needed for the family login.", 'warning', 7000); return; }
+      if (confirm(q)) { if (btn) { btn.disabled = false; } return confirmManualOnboard(true); }
+      return;
+    }
     if (!res.ok || !data.success) {
       showToast('Error: ' + (data.error || 'Onboarding failed'), 'error', 8000);
       return;
@@ -1502,7 +1513,7 @@ async function confirmManualOnboard() {
       }).catch(() => {});
     }
 
-    showToast(`✅ ${name} onboarded as ${data.user.staff_id}. Login details emailed.`, 'success', 7000);
+    showToast(`✅ ${name} onboarded as ${data.user.staff_id}.${data.family ? ' Added to the family login — ' + name + ' logs in with ' + data.user.staff_id + '.' : ''} Login details emailed.`, 'success', 9000);
     closeManualOnboardModal();
     _onboardSource = null;
     await loadDashboard();
@@ -1526,32 +1537,58 @@ async function confirmManualOnboard() {
 ═══════════════════════════════════════════════════════════════ */
 let _topUpStudentId = null;
 
+let _topUpStudentName = '';
+
+/** Confirm a payment received by bank transfer (or any manual payment) and add credits. */
 function openManualTopUp(studentId, studentName, studentEmail) {
   _topUpStudentId = studentId;
-  const credits = prompt(`Confirm Payment for ${studentName}\n\nEnter number of credits to add:`);
-  if (!credits || isNaN(parseInt(credits))) return;
-  const amount = prompt('Enter amount received (numbers only, e.g. 99):');
-  if (!amount) return;
-  confirmManualTopUp(studentId, parseInt(credits), parseFloat(amount), studentName, studentEmail);
+  _topUpStudentName = studentName;
+  const st = (POS_DATA.students || []).find(x => x.studentId === studentId) || {};
+  const held = (_board && _board.students || []).find(x => x.studentId === studentId && x.stage === 'on_hold_credits');
+  document.getElementById('tu-info').innerHTML =
+    `<strong>${_escH(studentName)}</strong>${st.staffId ? ' · ' + _escH(st.staffId) : ''}<br>Current balance: <strong>${st.credits != null ? st.credits : (held ? held.credits : '—')}</strong> credits`;
+  ['tu-credits', 'tu-amount', 'tu-ref', 'tu-notes'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  const hold = document.getElementById('tu-hold');
+  const onHold = held || st.classPaused;
+  hold.style.display = onHold ? 'block' : 'none';
+  hold.textContent = held ? '⏳ Classes are on hold for credits — they come back automatically once the balance is at least 1.' : '';
+  document.getElementById('topUpOverlay').classList.add('open');
 }
 
-async function confirmManualTopUp(studentId, credits, amount, studentName, studentEmail) {
+function closeTopUpModal() { document.getElementById('topUpOverlay').classList.remove('open'); }
+
+async function confirmTopUpModal() {
+  const credits  = parseInt(document.getElementById('tu-credits').value);
+  const amount   = parseFloat(document.getElementById('tu-amount').value);
+  const currency = document.getElementById('tu-currency').value;
+  const reference = document.getElementById('tu-ref').value.trim();
+  const notes    = document.getElementById('tu-notes').value.trim();
+  if (!(credits > 0)) { showToast('Enter the number of credits to add.', 'warning'); return; }
+  if (!(amount > 0))  { showToast('Enter the amount received.', 'warning'); return; }
+
+  const btn = document.getElementById('tu-btn');
+  btn.disabled = true; btn.textContent = '⏳ Saving…';
   const token = localStorage.getItem('sn_access_token');
   try {
     const res  = await fetch(`${API}/api/payments/manual-topup`, {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studentId, credits, amount, currency: 'GBP', notes: 'Manual confirmation by Post-Sales' }),
+      body: JSON.stringify({ studentId: _topUpStudentId, credits, amount, currency, reference, notes: notes || 'Manual confirmation by Post-Sales' }),
     });
     const data = await res.json();
-    if (data.success) {
-      showToast(`✅ ${credits} credits added for ${studentName}. New balance: ${data.newCredits}`);
-      await loadDashboard();
-    } else {
-      showToast('Error: ' + (data.error || 'Top-up failed'), 'error');
-    }
+    if (!data.success) { showToast('Error: ' + (data.error || 'Top-up failed'), 'error'); return; }
+    let extra = '';
+    if (data.resume && data.resume.resumed) extra = ` Classes are back on — ${data.resume.classes} classes from ${fmtDateShort(data.resume.firstClass.date + 'T00:00:00')}.`;
+    else if (data.resume && data.resume.reason === 'clash') extra = ' ⚠️ Classes could not come back automatically (the slot is taken) — resume them from Pause & Resume with a new time.';
+    else if (data.resume && data.resume.reason === 'balance still below 1 credit') extra = ' Classes stay on hold until the balance is at least 1.';
+    showToast(`✅ ${credits} credits added for ${_topUpStudentName}. New balance: ${data.newCredits}.${extra}`, data.resume && data.resume.reason === 'clash' ? 'warning' : 'success', 10000);
+    closeTopUpModal();
+    await loadDashboard();
+    if (_activeTab === 'overview') renderOverview();
   } catch (err) {
     showToast('Error: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '✅ Confirm Payment';
   }
 }
 
@@ -2202,3 +2239,250 @@ async function confirmBatchTransfer() {
 ═══════════════════════════════════════════════════════════════ */
 function updatePSStats() { updateStats(); }
 function renderScheduled() { renderScheduledClasses(); }
+
+/* ═══════════════════════════════════════════════════════════════
+   OVERVIEW — onboarding stage board
+═══════════════════════════════════════════════════════════════ */
+let _board = null;
+let _boardFilter = 'leads';
+
+function _escH(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function _jsArg(s) { return _escH(String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'")); }
+
+async function renderOverview() {
+  const cards = document.getElementById('overviewCards');
+  const list  = document.getElementById('overviewList');
+  if (!cards || !list) return;
+  if (!_board) list.innerHTML = '<div style="text-align:center;padding:32px;color:var(--light);font-weight:700;">⏳ Loading…</div>';
+
+  const token = localStorage.getItem('sn_access_token');
+  try {
+    const res = await fetch(`${API}/api/enrollments/board`, { headers: { 'Authorization': 'Bearer ' + token } });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Could not load');
+    _board = data;
+  } catch (err) {
+    list.innerHTML = `<div style="padding:24px;color:var(--orange);font-weight:700;">⚠️ ${_escH(err.message)}</div>`;
+    return;
+  }
+
+  const c = _board.counts;
+  setText('overviewBadge', c.leads + c.awaitingSchedule + c.onHoldCredits);
+  const defs = [
+    ['leads',             '📥', 'To onboard',        c.leads,            'Handovers, enquiries, referrals', '#1e40af', '#dbeafe'],
+    ['awaiting_schedule', '🗓️', 'Awaiting schedule', c.awaitingSchedule, 'Onboarded, no classes booked',    '#92400e', '#fff3e0'],
+    ['active',            '✅', 'Active',            c.active,           'Classes on the calendar',         '#065f46', '#d4f8e8'],
+    ['low_credit',        '⚠️', 'Low credit',        c.lowCredit,        'Active, 2 or fewer credits',      '#b45309', '#fef3c7'],
+    ['on_hold_credits',   '⏳', 'On hold — credits', c.onHoldCredits,    'Waiting for a top-up',            '#c53030', '#fed7d7'],
+    ['paused',            '⏸️', 'Paused',            c.paused,           'Paused by Post-Sales',            '#4a5568', '#edf2f7'],
+  ];
+  cards.innerHTML = defs.map(([key, icon, label, n, sub, fg, bg]) => `
+    <div onclick="_boardFilter='${key}';renderOverviewList();" style="cursor:pointer;background:${_boardFilter === key ? bg : 'var(--white)'};border:2px solid ${_boardFilter === key ? fg : '#e8eaf0'};border-radius:14px;padding:14px;">
+      <div style="font-size:12px;font-weight:900;color:${fg};">${icon} ${label}</div>
+      <div style="font-family:'Fredoka One',cursive;font-size:28px;color:var(--dark);margin:4px 0;">${n}</div>
+      <div style="font-size:11px;font-weight:700;color:var(--light);">${sub}</div>
+    </div>`).join('');
+  renderOverviewList();
+}
+
+function renderOverviewList() {
+  if (!_board) return;
+  const list = document.getElementById('overviewList');
+  /* keep card highlight in step */
+  const cardEls = document.querySelectorAll('#overviewCards > div');
+  const keys = ['leads','awaiting_schedule','active','low_credit','on_hold_credits','paused'];
+  cardEls.forEach((el, i) => { el.style.outline = keys[i] === _boardFilter ? '3px solid rgba(26,86,219,.25)' : 'none'; });
+
+  if (_boardFilter === 'leads') {
+    const L = _board.leads;
+    const rows = [];
+    const add = (r, kind, label) => {
+      _requestsById[r.id] = Object.assign(_requestsById[r.id] || {}, {
+        id: r.id, student_name: r.studentName, email: r.email, phone: r.phone, whatsapp: r.whatsapp,
+        source: r.source, pathway_name: r.pathwayName,
+      });
+      rows.push(`<tr>
+        <td style="${tdS};font-weight:800;">${_escH(r.studentName)}</td>
+        <td style="${tdS}"><span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:50px;font-size:10px;font-weight:900;">${label}</span></td>
+        <td style="${tdS}">${_escH(r.email || '—')}<br><span style="color:var(--light);font-size:12px;">${_escH(r.phone || r.whatsapp || '')}</span></td>
+        <td style="${tdS}">${r.paymentStatus === 'received' ? '✅ Paid' : (kind === 'referral' ? '—' : '⏳ Not yet')}</td>
+        <td style="${tdS}">${fmtDateShort(r.createdAt)}</td>
+        <td style="${tdS};text-align:center;">
+          <button onclick="${kind === 'referral' ? `_onboardReferralFromBoard('${r.id}')` : `_onboardRequestFromBoard('${r.id}')`}"
+            style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;">🎓 Onboard</button>
+        </td></tr>`);
+    };
+    L.handovers.forEach(r => add(r, 'request', 'From demo'));
+    L.website.forEach(r => add(r, 'request', 'Website'));
+    L.other.forEach(r => add(r, 'request', r.source || 'Other'));
+    L.referrals.forEach(r => { _referralsById[r.id] = Object.assign(_referralsById[r.id] || {}, { id: r.id, student_name: r.studentName, parent_email: r.email, parent_phone: r.phone, referrer_name: r.referrerName }); add(r, 'referral', 'Referral'); });
+    list.innerHTML = rows.length
+      ? tableWrap(['Student','From','Contact','Payment','Received','Action'], rows)
+      : emptyState('📥','Nothing waiting','New handovers, website enquiries and referrals appear here.');
+    return;
+  }
+
+  const students = _board.students.filter(s =>
+    _boardFilter === 'low_credit' ? (s.lowCredit && s.stage === 'active') : s.stage === _boardFilter);
+  if (!students.length) { list.innerHTML = emptyState('✨','No students here',''); return; }
+
+  const rows = students.map(s => {
+    const next = s.nextDate ? `${fmtDateShort(s.nextDate + 'T00:00:00')} · ${fmtTime(s.nextTime)}` : '—';
+    const credit = `<span style="font-weight:900;color:${(s.credits || 0) <= 0 ? '#c53030' : ((s.credits || 0) <= 2 ? '#b45309' : '#065f46')};">${s.credits || 0}</span>`;
+    const nm = _jsArg(s.studentName), em = _jsArg(s.email);
+    let action = '';
+    if (s.stage === 'awaiting_schedule') action = `<button onclick="openPOSScheduleModal('${s.studentId}','${nm}','${em}')" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;">📅 Schedule</button>`;
+    else if (s.stage === 'paused') action = `<button onclick="showPOSTab('pause-resume')" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;">▶️ Resume</button>`;
+    else action = `<button onclick="openManualTopUp('${s.studentId}','${nm}','${em}')" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;">💳 Confirm Payment</button>`;
+    return `<tr>
+      <td style="${tdS};font-weight:900;color:var(--blue);">${_escH(s.staffId || '—')}</td>
+      <td style="${tdS};font-weight:800;">${_escH(s.studentName)}</td>
+      <td style="${tdS}">${_escH(s.pathwayName || '—')}${s.currentGrade ? ' · G' + s.currentGrade : ''}</td>
+      <td style="${tdS};text-align:center;">${credit}</td>
+      <td style="${tdS}">${s.stage === 'on_hold_credits' || s.stage === 'paused'
+        ? `<span style="font-size:12px;color:#c53030;font-weight:700;">${_escH(s.pausedReason || 'Paused')}</span>`
+        : (s.stage === 'awaiting_schedule' ? `<span style="font-size:12px;color:var(--light);">Onboarded ${fmtDateShort(s.createdAt)}</span>` : next)}</td>
+      <td style="${tdS};text-align:center;">${action}</td>
+    </tr>`;
+  });
+  list.innerHTML = tableWrap(['ID','Student','Pathway','Credits', _boardFilter === 'active' || _boardFilter === 'low_credit' ? 'Next class (WAT)' : 'Status','Action'], rows);
+}
+
+function _onboardRequestFromBoard(id) { onboardFromRequest(id); }
+function _onboardReferralFromBoard(id) { onboardFromReferral(id); }
+
+/* ═══════════════════════════════════════════════════════════════
+   FAMILIES
+═══════════════════════════════════════════════════════════════ */
+let _familySuggestions = [];
+
+async function renderFamilies() {
+  const sEl = document.getElementById('familySuggestions');
+  const lEl = document.getElementById('familyList');
+  if (!sEl || !lEl) return;
+  sEl.innerHTML = lEl.innerHTML = '<div style="padding:16px;color:var(--light);font-weight:700;">⏳ Loading…</div>';
+  const token = localStorage.getItem('sn_access_token');
+  const h = { headers: { 'Authorization': 'Bearer ' + token } };
+  try {
+    const [sRes, fRes] = await Promise.all([fetch(`${API}/api/families/suggestions`, h), fetch(`${API}/api/families`, h)]);
+    const [sData, fData] = await Promise.all([sRes.json(), fRes.json()]);
+    if (!sData.success) throw new Error(sData.error || 'Could not load suggestions');
+    _familySuggestions = sData.suggestions;
+    setText('familiesBadge', _familySuggestions.length);
+    _renderFamilySuggestions(sEl);
+    _renderFamilyList(lEl, fData.families || []);
+  } catch (err) {
+    sEl.innerHTML = `<div style="padding:16px;color:var(--orange);font-weight:700;">⚠️ ${_escH(err.message)}</div>`;
+    lEl.innerHTML = '';
+  }
+}
+
+function _renderFamilySuggestions(el) {
+  if (!_familySuggestions.length) { el.innerHTML = emptyState('👨‍👩‍👧','No suggestions','Children sharing a phone number who are not yet on one family login appear here.'); return; }
+  el.innerHTML = _familySuggestions.map((g, i) => `
+    <div style="background:var(--white);border:1.5px solid #e8eaf0;border-radius:14px;padding:16px;margin-bottom:12px;">
+      <div style="font-weight:900;color:var(--dark);margin-bottom:8px;">📱 ${_escH(g.phone)} — ${g.children.length} children</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+        ${g.children.map(c => `<label style="display:flex;align-items:center;gap:6px;background:var(--bg);border-radius:10px;padding:6px 10px;font-size:13px;font-weight:800;cursor:pointer;">
+          <input type="checkbox" class="fam-kid-${i}" value="${c.id}" checked onchange="_famWarn(${i})"> ${_escH(c.name)}
+          <span style="color:var(--light);font-weight:700;">${_escH(c.staffId || '')}${c.email ? ' · ' + _escH(c.email) : ''}${c.linked ? ' · in a family' : ''}</span></label>`).join('')}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+        <input id="fam-name-${i}" placeholder="Parent name *" value="${_escH(g.parentName || '')}" style="padding:9px 12px;border:2px solid #e8eaf0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:13px;outline:none;">
+        <input id="fam-email-${i}" list="fam-emails-${i}" placeholder="Parent email *" value="${_escH(g.emails[0] || '')}" oninput="_famWarn(${i})" style="padding:9px 12px;border:2px solid #e8eaf0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:13px;outline:none;">
+        <datalist id="fam-emails-${i}">${g.emails.map(e => `<option value="${_escH(e)}">`).join('')}</datalist>
+        <input id="fam-phone-${i}" placeholder="Parent phone" value="${_escH(g.phone || '')}" style="padding:9px 12px;border:2px solid #e8eaf0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:13px;outline:none;">
+      </div>
+      <div id="fam-warn-${i}" style="font-size:12px;font-weight:800;color:#92400e;margin-top:8px;"></div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button onclick="createFamilyFromSuggestion(${i})" style="background:var(--blue);color:#fff;border:none;border-radius:10px;padding:9px 16px;font-family:'Nunito',sans-serif;font-weight:900;font-size:13px;cursor:pointer;">👨‍👩‍👧 Create family login</button>
+        <button onclick="dismissFamilySuggestion(${i})" style="background:var(--bg);color:var(--mid);border:1.5px solid #e8eaf0;border-radius:10px;padding:9px 16px;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;">Not a family</button>
+      </div>
+    </div>`).join('');
+  _familySuggestions.forEach((g, i) => _famWarn(i));
+}
+
+function _famWarn(i) {
+  const g = _familySuggestions[i];
+  const email = (document.getElementById('fam-email-' + i)?.value || '').trim().toLowerCase();
+  const picked = [...document.querySelectorAll('.fam-kid-' + i)].filter(x => x.checked).map(x => x.value);
+  const kid = g.children.find(c => picked.includes(c.id) && c.email && c.email.toLowerCase() === email);
+  const el = document.getElementById('fam-warn-' + i);
+  if (el) el.textContent = kid ? `ℹ️ ${kid.name} logs in with this email today — after linking, ${kid.name} logs in with student ID ${kid.staffId} and the same password.` : '';
+}
+
+async function createFamilyFromSuggestion(i) {
+  const studentIds = [...document.querySelectorAll('.fam-kid-' + i)].filter(x => x.checked).map(x => x.value);
+  const parentName  = (document.getElementById('fam-name-' + i)?.value || '').trim();
+  const parentEmail = (document.getElementById('fam-email-' + i)?.value || '').trim();
+  const parentPhone = (document.getElementById('fam-phone-' + i)?.value || '').trim();
+  if (!studentIds.length) { showToast('Tick at least one child.', 'warning'); return; }
+  if (!parentName || !parentEmail) { showToast("Enter the parent's name and email.", 'warning'); return; }
+  if (!confirm(`Create a family login for ${parentEmail} with ${studentIds.length} child(ren)? The parent will be emailed their login.`)) return;
+  await _createFamily({ parentName, parentEmail, parentPhone, studentIds });
+}
+
+async function _createFamily(body) {
+  const token = localStorage.getItem('sn_access_token');
+  try {
+    const res = await fetch(`${API}/api/families`, {
+      method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || 'Could not create the family login');
+    const moved = (data.movedToStudentId || []).map(m => `${m.name} now logs in with ${m.staffId}`).join('; ');
+    showToast(`✅ Family login ${data.created ? 'created' : 'updated'} — ${data.children.length} children. Login emailed to the parent.${moved ? ' ' + moved + '.' : ''}`, 'success', 9000);
+    renderFamilies();
+  } catch (err) { showToast('Error: ' + err.message, 'error', 8000); }
+}
+
+async function dismissFamilySuggestion(i) {
+  const g = _familySuggestions[i];
+  if (!confirm('Hide this suggestion? These children will not be suggested as a family again.')) return;
+  const token = localStorage.getItem('sn_access_token');
+  await fetch(`${API}/api/families/suggestions/${encodeURIComponent(g.key)}/dismiss`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } });
+  renderFamilies();
+}
+
+function _renderFamilyList(el, families) {
+  if (!families.length) { el.innerHTML = emptyState('🔑','No family logins yet',''); return; }
+  const options = (POS_DATA.students || []).map(s => `<option value="${s.studentId}">${_escH(s.studentName)} (${_escH(s.staffId || '')})</option>`).join('');
+  el.innerHTML = families.map(f => `
+    <div style="background:var(--white);border:1.5px solid #e8eaf0;border-radius:14px;padding:14px 16px;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+        <div><div style="font-weight:900;color:var(--dark);">${_escH(f.name)}</div>
+          <div style="font-size:12px;color:var(--mid);font-weight:700;">${_escH(f.email)}${f.phone ? ' · ' + _escH(f.phone) : ''} · ${f.lastLoginAt ? 'last login ' + fmtDateShort(f.lastLoginAt) : 'not logged in yet'}</div></div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <select id="fam-add-${f.id}" style="max-width:200px;padding:7px 10px;border:1.5px solid #e8eaf0;border-radius:8px;font-family:'Nunito',sans-serif;font-size:12px;"><option value="">Add a child…</option>${options}</select>
+          <button onclick="addChildToFamily('${f.id}')" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;">Add</button>
+        </div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;">
+        ${(f.children || []).map(c => `<span style="background:var(--blue-light);color:var(--blue);border-radius:50px;padding:5px 10px;font-size:12px;font-weight:800;">${_escH(c.name)} · ${_escH(c.staffId || '')}
+          <a href="#" title="Remove from family" onclick="removeChildFromFamily('${f.id}','${c.id}','${_jsArg(c.name)}');return false;" style="color:#c53030;text-decoration:none;margin-left:4px;">✕</a></span>`).join('') || '<span style="font-size:12px;color:var(--light);">No children linked</span>'}
+      </div>
+    </div>`).join('');
+}
+
+async function addChildToFamily(parentId) {
+  const studentId = document.getElementById('fam-add-' + parentId)?.value;
+  if (!studentId) { showToast('Choose a child to add.', 'warning'); return; }
+  const token = localStorage.getItem('sn_access_token');
+  const res = await fetch(`${API}/api/families/${parentId}/children`, {
+    method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ studentId }),
+  });
+  const data = await res.json();
+  if (!data.success) { showToast('Error: ' + (data.error || 'Could not add'), 'error'); return; }
+  showToast('✅ Child added to the family.');
+  renderFamilies();
+}
+
+async function removeChildFromFamily(parentId, studentId, name) {
+  if (!confirm(`Remove ${name} from this family login? ${name} keeps their own student login.`)) return;
+  const token = localStorage.getItem('sn_access_token');
+  await fetch(`${API}/api/families/${parentId}/children/${studentId}`, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } });
+  renderFamilies();
+}

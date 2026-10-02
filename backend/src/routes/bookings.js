@@ -17,6 +17,7 @@ const pool     = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const notify   = require('../services/notificationService');
 const rescheduleSvc = require('../services/rescheduleService');
+const pauseSvc = require('../services/pauseService');
 const logger   = require('../utils/logger');
 
 const router = express.Router();
@@ -1434,12 +1435,14 @@ async function chargeStudentForClass(studentId, booking, bookingNotes) {
     [studentId, booking.id]
   );
 
-  /* Apply suspension at -2 */
-  if (newCredits <= -2) {
+  /* At -2 (2-class grace) the remaining classes go on hold until a top-up */
+  let autoPause = { paused: false };
+  if (newCredits <= pauseSvc.CREDIT_PAUSE_AT) {
     await pool.query(
       `UPDATE student_profiles SET credits_suspended = TRUE WHERE user_id = $1`,
       [studentId]
     );
+    autoPause = await pauseSvc.autoPauseForCredits(studentId);
   }
 
   logger.info(`[CREDITS] Student ${studentId}: ${currentCredits} â†’ ${newCredits}`);
@@ -1552,15 +1555,15 @@ async function chargeStudentForClass(studentId, booking, bookingNotes) {
       }).catch(e => logger.warn('[CREDITS] Email (-1) failed:', e.message));
     }
 
-    /* -2 credits â€” suspended notification */
-    if (newCredits <= -2) {
+    /* -2 credits â€” classes put on hold (sent once, when the hold happens) */
+    if (autoPause.paused) {
       emailSvc.sendEmail({
         to:      recipientEmail,
         subject: `ðŸ”’ ${studentName}'s classes have been paused`,
         html: emailSvc._buildCreditNudgeEmail({
           parentName: recipientName, studentName, credits: newCredits,
           urgency: 'suspended', topUpUrl,
-          message: `${studentName}'s live class access has been <strong>temporarily paused</strong> due to insufficient credits. ${studentName} can still access all previous lesson materials and complete assignments, but cannot join new live sessions until credits are topped up.`
+          message: `${studentName} has used the 2 grace classes, so the remaining classes are <strong>on hold</strong>. Nothing is lost — as soon as you top up, the classes come back automatically on the same days, times and teacher. ${studentName} can still access all previous lesson materials and assignments.`
         }),
         template: 'credit_suspended',
       }).catch(e => logger.warn('[CREDITS] Email (suspended) failed:', e.message));
@@ -1652,8 +1655,11 @@ router.post('/:id/report', requireAuth, requireRole('tutor'), async (req, res, n
       if (booking.student_id) {
         await chargeStudentForClass(booking.student_id, booking, bookingNotes);
       } else if (booking.batch_id) {
+        /* Members on hold (paused) are not charged */
         const members = await pool.query(
-          `SELECT student_id FROM batch_members WHERE batch_id = $1 AND status = 'active'`,
+          `SELECT bm.student_id FROM batch_members bm
+           LEFT JOIN student_profiles sp ON sp.user_id = bm.student_id
+           WHERE bm.batch_id = $1 AND bm.status = 'active' AND COALESCE(sp.class_paused, FALSE) = FALSE`,
           [booking.batch_id]
         );
         const memberIds = members.rows.map(r => r.student_id);

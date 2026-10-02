@@ -198,6 +198,11 @@ router.post('/credits', requireAuth, async (req, res, next) => {
   try {
     const { studentEmail, credits, type, description, bookingId } = req.body;
     if (!studentEmail) return res.status(400).json({ success: false, error: 'studentEmail required' });
+    /* Only staff may set a balance; tutors may only log a transaction */
+    const canSet = ['admin', 'super_admin', 'postsales'].includes(req.user.role);
+    if (!canSet && !(req.user.role === 'tutor' && credits === undefined)) {
+      return res.status(403).json({ success: false, error: 'Access denied' });
+    }
 
     /* Find student by email */
     const userResult = await pool.query(
@@ -567,7 +572,9 @@ router.get('/dashboard/:role', requireAuth, async (req, res, next) => {
                     WHERE (b.student_id = $1
                        OR b.batch_id IN (
                          SELECT bm.batch_id FROM batch_members bm
+                         LEFT JOIN student_profiles spb ON spb.user_id = bm.student_id
                          WHERE bm.student_id = $1 AND bm.status = 'active'
+                           AND (COALESCE(spb.class_paused, FALSE) = FALSE OR b.date < CURRENT_DATE)
                        ))
                       AND ${dateFilter}
                     ORDER BY ${order} LIMIT ${limit}`;

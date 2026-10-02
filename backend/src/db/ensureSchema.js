@@ -69,6 +69,9 @@ const STATEMENTS = [
   `ALTER TABLE student_profiles ADD COLUMN IF NOT EXISTS paused_at     TIMESTAMPTZ`,
   `ALTER TABLE student_profiles ADD COLUMN IF NOT EXISTS paused_reason TEXT`,
   `ALTER TABLE student_profiles ADD COLUMN IF NOT EXISTS paused_by     UUID REFERENCES users(id)`,
+  /* 'manual' (Post-Sales) or 'credits' (automatic hold at -2) */
+  `ALTER TABLE student_profiles ADD COLUMN IF NOT EXISTS pause_kind    VARCHAR(20)`,
+  `UPDATE student_profiles SET pause_kind = 'manual' WHERE class_paused = TRUE AND pause_kind IS NULL`,
 
   /* ── Pathway progress: lessons per grade (used for progress + certificates) ── */
   `ALTER TABLE pathway_grades ADD COLUMN IF NOT EXISTS total_lessons INTEGER`,
@@ -88,6 +91,27 @@ const STATEMENTS = [
   `ALTER TABLE enrollment_requests ADD COLUMN IF NOT EXISTS booking_id     UUID REFERENCES bookings(id) ON DELETE SET NULL`,
   `ALTER TABLE enrollment_requests ADD COLUMN IF NOT EXISTS student_id     UUID REFERENCES users(id) ON DELETE SET NULL`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_enrollment_requests_booking ON enrollment_requests(booking_id) WHERE booking_id IS NOT NULL`,
+
+  /* ── Family logins: a parent account sees all their children ── */
+  `ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check`,
+  `ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN
+     ('student','tutor','admin','super_admin','sales','presales','postsales','operations','hr','parent'))`,
+  `CREATE TABLE IF NOT EXISTS parent_children (
+     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     parent_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     student_id  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     linked_by   UUID REFERENCES users(id),
+     linked_via  VARCHAR(20),
+     created_at  TIMESTAMPTZ DEFAULT NOW(),
+     UNIQUE (parent_id, student_id)
+   )`,
+  `CREATE INDEX IF NOT EXISTS idx_parent_children_student ON parent_children(student_id)`,
+  /* Suggested families Post-Sales marked as 'not a family' */
+  `CREATE TABLE IF NOT EXISTS family_suggestions_dismissed (
+     group_key    VARCHAR(40) PRIMARY KEY,
+     dismissed_by UUID REFERENCES users(id),
+     created_at   TIMESTAMPTZ DEFAULT NOW()
+   )`,
 
   /* ── Referrals ── */
   `CREATE TABLE IF NOT EXISTS referrals (

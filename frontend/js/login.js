@@ -173,6 +173,14 @@ async function handleLogin() {
     try {
       const user = await Auth.login(email, pw);
 
+      /* Family login: open the parent's first child on the student dashboard */
+      if (user.role === 'parent') {
+        document.getElementById('btnIcon').textContent = '✅';
+        document.getElementById('btnText').textContent = `Welcome, ${user.name.split(' ')[0]}! Opening your family…`;
+        await SNFamily.enter();
+        return;
+      }
+
       document.getElementById('btnIcon').textContent = '✅';
       document.getElementById('btnText').textContent = `Welcome, ${user.name.split(' ')[0]}! Redirecting…`;
 

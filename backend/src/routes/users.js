@@ -19,6 +19,9 @@ const { requireAuth, requireRole } = require('../middleware/auth');
 const emailSvc = require('../services/emailService');
 const logger   = require('../utils/logger');
 const { isValidTimeZone } = require('../utils/timezone');
+const { nextStudentId } = require('../utils/studentId');
+const family = require('../services/familyService');
+const genFamilyPassword = () => family.tempPassword();
 
 const router = express.Router();
 
@@ -164,20 +167,12 @@ const studentProfileSchema = z.object({
   paymentReference:    z.string().max(120).optional().nullable(),
   timezone:     z.string().optional().nullable(),
   enrollmentRequestId: z.string().uuid().optional().nullable(),
+  joinFamily:   z.boolean().optional(),
 }).partial();
 
 const createUserWithProfileSchema = createUserSchema.extend({
   studentProfile: studentProfileSchema.optional(),
 });
-
-/** Next free S-#### student ID (call inside the transaction, after the lock). */
-async function nextStudentId(client) {
-  const r = await client.query(
-    `SELECT COALESCE(MAX(substring(staff_id FROM '^S-(\\d+)$')::int), 0) AS n
-     FROM users WHERE staff_id ~ '^S-\\d+$'`
-  );
-  return 'S-' + String(r.rows[0].n + 1).padStart(4, '0');
-}
 
 router.post('/', requireAuth, requireRole('admin', 'super_admin', 'postsales'), async (req, res, next) => {
   let client;
@@ -200,10 +195,29 @@ router.post('/', requireAuth, requireRole('admin', 'super_admin', 'postsales'), 
     /* Serialise ID allocation so two onboardings never get the same S-#### */
     await client.query(`SELECT pg_advisory_xact_lock(hashtext('users.staff_id'))`);
 
-    const exists = await client.query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [data.email]);
+    /* The login email may already belong to a sibling or to a family login.
+       With joinFamily the new child is added to that family instead. */
+    let familyWith = null;
+    const exists = await client.query('SELECT id, role, name FROM users WHERE LOWER(email) = LOWER($1)', [data.email]);
     if (exists.rows.length) {
-      await client.query('ROLLBACK');
-      return res.status(409).json({ success: false, error: 'Email already registered' });
+      const ex = exists.rows[0];
+      const canJoin = data.role === 'student' && ['parent', 'student'].includes(ex.role);
+      if (!canJoin || !sp.joinFamily) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({
+          success: false,
+          error: canJoin
+            ? (ex.role === 'parent'
+                ? `${data.email} is already a family login — add this child to that family?`
+                : `${data.email} is already ${ex.name}'s login — are they siblings? Create a family login for both?`)
+            : 'Email already registered',
+          family: canJoin ? { type: ex.role, name: ex.name } : null,
+        });
+      }
+      if (ex.role === 'student' && !str(sp.parentName)) {
+        throw Object.assign(new Error("Please enter the parent's name to create the family login"), { status: 400 });
+      }
+      familyWith = ex;
     }
 
     let finalStaffId = data.staff_id || null;
@@ -226,7 +240,7 @@ router.post('/', requireAuth, requireRole('admin', 'super_admin', 'postsales'), 
       `INSERT INTO users (name, email, password_hash, role, staff_id, phone, whatsapp, timezone)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING id, name, email, role, staff_id`,
-      [data.name, data.email, passwordHash, data.role, finalStaffId,
+      [data.name, familyWith ? family.aliasEmailFor(finalStaffId) : data.email, passwordHash, data.role, finalStaffId,
        data.phone || null, data.whatsapp || null,
        timezone || (data.role === 'student' ? null : 'Africa/Lagos')]
     );
@@ -235,6 +249,8 @@ router.post('/', requireAuth, requireRole('admin', 'super_admin', 'postsales'), 
     let pathwayName = data.pathway || null;
     let enrolmentId = null;
     let paymentId   = null;
+    let familyResult = null;
+    let familyPassword = null;
 
     if (data.role === 'student') {
       await client.query(
@@ -285,6 +301,24 @@ router.post('/', requireAuth, requireRole('admin', 'super_admin', 'postsales'), 
         enrolmentId = en.rows[0].id;
       }
 
+      /* Family: join the existing family login, or create one for the siblings */
+      if (familyWith && familyWith.role === 'parent') {
+        await family.linkChild(client, { parentId: familyWith.id, studentId: user.id, byUserId: req.user.id });
+        familyResult = { parentId: familyWith.id, created: false };
+      } else if (familyWith) {
+        await family.convertChildToIdLogin(client, familyWith.id);
+        familyPassword = genFamilyPassword();
+        const p = await client.query(
+          `INSERT INTO users (name, email, password_hash, role, phone, is_active, timezone)
+           VALUES ($1, $2, $3, 'parent', $4, TRUE, $5) RETURNING id`,
+          [str(sp.parentName), data.email, await bcrypt.hash(familyPassword, 12), data.phone || null, timezone]
+        );
+        for (const sid of [familyWith.id, user.id]) {
+          await family.linkChild(client, { parentId: p.rows[0].id, studentId: sid, byUserId: req.user.id });
+        }
+        familyResult = { parentId: p.rows[0].id, created: true, siblingMovedToStudentId: familyWith.name };
+      }
+
       if (sp.enrollmentRequestId) {
         await client.query(
           `UPDATE enrollment_requests
@@ -314,6 +348,7 @@ router.post('/', requireAuth, requireRole('admin', 'super_admin', 'postsales'), 
         to,
         name:      data.name,
         studentId: user.staff_id || user.id,
+        loginId:   familyWith ? user.staff_id : null,
         password:  data.password,
         course:    str(sp.course) || data.course || str(sp.subject) || 'Coding',
         pathway:   pathwayName,
@@ -333,8 +368,14 @@ router.post('/', requireAuth, requireRole('admin', 'super_admin', 'postsales'), 
       }).catch(e => logger.error('Welcome email failed:', e.message));
     }
 
-    logger.info(`[CREATE USER] ${user.staff_id || ''} ${data.email} (${data.role}) by ${req.user.email}`);
-    res.status(201).json({ success: true, user, enrolmentId, paymentId });
+    if (familyResult && familyResult.created) {
+      const kids = await family.childrenOf(pool, familyResult.parentId).catch(() => []);
+      await family.sendFamilyLoginEmail({ to: data.email, parentName: str(sp.parentName), password: familyPassword, children: kids })
+        .catch(e => logger.error('Family login email failed:', e.message));
+    }
+
+    logger.info(`[CREATE USER] ${user.staff_id || ''} ${data.email} (${data.role}) by ${req.user.email}${familyResult ? ' [family]' : ''}`);
+    res.status(201).json({ success: true, user, enrolmentId, paymentId, family: familyResult });
   } catch (err) {
     if (client) {
       await client.query('ROLLBACK').catch(() => {});

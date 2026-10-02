@@ -81,10 +81,10 @@
 
       <!-- Email -->
       <div class="login-field">
-        <label>Email Address</label>
+        <label>Email Address or Student ID</label>
         <div class="input-wrap">
           <span class="input-icon">✉️</span>
-          <input type="email" id="emailInput" placeholder="you@stemnestacademy.co.uk" autocomplete="email">
+          <input type="text" id="emailInput" placeholder="you@email.com or S-0012" autocomplete="username" autocapitalize="off" spellcheck="false">
         </div>
       </div>
 
@@ -112,6 +112,10 @@
         <span id="btnIcon"></span>
         <span id="btnText"></span>
       </button>
+
+      <div style="text-align:center;margin-top:12px;font-size:13px;font-weight:700;color:var(--mid);">
+        Parent with more than one child at StemNest? <a href="family-setup.html" style="color:var(--blue);font-weight:900;">Set up a family login →</a>
+      </div>
 
       <!-- Divider -->
       <div class="divider">
@@ -205,6 +209,7 @@
 
 <script src="../js/utils.js"></script>
 <script src="../js/api.js"></script>
+<script src="../js/family.js"></script>
 <script src="../js/login.js"></script>
 
 <!-- FORGOT PASSWORD MODAL -->

@@ -18,6 +18,7 @@ function clearTokens() {
   localStorage.removeItem('sn_access_token');
   localStorage.removeItem('sn_refresh_token');
   localStorage.removeItem('sn_api_user');
+  ['sn_parent_token', 'sn_parent_refresh', 'sn_parent_user'].forEach(k => localStorage.removeItem(k));
 }
 
 /* ── Core fetch wrapper ── */
@@ -92,6 +93,8 @@ const Auth = {
       method: 'POST',
       body: { email, password },
     });
+    /* A fresh login ends any previous family session */
+    ['sn_parent_token', 'sn_parent_refresh', 'sn_parent_user'].forEach(k => localStorage.removeItem(k));
     setTokens(data.accessToken, data.refreshToken);
     /* Store user with both id and staffId for dashboard compatibility */
     const user = { ...data.user, staffId: data.user.staffId || data.user.staff_id };

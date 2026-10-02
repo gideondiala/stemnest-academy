@@ -68,7 +68,8 @@
     </div>
     <div class="sidebar-nav">
       <div class="sidebar-section-label">Finance</div>
-      <a class="sidebar-link active" data-tab="students"  onclick="showPOSTab('students')"> <span class="sl-icon">🎓</span> Paid Students <span class="sl-badge" id="posBadge">0</span></a>
+      <a class="sidebar-link active" data-tab="overview"  onclick="showPOSTab('overview')"> <span class="sl-icon">📊</span> Overview <span class="sl-badge" id="overviewBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="students"  onclick="showPOSTab('students')"> <span class="sl-icon">🎓</span> Paid Students <span class="sl-badge" id="posBadge">0</span></a>
       <a class="sidebar-link"        data-tab="topup"     onclick="showPOSTab('topup')">    <span class="sl-icon">⚠️</span> Needs Top-Up <span class="sl-badge" id="topupBadge">0</span></a>
       <a class="sidebar-link"        data-tab="scheduled" onclick="showPOSTab('scheduled')"><span class="sl-icon">📅</span> Scheduled Classes</a>
       <a class="sidebar-link"        data-tab="paylinks"  onclick="showPOSTab('paylinks')"> <span class="sl-icon">🔗</span> Payment Links</a>
@@ -79,6 +80,7 @@
       <a class="sidebar-link"        data-tab="promotions" onclick="showPOSTab('promotions')"><span class="sl-icon">🎓</span> Grade Promotions <span class="sl-badge" id="promotionsBadge">0</span></a>
       <a class="sidebar-link"        data-tab="pause-resume" onclick="showPOSTab('pause-resume')"><span class="sl-icon">⏸️</span> Pause &amp; Resume <span class="sl-badge" id="pauseBadge">0</span></a>
       <a class="sidebar-link"        data-tab="batches" onclick="showPOSTab('batches')"><span class="sl-icon">👥</span> Group Batches <span class="sl-badge" id="batchesBadge">0</span></a>
+      <a class="sidebar-link"        data-tab="families" onclick="showPOSTab('families')"><span class="sl-icon">👨‍👩‍👧</span> Families <span class="sl-badge" id="familiesBadge">0</span></a>
     </div>
     <div class="sidebar-bottom">
       <button class="logout-btn" onclick="window.location.href='login.html'">🚪 Log Out</button>
@@ -143,8 +145,34 @@
       </div>
     </div>
 
+    <!-- OVERVIEW: stage board -->
+    <div id="tab-overview">
+      <div class="dash-section-header">
+        <div class="dash-section-title">📊 Onboarding Overview</div>
+        <button class="btn btn-outline" style="font-size:12px;" onclick="renderOverview()">🔄 Refresh</button>
+      </div>
+      <div id="overviewCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px;"></div>
+      <div id="overviewList"></div>
+    </div>
+
+    <!-- FAMILIES -->
+    <div id="tab-families" style="display:none;">
+      <div class="dash-section-header">
+        <div class="dash-section-title">👨‍👩‍👧 Families</div>
+        <button class="btn btn-outline" style="font-size:12px;" onclick="renderFamilies()">🔄 Refresh</button>
+      </div>
+      <div style="background:var(--blue-light);border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13px;font-weight:700;color:var(--blue);line-height:1.6;">
+        💡 A family login lets a parent see all their children with one email. Children who share a parent phone number are suggested below — check them and click <strong>Create family login</strong>. The parent is emailed their login. If the parent email is one child's current login, that child switches to logging in with their student ID (same password).
+        Parents can also set one up themselves at <strong>stemnestacademy.co.uk/pages/family-setup.html</strong>.
+      </div>
+      <div class="dash-section-title" style="font-size:16px;margin:8px 0 10px;">Suggested families</div>
+      <div id="familySuggestions"></div>
+      <div class="dash-section-title" style="font-size:16px;margin:22px 0 10px;">Family logins</div>
+      <div id="familyList"></div>
+    </div>
+
     <!-- PAID STUDENTS -->
-    <div id="tab-students">
+    <div id="tab-students" style="display:none;">
       <div class="dash-section-header">
         <div class="dash-section-title">🎓 Paid Students</div>
         <div style="display:flex;gap:10px;">
@@ -420,6 +448,40 @@
     </div>
     <div class="modal-body" id="greyPaymentBody">
       <div style="text-align:center;padding:32px;color:var(--light);font-weight:700;">⏳ Loading...</div>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM PAYMENT / TOP-UP MODAL -->
+<div class="modal-overlay" id="topUpOverlay">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-header">
+      <div class="modal-title">💳 Confirm Payment</div>
+      <button class="modal-close" onclick="closeTopUpModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="tu-info" style="background:var(--green-light);border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13px;font-weight:700;color:var(--dark);line-height:1.6;"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Credits to add *</label>
+          <input type="number" id="tu-credits" min="1" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Amount received *</label>
+          <div style="display:flex;gap:6px;">
+            <select id="tu-currency" style="width:90px;padding:10px 6px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:13px;outline:none;background:var(--white);">
+              <option value="NGN">NGN ₦</option><option value="GBP">GBP £</option><option value="USD">USD $</option><option value="EUR">EUR €</option>
+              <option value="GHS">GHS ₵</option><option value="KES">KES</option><option value="ZAR">ZAR R</option><option value="CAD">CAD $</option><option value="AED">AED</option>
+            </select>
+            <input type="number" id="tu-amount" min="0" step="0.01" style="flex:1;min-width:0;padding:10px 12px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
+          </div></div>
+      </div>
+      <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Payment reference</label>
+        <input type="text" id="tu-ref" placeholder="e.g. bank transfer ref" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+      <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Note</label>
+        <input type="text" id="tu-notes" placeholder="e.g. October classes" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
+      <div id="tu-hold" style="display:none;background:#fff8e1;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:12px;font-weight:800;color:#92400e;"></div>
+      <div style="display:flex;gap:12px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="closeTopUpModal()">Cancel</button>
+        <button class="btn btn-green" id="tu-btn" style="flex:2;" onclick="confirmTopUpModal()">✅ Confirm Payment</button>
+      </div>
     </div>
   </div>
 </div>

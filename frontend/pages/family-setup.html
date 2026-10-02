@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="../assets/icons/icon.png">
+  <title>Family Login – StemNest Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/global.css">
+  <style>
+    body { background: var(--bg, #f4f6fb); font-family: 'Nunito', sans-serif; margin: 0; }
+    .fs-wrap { max-width: 520px; margin: 40px auto; padding: 0 16px; }
+    .fs-card { background: #fff; border-radius: 20px; box-shadow: 0 8px 30px rgba(0,0,0,.08); padding: 28px; }
+    .fs-title { font-family: 'Fredoka One', cursive; font-size: 26px; color: #1a202c; margin: 0 0 6px; }
+    .fs-sub { font-size: 14px; color: #4a5568; font-weight: 700; line-height: 1.6; margin-bottom: 20px; }
+    .fs-field { margin-bottom: 14px; }
+    .fs-field label { display: block; font-size: 12px; font-weight: 900; color: #4a5568; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
+    .fs-field input { width: 100%; box-sizing: border-box; padding: 12px 14px; border: 2px solid #e8eaf0; border-radius: 12px; font-family: 'Nunito', sans-serif; font-size: 15px; outline: none; }
+    .fs-field input:focus { border-color: #1a56db; }
+    .fs-section { font-size: 13px; font-weight: 900; color: #1a56db; margin: 20px 0 10px; }
+    .fs-hint { font-size: 12px; color: #718096; font-weight: 700; margin-top: 4px; }
+    .fs-btn { width: 100%; border: none; border-radius: 50px; padding: 14px; background: #1a56db; color: #fff; font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 15px; cursor: pointer; margin-top: 8px; }
+    .fs-btn:disabled { opacity: .6; cursor: default; }
+    .fs-msg { border-radius: 12px; padding: 12px 14px; font-size: 13px; font-weight: 800; margin-top: 14px; display: none; line-height: 1.6; }
+    .fs-msg.err { background: #fed7d7; color: #c53030; display: block; }
+    .fs-msg.ok { background: #d4f8e8; color: #065f46; display: block; }
+    .fs-foot { text-align: center; font-size: 13px; font-weight: 700; color: #4a5568; margin-top: 16px; }
+    .fs-foot a { color: #1a56db; font-weight: 900; }
+  </style>
+</head>
+<body>
+<div class="fs-wrap">
+  <div class="fs-card">
+
+    <!-- Set up a new family login (public) -->
+    <div id="registerView">
+      <h1 class="fs-title">👨‍👩‍👧 Set up a family login</h1>
+      <div class="fs-sub">One login for you to see all your children's classes, credits and progress. Each child keeps their own login too.</div>
+
+      <div class="fs-section">About you</div>
+      <div class="fs-field"><label>Your name</label><input id="fsName" autocomplete="name"></div>
+      <div class="fs-field"><label>Your email</label><input id="fsEmail" type="email" autocomplete="email">
+        <div class="fs-hint">If this is the email one of your children logs in with, that child will log in with their student ID instead (same password).</div></div>
+      <div class="fs-field"><label>Your phone / WhatsApp</label><input id="fsPhone" type="tel" autocomplete="tel"></div>
+      <div class="fs-field"><label>Choose a password</label><input id="fsPassword" type="password" autocomplete="new-password">
+        <div class="fs-hint">At least 8 characters.</div></div>
+
+      <div class="fs-section">Your first child</div>
+      <div class="fs-field"><label>Child's student ID or login email</label><input id="fsChild" placeholder="e.g. S-0012" autocapitalize="off"></div>
+      <div class="fs-field"><label>Child's password</label><input id="fsChildPw" type="password" autocomplete="off">
+        <div class="fs-hint">This proves the child is yours. You can add your other children after logging in.</div></div>
+
+      <button class="fs-btn" id="fsRegisterBtn" onclick="fsRegister()">Create family login</button>
+      <div class="fs-msg" id="fsRegisterMsg"></div>
+      <div class="fs-foot">Already have a family login? <a href="login.html">Log in</a></div>
+    </div>
+
+    <!-- Add a child (logged-in parent) -->
+    <div id="addView" style="display:none;">
+      <h1 class="fs-title">➕ Add a child</h1>
+      <div class="fs-sub" id="fsAddSub">Enter your child's student ID (or the email they log in with) and their password.</div>
+      <div class="fs-field"><label>Child's student ID or login email</label><input id="fsAddChild" placeholder="e.g. S-0012" autocapitalize="off"></div>
+      <div class="fs-field"><label>Child's password</label><input id="fsAddPw" type="password" autocomplete="off"></div>
+      <button class="fs-btn" id="fsAddBtn" onclick="fsAdd()">Add child</button>
+      <div class="fs-msg" id="fsAddMsg"></div>
+      <div class="fs-foot" id="fsAddFoot"><a href="#" onclick="fsBack();return false;">← Back to the dashboard</a></div>
+    </div>
+
+  </div>
+</div>
+
+<script src="../js/api.js"></script>
+<script src="../js/family.js"></script>
+<script>
+  var API_BASE = 'https://api.stemnestacademy.co.uk';
+  function msg(id, text, ok) { var el = document.getElementById(id); el.className = 'fs-msg ' + (ok ? 'ok' : 'err'); el.innerHTML = text; }
+  function val(id) { return (document.getElementById(id).value || '').trim(); }
+
+  var params = new URLSearchParams(location.search);
+  var hasParent = !!localStorage.getItem('sn_parent_token') ||
+    (function () { try { return JSON.parse(localStorage.getItem('sn_api_user') || '{}').role === 'parent'; } catch (e) { return false; } })();
+
+  if (params.get('add') && hasParent) {
+    /* A parent who just logged in with no children yet still has their own token as the access token */
+    if (!localStorage.getItem('sn_parent_token')) {
+      localStorage.setItem('sn_parent_token', localStorage.getItem('sn_access_token') || '');
+      localStorage.setItem('sn_parent_refresh', localStorage.getItem('sn_refresh_token') || '');
+      localStorage.setItem('sn_parent_user', localStorage.getItem('sn_api_user') || '');
+    }
+    document.getElementById('registerView').style.display = 'none';
+    document.getElementById('addView').style.display = 'block';
+  }
+
+  async function fsRegister() {
+    var body = {
+      parentName: val('fsName'), email: val('fsEmail'), phone: val('fsPhone'),
+      password: document.getElementById('fsPassword').value,
+      studentLogin: val('fsChild'), studentPassword: document.getElementById('fsChildPw').value,
+    };
+    if (!body.parentName || !body.email || !body.password || !body.studentLogin || !body.studentPassword) {
+      return msg('fsRegisterMsg', 'Please fill in every field.');
+    }
+    var btn = document.getElementById('fsRegisterBtn'); btn.disabled = true; btn.textContent = 'Creating…';
+    try {
+      var res = await fetch(API_BASE + '/api/families/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      var d = await res.json();
+      if (!res.ok || !d.success) throw new Error(d.error || 'Could not create the family login');
+      msg('fsRegisterMsg', '✅ Your family login is ready with <strong>' + d.child.name + '</strong>.' +
+        (d.childMovedToStudentId ? '<br>' + d.child.name + ' now logs in with student ID <strong>' + d.child.staffId + '</strong> and the same password.' : '') +
+        '<br><a href="login.html" style="color:#065f46;">Log in now →</a> and use “Add a child” for your other children.', true);
+      btn.textContent = 'Done';
+    } catch (e) {
+      msg('fsRegisterMsg', e.message); btn.disabled = false; btn.textContent = 'Create family login';
+    }
+  }
+
+  async function fsAdd() {
+    var login = val('fsAddChild'), pw = document.getElementById('fsAddPw').value;
+    if (!login || !pw) return msg('fsAddMsg', "Please enter the child's student ID and password.");
+    var btn = document.getElementById('fsAddBtn'); btn.disabled = true; btn.textContent = 'Adding…';
+    try {
+      var d = await SNFamily.addChild(login, pw);
+      msg('fsAddMsg', '✅ ' + d.child.name + ' has been added. Opening the dashboard…', true);
+      await SNFamily.switchTo(d.child.id);
+      setTimeout(function () { location.href = 'student-dashboard.html'; }, 900);
+    } catch (e) {
+      msg('fsAddMsg', e.message); btn.disabled = false; btn.textContent = 'Add child';
+    }
+  }
+
+  async function fsBack() {
+    try {
+      var d = await SNFamily.parentCall('/api/families/me');
+      if (d.children.length) { await SNFamily.switchTo(d.children[0].id); location.href = 'student-dashboard.html'; return; }
+    } catch (e) {}
+    SNFamily.logout();
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter') return;
+    if (document.getElementById('addView').style.display === 'block') fsAdd(); else fsRegister();
+  });
+</script>
+</body>
+</html>

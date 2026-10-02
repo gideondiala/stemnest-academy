@@ -33,8 +33,9 @@ const authLimiter = rateLimit({
 });
 
 /* ── Validation schemas ── */
+/* "email" may also be a student ID (S-0012) — children on a family login use it */
 const loginSchema = z.object({
-  email:    z.string().email(),
+  email:    z.string().trim().min(1, 'Please enter your email or student ID'),
   password: z.string().min(1),
 });
 
@@ -76,8 +77,11 @@ router.post('/login', authLimiter, async (req, res, next) => {
     const { email, password } = loginSchema.parse(req.body);
 
     /* Look up user */
+    const byStudentId = /^S-\d+$/i.test(email);
     const result = await pool.query(
-      'SELECT * FROM users WHERE LOWER(email) = LOWER($1) AND is_active = TRUE',
+      byStudentId
+        ? `SELECT * FROM users WHERE UPPER(staff_id) = UPPER($1) AND role = 'student' AND is_active = TRUE`
+        : 'SELECT * FROM users WHERE LOWER(email) = LOWER($1) AND is_active = TRUE',
       [email]
     );
     const user = result.rows[0];

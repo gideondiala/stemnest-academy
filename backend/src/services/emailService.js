@@ -12,6 +12,11 @@ const pool   = require('../config/db');
    SEND FUNCTION
 ───────────────────────────────────────────── */
 async function sendEmail({ to, subject, html, text, template }) {
+  /* Children on a family login have a placeholder address — their emails go to the parent */
+  if (typeof to === 'string' && to.toLowerCase().endsWith('@login.stemnest.invalid')) {
+    logger.info(`[EMAIL SKIPPED] placeholder child address ${to} | ${subject}`);
+    return { skipped: true };
+  }
   const fromName    = process.env.EMAIL_FROM_NAME || 'StemNest Academy';
   const fromAddress = process.env.EMAIL_FROM      || 'noreply@stemnestacademy.co.uk';
   const from        = `${fromName} <${fromAddress}>`;
@@ -119,7 +124,7 @@ async function sendWelcomeEmail({ to, name, role, loginUrl, password }) {
   return sendEmail({ to, subject: 'Welcome to StemNest Academy — Your Account is Ready', html, template: 'welcome' });
 }
 
-async function sendOnboardingEmail({ to, name, studentId, password, course, pathway, credits, loginUrl }) {
+async function sendOnboardingEmail({ to, name, studentId, loginId, password, course, pathway, credits, loginUrl }) {
   const html = _wrap(`
     <h2>Welcome to StemNest Academy, ${name}! 🎉</h2>
     <p>Congratulations on your enrollment! Your student dashboard is now active and ready for you.</p>
@@ -130,7 +135,7 @@ async function sendOnboardingEmail({ to, name, studentId, password, course, path
       ${pathway ? `<strong>Pathway:</strong> ${pathway} (Pathway chosen)<br>` : ''}
       <strong>Available Credits:</strong> ${credits} class${credits !== 1 ? 'es' : ''}<br>
       <br>
-      <strong>Login Email:</strong> ${to}<br>
+      <strong>${loginId ? 'Student login (student ID)' : 'Login Email'}:</strong> ${loginId || to}<br>
       <strong>Temporary Password:</strong> ${password}
     </div>
     <p>Please log in to your dashboard to view your schedule and join your upcoming classes. You can change your password at any time.</p>

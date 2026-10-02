@@ -13,6 +13,8 @@ const pool    = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const notify  = require('../services/notificationService');
 const logger  = require('../utils/logger');
+const pauseSvc = require('../services/pauseService');
+const { nextStudentId } = require('../utils/studentId');
 const fincra  = require('../services/fincraService');
 
 const router = express.Router();
@@ -263,8 +265,22 @@ router.post(
           /* Check if a user account already exists for this email */
           if (studentEmail) {
             const existingUser = await pool.query(
-              'SELECT id FROM users WHERE email = $1', [studentEmail]
+              'SELECT id, role FROM users WHERE LOWER(email) = LOWER($1)', [studentEmail]
             );
+            /* A family login's email: credit the child only when there is exactly one */
+            if (existingUser.rows.length && existingUser.rows[0].role === 'parent') {
+              const kids = await require('../services/familyService').childrenOf(pool, existingUser.rows[0].id);
+              if (kids.length === 1) existingUser.rows[0] = { id: kids[0].id, role: 'student' };
+              else {
+                logger.warn(`[FINCRA WEBHOOK] Payment ${payment.id} is from family login ${studentEmail} with ${kids.length} children — assign the credits manually`);
+                existingUser.rows = [];
+                studentEmail = '';
+              }
+            } else if (existingUser.rows.length && existingUser.rows[0].role !== 'student') {
+              logger.warn(`[FINCRA WEBHOOK] Payment ${payment.id} email belongs to a ${existingUser.rows[0].role} account — not applied`);
+              existingUser.rows = [];
+              studentEmail = '';
+            }
 
             if (existingUser.rows.length) {
               /* Account exists — just link it */
@@ -274,27 +290,45 @@ router.post(
                 [studentId, payment.id]
               );
               logger.info(`[FINCRA WEBHOOK] Linked existing account ${studentId} to payment ${payment.id}`);
-            } else {
+            } else if (studentEmail) {
               /* Create new student account */
               const bcrypt = require('bcrypt');
               const tempPassword = Math.random().toString(36).slice(-8) + '!S1';
               const passwordHash = await bcrypt.hash(tempPassword, 10);
-              const staffId = 'S-' + Date.now().toString(36).toUpperCase().slice(-5);
-
-              const newUser = await pool.query(
-                `INSERT INTO users (name, email, role, password_hash, staff_id, is_active)
-                 VALUES ($1, $2, 'student', $3, $4, TRUE)
-                 RETURNING id`,
-                [studentName, studentEmail, passwordHash, staffId]
-              );
-              studentId = newUser.rows[0].id;
-
-              /* Create student profile */
-              await pool.query(
-                `INSERT INTO student_profiles (user_id, grade, credits, parent_name, parent_email, enrolled_at)
-                 VALUES ($1, $2, 0, $3, $4, NOW())`,
-                [studentId, studentGrade, parentName || null, studentEmail]
-              );
+              /* Account + profile together, with the next S-#### ID */
+              let staffId;
+              const tx = await pool.connect();
+              try {
+                await tx.query('BEGIN');
+                staffId = await nextStudentId(tx);
+                const newUser = await tx.query(
+                  `INSERT INTO users (name, email, role, password_hash, staff_id, is_active)
+                   VALUES ($1, $2, 'student', $3, $4, TRUE)
+                   RETURNING id`,
+                  [studentName, studentEmail, passwordHash, staffId]
+                );
+                studentId = newUser.rows[0].id;
+                await tx.query(
+                  `INSERT INTO student_profiles (user_id, grade, credits, parent_name, parent_email, enrolled_at)
+                   VALUES ($1, $2, 0, $3, $4, NOW())`,
+                  [studentId, studentGrade, parentName || null, studentEmail]
+                );
+                /* The Pre-Sales handover for this demo is now onboarded */
+                if (bookingId) {
+                  await tx.query(
+                    `UPDATE enrollment_requests SET status = 'processed', processed_at = NOW(), student_id = $1,
+                            payment_status = 'received'
+                     WHERE booking_id = $2`,
+                    [studentId, bookingId]
+                  );
+                }
+                await tx.query('COMMIT');
+              } catch (txErr) {
+                await tx.query('ROLLBACK').catch(() => {});
+                throw txErr;
+              } finally {
+                tx.release();
+              }
 
               /* Update payment record with the new student_id */
               await pool.query(
@@ -349,19 +383,15 @@ router.post(
 
       /* Add credits to student — handling negative balance (debt settlement) */
       if (studentId && credits > 0) {
-        /* Get current credit balance */
+        /* Add credits atomically (settles any negative balance) and lift suspension */
         const credResult = await pool.query(
-          `SELECT credits FROM student_profiles WHERE user_id = $1`,
-          [studentId]
+          `INSERT INTO student_profiles (user_id, credits) VALUES ($2, $1)
+           ON CONFLICT (user_id) DO UPDATE SET credits = COALESCE(student_profiles.credits, 0) + $1, credits_suspended = FALSE
+           RETURNING credits`,
+          [credits, studentId]
         );
-        const currentCredits = parseInt(credResult.rows[0]?.credits || 0);
-        const newCredits     = currentCredits + credits;
-
-        /* Update credits */
-        await pool.query(
-          `UPDATE student_profiles SET credits = $1, credits_suspended = FALSE WHERE user_id = $2`,
-          [newCredits, studentId]
-        );
+        const newCredits     = parseInt(credResult.rows[0].credits, 10);
+        const currentCredits = newCredits - credits;
 
         /* Log transaction */
         await pool.query(
@@ -383,6 +413,9 @@ router.post(
         } catch (retErr) {
           logger.warn('[FINCRA WEBHOOK] markStudentRenewed failed:', retErr.message);
         }
+
+        /* Classes on hold for credits come back automatically */
+        await pauseSvc.autoResumeAfterTopUp(studentId);
 
         /* Notify student in-app */
         await notify.saveNotification(
@@ -515,7 +548,7 @@ router.post(
 ════════════════════════════════════════════════════ */
 router.post('/manual-topup', requireAuth, requireRole('admin','super_admin','postsales'), async (req, res, next) => {
   try {
-    const { studentId, credits, amount, currency, notes } = req.body;
+    const { studentId, credits, amount, currency, notes, reference } = req.body;
 
     if (!studentId) return res.status(400).json({ success: false, error: 'studentId is required' });
     if (!credits || parseInt(credits) <= 0) return res.status(400).json({ success: false, error: 'credits must be a positive integer' });
@@ -539,14 +572,15 @@ router.post('/manual-topup', requireAuth, requireRole('admin','super_admin','pos
     }
 
     const student        = stuResult.rows[0];
-    const currentCredits = parseInt(student.current_credits || 0);
-    const newCredits     = currentCredits + creditsToAdd;
-
-    /* Update credits and lift suspension */
-    await pool.query(
-      `UPDATE student_profiles SET credits = $1, credits_suspended = FALSE WHERE user_id = $2`,
-      [newCredits, studentId]
+    /* Add credits atomically and lift suspension */
+    const upd = await pool.query(
+      `INSERT INTO student_profiles (user_id, credits) VALUES ($2, $1)
+       ON CONFLICT (user_id) DO UPDATE SET credits = COALESCE(student_profiles.credits, 0) + $1, credits_suspended = FALSE
+       RETURNING credits`,
+      [creditsToAdd, studentId]
     );
+    const newCredits     = parseInt(upd.rows[0].credits, 10);
+    const currentCredits = newCredits - creditsToAdd;
 
     /* Insert confirmed payment record */
     const payResult = await pool.query(
@@ -564,6 +598,7 @@ router.post('/manual-topup', requireAuth, requireRole('admin','super_admin','pos
           method:       'manual',
           confirmedBy:  req.user.email,
           notes:        notes || '',
+          reference:    reference || null,
           previousCredits: currentCredits,
           newCredits,
         }),
@@ -605,9 +640,12 @@ router.post('/manual-topup', requireAuth, requireRole('admin','super_admin','pos
       }
     }
 
+    /* Classes on hold for credits come back automatically */
+    const resume = await pauseSvc.autoResumeAfterTopUp(studentId);
+
     logger.info(`[MANUAL-TOPUP] student=${studentId} name=${student.name} added=${creditsToAdd} new=${newCredits} by=${req.user.email}`);
 
-    res.json({ success: true, newCredits, paymentId });
+    res.json({ success: true, newCredits, paymentId, resume });
 
   } catch (err) { next(err); }
 });
