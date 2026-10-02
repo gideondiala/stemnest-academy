@@ -445,239 +445,292 @@ router.get('/', requireAuth, async (req, res, next) => {
    Creates multiple paid sessions for a student without
    sending demo emails. Sends ONE summary email only.
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+/* Booking date + time are WAT. The whole grade is booked up front (72
+   lessons, or the grade's real lesson count) so parents always see the
+   full plan; classes are put on hold automatically when credits run out. */
+const FULL_GRADE_LESSONS = 72;
+
+function _bsAddDays(dateStr, n) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+}
+function _bsWeekday(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+
+/** Weekly pattern [{weekday, time}] → the next `count` class slots from startDate. */
+function _bsGenerateSlots(startDate, schedule, count) {
+  const slots = [...schedule].sort((a, b) => a.weekday - b.weekday || a.time.localeCompare(b.time));
+  const out = [];
+  for (let day = 0; out.length < count && day < 366 * 6; day++) {
+    const d = _bsAddDays(startDate, day), wd = _bsWeekday(d);
+    for (const s of slots) if (s.weekday === wd && out.length < count) out.push({ d, t: s.time });
+  }
+  return out;
+}
+
+/** First overlap between the slots and the tutor's or the student's other live classes (incl. batches). */
+async function _bsFindClash(client, tutorId, studentId, slots) {
+  if (!slots.length) return null;
+  const r = await client.query(
+    `SELECT s.d::text AS d, s.t AS t, (b.tutor_id = $1) AS tutor_clash,
+            COALESCE(u.name, b.notes->>'batchRef', b.lesson_name, 'another class') AS who
+     FROM unnest($2::date[], $3::text[]) AS s(d, t)
+     JOIN bookings b
+       ON b.status = 'scheduled'
+      AND (b.tutor_id = $1
+           OR ($4::uuid IS NOT NULL AND b.student_id = $4::uuid)
+           OR ($4::uuid IS NOT NULL AND b.batch_id IN (
+                 SELECT batch_id FROM batch_members WHERE student_id = $4::uuid AND status = 'active')))
+      AND (b.date + b.time) < (s.d + s.t::time) + INTERVAL '60 minutes'
+      AND (s.d + s.t::time) < (b.date + b.time) + make_interval(mins => COALESCE(b.duration_mins, 60))
+     LEFT JOIN users u ON u.id = b.student_id
+     ORDER BY s.d, s.t LIMIT 1`,
+    [tutorId, slots.map(s => s.d), slots.map(s => s.t), studentId || null]
+  );
+  return r.rows[0] || null;
+}
+
+/* ════════════════════════════════════════════════
+   POST /api/bookings/bulk-schedule  (postsales/admin)
+   Body: { studentId, tutorId, classLink, pathwayId?, gradeNumber?,
+           schedule: [{weekday 0-6, time 'HH:MM'}], startDate 'YYYY-MM-DD',
+           totalClasses?, startingLesson?, subject? }
+   (Legacy: { sessions: [{date, time}] } instead of schedule/startDate.)
+   Books every remaining lesson of the grade in one transaction, links each
+   class to its pathway lesson, records the pathway enrolment, and emails
+   the parent and the tutor once.
+════════════════════════════════════════════════ */
 router.post('/bulk-schedule', requireAuth, requireRole('admin','super_admin','postsales'), async (req, res, next) => {
+  const { studentId, studentEmail, tutorId, classLink, pathwayId, gradeNumber,
+          schedule, startDate, sessions, totalClasses, startingLesson, subject } = req.body || {};
+
+  if (!tutorId)   return res.status(400).json({ success: false, error: 'Please select a teacher' });
+  if (!classLink || !String(classLink).trim()) return res.status(400).json({ success: false, error: 'Please enter the class link' });
+
+  const usePattern = Array.isArray(schedule) && schedule.length > 0;
+  if (!usePattern && !(Array.isArray(sessions) && sessions.length)) {
+    return res.status(400).json({ success: false, error: 'Add at least one class day and time' });
+  }
+  let pattern = [];
+  if (usePattern) {
+    pattern = schedule.map(s => ({ weekday: parseInt(s.weekday, 10), time: String(s.time || '').slice(0, 5) }));
+    if (pattern.some(s => !(s.weekday >= 0 && s.weekday <= 6) || !/^\d{2}:\d{2}$/.test(s.time))) {
+      return res.status(400).json({ success: false, error: 'Each class day needs a weekday and a time' });
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(startDate || ''))) {
+      return res.status(400).json({ success: false, error: 'Please choose a start date' });
+    }
+  }
+
+  const client = await pool.connect();
   try {
-    const {
-      studentId,      // DB UUID of the student
-      studentName,
-      studentEmail,
-      tutorId,        // DB UUID of the tutor
-      tutorName,
-      course,         // pathway or course name
-      classLink,
-      sessions,       // [{ date: 'YYYY-MM-DD', time: 'HH:MM' }, ...]
-      pathwayId,      // UUID of the pathway (optional â€” enables lesson linking)
-      gradeNumber,    // integer grade number e.g. 4 (optional)
-      startingLesson, // which lesson number to start from (default: 1)
-    } = req.body;
+    await client.query('BEGIN');
 
-    if (!studentName)              return res.status(400).json({ success: false, error: 'studentName required' });
-    if (!tutorId)                  return res.status(400).json({ success: false, error: 'tutorId required' });
-    if (!Array.isArray(sessions) || sessions.length === 0) {
-      return res.status(400).json({ success: false, error: 'sessions array required' });
+    /* ── Student ── */
+    const stu = await client.query(
+      `SELECT u.id, u.name, u.email, sp.parent_email, sp.parent_name, sp.class_paused
+       FROM users u LEFT JOIN student_profiles sp ON sp.user_id = u.id
+       WHERE u.role = 'student' AND ${studentId ? 'u.id = $1' : 'LOWER(u.email) = LOWER($1)'}`,
+      [studentId || studentEmail || '']
+    );
+    if (!stu.rows.length) throw Object.assign(new Error('Student not found'), { status: 404 });
+    const student = stu.rows[0];
+    if (student.class_paused) {
+      throw Object.assign(new Error(`${student.name} is paused — resume them from Pause & Resume instead`), { status: 400 });
     }
 
-    const createdIds = [];
+    const tut = await client.query(`SELECT id, name, email FROM users WHERE id = $1 AND role = 'tutor'`, [tutorId]);
+    if (!tut.rows.length) throw Object.assign(new Error('Teacher not found'), { status: 404 });
+    const tutor = tut.rows[0];
 
-    /* If studentId is not provided, look it up by email */
-    let resolvedStudentId = studentId || null;
-    if (!resolvedStudentId && studentEmail) {
-      try {
-        const stuResult = await pool.query(
-          `SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND role = 'student' LIMIT 1`,
-          [studentEmail]
-        );
-        if (stuResult.rows.length) {
-          resolvedStudentId = stuResult.rows[0].id;
-          logger.info(`[BULK-SCHEDULE] Resolved student_id from email: ${studentEmail} â†’ ${resolvedStudentId}`);
-        } else {
-          logger.warn(`[BULK-SCHEDULE] No student found for email: ${studentEmail}`);
-        }
-      } catch (e) {
-        logger.warn(`[BULK-SCHEDULE] Student lookup failed: ${e.message}`);
-      }
-    }
-
-    /* â”€â”€ Look up ordered pathway lessons if pathwayId + gradeNumber provided â”€â”€ */
-    let orderedLessons   = [];   // [{id, lesson_number, title}, ...]
-    let totalLessons     = 0;
-    let resolvedGradeNum = parseInt(gradeNumber) || 1;
-
-    if (pathwayId && gradeNumber) {
-      try {
-        /* Find the grade record */
-        const gradeResult = await pool.query(
-          `SELECT id, grade_number FROM pathway_grades
-           WHERE pathway_id = $1 AND grade_number = $2 AND is_active = TRUE
-           LIMIT 1`,
-          [pathwayId, parseInt(gradeNumber)]
-        );
-
-        if (gradeResult.rows.length) {
-          const gradeId = gradeResult.rows[0].id;
-
-          /* Fetch all active lessons for this grade, ordered by lesson_number */
-          const lessonsResult = await pool.query(
-            `SELECT id, lesson_number, title, unit_id
-             FROM pathway_lessons
-             WHERE grade_id = $1 AND is_active = TRUE
-             ORDER BY lesson_number ASC`,
-            [gradeId]
-          );
-
-          orderedLessons = lessonsResult.rows;
-          totalLessons   = orderedLessons.length;
-          logger.info(`[BULK-SCHEDULE] Loaded ${totalLessons} lessons for pathway=${pathwayId} grade=${gradeNumber}`);
-        } else {
-          logger.warn(`[BULK-SCHEDULE] No grade found for pathway=${pathwayId} grade=${gradeNumber}`);
-        }
-      } catch (e) {
-        logger.warn(`[BULK-SCHEDULE] Lesson lookup failed: ${e.message}`);
-        /* Non-fatal â€” bookings still created without lesson links */
-      }
-    }
-
-    /* â”€â”€ If student has prior completed lessons, check enrolments â”€â”€ */
-    let lessonOffset = (parseInt(startingLesson) || 1) - 1; // 0-based index into orderedLessons
-
-    if (resolvedStudentId && orderedLessons.length > 0 && !startingLesson) {
-      try {
-        const enrolResult = await pool.query(
-          `SELECT lessons_completed FROM enrolments
-           WHERE student_id = $1 AND pathway_id = $2
-           ORDER BY created_at DESC LIMIT 1`,
-          [resolvedStudentId, pathwayId]
-        );
-        if (enrolResult.rows.length) {
-          lessonOffset = parseInt(enrolResult.rows[0].lessons_completed) || 0;
-          logger.info(`[BULK-SCHEDULE] Student has ${lessonOffset} lessons completed â€” starting from lesson ${lessonOffset + 1}`);
-        }
-      } catch (e) {
-        logger.warn(`[BULK-SCHEDULE] Enrolment lookup failed: ${e.message}`);
-      }
-    }
-
-    const gradeDisplay = `Grade ${resolvedGradeNum}`;
-
-    for (let i = 0; i < sessions.length; i++) {
-      const session = sessions[i];
-      if (!session.date || !session.time) continue;
-
-      /* Find the lesson for this session slot */
-      const lessonIdx  = lessonOffset + i;
-      const lesson     = orderedLessons[lessonIdx] || null;
-      const lessonNum  = lesson ? lesson.lesson_number : null;
-      const lessonName = lesson ? lesson.title : (course || '');
-
-      /* Insert paid booking â€” is_demo = FALSE, status = scheduled, tutor linked */
-      const result = await pool.query(
-        `INSERT INTO bookings
-           (subject, grade, date, time, class_link, status, is_demo,
-            tutor_id, student_id, lesson_name, notes, booked_at, scheduled_at,
-            pathway_lesson_id, lesson_number_in_grade)
-         VALUES ($1, $2, $3::date, $4::time, $5, 'scheduled', FALSE,
-                 $6, $7, $8, $9, NOW(), NOW(), $10, $11)
-         RETURNING id`,
-        [
-          'Coding',
-          gradeDisplay,
-          session.date,
-          session.time.substring(0, 5),
-          classLink || '',
-          tutorId,
-          resolvedStudentId,
-          lessonName || studentName,
-          JSON.stringify({
-            studentName,
-            email:       studentEmail || '',
-            course:      course || '',
-            tutorName:   tutorName || '',
-            classLink:   classLink || '',
-            isPaidClass: true,
-            lessonTitle: lessonName || '',
-            lessonNumber: lessonNum,
-            totalLessons,
-            pathwayId:   pathwayId || null,
-            gradeNumber: resolvedGradeNum,
-          }),
-          lesson ? lesson.id : null,
-          lessonNum,
-        ]
+    /* ── Pathway lessons for the grade ── */
+    let lessons = [], pathwayName = null, gradeNum = parseInt(gradeNumber, 10) || null;
+    if (pathwayId) {
+      const pw = await client.query('SELECT name FROM pathways WHERE id = $1', [pathwayId]);
+      if (!pw.rows.length) throw Object.assign(new Error('Pathway not found'), { status: 400 });
+      pathwayName = pw.rows[0].name;
+      gradeNum = gradeNum || 1;
+      const l = await client.query(
+        `SELECT pl.id, pl.lesson_number, pl.title
+         FROM pathway_lessons pl JOIN pathway_grades pg ON pg.id = pl.grade_id
+         WHERE pg.pathway_id = $1 AND pg.grade_number = $2 AND pg.is_active = TRUE AND pl.is_active = TRUE
+         ORDER BY pl.lesson_number`,
+        [pathwayId, gradeNum]
       );
-      createdIds.push(result.rows[0].id);
+      lessons = l.rows;
     }
 
-    /* Send ONE summary email to parent/student */
-    if (studentEmail && createdIds.length > 0) {
-      try {
-        const emailSvc = require('../services/emailService');
-        const appUrl   = process.env.APP_URL || 'https://stemnestacademy.co.uk';
-        const firstSession = sessions[0];
-        const firstDate    = firstSession
-          ? new Date(firstSession.date).toLocaleDateString('en-GB', {
-              weekday:'long', day:'numeric', month:'long', year:'numeric'
-            })
-          : 'â€”';
-
-        await emailSvc.sendEmail({
-          to:      studentEmail,
-          subject: `ðŸŽ‰ Your classes are scheduled â€” ${course || 'STEMNest Programme'}`,
-          html: `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
-<style>
-body{font-family:'Helvetica Neue',Arial,sans-serif;background:#f4f6fb;margin:0;padding:0;}
-.container{max-width:600px;margin:32px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08);}
-.header{background:linear-gradient(135deg,#1a56db,#0e9f6e);padding:36px 40px;text-align:center;}
-.header h1{color:#fff;font-size:24px;margin:0;font-weight:900;}
-.body{padding:36px 40px;color:#1a202c;font-size:15px;line-height:1.7;}
-.info-box{background:#f0fdf4;border-radius:12px;padding:20px 24px;margin:20px 0;border-left:4px solid #0e9f6e;}
-.btn{display:inline-block;background:#1a56db;color:#fff!important;text-decoration:none;padding:14px 36px;border-radius:50px;font-weight:700;font-size:15px;margin-top:16px;}
-.footer{background:#f4f6fb;padding:20px 40px;text-align:center;font-size:12px;color:#718096;}
-</style></head>
-<body><div class="container">
-  <div class="header"><h1>ðŸŽ‰ Your Classes Are Scheduled!</h1></div>
-  <div class="body">
-    <p>Hi <strong>${studentName}</strong>,</p>
-    <p>Excellent news! Your classes have been scheduled and are ready to begin.</p>
-    <div class="info-box">
-      <strong>Programme:</strong> ${course || 'STEMNest Programme'}<br>
-      <strong>Teacher:</strong> ${tutorName || 'Your STEMNest Tutor'}<br>
-      <strong>First Class:</strong> ${firstDate}<br>
-      <strong>Total Sessions:</strong> ${createdIds.length} class${createdIds.length !== 1 ? 'es' : ''}<br>
-      ${classLink ? `<strong>Class Link:</strong> <a href="${classLink}" style="color:#1a56db;">${classLink}</a>` : ''}
-    </div>
-    <p>Log in to your student dashboard to see your full schedule, join upcoming classes and track your progress.</p>
-    <a href="${appUrl}/pages/student-dashboard.html" class="btn">Go to My Dashboard â†’</a>
-    <p style="font-size:13px;color:#718096;margin-top:20px;">If you have any questions, contact us at <a href="mailto:support@stemnestacademy.co.uk" style="color:#1a56db;">support@stemnestacademy.co.uk</a></p>
-  </div>
-  <div class="footer">Â© ${new Date().getFullYear()} StemNest Academy Ltd Â· <a href="${appUrl}" style="color:#1a56db;">stemnestacademy.co.uk</a></div>
-</div></body></html>`,
-          template: 'paid_classes_scheduled',
-        }).catch(e => logger.warn('[BULK-SCHEDULE] Student email failed:', e.message));
-
-        /* ONE email to tutor */
-        const tutorResult = await pool.query('SELECT email, name FROM users WHERE id = $1', [tutorId]);
-        const tutor = tutorResult.rows[0];
-        if (tutor && tutor.email) {
-          await emailSvc.sendEmail({
-            to:      tutor.email,
-            subject: `ðŸ“… New student assigned â€” ${studentName}`,
-            html: `<div style="font-family:Arial,sans-serif;max-width:500px;padding:24px;">
-              <h2 style="color:#1a56db;">New Student Assigned ðŸ“…</h2>
-              <p>Hi ${tutor.name},</p>
-              <p>A student has been assigned to you for ongoing classes.</p>
-              <div style="background:#f0f4ff;border-radius:10px;padding:16px;margin:16px 0;">
-                <p><strong>Student:</strong> ${studentName}</p>
-                <p><strong>Programme:</strong> ${course || 'â€”'}</p>
-                <p><strong>First Class:</strong> ${firstDate}</p>
-                <p><strong>Total Sessions:</strong> ${createdIds.length}</p>
-                ${classLink ? `<p><strong>Class Link:</strong> <a href="${classLink}">${classLink}</a></p>` : ''}
-              </div>
-              <a href="${appUrl}/pages/tutor-dashboard.html"
-                 style="display:inline-block;margin-top:12px;background:#1a56db;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:700;">
-                View Dashboard â†’
-              </a>
-            </div>`,
-            template: 'tutor_assignment',
-          }).catch(e => logger.warn('[BULK-SCHEDULE] Tutor email failed:', e.message));
-        }
-      } catch (emailErr) {
-        logger.warn('[BULK-SCHEDULE] Email notifications failed:', emailErr.message);
+    /* ── Pathway enrolment: reuse the active one or create it ── */
+    let enrolment = null;
+    if (pathwayId) {
+      const e = await client.query(
+        `SELECT id, current_grade, lessons_completed FROM enrolments
+         WHERE student_id = $1 AND pathway_id = $2 AND status IN ('active','paused')
+         ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,
+        [student.id, pathwayId]
+      );
+      enrolment = e.rows[0] || null;
+      if (enrolment && enrolment.current_grade !== gradeNum) {
+        /* Moving to a different grade starts that grade from lesson 1 */
+        await client.query(
+          `UPDATE enrolments SET current_grade = $1, lessons_completed = 0, updated_at = NOW() WHERE id = $2`,
+          [gradeNum, enrolment.id]
+        );
+        enrolment.lessons_completed = 0;
       }
     }
 
-    logger.info(`[BULK-SCHEDULE] ${createdIds.length} sessions created for ${studentName} with tutor ${tutorId}`);
-    res.json({ success: true, count: createdIds.length, bookingIds: createdIds });
-  } catch (err) { next(err); }
+    /* Which lesson to start from: explicit, else continue after completed lessons */
+    const offset = startingLesson
+      ? Math.max(0, parseInt(startingLesson, 10) - 1)
+      : (enrolment ? parseInt(enrolment.lessons_completed, 10) || 0 : 0);
+    const gradeLength = lessons.length || FULL_GRADE_LESSONS;
+    const count = parseInt(totalClasses, 10) > 0
+      ? Math.min(parseInt(totalClasses, 10), 200)
+      : Math.max(gradeLength - offset, 0);
+    if (!count) throw Object.assign(new Error('This student has already completed every lesson in this grade — promote them first'), { status: 400 });
+
+    const slots = usePattern
+      ? _bsGenerateSlots(startDate, pattern, count)
+      : sessions.filter(s => s.date && s.time).map(s => ({ d: s.date, t: String(s.time).slice(0, 5) }));
+
+    const clash = await _bsFindClash(client, tutor.id, student.id, slots);
+    if (clash) {
+      const day = new Date(clash.d + 'T00:00:00Z').toLocaleDateString('en-GB', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+      const msg = clash.tutor_clash
+        ? `${tutor.name} already teaches ${clash.who} on ${day} at ${clash.t} WAT. Pick another time or teacher.`
+        : `${student.name} already has a class (${clash.who}) on ${day} at ${clash.t} WAT.`;
+      throw Object.assign(new Error(msg), { status: 409 });
+    }
+
+    if (pathwayId) {
+      const sched = JSON.stringify(usePattern ? pattern : []);
+      if (enrolment) {
+        await client.query(
+          `UPDATE enrolments SET tutor_id = $1, schedule = $2, class_link = $3, start_date = $4::date,
+                  total_lessons = $5, status = 'active', updated_at = NOW()
+           WHERE id = $6`,
+          [tutor.id, sched, classLink, slots[0].d, gradeLength, enrolment.id]
+        );
+      } else {
+        const ins = await client.query(
+          `INSERT INTO enrolments (student_id, pathway_id, tutor_id, current_grade, lessons_completed,
+                                   total_lessons, schedule, class_link, start_date, frequency_per_week,
+                                   status, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, 0, $5, $6, $7, $8::date, $9, 'active', NOW(), NOW())
+           RETURNING id`,
+          [student.id, pathwayId, tutor.id, gradeNum, gradeLength, sched, classLink, slots[0].d, pattern.length || null]
+        );
+        enrolment = { id: ins.rows[0].id, lessons_completed: 0 };
+      }
+    }
+
+    /* ── Classes ── */
+    const course = pathwayName || req.body.course || 'STEMNest Programme';
+    const createdIds = [];
+    for (let i = 0; i < slots.length; i++) {
+      const lesson = lessons[offset + i] || null;
+      const lessonNum = lesson ? lesson.lesson_number : offset + i + 1;
+      const r = await client.query(
+        `INSERT INTO bookings
+           (subject, grade, date, time, class_link, status, is_demo, tutor_id, student_id,
+            enrolment_id, lesson_name, notes, booked_at, scheduled_at, pathway_lesson_id, lesson_number_in_grade)
+         VALUES ($1, $2, $3::date, $4::time, $5, 'scheduled', FALSE, $6, $7, $8, $9, $10, NOW(), NOW(), $11, $12)
+         RETURNING id`,
+        [subject || 'Coding', gradeNum ? `Grade ${gradeNum}` : null, slots[i].d, slots[i].t, classLink,
+         tutor.id, student.id, enrolment ? enrolment.id : null,
+         lesson ? lesson.title : `${course} — Lesson ${lessonNum}`,
+         JSON.stringify({
+           studentName: student.name, email: student.email, course, tutorName: tutor.name,
+           classLink, isPaidClass: true, lessonTitle: lesson ? lesson.title : '',
+           lessonNumber: lessonNum, totalLessons: gradeLength,
+           pathwayId: pathwayId || null, gradeNumber: gradeNum, scheduledBy: req.user.email,
+         }),
+         lesson ? lesson.id : null, lessonNum]
+      );
+      createdIds.push(r.rows[0].id);
+    }
+
+    await client.query('COMMIT');
+
+    /* ── One email each to the parent and the tutor, times in their own timezone ── */
+    const { formatForTimeZone } = require('../utils/timezone');
+    const { resolveUserTimeZone } = require('../services/timezoneService');
+    const emailSvc = require('../services/emailService');
+    const appUrl = process.env.APP_URL || 'https://stemnestacademy.co.uk';
+    const first = slots[0], last = slots[slots.length - 1];
+    const days = usePattern
+      ? pattern.map(p => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][p.weekday]).join(', ')
+      : '';
+    const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+    (async () => {
+      const parentTo = student.parent_email || student.email;
+      if (parentTo) {
+        const tz = await resolveUserTimeZone(student.id, student.email).catch(() => null);
+        const f = formatForTimeZone(first.d, first.t, tz), l = formatForTimeZone(last.d, last.t, tz);
+        await emailSvc.sendEmail({
+          to: parentTo,
+          subject: `🎉 ${student.name}'s classes are scheduled — ${course}`,
+          html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:24px;color:#1a202c;line-height:1.6;">
+            <h2 style="color:#1a56db;">Your classes are scheduled 🎉</h2>
+            <p>Hi ${esc(student.parent_name || student.name)},</p>
+            <p>${esc(student.name)}'s full ${esc(course)}${gradeNum ? ' Grade ' + gradeNum : ''} programme is now booked.</p>
+            <div style="background:#f0fdf4;border-left:4px solid #0e9f6e;border-radius:10px;padding:16px 20px;margin:16px 0;">
+              <strong>Teacher:</strong> ${esc(tutor.name)}<br>
+              ${days ? `<strong>Days:</strong> ${esc(days)}<br>` : ''}
+              <strong>First class:</strong> ${esc(f ? f.full : first.d)}<br>
+              <strong>Classes booked:</strong> ${slots.length} (until ${esc(l ? l.date : last.d)})<br>
+              <strong>Class link:</strong> <a href="${esc(classLink)}">${esc(classLink)}</a>
+            </div>
+            <p>Each class uses one credit. If credits run out, the remaining classes are held for you and continue as soon as you top up.</p>
+            <a href="${appUrl}/pages/student-dashboard.html" style="display:inline-block;background:#1a56db;color:#fff;text-decoration:none;padding:12px 28px;border-radius:50px;font-weight:700;">Go to the dashboard →</a>
+          </div>`,
+          template: 'paid_classes_scheduled',
+        });
+      }
+      if (tutor.email) {
+        const tz = await resolveUserTimeZone(tutor.id, tutor.email).catch(() => null);
+        const f = formatForTimeZone(first.d, first.t, tz);
+        await emailSvc.sendEmail({
+          to: tutor.email,
+          subject: `📅 New student assigned — ${student.name}`,
+          html: `<div style="font-family:Arial,sans-serif;max-width:520px;padding:24px;line-height:1.6;">
+            <h2 style="color:#1a56db;">New student assigned 📅</h2>
+            <p>Hi ${esc(tutor.name)},</p>
+            <div style="background:#f0f4ff;border-radius:10px;padding:16px;margin:16px 0;">
+              <strong>Student:</strong> ${esc(student.name)}<br>
+              <strong>Programme:</strong> ${esc(course)}${gradeNum ? ' — Grade ' + gradeNum : ''}<br>
+              ${days ? `<strong>Days:</strong> ${esc(days)}<br>` : ''}
+              <strong>First class:</strong> ${esc(f ? f.full : first.d)}<br>
+              <strong>Classes:</strong> ${slots.length}<br>
+              <strong>Class link:</strong> <a href="${esc(classLink)}">${esc(classLink)}</a>
+            </div>
+            <a href="${appUrl}/pages/tutor-dashboard.html" style="display:inline-block;background:#1a56db;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:700;">View dashboard →</a>
+          </div>`,
+          template: 'tutor_assignment',
+        });
+      }
+    })().catch(e => logger.warn('[BULK-SCHEDULE] Email failed:', e.message));
+
+    logger.info(`[BULK-SCHEDULE] ${createdIds.length} classes for ${student.name} with ${tutor.name} by ${req.user.email}`);
+    res.json({
+      success: true,
+      count: createdIds.length,
+      bookingsCreated: createdIds.length,
+      enrolmentId: enrolment ? enrolment.id : null,
+      firstClass: { date: first.d, time: first.t },
+      lastClass:  { date: last.d,  time: last.t },
+    });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    if (err.status) return res.status(err.status).json({ success: false, error: err.message });
+    next(err);
+  } finally {
+    client.release();
+  }
 });
 
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
@@ -909,7 +962,7 @@ router.put('/reschedule-student', requireAuth, requireRole('admin','super_admin'
     /* Get existing future bookings for this student, ordered by date */
     const existing = await pool.query(`
       SELECT id, date, time, tutor_id, class_link, lesson_name, pathway_lesson_id,
-             lesson_number_in_grade, notes
+             lesson_number_in_grade, notes, enrolment_id, subject, grade
       FROM bookings
       WHERE student_id = $1
         AND status = 'scheduled'
@@ -974,20 +1027,21 @@ router.put('/reschedule-student', requireAuth, requireRole('admin','super_admin'
         INSERT INTO bookings
           (subject, grade, date, time, class_link, status, is_demo,
            tutor_id, student_id, lesson_name, notes, booked_at, scheduled_at,
-           pathway_lesson_id, lesson_number_in_grade)
+           pathway_lesson_id, lesson_number_in_grade, enrolment_id)
         VALUES ($1,$2,$3::date,$4::time,$5,'scheduled',FALSE,
-                $6,$7,$8,$9,NOW(),NOW(),$10,$11)
+                $6,$7,$8,$9,NOW(),NOW(),$10,$11,$12)
         RETURNING id
       `, [
-        'Coding',
-        student.grade || 'Grade 1',
+        old.subject || 'Coding',
+        old.grade || student.grade || 'Grade 1',
         nd.date,
         nd.time.substring(0,5),
         resolvedClassLink,
         resolvedTutorId,
         studentId,
-        student.name || old.lesson_name,
+        old.lesson_name || student.name,
         JSON.stringify({
+          ...(typeof old.notes === 'string' ? (() => { try { return JSON.parse(old.notes); } catch { return {}; } })() : (old.notes || {})),
           studentName: student.name || '',
           email:       student.email || '',
           tutorName,
@@ -997,8 +1051,20 @@ router.put('/reschedule-student', requireAuth, requireRole('admin','super_admin'
         }),
         old.pathway_lesson_id || null,
         old.lesson_number_in_grade || null,
+        old.enrolment_id || null,
       ]);
       createdIds.push(result.rows[0].id);
+    }
+
+    /* Keep the pathway enrolment's weekly pattern in step (used by Next Learning Day) */
+    const enrolIds = [...new Set(existing.rows.map(r => r.enrolment_id).filter(Boolean))];
+    if (enrolIds.length) {
+      await pool.query(
+        `UPDATE enrolments SET schedule = $1, tutor_id = $2, class_link = $3, updated_at = NOW()
+         WHERE id = ANY($4::uuid[])`,
+        [JSON.stringify(schedule.map(x => ({ weekday: Number(x.weekday), time: String(x.time).slice(0, 5) }))),
+         resolvedTutorId, resolvedClassLink, enrolIds]
+      );
     }
 
     logger.info(`[RESCHEDULE] Student ${studentId}: cancelled ${totalToReschedule}, created ${createdIds.length}`);
@@ -1024,7 +1090,7 @@ router.put('/change-tutor', requireAuth, requireRole('admin','super_admin','post
 
     /* Get affected bookings */
     const affected = await pool.query(`
-      SELECT id, notes FROM bookings
+      SELECT id, notes, enrolment_id FROM bookings
       WHERE student_id = $1 AND status = 'scheduled' AND date >= $2::date
     `, [studentId, effectiveDate]);
 
@@ -1041,6 +1107,11 @@ router.put('/change-tutor', requireAuth, requireRole('admin','super_admin','post
         'UPDATE bookings SET tutor_id = $1, notes = $2 WHERE id = $3',
         [newTutorId, JSON.stringify(notes), b.id]
       );
+    }
+
+    const enrolIds = [...new Set(affected.rows.map(r => r.enrolment_id).filter(Boolean))];
+    if (enrolIds.length) {
+      await pool.query('UPDATE enrolments SET tutor_id = $1, updated_at = NOW() WHERE id = ANY($2::uuid[])', [newTutorId, enrolIds]);
     }
 
     logger.info(`[CHANGE-TUTOR] Student ${studentId}: ${affected.rows.length} bookings â†’ tutor ${newTutorId} (${newTutorName})`);

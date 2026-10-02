@@ -145,119 +145,207 @@ router.get('/', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-/* Ã¢â€â‚¬Ã¢â€â‚¬ POST /api/users Ã¢â‚¬â€ create any user (requires login) Ã¢â€â‚¬Ã¢â€â‚¬ */
-router.post('/', requireAuth, async (req, res, next) => {
-  try {
-    const data = createUserSchema.parse(req.body);
+/* ── POST /api/users — create a user (admin, super_admin; postsales: students only) ──
+   For students the whole onboarding is one transaction: account, profile
+   (grade, age, parent details, credits), the payment record when an amount
+   was received, and the pathway enrolment when a pathway was chosen. */
+const studentProfileSchema = z.object({
+  grade:        z.union([z.string(), z.number()]).optional().nullable(),
+  age:          z.union([z.string(), z.number()]).optional().nullable(),
+  credits:      z.coerce.number().int().min(0).optional().nullable(),
+  parentName:   z.string().optional().nullable(),
+  parentEmail:  z.string().optional().nullable(),
+  pathwayId:    z.string().uuid().optional().nullable().or(z.literal('')),
+  gradeNumber:  z.coerce.number().int().positive().optional().nullable(),
+  subject:      z.string().optional().nullable(),
+  course:       z.string().optional().nullable(),
+  amount:       z.coerce.number().min(0).optional().nullable(),
+  currency:     z.string().max(10).optional().nullable(),
+  paymentReference:    z.string().max(120).optional().nullable(),
+  timezone:     z.string().optional().nullable(),
+  enrollmentRequestId: z.string().uuid().optional().nullable(),
+}).partial();
 
-    /* Check duplicate email */
-    const exists = await pool.query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [data.email]);
+const createUserWithProfileSchema = createUserSchema.extend({
+  studentProfile: studentProfileSchema.optional(),
+});
+
+/** Next free S-#### student ID (call inside the transaction, after the lock). */
+async function nextStudentId(client) {
+  const r = await client.query(
+    `SELECT COALESCE(MAX(substring(staff_id FROM '^S-(\\d+)$')::int), 0) AS n
+     FROM users WHERE staff_id ~ '^S-\\d+$'`
+  );
+  return 'S-' + String(r.rows[0].n + 1).padStart(4, '0');
+}
+
+router.post('/', requireAuth, requireRole('admin', 'super_admin', 'postsales'), async (req, res, next) => {
+  let client;
+  try {
+    const data = createUserWithProfileSchema.parse(req.body);
+    validateCreateRole(req, data);
+
+    const sp = data.studentProfile || {};
+    const str = v => (v === undefined || v === null || String(v).trim() === '') ? null : String(v).trim();
+    const credits     = Number.isInteger(sp.credits) ? sp.credits : (data.credits || 0);
+    const parentEmail = str(sp.parentEmail);
+    const pathwayId   = str(sp.pathwayId);
+    const timezone    = str(sp.timezone);
+    if (timezone && !isValidTimeZone(timezone)) {
+      return res.status(400).json({ success: false, error: 'Invalid timezone' });
+    }
+
+    client = await pool.connect();
+    await client.query('BEGIN');
+    /* Serialise ID allocation so two onboardings never get the same S-#### */
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext('users.staff_id'))`);
+
+    const exists = await client.query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [data.email]);
     if (exists.rows.length) {
+      await client.query('ROLLBACK');
       return res.status(409).json({ success: false, error: 'Email already registered' });
     }
 
-    /* If a staff_id was provided, check it's not already taken and auto-increment if needed.
-       For students, auto-generate S-XXXX if no staff_id provided. */
     let finalStaffId = data.staff_id || null;
-
-    /* Auto-generate S-XXXX for students */
-    if (!finalStaffId && data.role === 'student') {
-      const lastStudent = await pool.query(
-        `SELECT staff_id FROM users WHERE role = 'student' AND staff_id LIKE 'S-%'
-         ORDER BY created_at DESC LIMIT 1`
-      );
-      const lastNum = lastStudent.rows.length
-        ? parseInt((lastStudent.rows[0].staff_id || 'S-0000').replace('S-', '')) || 0
-        : 0;
-      finalStaffId = 'S-' + String(lastNum + 1).padStart(4, '0');
-    }
-
+    if (!finalStaffId && data.role === 'student') finalStaffId = await nextStudentId(client);
     if (finalStaffId) {
-      const staffExists = await pool.query('SELECT id FROM users WHERE staff_id = $1', [finalStaffId]);
-      if (staffExists.rows.length) {
-        const prefix  = finalStaffId.replace(/\d+$/, '');
-        const numPart = parseInt(finalStaffId.replace(/^\D+/, '')) || 0;
-        const taken   = await pool.query(
-          `SELECT staff_id FROM users WHERE staff_id LIKE $1 ORDER BY staff_id`,
-          [prefix + '%']
+      const taken = await client.query('SELECT id FROM users WHERE staff_id = $1', [finalStaffId]);
+      if (taken.rows.length) {
+        const prefix = finalStaffId.replace(/\d+$/, '');
+        const r = await client.query(
+          `SELECT COALESCE(MAX(NULLIF(regexp_replace(staff_id, '^\\D+', ''), '')::int), 0) AS n
+           FROM users WHERE staff_id LIKE $1 AND staff_id ~ ('^' || $2 || '\\d+$')`,
+          [prefix + '%', prefix]
         );
-        const takenNums = taken.rows
-          .map(r => parseInt((r.staff_id || '').replace(/^\D+/, '')) || 0)
-          .filter(n => !isNaN(n));
-        const nextNum = takenNums.length ? Math.max(...takenNums) + 1 : numPart + 1;
-        finalStaffId = prefix + String(nextNum).padStart(4, '0');
+        finalStaffId = prefix + String(r.rows[0].n + 1).padStart(4, '0');
       }
     }
 
     const passwordHash = await bcrypt.hash(data.password, 12);
-    const result = await pool.query(
-      `INSERT INTO users (name, email, password_hash, role, staff_id, phone, whatsapp)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+    const result = await client.query(
+      `INSERT INTO users (name, email, password_hash, role, staff_id, phone, whatsapp, timezone)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING id, name, email, role, staff_id`,
-      [data.name, data.email, passwordHash, data.role, finalStaffId, data.phone || null, data.whatsapp || null]
+      [data.name, data.email, passwordHash, data.role, finalStaffId,
+       data.phone || null, data.whatsapp || null,
+       timezone || (data.role === 'student' ? null : 'Africa/Lagos')]
     );
-
     const user = result.rows[0];
 
-    /* If student, initialize profile */
+    let pathwayName = data.pathway || null;
+    let enrolmentId = null;
+    let paymentId   = null;
+
     if (data.role === 'student') {
-      await pool.query(
-        `INSERT INTO student_profiles (user_id, grade, age, credits)
-         VALUES ($1, $2, $3, $4)`,
-        [user.id, data.grade || null, data.age || null, data.credits || 0]
+      await client.query(
+        `INSERT INTO student_profiles (user_id, grade, age, credits, parent_name, parent_email, enrolled_at)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+        [user.id, str(sp.grade) ?? data.grade ?? null, str(sp.age) ?? data.age ?? null, credits,
+         str(sp.parentName), parentEmail]
       );
-      
-      if (typeof emailSvc.sendOnboardingEmail === 'function') {
-        await emailSvc.sendOnboardingEmail({
-          to:        data.email,
-          name:      data.name,
-          studentId: user.staff_id || user.id,
-          password:  data.password,
-          course:    data.course || 'Coding',
-          pathway:   data.pathway || null,
-          credits:   data.credits || 0,
-          loginUrl:  `${process.env.APP_URL}/pages/login.html`
-        }).catch(e => logger.error('Onboarding email failed:', e.message));
-      } else {
-        await emailSvc.sendWelcomeEmail({
-          to:       data.email,
-          name:     data.name,
-          role:     data.role,
-          loginUrl: `${process.env.APP_URL}/pages/login.html`,
-          password: data.password,
-        }).catch(e => logger.error('Welcome email failed:', e.message));
+
+      if (credits > 0) {
+        await client.query(
+          `INSERT INTO credit_transactions (student_id, type, amount, description)
+           VALUES ($1, 'topup', $2, $3)`,
+          [user.id, credits, `Onboarding — ${credits} credit${credits !== 1 ? 's' : ''} added by ${req.user.email}`]
+        );
+      }
+
+      if (sp.amount && sp.amount > 0) {
+        const pay = await client.query(
+          `INSERT INTO payments (student_id, sales_id, amount, currency, credits_purchased,
+                                 status, notes, created_at, confirmed_at)
+           VALUES ($1, $2, $3, $4, $5, 'confirmed', $6, NOW(), NOW())
+           RETURNING id`,
+          [user.id, req.user.id, sp.amount, (str(sp.currency) || 'GBP').toUpperCase(), credits,
+           JSON.stringify({ method: 'manual', reference: str(sp.paymentReference), recordedBy: req.user.email, onboarding: true })]
+        );
+        paymentId = pay.rows[0].id;
+      }
+
+      if (pathwayId) {
+        const gradeNumber = sp.gradeNumber || 1;
+        const pw = await client.query(
+          `SELECT p.name, pg.total_lessons
+           FROM pathways p
+           LEFT JOIN pathway_grades pg ON pg.pathway_id = p.id AND pg.grade_number = $2
+           WHERE p.id = $1`,
+          [pathwayId, gradeNumber]
+        );
+        if (!pw.rows.length) throw Object.assign(new Error('Pathway not found'), { status: 400 });
+        pathwayName = pw.rows[0].name;
+        const en = await client.query(
+          `INSERT INTO enrolments (student_id, pathway_id, current_grade, lessons_completed,
+                                   total_lessons, status, created_at, updated_at)
+           VALUES ($1, $2, $3, 0, $4, 'active', NOW(), NOW())
+           RETURNING id`,
+          [user.id, pathwayId, gradeNumber, pw.rows[0].total_lessons || 72]
+        );
+        enrolmentId = en.rows[0].id;
+      }
+
+      if (sp.enrollmentRequestId) {
+        await client.query(
+          `UPDATE enrollment_requests
+           SET status = 'processed', processed_by = $1, processed_at = NOW(), student_id = $2
+           WHERE id = $3`,
+          [req.user.id, user.id, sp.enrollmentRequestId]
+        );
       }
     } else if (data.role === 'tutor') {
       const colors = ['linear-gradient(135deg,var(--blue),#4f87f5)','linear-gradient(135deg,var(--green),#3dd9a4)','linear-gradient(135deg,var(--orange),#ffaa80)','linear-gradient(135deg,var(--purple),#a78bfa)'];
       const randomColor = colors[Math.floor(Math.random() * colors.length)];
-      await pool.query(
+      await client.query(
         `INSERT INTO tutor_profiles (user_id, subject, courses, grade_groups, availability, dbs_checked, color, regions)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [user.id, data.subject || null, data.courses || [], data.gradeGroups || [], data.availability || null, data.dbs || 'pending', randomColor, data.regions || []]
       );
+    }
 
-      /* Send welcome email */
-      await emailSvc.sendWelcomeEmail({
-        to: data.email, name: data.name, role: data.role,
-        loginUrl: `${process.env.APP_URL}/pages/login.html`,
-        password: data.password,
-      }).catch(e => logger.error('Welcome email failed:', e.message));
+    await client.query('COMMIT');
+    client.release(); client = null;
+
+    /* Emails after commit — a mail failure must not undo the account */
+    const loginUrl = `${process.env.APP_URL}/pages/login.html`;
+    if (data.role === 'student') {
+      const to = data.email;
+      await emailSvc.sendOnboardingEmail({
+        to,
+        name:      data.name,
+        studentId: user.staff_id || user.id,
+        password:  data.password,
+        course:    str(sp.course) || data.course || str(sp.subject) || 'Coding',
+        pathway:   pathwayName,
+        credits,
+        loginUrl,
+      }).catch(e => logger.error('Onboarding email failed:', e.message));
+      if (parentEmail && parentEmail.toLowerCase() !== to.toLowerCase()) {
+        await emailSvc.sendOnboardingEmail({
+          to: parentEmail, name: data.name, studentId: user.staff_id || user.id,
+          password: data.password, course: str(sp.course) || 'Coding', pathway: pathwayName,
+          credits, loginUrl,
+        }).catch(e => logger.error('Parent onboarding email failed:', e.message));
+      }
     } else {
-      /* Send welcome email */
       await emailSvc.sendWelcomeEmail({
-        to: data.email, name: data.name, role: data.role,
-        loginUrl: `${process.env.APP_URL}/pages/login.html`,
-        password: data.password,
+        to: data.email, name: data.name, role: data.role, loginUrl, password: data.password,
       }).catch(e => logger.error('Welcome email failed:', e.message));
     }
 
-    // logger.info(`[CREATE USER] ${data.email} (${data.role}) by admin ${req.user?.email}`);
-    res.status(201).json({ success: true, user });
+    logger.info(`[CREATE USER] ${user.staff_id || ''} ${data.email} (${data.role}) by ${req.user.email}`);
+    res.status(201).json({ success: true, user, enrolmentId, paymentId });
   } catch (err) {
-    if (err.name === 'ZodError') {
-      return res.status(400).json({ success: false, error: err.errors[0].message });
+    if (client) {
+      await client.query('ROLLBACK').catch(() => {});
+      client.release();
     }
-    /* Postgres unique constraint violations Ã¢â‚¬â€ return friendly messages */
+    if (err.name === 'ZodError') {
+      const issue = err.errors[0];
+      return res.status(400).json({ success: false, error: (issue.path.join('.') ? issue.path.join('.') + ': ' : '') + issue.message });
+    }
+    if (err.status) return res.status(err.status).json({ success: false, error: err.message });
+    /* Postgres unique constraint violations — return friendly messages */
     if (err.code === '23505') {
       if (err.constraint === 'users_staff_id_key') {
         return res.status(409).json({ success: false, error: 'Staff ID already in use. Please try again.' });

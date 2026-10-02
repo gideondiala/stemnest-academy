@@ -236,9 +236,27 @@ router.post('/credits', requireAuth, async (req, res, next) => {
    GET /api/sync/dashboard/:role
    Returns all data needed for a dashboard
 ══════════════════════════════════════════════ */
+/* Which logged-in roles may load each dashboard's data.
+   The student dashboard only ever returns the caller's own data. */
+const DASHBOARD_ACCESS = {
+  operations: ['operations'],
+  sales:      ['sales', 'presales'],   // presales reads its own (empty) pipeline view
+  presales:   ['presales'],
+  postsales:  ['postsales'],
+  hr:         ['hr'],
+  admin:      [],
+  student:    ['student'],
+  retention:  ['sales'],
+};
+
 router.get('/dashboard/:role', requireAuth, async (req, res, next) => {
   try {
     const { role } = req.params;
+    const allowed = DASHBOARD_ACCESS[role];
+    if (!allowed) return res.status(404).json({ success: false, error: 'Unknown dashboard' });
+    if (!['admin', 'super_admin'].includes(req.user.role) && !allowed.includes(req.user.role)) {
+      return res.status(403).json({ success: false, error: 'Access denied' });
+    }
     const userId   = req.user.id;
     const result   = {};
 
@@ -361,6 +379,9 @@ router.get('/dashboard/:role', requireAuth, async (req, res, next) => {
             sp.parent_name                                                  AS "parentName",
             sp.parent_email                                                 AS "parentEmail",
             pw.name                                                         AS "pathwayName",
+            e.pathway_id                                                    AS "pathwayId",
+            e.id                                                            AS "enrolmentId",
+            u.timezone,
             e.current_grade                                                 AS "currentGrade",
             e.lessons_completed                                             AS "lessonsCompleted",
             e.status                                                        AS "enrolmentStatus",
@@ -369,8 +390,12 @@ router.get('/dashboard/:role', requireAuth, async (req, res, next) => {
             (SELECT pm.currency FROM payments pm WHERE pm.student_id = u.id ORDER BY pm.created_at DESC LIMIT 1) AS "amountCurrency"
           FROM users u
           LEFT JOIN student_profiles sp ON sp.user_id  = u.id
-          LEFT JOIN enrolments e        ON e.student_id = u.id
-                                       AND e.status IN ('active','paused')
+          /* One row per student: their most recent live enrolment */
+          LEFT JOIN LATERAL (
+            SELECT * FROM enrolments en
+            WHERE en.student_id = u.id AND en.status IN ('active','paused')
+            ORDER BY en.created_at DESC LIMIT 1
+          ) e ON TRUE
           LEFT JOIN pathways pw         ON pw.id = e.pathway_id
           LEFT JOIN users u_t           ON u_t.id = e.tutor_id
           WHERE u.role = 'student'

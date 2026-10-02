@@ -25,21 +25,70 @@ const router = express.Router();
 /* POST /api/enrollments/request — public */
 router.post('/request', async (req, res, next) => {
   try {
-    const { studentName, age, email, phone, timezone, courseId, courseName, coursePrice, notes } = req.body;
+    const { studentName, age, email, phone, timezone, courseId, courseName, coursePrice, notes,
+            pathway_id, pathway_name, grade_number, has_device, expected_start } = req.body;
     if (!studentName) return res.status(400).json({ success: false, error: 'studentName required' });
     if (!email && !phone) return res.status(400).json({ success: false, error: 'email or phone required' });
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
     const result = await pool.query(
       `INSERT INTO enrollment_requests
-         (student_name, age, email, phone, timezone, course_id, course_name, course_price, notes, source)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'website')
+         (student_name, age, email, phone, timezone, course_id, course_name, course_price, notes, source,
+          pathway_id, pathway_name, grade_number, has_device, expected_start, payment_status, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'website',$10,$11,$12,$13,$14,'pending','pending')
        RETURNING id`,
-      [studentName, age||null, email||null, phone||null, timezone||null,
-       courseId||null, courseName||null, parseFloat(coursePrice)||null, notes||null]
+      [String(studentName).slice(0, 200), age||null, email||null, phone||null, timezone||null,
+       courseId ? String(courseId).slice(0, 100) : null, courseName||null, parseFloat(coursePrice)||null, notes||null,
+       uuidRe.test(pathway_id || '') ? pathway_id : null, pathway_name || null,
+       parseInt(grade_number, 10) || null, typeof has_device === 'boolean' ? has_device : null,
+       /^\d{4}-\d{2}-\d{2}$/.test(expected_start || '') ? expected_start : null]
     );
 
     logger.info(`[ENROLLMENT REQUEST] ${studentName} → ${courseName}`);
     res.status(201).json({ success: true, id: result.rows[0].id });
+  } catch (err) { next(err); }
+});
+
+/* POST /api/enrollments/handover — Pre-Sales hands a demo student to Post-Sales.
+   Creates (once per demo booking) an enrollment request carrying everything
+   captured at booking, so Post-Sales never retypes it. */
+router.post('/handover', requireAuth, requireRole('presales','admin','super_admin'), async (req, res, next) => {
+  try {
+    const { bookingId } = req.body || {};
+    if (!bookingId) return res.status(400).json({ success: false, error: 'bookingId required' });
+
+    const b = await pool.query(
+      `SELECT id, subject, grade, notes, lesson_name, is_demo FROM bookings WHERE id = $1`, [bookingId]);
+    if (!b.rows.length) return res.status(404).json({ success: false, error: 'Booking not found' });
+    const booking = b.rows[0];
+    let n = {};
+    try { n = typeof booking.notes === 'string' ? JSON.parse(booking.notes || '{}') : (booking.notes || {}); } catch {}
+
+    /* Already paid through a payment link for this demo? */
+    const paid = await pool.query(
+      `SELECT 1 FROM payments WHERE status = 'confirmed' AND notes LIKE $1 LIMIT 1`, ['%' + bookingId + '%']);
+
+    const ins = await pool.query(
+      `INSERT INTO enrollment_requests
+         (student_name, parent_name, email, whatsapp, phone, age, grade, gender, country, subject,
+          device, timezone, notes, source, status, payment_status, booking_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'presales','pending',$14,$15)
+       ON CONFLICT (booking_id) WHERE booking_id IS NOT NULL DO NOTHING
+       RETURNING id`,
+      [n.studentName || booking.lesson_name || 'Student', n.parentName || null,
+       n.email || null, n.whatsapp || null, n.phone || n.whatsapp || null,
+       n.age != null ? String(n.age) : null, booking.grade || n.grade || null,
+       n.gender || null, n.country || null, booking.subject || null, n.device || null,
+       n.timezone || null, (req.body.note || n.psNote || null),
+       paid.rows.length ? 'received' : 'pending', bookingId]
+    );
+
+    n.handedOverAt = new Date().toISOString();
+    n.handedOverBy = req.user.email;
+    await pool.query('UPDATE bookings SET notes = $1 WHERE id = $2', [JSON.stringify(n), bookingId]);
+
+    logger.info(`[HANDOVER] Demo ${bookingId} → Post-Sales by ${req.user.email}`);
+    res.json({ success: true, alreadyHandedOver: !ins.rows.length, requestId: ins.rows[0]?.id || null });
   } catch (err) { next(err); }
 });
 

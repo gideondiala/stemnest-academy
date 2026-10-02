@@ -96,6 +96,7 @@ async function _loadPresalesFromAPI() {
           completedAt:     b.completed_at,
           isDemoClass:     b.is_demo,
           psNote:          notes.psNote || '',
+          _enrolled:       !!notes.handedOverAt,
           psConfirmed:     !!notes.psNote,
           cancelReason:    notes.cancelReason || '',
           rescheduleNote:  notes.rescheduleNote || null,
@@ -1275,7 +1276,7 @@ function renderCompletedDemos() {
               </td>
               <td style="${tdS};text-align:center;">
                 ${alreadyEnrolled
-                  ? '<span style="background:var(--green-light);color:var(--green-dark);font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">✅ Enrolled</span>'
+                  ? '<span style="background:var(--green-light);color:var(--green-dark);font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">✅ Sent to Post-Sales</span>'
                   : `<button onclick="openEnrolmentModal('${item.bookingId||item.id}')"
                       style="background:var(--blue);color:#fff;border:none;border-radius:10px;padding:8px 14px;font-family:'Nunito',sans-serif;font-weight:900;font-size:12px;cursor:pointer;white-space:nowrap;">
                       🎓 Enrol
@@ -1373,22 +1374,21 @@ async function enrollStudentToPostSales(bookingId, enrolment) {
   if (!token) { showToast('Not logged in.', 'error'); return; }
 
   try {
-    /* Update booking status to 'converted' so postsales paid students tab picks it up */
-    const res = await fetch('https://api.stemnestacademy.co.uk/api/bookings/' + bookingId + '/status', {
-      method: 'PUT',
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/enrollments/handover', {
+      method: 'POST',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'completed' })
+      body: JSON.stringify({ bookingId })
     });
     const data = await res.json();
 
-    if (data.success || res.ok) {
+    if (res.ok && data.success) {
       /* Mark as enrolled in local state */
       const idx = (window.PS_DATA.enrolments || []).findIndex(e => (e.bookingId || e.id) === bookingId);
       if (idx !== -1) window.PS_DATA.enrolments[idx].enrolled = true;
 
       setText('enrolmentsBadge', (window.PS_DATA.enrolments || []).filter(e => !e.enrolled).length);
       renderEnrolments();
-      showToast('✅ Student moved to Post-Sales! They will appear in the Paid Students section.');
+      showToast('✅ Sent to Post-Sales — they will onboard and schedule from Enrollment Requests.');
     } else {
       showToast('Failed: ' + (data.error || 'Unknown error'), 'error');
     }
@@ -1934,17 +1934,14 @@ async function confirmEnrolment() {
     const token = localStorage.getItem('sn_access_token');
     if (!token) throw new Error('Not logged in');
 
-    /* Mark booking as 'converted' so postsales Paid Students tab picks it up.
-       NOTE: Do NOT use POST /api/enrollments/request here — that endpoint is
-       only for the public website "Enrol Now" form (Website Enquiries).
-       Presales handing off goes through booking status = converted. */
-    const res = await fetch('https://api.stemnestacademy.co.uk/api/bookings/' + _enrolBookingId + '/status', {
-      method:  'PUT',
+    /* Creates a Post-Sales enrollment request carrying the demo's details */
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/enrollments/handover', {
+      method:  'POST',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'converted' }),
+      body: JSON.stringify({ bookingId: _enrolBookingId }),
     });
     const data = await res.json();
-    if (!data.success && !res.ok) throw new Error(data.error || 'Failed to hand off to Post-Sales');
+    if (!res.ok || !data.success) throw new Error(data.error || 'Failed to hand off to Post-Sales');
 
     /* Mark the booking in local state so the button changes to ✅ Handed Over */
     const bIdx = (window.PS_DATA?.bookings || []).findIndex(x => x.id === _enrolBookingId);
@@ -1954,7 +1951,7 @@ async function confirmEnrolment() {
     renderCompletedDemos();
 
     showToast(
-      '✅ ' + (b.studentName || 'Student') + ' sent to Post-Sales! They will appear in Post-Sales → Enrollment Requests.',
+'✅ ' + (b.studentName || 'Student') + (data.alreadyHandedOver ? ' was already with Post-Sales.' : ' sent to Post-Sales — they will onboard and schedule from Enrollment Requests.'),
       'success',
       6000
     );

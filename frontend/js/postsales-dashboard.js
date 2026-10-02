@@ -12,6 +12,7 @@
 const API = 'https://api.stemnestacademy.co.uk';
 let   POS_DATA      = {};           // full dashboard payload
 let   _allPathways  = [];           // cached pathways list
+let   _allGrades    = [];           // cached grades of every pathway [{pathway_id, grade_number, name, lesson_count}]
 let   _allTutors    = [];           // cached tutors list
 let   _allStudents  = [];           // cached paid students (for batch selector)
 let   _activeTab    = 'students';   // current sidebar tab
@@ -80,6 +81,7 @@ async function loadDashboard() {
     if (pathwayRes.ok) {
       const pd = await pathwayRes.json();
       _allPathways = pd.pathways || pd || [];
+      _allGrades   = pd.grades || [];
     }
     if (tutorRes.ok) {
       const td = await tutorRes.json();
@@ -498,12 +500,12 @@ async function renderWebsiteEnquiries() {
           ? '<span style="background:#dbeafe;color:#1e40af;padding:3px 9px;border-radius:50px;font-size:11px;font-weight:900;">🔗 Link Sent</span>'
           : '<span style="background:#fff3e0;color:#e65100;padding:3px 9px;border-radius:50px;font-size:11px;font-weight:900;">⏳ Pending</span>';
 
+      _requestsById[r.id] = r;
       const proceed = r.status === 'processed'
-        ? '<span style="background:var(--green-light);color:var(--green-dark);font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">✅ Processed</span>'
-        : `<button onclick="proceedEnrollmentRequest('${r.id}')"
-            style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;"
-            ${r.payment_status !== 'received' ? 'disabled style="opacity:.5;cursor:not-allowed;"' : ''}>
-            🎓 Proceed
+        ? '<span style="background:var(--green-light);color:var(--green-dark);font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">✅ Onboarded</span>'
+        : `<button onclick="onboardFromRequest('${r.id}')"
+            style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;">
+            🎓 Onboard
           </button>`;
 
       return `<tr>
@@ -537,6 +539,35 @@ async function renderWebsiteEnquiries() {
   } catch (err) {
     el.innerHTML = `<div style="padding:24px;color:var(--orange);font-weight:700;">⚠️ Error: ${err.message}</div>`;
   }
+}
+
+/* Enquiries/handovers by id, so Onboard can prefill the form */
+const _requestsById = {};
+
+function _requestPrefill(r) {
+  return {
+    sourceType:  'request',
+    sourceId:    r.id,
+    sourceLabel: r.source === 'presales'
+      ? 'Handed over by Pre-Sales after the demo — details filled in, please check them.'
+      : 'From the website Enrol Now form — details filled in, please check them.',
+    studentName: r.student_name,
+    parentName:  r.parent_name,
+    email:       r.email,
+    phone:       r.phone || r.whatsapp,
+    age:         r.age,
+    grade:       r.grade || (r.grade_number ? 'Grade ' + r.grade_number : ''),
+    course:      r.pathway_name || r.course_name || r.course_name_db || r.subject || '',
+    pathwayId:   r.pathway_id,
+    gradeNumber: r.grade_number,
+    timezone:    r.timezone,
+  };
+}
+
+function onboardFromRequest(id) {
+  const r = _requestsById[id];
+  if (!r) { showToast('Please refresh and try again.', 'warning'); return; }
+  openManualOnboardModal(_requestPrefill(r));
 }
 
 async function saveEnqPaymentStatus(id, status) {
@@ -592,7 +623,7 @@ async function renderEnrollmentRequests() {
     const requests = (data.requests || []).filter(r => r.source !== 'website');
 
     if (!requests.length) {
-      el.innerHTML = emptyState('📋','No enrollment requests','Students sent here from Presales or referrals will appear here.');
+      el.innerHTML = emptyState('📋','No handovers yet','Students Pre-Sales hands over after their demo appear here, ready to onboard.');
       return;
     }
 
@@ -601,16 +632,19 @@ async function renderEnrollmentRequests() {
         ? '<span style="background:#d4f8e8;color:#065f46;padding:3px 9px;border-radius:50px;font-size:11px;font-weight:900;">✅ Received</span>'
         : '<span style="background:#fff3e0;color:#e65100;padding:3px 9px;border-radius:50px;font-size:11px;font-weight:900;">⏳ Pending</span>';
 
+      _requestsById[r.id] = r;
       const proceed = r.status === 'processed'
-        ? '<span style="background:var(--green-light);color:var(--green-dark);font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">✅ Processed</span>'
-        : `<button onclick="proceedEnrollmentRequest('${r.id}')"
-            style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;"
-            ${r.payment_status !== 'received' ? 'disabled style="opacity:.5;cursor:not-allowed;"' : ''}>
-            🎓 Proceed
+        ? '<span style="background:var(--green-light);color:var(--green-dark);font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">✅ Onboarded</span>'
+        : `<button onclick="onboardFromRequest('${r.id}')"
+            style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;">
+            🎓 Onboard
           </button>`;
 
+      const srcBadge = r.source === 'presales'
+        ? '<span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:50px;font-size:10px;font-weight:900;">From demo</span>'
+        : '<span style="background:#f3e8ff;color:#6b21a8;padding:2px 8px;border-radius:50px;font-size:10px;font-weight:900;">' + (r.source || 'Other') + '</span>';
       return `<tr>
-        <td style="${tdS};font-weight:800;">${r.student_name}</td>
+        <td style="${tdS};font-weight:800;">${r.student_name}<div style="margin-top:3px;">${srcBadge}</div></td>
         <td style="${tdS}">${r.email || '—'}</td>
         <td style="${tdS}">${r.phone || '—'}</td>
         <td style="${tdS};color:var(--blue);">${r.course_name || r.course_name_db || '—'}</td>
@@ -661,15 +695,16 @@ async function renderIncomingReferrals() {
     }
 
     const rows = referrals.map(r => {
+      _referralsById[r.id] = r;
       const statusBadge = r.payment_status === 'received'
         ? '<span style="background:#d4f8e8;color:#065f46;padding:3px 9px;border-radius:50px;font-size:11px;font-weight:900;">✅ Received</span>'
         : '<span style="background:#fff3e0;color:#e65100;padding:3px 9px;border-radius:50px;font-size:11px;font-weight:900;">⏳ Pending</span>';
 
       const enrolled = r.status === 'enrolled'
         ? '<span style="background:var(--green-light);color:var(--green-dark);font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">✅ Enrolled</span>'
-        : `<button onclick="proceedReferral('${r.id}')"
+        : `<button onclick="onboardFromReferral('${r.id}')"
             style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;">
-            🎓 Proceed
+            🎓 Onboard
           </button>`;
 
       return `<tr>
@@ -708,6 +743,23 @@ async function saveReferralPaymentStatus(id, status) {
     body: JSON.stringify({ paymentStatus: status }),
   });
   renderIncomingReferrals();
+}
+
+const _referralsById = {};
+
+function onboardFromReferral(id) {
+  const r = _referralsById[id];
+  if (!r) { showToast('Please refresh and try again.', 'warning'); return; }
+  openManualOnboardModal({
+    sourceType:  'referral',
+    sourceId:    r.id,
+    sourceLabel: `Referred by ${r.referrer_name || 'a StemNest family'} — details filled in, please check them.`,
+    studentName: r.student_name,
+    email:       r.parent_email,
+    phone:       r.parent_phone,
+    age:         r.age,
+    grade:       r.grade,
+  });
 }
 
 async function proceedReferral(id) {
@@ -1007,7 +1059,8 @@ function openPOSScheduleModal(studentId, studentName, studentEmail, enrolId, pat
       <strong>${studentName}</strong><br>
       📧 ${studentEmail || '—'} &nbsp;&nbsp;
       📚 ${studentData?.pathwayName || '—'} · Grade ${studentData?.currentGrade || '—'} &nbsp;&nbsp;
-      🎟️ ${studentData?.credits || 0} credits`;
+      🎟️ ${studentData?.credits || 0} credits &nbsp;&nbsp;
+      🌍 ${studentData?.timezone || 'Parent time zone not known yet'}`;
   }
 
   // Populate teacher dropdown
@@ -1033,29 +1086,26 @@ function openPOSScheduleModal(studentId, studentName, studentEmail, enrolId, pat
       if (p.id === (studentData?.pathwayId || pathwayId)) opt.selected = true;
       pathwaySel.appendChild(opt);
     });
-    // Trigger grade load if pathway already selected
-    if (pathwaySel.value) onPOSPathwayChange();
+    onPOSPathwayChange();
   }
 
   // Pre-fill grade
-  if (gradeNumber || studentData?.currentGrade) {
-    setTimeout(() => {
-      const grSel = document.getElementById('pos-sm-grade');
-      if (grSel) {
-        const target = gradeNumber || studentData.currentGrade;
-        [...grSel.options].forEach(o => { if (parseInt(o.value) === parseInt(target)) o.selected = true; });
-      }
-    }, 400);
+  const targetGrade = gradeNumber || studentData?.currentGrade;
+  if (targetGrade) {
+    const grSel = document.getElementById('pos-sm-grade');
+    if (grSel) [...grSel.options].forEach(o => { if (parseInt(o.value) === parseInt(targetGrade)) o.selected = true; });
   }
 
   // Reset schedule rows
   const rowsEl = document.getElementById('pos-schedule-rows');
   if (rowsEl) rowsEl.innerHTML = '';
   addPOSScheduleRow();
+  if (document.getElementById('pos-sm-link')) document.getElementById('pos-sm-link').value = '';
 
   // Default start date
   const startEl = document.getElementById('pos-sm-start');
   if (startEl && !startEl.value) startEl.value = new Date().toISOString().split('T')[0];
+  updatePOSScheduleSummary();
 
   document.getElementById('posScheduleModalOverlay').classList.add('open');
 }
@@ -1064,26 +1114,34 @@ function closePOSScheduleModal() {
   document.getElementById('posScheduleModalOverlay').classList.remove('open');
 }
 
-async function onPOSPathwayChange() {
-  const pathwayId = document.getElementById('pos-sm-pathway')?.value;
-  const grSel     = document.getElementById('pos-sm-grade');
+/** Fill a grade <select> with the grades of the chosen pathway (from the cached list). */
+function fillGradeSelect(pathwayId, grSel, placeholder) {
   if (!grSel) return;
+  const grades = _allGrades
+    .filter(g => g.pathway_id === pathwayId)
+    .sort((a, b) => a.grade_number - b.grade_number);
+  grSel.innerHTML = `<option value="">${placeholder}</option>` +
+    grades.map(g => `<option value="${g.grade_number}">Grade ${g.grade_number}${g.name ? ' — ' + g.name : ''}${parseInt(g.lesson_count) ? ' (' + g.lesson_count + ' lessons)' : ''}</option>`).join('');
+}
 
-  if (!pathwayId) {
-    grSel.innerHTML = '<option value="">— Select grade —</option>';
-    return;
-  }
+function onPOSPathwayChange() {
+  const pathwayId = document.getElementById('pos-sm-pathway')?.value;
+  fillGradeSelect(pathwayId, document.getElementById('pos-sm-grade'), '— Select grade —');
+  updatePOSScheduleSummary();
+}
 
-  const token = localStorage.getItem('sn_access_token');
-  try {
-    const res  = await fetch(`${API}/api/pathways/${pathwayId}`, {
-      headers: { 'Authorization': 'Bearer ' + token }
-    });
-    const data = await res.json();
-    const grades = (data.pathway?.grades || data.grades || []).filter(g => g.is_active !== false);
-    grSel.innerHTML = '<option value="">— Select grade —</option>' +
-      grades.map(g => `<option value="${g.grade_number}">Grade ${g.grade_number}${g.name ? ' — ' + g.name : ''}</option>`).join('');
-  } catch {}
+/** "72 classes will be booked" hint under the schedule form. */
+function updatePOSScheduleSummary() {
+  const el = document.getElementById('pos-sm-summary');
+  if (!el) return;
+  const pathwayId = document.getElementById('pos-sm-pathway')?.value;
+  const gradeNum  = parseInt(document.getElementById('pos-sm-grade')?.value) || null;
+  const g = _allGrades.find(x => x.pathway_id === pathwayId && x.grade_number === gradeNum);
+  const total = (g && parseInt(g.lesson_count)) || 72;
+  const perWeek = document.getElementById('pos-schedule-rows')?.children.length || 0;
+  const weeks = perWeek ? Math.ceil(total / perWeek) : 0;
+  el.innerHTML = `📚 The whole grade will be booked: <strong>${total} classes</strong>${perWeek ? ` (${perWeek}×/week ≈ ${weeks} weeks)` : ''}.
+    Lessons already completed in this grade are skipped. When credits run out, the remaining classes are held automatically and continue when the parent tops up.`;
 }
 
 function addPOSScheduleRow() {
@@ -1098,8 +1156,9 @@ function addPOSScheduleRow() {
       <option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option><option value="0">Sunday</option>
     </select>
     <input type="time" style="flex:1;padding:10px 12px;border:2px solid #e8eaf0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;outline:none;" value="16:00">
-    <button type="button" onclick="this.parentElement.remove()" style="background:#fed7d7;color:#c53030;border:none;border-radius:8px;width:32px;height:36px;font-size:16px;cursor:pointer;flex-shrink:0;">×</button>`;
+    <button type="button" onclick="this.parentElement.remove();updatePOSScheduleSummary();" style="background:#fed7d7;color:#c53030;border:none;border-radius:8px;width:32px;height:36px;font-size:16px;cursor:pointer;flex-shrink:0;">×</button>`;
   rowsEl.appendChild(div);
+  updatePOSScheduleSummary();
 }
 
 function collectScheduleRows(containerId) {
@@ -1119,14 +1178,16 @@ async function confirmPOSSchedule() {
   const pathwayId  = document.getElementById('pos-sm-pathway')?.value || null;
   const gradeNum   = parseInt(document.getElementById('pos-sm-grade')?.value) || null;
   const startDate  = document.getElementById('pos-sm-start')?.value;
-  const weeks      = parseInt(document.getElementById('pos-sm-weeks')?.value) || 36;
-  const classLink  = document.getElementById('pos-sm-link')?.value;
+  const classLink  = document.getElementById('pos-sm-link')?.value.trim();
   const schedule   = collectScheduleRows('pos-schedule-rows');
 
   if (!teacherId)    { showToast('Please select a teacher.','warning'); return; }
   if (!startDate)    { showToast('Please select a start date.','warning'); return; }
   if (!classLink)    { showToast('Please enter a class link.','warning'); return; }
   if (!schedule.length) { showToast('Please add at least one schedule day.','warning'); return; }
+  if (!pathwayId || !gradeNum) {
+    if (!confirm('No pathway/grade selected — classes will not be linked to lessons and progress will not be tracked. Continue anyway?')) return;
+  }
 
   const btn = document.querySelector('#posScheduleModalOverlay .btn-green');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Scheduling…'; }
@@ -1143,13 +1204,13 @@ async function confirmPOSSchedule() {
         gradeNumber: gradeNum,
         schedule,
         startDate,
-        weeks,
         classLink,
       }),
     });
     const data = await res.json();
     if (data.success) {
-      showToast(`✅ ${data.bookingsCreated || ''} classes scheduled for ${_posScheduleStudentName}!`);
+      const first = data.firstClass ? ` First class ${fmtDateShort(data.firstClass.date + 'T00:00:00')} at ${fmtTime(data.firstClass.time)} WAT.` : '';
+      showToast(`✅ ${data.bookingsCreated} classes booked for ${_posScheduleStudentName}.${first} Parent and teacher have been emailed.`, 'success', 9000);
       closePOSScheduleModal();
       await loadDashboard();
     } else {
@@ -1303,26 +1364,64 @@ async function confirmChangeTutor() {
 /* ═══════════════════════════════════════════════════════════════
    MANUAL ONBOARD MODAL
 ═══════════════════════════════════════════════════════════════ */
-function openManualOnboardModal() {
-  // Populate pathways
-  ['mob-pathway','ob-pathway'].forEach(id => {
-    const sel = document.getElementById(id);
-    if (!sel) return;
+/** Strong-enough temporary password: SN + 8 random letters/digits. */
+function genTempPassword() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const buf = new Uint32Array(8);
+  (window.crypto || window.msCrypto).getRandomValues(buf);
+  return 'SN' + Array.from(buf, n => chars[n % chars.length]).join('');
+}
+
+/* Context of the current onboarding: which enquiry/referral it came from */
+let _onboardSource = null;   // { type: 'request'|'referral', id }
+
+/**
+ * Open the onboarding form. With no argument it is blank (walk-in, referral
+ * typed by hand). With a prefill object (from a website enquiry, a Pre-Sales
+ * handover or a referral) the known details are filled in.
+ */
+function openManualOnboardModal(prefill) {
+  const p = prefill || {};
+  _onboardSource = p.sourceType ? { type: p.sourceType, id: p.sourceId } : null;
+
+  const sel = document.getElementById('mob-pathway');
+  if (sel) {
     sel.innerHTML = '<option value="">— Select Pathway (optional) —</option>';
-    _allPathways.forEach(p => {
+    _allPathways.forEach(pw => {
       const opt = document.createElement('option');
-      opt.value = p.id;
-      opt.textContent = (p.emoji || '') + ' ' + p.name;
+      opt.value = pw.id;
+      opt.textContent = (pw.emoji || '') + ' ' + pw.name;
+      if (p.pathwayId && pw.id === p.pathwayId) opt.selected = true;
       sel.appendChild(opt);
     });
-  });
+  }
+  onPathwayChange('mob-pathway', 'mob-pathway-grade');
+  if (p.gradeNumber) {
+    const g = document.getElementById('mob-pathway-grade');
+    if (g) [...g.options].forEach(o => { if (parseInt(o.value) === parseInt(p.gradeNumber)) o.selected = true; });
+  }
 
-  // Auto-generate password
-  const pass = 'SN' + Math.random().toString(36).slice(2,8).toUpperCase();
-  ['mob-password','ob-password'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = pass;
-  });
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v == null ? '' : v; };
+  set('mob-name',        p.studentName);
+  set('mob-email',       p.email);
+  set('mob-parent-name', p.parentName);
+  set('mob-phone',       p.phone);
+  set('mob-age',         p.age);
+  set('mob-grade',       p.grade);
+  set('mob-course',      p.course);
+  set('mob-credits',     '');
+  set('mob-amount',      '');
+  set('mob-payref',      '');
+  set('mob-timezone',    p.timezone);
+  set('mob-password',    genTempPassword());
+
+  const src = document.getElementById('mob-source');
+  if (src) {
+    src.style.display = _onboardSource ? 'block' : 'none';
+    src.textContent = _onboardSource
+      ? (p.sourceLabel || 'Details filled in from the enquiry — please check them.') + (p.timezone ? ' Parent time zone: ' + p.timezone + '.' : '')
+      : '';
+  }
 
   document.getElementById('manualOnboardOverlay').classList.add('open');
 }
@@ -1331,42 +1430,37 @@ function closeManualOnboardModal() {
   document.getElementById('manualOnboardOverlay').classList.remove('open');
 }
 
-async function onPathwayChange(pathwaySelId, gradeSelId) {
+function onPathwayChange(pathwaySelId, gradeSelId) {
   const pathwayId = document.getElementById(pathwaySelId)?.value;
-  const grSel     = document.getElementById(gradeSelId);
-  if (!grSel) return;
-  if (!pathwayId) { grSel.innerHTML = '<option value="">— Select Grade —</option>'; return; }
-
-  const token = localStorage.getItem('sn_access_token');
-  try {
-    const res  = await fetch(`${API}/api/pathways/${pathwayId}`, {
-      headers: { 'Authorization': 'Bearer ' + token }
-    });
-    const data = await res.json();
-    const grades = (data.pathway?.grades || data.grades || []).filter(g => g.is_active !== false);
-    grSel.innerHTML = '<option value="">— Select Grade —</option>' +
-      grades.map(g => `<option value="${g.grade_number}">Grade ${g.grade_number}${g.name ? ' — ' + g.name : ''}</option>`).join('');
-  } catch {}
+  fillGradeSelect(pathwayId, document.getElementById(gradeSelId), '— Select Grade —');
 }
 
 async function confirmManualOnboard() {
-  const name     = document.getElementById('mob-name')?.value.trim();
-  const email    = document.getElementById('mob-email')?.value.trim();
-  const phone    = document.getElementById('mob-phone')?.value.trim();
-  const age      = document.getElementById('mob-age')?.value.trim();
-  const grade    = document.getElementById('mob-grade')?.value.trim();
-  const subject  = document.getElementById('mob-subject')?.value;
-  const course   = document.getElementById('mob-course')?.value.trim();
-  const pathwayId = document.getElementById('mob-pathway')?.value;
-  const gradeNum = parseInt(document.getElementById('mob-pathway-grade')?.value) || null;
-  const credits  = parseInt(document.getElementById('mob-credits')?.value) || 0;
-  const amount   = parseFloat(document.getElementById('mob-amount')?.value) || null;
-  const currency = document.getElementById('mob-currency')?.value || 'GBP';
-  const password = document.getElementById('mob-password')?.value.trim();
+  const v = id => (document.getElementById(id)?.value || '').trim();
+  const name       = v('mob-name');
+  const email      = v('mob-email');
+  const parentName = v('mob-parent-name');
+  const phone      = v('mob-phone');
+  const age        = v('mob-age');
+  const grade      = v('mob-grade');
+  const subject    = v('mob-subject');
+  const course     = v('mob-course');
+  const pathwayId  = v('mob-pathway');
+  const gradeNum   = parseInt(v('mob-pathway-grade')) || null;
+  const credits    = parseInt(v('mob-credits')) || 0;
+  const amount     = parseFloat(v('mob-amount')) || null;
+  const currency   = v('mob-currency') || 'GBP';
+  const paymentRef = v('mob-payref');
+  const timezone   = v('mob-timezone');
+  const password   = v('mob-password');
 
-  if (!name)     { showToast('Full name is required.','warning'); return; }
-  if (!email)    { showToast('Email is required.','warning'); return; }
-  if (!password) { showToast('Password is required.','warning'); return; }
+  if (!name)     { showToast('Student name is required.','warning'); return; }
+  if (!email)    { showToast('Login email is required.','warning'); return; }
+  if (!password || password.length < 8) { showToast('Password must be at least 8 characters.','warning'); return; }
+  if (pathwayId && !gradeNum) { showToast('Please choose the grade for this pathway.','warning'); return; }
+  if (amount && !credits) {
+    if (!confirm('An amount was entered but 0 credits. Onboard without credits?')) return;
+  }
 
   const btn = document.querySelector('#manualOnboardOverlay .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Onboarding…'; }
@@ -1377,86 +1471,53 @@ async function confirmManualOnboard() {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        name, email, password, phone: phone || null,
+        name, email, password, phone: phone || undefined,
         role: 'student',
         studentProfile: {
           grade, age, credits,
-          parentName: name,
+          parentName:  parentName || null,
           parentEmail: email,
           pathwayId:   pathwayId || null,
           gradeNumber: gradeNum,
-          subject:     subject,
-          course:      course,
-          amount:      amount,
-          currency:    currency,
+          subject, course,
+          amount, currency,
+          paymentReference: paymentRef || null,
+          timezone: timezone || null,
+          enrollmentRequestId: _onboardSource?.type === 'request' ? _onboardSource.id : null,
         }
       }),
     });
     const data = await res.json();
-    if (data.success || data.user || data.id) {
-      showToast(`✅ ${name} onboarded successfully!`);
-      closeManualOnboardModal();
-      await loadDashboard();
-    } else {
-      showToast('Error: ' + (data.error || 'Onboarding failed'), 'error');
+    if (!res.ok || !data.success) {
+      showToast('Error: ' + (data.error || 'Onboarding failed'), 'error', 8000);
+      return;
+    }
+
+    /* A referral is marked enrolled once the account exists */
+    if (_onboardSource?.type === 'referral') {
+      await fetch(`${API}/api/enrollments/referrals/${_onboardSource.id}`, {
+        method: 'PUT',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ proceed: true }),
+      }).catch(() => {});
+    }
+
+    showToast(`✅ ${name} onboarded as ${data.user.staff_id}. Login details emailed.`, 'success', 7000);
+    closeManualOnboardModal();
+    _onboardSource = null;
+    await loadDashboard();
+    if (_activeTab === 'website-enquiries') renderWebsiteEnquiries();
+    if (_activeTab === 'enrollment-requests') renderEnrollmentRequests();
+    if (_activeTab === 'incoming-referrals') renderIncomingReferrals();
+
+    if (confirm(`Schedule ${name}'s classes now?`)) {
+      showPOSTab('students');
+      openPOSScheduleModal(data.user.id, name, email, data.enrolmentId, pathwayId || null, gradeNum);
     }
   } catch (err) {
     showToast('Error: ' + err.message, 'error');
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '🎓 Onboard Student'; }
-  }
-}
-
-/* ─── Onboard Modal (from Paid Students enrol flow) ─── */
-function closeOnboardModal() {
-  const el = document.getElementById('onboardModalOverlay');
-  if (el) el.classList.remove('open');
-}
-
-async function confirmOnboard() {
-  const name     = document.getElementById('ob-name')?.value.trim();
-  const email    = document.getElementById('ob-email')?.value.trim();
-  const phone    = document.getElementById('ob-phone')?.value.trim();
-  const age      = document.getElementById('ob-age')?.value.trim();
-  const grade    = document.getElementById('ob-grade')?.value.trim();
-  const subject  = document.getElementById('ob-subject')?.value.trim();
-  const course   = document.getElementById('ob-course')?.value.trim();
-  const pathwayId = document.getElementById('ob-pathway')?.value;
-  const gradeNum = parseInt(document.getElementById('ob-pathway-grade')?.value) || null;
-  const credits  = parseInt(document.getElementById('ob-credits')?.value) || 0;
-  const amount   = document.getElementById('ob-amount')?.value.trim();
-  const password = document.getElementById('ob-password')?.value.trim();
-
-  if (!name)     { showToast('Name required.','warning'); return; }
-  if (!email)    { showToast('Email required.','warning'); return; }
-  if (!password) { showToast('Password required.','warning'); return; }
-
-  const btn = document.querySelector('#onboardModalOverlay .btn-primary');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Onboarding…'; }
-
-  const token = localStorage.getItem('sn_access_token');
-  try {
-    const res = await fetch(`${API}/api/users`, {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name, email, password, phone: phone || null,
-        role: 'student',
-        studentProfile: { grade, age, credits, subject, course, pathwayId, gradeNumber: gradeNum, amount }
-      }),
-    });
-    const data = await res.json();
-    if (data.success || data.user || data.id) {
-      showToast(`✅ ${name} onboarded!`);
-      closeOnboardModal();
-      await loadDashboard();
-    } else {
-      showToast('Error: ' + (data.error || 'Onboarding failed'), 'error');
-    }
-  } catch (err) {
-    showToast('Error: ' + err.message, 'error');
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '🎓 Confirm & Onboard Student'; }
   }
 }
 

@@ -61,6 +61,10 @@ const STATEMENTS = [
   `ALTER TABLE enrolments ADD COLUMN IF NOT EXISTS last_lesson_at_pause INTEGER`,
   `ALTER TABLE enrolments ADD COLUMN IF NOT EXISTS resumed_at           TIMESTAMPTZ`,
   `ALTER TABLE enrolments ADD COLUMN IF NOT EXISTS updated_at           TIMESTAMPTZ DEFAULT NOW()`,
+  /* Onboarding records the pathway enrolment before a teacher and start
+     date are chosen; scheduling fills them in. */
+  `ALTER TABLE enrolments ALTER COLUMN tutor_id   DROP NOT NULL`,
+  `ALTER TABLE enrolments ALTER COLUMN start_date DROP NOT NULL`,
   /* Most paid students have no enrolment row, so the pause is also recorded on the profile */
   `ALTER TABLE student_profiles ADD COLUMN IF NOT EXISTS paused_at     TIMESTAMPTZ`,
   `ALTER TABLE student_profiles ADD COLUMN IF NOT EXISTS paused_reason TEXT`,
@@ -71,6 +75,19 @@ const STATEMENTS = [
   `UPDATE pathway_grades pg SET total_lessons = (
      SELECT COUNT(*) FROM pathway_lessons pl WHERE pl.grade_id = pg.id AND pl.is_active = TRUE)
    WHERE pg.total_lessons IS NULL`,
+
+  /* ── Enrollment requests (website Enrol Now + Pre-Sales handover) ──
+     Columns the routes write that the Supabase table was created without. */
+  `ALTER TABLE enrollment_requests ADD COLUMN IF NOT EXISTS course_id      VARCHAR(100)`,
+  `ALTER TABLE enrollment_requests ADD COLUMN IF NOT EXISTS course_name    VARCHAR(200)`,
+  `ALTER TABLE enrollment_requests ADD COLUMN IF NOT EXISTS course_price   NUMERIC(10,2)`,
+  `ALTER TABLE enrollment_requests ADD COLUMN IF NOT EXISTS payment_status VARCHAR(30) DEFAULT 'pending'`,
+  `ALTER TABLE enrollment_requests ADD COLUMN IF NOT EXISTS payment_link   TEXT`,
+  `ALTER TABLE enrollment_requests ADD COLUMN IF NOT EXISTS processed_by   UUID REFERENCES users(id)`,
+  `ALTER TABLE enrollment_requests ADD COLUMN IF NOT EXISTS processed_at   TIMESTAMPTZ`,
+  `ALTER TABLE enrollment_requests ADD COLUMN IF NOT EXISTS booking_id     UUID REFERENCES bookings(id) ON DELETE SET NULL`,
+  `ALTER TABLE enrollment_requests ADD COLUMN IF NOT EXISTS student_id     UUID REFERENCES users(id) ON DELETE SET NULL`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_enrollment_requests_booking ON enrollment_requests(booking_id) WHERE booking_id IS NOT NULL`,
 
   /* ── Referrals ── */
   `CREATE TABLE IF NOT EXISTS referrals (
