@@ -1,80 +1,278 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <!-- Microsoft Clarity -->
+  <script type="text/javascript">
+    (function(c,l,a,r,i,t,y){
+      c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+      t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+      y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    })(window, document, "clarity", "script", "xer20hj8fr");
+  </script>
+  <!-- End Microsoft Clarity -->
+  <!-- TikTok Pixel Code -->
+  <script>
+    !function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var r="https://analytics.tiktok.com/i18n/pixel/events.js",o=n&&n.partner;ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=r,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};n=document.createElement("script");n.type="text/javascript",n.async=!0,n.src=r+"?sdkid="+e+"&lib="+t;e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(n,e)};ttq.load('D8V60AJC77U45FANPDG0');ttq.load('D91PAORC77U4QRO9NQ0G');ttq.page()}(window,document,'ttq');
+  </script>
+  <!-- End TikTok Pixel Code -->
+  <!-- Google Analytics 4 -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-WB62B0P5KG"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-WB62B0P5KG');
+  </script>
+  <!-- End Google Analytics 4 -->
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/png" sizes="32x32" href="../assets/icons/icon.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="../assets/icons/icon.png">
+  <link rel="apple-touch-icon" href="../assets/icons/icon.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Family Login – StemNest Academy</title>
+  <meta name="description" content="Set up one StemNest Academy login to see all your children’s classes, credits, homework and progress.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../css/global.css">
-  <style>
-    body { background: var(--bg, #f4f6fb); font-family: 'Nunito', sans-serif; margin: 0; }
-    .fs-wrap { max-width: 520px; margin: 40px auto; padding: 0 16px; }
-    .fs-card { background: #fff; border-radius: 20px; box-shadow: 0 8px 30px rgba(0,0,0,.08); padding: 28px; }
-    .fs-title { font-family: 'Fredoka One', cursive; font-size: 26px; color: #1a202c; margin: 0 0 6px; }
-    .fs-sub { font-size: 14px; color: #4a5568; font-weight: 700; line-height: 1.6; margin-bottom: 20px; }
-    .fs-field { margin-bottom: 14px; }
-    .fs-field label { display: block; font-size: 12px; font-weight: 900; color: #4a5568; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
-    .fs-field input { width: 100%; box-sizing: border-box; padding: 12px 14px; border: 2px solid #e8eaf0; border-radius: 12px; font-family: 'Nunito', sans-serif; font-size: 15px; outline: none; }
-    .fs-field input:focus { border-color: #1a56db; }
-    .fs-section { font-size: 13px; font-weight: 900; color: #1a56db; margin: 20px 0 10px; }
-    .fs-hint { font-size: 12px; color: #718096; font-weight: 700; margin-top: 4px; }
-    .fs-btn { width: 100%; border: none; border-radius: 50px; padding: 14px; background: #1a56db; color: #fff; font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 15px; cursor: pointer; margin-top: 8px; }
-    .fs-btn:disabled { opacity: .6; cursor: default; }
-    .fs-msg { border-radius: 12px; padding: 12px 14px; font-size: 13px; font-weight: 800; margin-top: 14px; display: none; line-height: 1.6; }
-    .fs-msg.err { background: #fed7d7; color: #c53030; display: block; }
-    .fs-msg.ok { background: #d4f8e8; color: #065f46; display: block; }
-    .fs-foot { text-align: center; font-size: 13px; font-weight: 700; color: #4a5568; margin-top: 16px; }
-    .fs-foot a { color: #1a56db; font-weight: 900; }
-  </style>
-</head>
+  <link rel="stylesheet" href="../css/about.css">
+  <link rel="stylesheet" href="../css/mobile.css">
+<!-- Meta Pixel Code -->
+<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window, document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init', '705705174881422');fbq('track', 'PageView');</script>
+<noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=705705174881422&ev=PageView&noscript=1"/></noscript>
+<!-- End Meta Pixel Code --></head>
 <body>
-<div class="fs-wrap">
-  <div class="fs-card">
+
+<!-- ═══ NAV ═══ -->
+<nav>
+  <a class="logo" href="../index.html">
+    <img src="../assets/images/logo.png" alt="StemNest Academy" class="logo-img">
+  </a>
+  <ul class="nav-links">
+    <li><a href="../index.html">Home</a></li>
+    <li><a href="courses.html">Courses</a></li>
+    <li><a href="about.html">About</a></li>
+    <li><a href="team.html">Team</a></li>
+    <li><a href="faq.html">FAQ</a></li>
+    <li><a href="teach-with-us.html">Teach With Us</a></li>
+  </ul>
+  <div class="nav-actions">
+    <a href="login.html"      class="btn btn-outline">Log In</a>
+    <a href="free-trial.html" class="btn btn-primary">Book a Demo ✦</a>
+  </div>
+  <button class="nav-hamburger" id="navHamburger" onclick="toggleMobileNav()" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div class="nav-mobile-drawer" id="navDrawer">
+  <a href="../index.html">Home</a>
+  <a href="courses.html">Courses</a>
+  <a href="about.html">About</a>
+  <a href="team.html">Team</a>
+  <a href="faq.html">FAQ</a>
+  <a href="teach-with-us.html">Teach With Us</a>
+  <div class="nav-mobile-actions">
+    <a href="login.html"      class="btn btn-outline">Log In</a>
+    <a href="free-trial.html" class="btn btn-primary">Book a Demo ✦</a>
+  </div>
+</div>
+
+<style>
+  .fam-wrap { max-width: 1100px; margin: -48px auto 64px; padding: 0 5%; position: relative; z-index: 2;
+              display: grid; grid-template-columns: 1fr 1.1fr; gap: 28px; align-items: start; }
+  .fam-card { background: var(--white); border-radius: 22px; box-shadow: 0 12px 40px rgba(26,86,219,.12); padding: 30px; }
+  .fam-card h2 { font-family: 'Fredoka One', cursive; font-size: 24px; color: var(--dark); margin: 0 0 6px; }
+  .fam-sub { font-size: 14px; color: var(--mid); font-weight: 700; line-height: 1.6; margin-bottom: 18px; }
+  .fam-step { display: flex; gap: 14px; margin-bottom: 18px; }
+  .fam-num { flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; background: var(--blue-light); color: var(--blue);
+             font-family: 'Fredoka One', cursive; font-size: 17px; display: flex; align-items: center; justify-content: center; }
+  .fam-step h4 { margin: 2px 0 4px; font-size: 15px; font-weight: 900; color: var(--dark); }
+  .fam-step p { margin: 0; font-size: 13px; color: var(--mid); font-weight: 700; line-height: 1.6; }
+  .fam-feats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+  .fam-feat { background: var(--bg); border-radius: 14px; padding: 12px 14px; font-size: 13px; font-weight: 800; color: var(--dark); line-height: 1.5; }
+  .fam-feat span { display: block; font-size: 12px; font-weight: 700; color: var(--light); margin-top: 2px; }
+  .fam-section { font-size: 12px; font-weight: 900; color: var(--blue); text-transform: uppercase; letter-spacing: .6px; margin: 20px 0 10px; }
+  .fam-field { margin-bottom: 14px; }
+  .fam-field label { display: block; font-size: 12px; font-weight: 900; color: var(--mid); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
+  .fam-field input { width: 100%; box-sizing: border-box; padding: 12px 14px; border: 2px solid #e8eaf0; border-radius: 12px;
+                     font-family: 'Nunito', sans-serif; font-size: 15px; font-weight: 700; outline: none; background: #fff; }
+  .fam-field input:focus { border-color: var(--blue); }
+  .fam-hint { font-size: 12px; color: var(--light); font-weight: 700; margin-top: 5px; line-height: 1.5; }
+  .fam-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .fam-btn { width: 100%; border: none; border-radius: 50px; padding: 14px; background: var(--orange); color: #fff;
+             font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 15px; cursor: pointer; margin-top: 6px;
+             box-shadow: 0 4px 16px rgba(255,107,53,.35); }
+  .fam-btn:disabled { opacity: .6; cursor: default; }
+  .fam-msg { border-radius: 12px; padding: 12px 14px; font-size: 13px; font-weight: 800; margin-top: 14px; display: none; line-height: 1.6; }
+  .fam-msg.err { background: #fed7d7; color: #c53030; display: block; }
+  .fam-msg.ok  { background: var(--green-light); color: var(--green-dark); display: block; }
+  .fam-foot { text-align: center; font-size: 13px; font-weight: 700; color: var(--mid); margin-top: 16px; }
+  .fam-foot a { color: var(--blue); font-weight: 900; }
+  .fam-help { max-width: 1100px; margin: 0 auto 72px; padding: 0 5%; }
+  .fam-help h3 { font-family: 'Fredoka One', cursive; font-size: 24px; color: var(--dark); margin-bottom: 14px; }
+  .fam-help details { background: var(--white); border: 1.5px solid #e8eaf0; border-radius: 14px; padding: 14px 18px; margin-bottom: 10px; }
+  .fam-help summary { cursor: pointer; font-weight: 900; color: var(--dark); font-size: 15px; }
+  .fam-help p { font-size: 14px; color: var(--mid); font-weight: 700; line-height: 1.7; margin: 10px 0 0; }
+  @media (max-width: 860px) {
+    .fam-wrap { grid-template-columns: 1fr; margin-top: -32px; }
+    .fam-form-card { order: -1; }
+  }
+  @media (max-width: 520px) {
+    .fam-row, .fam-feats { grid-template-columns: 1fr; }
+    .fam-card { padding: 22px 18px; }
+  }
+</style>
+
+<!-- ═══ HERO ═══ -->
+<div class="about-hero">
+  <div class="about-hero-inner">
+    <div class="about-hero-badge">👨‍👩‍👧 For Parents</div>
+    <h1 id="famHeroTitle">One Login for <span>All Your Children</span></h1>
+    <p style="color:rgba(255,255,255,.8);font-size:17px;font-weight:700;line-height:1.7;max-width:620px;margin:0 auto;">
+      See every child's classes, credits, homework and progress from a single account — and switch between them with one tap.
+    </p>
+  </div>
+</div>
+
+<div class="fam-wrap">
+
+  <!-- How it works -->
+  <div class="fam-card">
+    <h2>How it works</h2>
+    <div class="fam-sub">It takes about two minutes. You only need one child's login to start.</div>
+    <div class="fam-step"><div class="fam-num">1</div><div>
+      <h4>Create your family login</h4>
+      <p>Enter your name, the email you want to log in with and a password.</p></div></div>
+    <div class="fam-step"><div class="fam-num">2</div><div>
+      <h4>Add your first child</h4>
+      <p>Type their student ID (for example <strong>S-0012</strong>) or the email they log in with, and their password. This shows us the child is yours.</p></div></div>
+    <div class="fam-step"><div class="fam-num">3</div><div>
+      <h4>Add the others</h4>
+      <p>Log in, then tap <strong>+ Add a child</strong> in the family bar at the top of the dashboard for each brother or sister.</p></div></div>
+
+    <div class="fam-section">What you can see</div>
+    <div class="fam-feats">
+      <div class="fam-feat">📅 Classes &amp; Join button<span>In your own time zone</span></div>
+      <div class="fam-feat">💳 Credits<span>Balance and top-ups per child</span></div>
+      <div class="fam-feat">📝 Homework &amp; projects<span>With due-date countdowns</span></div>
+      <div class="fam-feat">🧠 Unit quizzes<span>Scores and attempts</span></div>
+      <div class="fam-feat">🥇 Points &amp; leaderboard<span>How each child ranks</span></div>
+      <div class="fam-feat">🏆 Certificates<span>When a grade is completed</span></div>
+    </div>
+    <div class="fam-hint" style="margin-top:14px;">All emails about your children (reminders, homework, payments) come to your family login email.</div>
+  </div>
+
+  <!-- Form -->
+  <div class="fam-card fam-form-card">
 
     <!-- Set up a new family login (public) -->
     <div id="registerView">
-      <h1 class="fs-title">👨‍👩‍👧 Set up a family login</h1>
-      <div class="fs-sub">One login for you to see all your children's classes, credits and progress. Each child keeps their own login too.</div>
+      <h2>Set up your family login</h2>
+      <div class="fam-sub">Already set up by StemNest? You don't need this — just <a href="login.html" style="color:var(--blue);font-weight:900;">log in</a> with the email we sent you.</div>
 
-      <div class="fs-section">About you</div>
-      <div class="fs-field"><label>Your name</label><input id="fsName" autocomplete="name"></div>
-      <div class="fs-field"><label>Your email</label><input id="fsEmail" type="email" autocomplete="email">
-        <div class="fs-hint">If this is the email one of your children logs in with, that child will log in with their student ID instead (same password).</div></div>
-      <div class="fs-field"><label>Your phone / WhatsApp</label><input id="fsPhone" type="tel" autocomplete="tel"></div>
-      <div class="fs-field"><label>Choose a password</label><input id="fsPassword" type="password" autocomplete="new-password">
-        <div class="fs-hint">At least 8 characters.</div></div>
+      <div class="fam-section">About you</div>
+      <div class="fam-field"><label for="fsName">Your full name</label><input id="fsName" autocomplete="name" placeholder="e.g. Mrs. Ada Obi"></div>
+      <div class="fam-field"><label for="fsEmail">Your email</label><input id="fsEmail" type="email" autocomplete="email" placeholder="you@email.com">
+        <div class="fam-hint">If one of your children logs in with this email today, that child will log in with their <strong>student ID</strong> instead — same password.</div></div>
+      <div class="fam-row">
+        <div class="fam-field"><label for="fsPhone">Phone / WhatsApp</label><input id="fsPhone" type="tel" autocomplete="tel" placeholder="+234…"></div>
+        <div class="fam-field"><label for="fsPassword">Choose a password</label><input id="fsPassword" type="password" autocomplete="new-password" placeholder="8+ characters"></div>
+      </div>
 
-      <div class="fs-section">Your first child</div>
-      <div class="fs-field"><label>Child's student ID or login email</label><input id="fsChild" placeholder="e.g. S-0012" autocapitalize="off"></div>
-      <div class="fs-field"><label>Child's password</label><input id="fsChildPw" type="password" autocomplete="off">
-        <div class="fs-hint">This proves the child is yours. You can add your other children after logging in.</div></div>
+      <div class="fam-section">Your first child</div>
+      <div class="fam-field"><label for="fsChild">Child's student ID or login email</label><input id="fsChild" placeholder="e.g. S-0012" autocapitalize="off" spellcheck="false"></div>
+      <div class="fam-field"><label for="fsChildPw">Child's password</label><input id="fsChildPw" type="password" autocomplete="off">
+        <div class="fam-hint">Don't know it? Message us on WhatsApp and we'll set it up for you.</div></div>
 
-      <button class="fs-btn" id="fsRegisterBtn" onclick="fsRegister()">Create family login</button>
-      <div class="fs-msg" id="fsRegisterMsg"></div>
-      <div class="fs-foot">Already have a family login? <a href="login.html">Log in</a></div>
+      <button class="fam-btn" id="fsRegisterBtn" onclick="fsRegister()">Create family login →</button>
+      <div class="fam-msg" id="fsRegisterMsg"></div>
+      <div class="fam-foot">Already have a family login? <a href="login.html">Log in</a></div>
     </div>
 
     <!-- Add a child (logged-in parent) -->
     <div id="addView" style="display:none;">
-      <h1 class="fs-title">➕ Add a child</h1>
-      <div class="fs-sub" id="fsAddSub">Enter your child's student ID (or the email they log in with) and their password.</div>
-      <div class="fs-field"><label>Child's student ID or login email</label><input id="fsAddChild" placeholder="e.g. S-0012" autocapitalize="off"></div>
-      <div class="fs-field"><label>Child's password</label><input id="fsAddPw" type="password" autocomplete="off"></div>
-      <button class="fs-btn" id="fsAddBtn" onclick="fsAdd()">Add child</button>
-      <div class="fs-msg" id="fsAddMsg"></div>
-      <div class="fs-foot" id="fsAddFoot"><a href="#" onclick="fsBack();return false;">← Back to the dashboard</a></div>
+      <h2>➕ Add a child</h2>
+      <div class="fam-sub" id="fsAddSub">Enter your child's student ID (or the email they log in with) and their password.</div>
+      <div class="fam-field"><label for="fsAddChild">Child's student ID or login email</label><input id="fsAddChild" placeholder="e.g. S-0012" autocapitalize="off" spellcheck="false"></div>
+      <div class="fam-field"><label for="fsAddPw">Child's password</label><input id="fsAddPw" type="password" autocomplete="off">
+        <div class="fam-hint">Don't know it? Message StemNest on WhatsApp and we'll add the child for you.</div></div>
+      <button class="fam-btn" id="fsAddBtn" onclick="fsAdd()">Add child</button>
+      <div class="fam-msg" id="fsAddMsg"></div>
+      <div class="fam-foot"><a href="#" onclick="fsBack();return false;">← Back to the dashboard</a></div>
     </div>
 
   </div>
 </div>
 
+<!-- ═══ HELP ═══ -->
+<div class="fam-help">
+  <h3>Questions</h3>
+  <details><summary>Where do I find my child's student ID?</summary>
+    <p>It's in the welcome email we sent when your child joined (it looks like <strong>S-0012</strong>). You can also ask us on WhatsApp and we'll tell you.</p></details>
+  <details><summary>Can my child still log in on their own computer?</summary>
+    <p>Yes. Each child keeps their own login — their student ID (or email) and their password. Your family login is for you to see everything in one place.</p></details>
+  <details><summary>I don't know my child's password</summary>
+    <p>No problem — message StemNest Academy on WhatsApp. We can set a new password or create the family login for you.</p></details>
+  <details><summary>Are credits shared between my children?</summary>
+    <p>No, each child keeps their own credit balance. You can see every child's balance from your family login.</p></details>
+</div>
+
+<!-- ═══ FOOTER ═══ -->
+<footer>
+  <div class="footer-top">
+    <div class="footer-brand">
+      <a class="logo" href="../index.html"><img src="../assets/images/logo2.png?v=2" alt="StemNest Academy" class="logo-img"></a>
+      <p>Expert 1-on-1 online tutoring in Coding, Maths and Sciences for students aged 7–19. UK-based, globally trusted.</p>
+      <div class="social-links" style="margin-top:20px;">
+        <a class="social-link" href="https://x.com/StemNestAcademy">𝕏</a><a class="social-link" href="https://www.linkedin.com/company/stemnest-academy">in</a>
+        <a class="social-link" href="https://web.facebook.com/profile.php?id=61582023473392">f</a><a class="social-link" href="https://www.instagram.com/stemnestacademy">▶</a>
+      </div>
+    </div>
+    <div class="footer-col">
+      <h4>Courses</h4>
+      <a href="courses.html">Coding</a>
+      <a href="courses.html">Mathematics</a>
+      <a href="courses.html">Science</a>
+      <a href="courses.html">All Programmes</a>
+    </div>
+    <div class="footer-col">
+      <h4>Company</h4>
+      <a href="about.html">About Us</a>
+      <a href="team.html">Our Team</a>
+      <a href="teach-with-us.html">Teach With Us</a>
+      <a href="faq.html">FAQ</a>
+    </div>
+    <div class="footer-col">
+      <h4>Account</h4>
+      <a href="login.html">Tutor Login</a>
+      <a href="login.html">Student Login</a>
+      <a href="free-trial.html">Book a Demo</a>
+      <a href="join-class.html">Join My Class</a>
+    </div>
+    <div class="footer-col">
+      <h4>Legal</h4>
+      <a href="legal/privacy-policy.html">Privacy Policy</a>
+      <a href="legal/terms-of-use.html">Terms of Use</a>
+      <a href="legal/refund-policy.html">Refund &amp; Cancellation</a>
+      <a href="legal/disclaimer.html">Disclaimer</a>
+      <a href="legal/payment-policy.html">Payment Policy</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="footer-copy">© 2026 StemNest Academy Ltd. Registered in England &amp; Wales. All rights reserved.</div>
+    <div class="footer-badges">
+      <div class="footer-badge">🇬🇧 UK Based</div>
+      <div class="footer-badge">🔒 Safeguarding First</div>
+      <div class="footer-badge">✦ DBS Checked Tutors</div>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/utils.js"></script>
 <script src="../js/api.js"></script>
 <script src="../js/family.js"></script>
 <script>
   var API_BASE = 'https://api.stemnestacademy.co.uk';
-  function msg(id, text, ok) { var el = document.getElementById(id); el.className = 'fs-msg ' + (ok ? 'ok' : 'err'); el.innerHTML = text; }
+  function msg(id, text, ok) { var el = document.getElementById(id); el.className = 'fam-msg ' + (ok ? 'ok' : 'err'); el.innerHTML = text; }
   function val(id) { return (document.getElementById(id).value || '').trim(); }
 
   var params = new URLSearchParams(location.search);
@@ -89,6 +287,7 @@
       localStorage.setItem('sn_parent_user', localStorage.getItem('sn_api_user') || '');
     }
     document.getElementById('registerView').style.display = 'none';
+    var ht = document.getElementById('famHeroTitle'); if (ht) ht.innerHTML = 'Add a <span>Child</span>';
     document.getElementById('addView').style.display = 'block';
   }
 

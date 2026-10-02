@@ -294,6 +294,10 @@ function renderPaidStudents() {
             style="background:#f59e0b;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;">
             ⏸️
           </button>
+          <button title="Set login / reset password" onclick="openSetLogin('${s.studentId}','${(s.studentName||'').replace(/'/g,'')}','student')"
+            style="background:#64748b;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;">
+            🔑
+          </button>
         </div>
       </td>
     </tr>`;
@@ -2516,7 +2520,7 @@ function _renderFamilyList(el, families) {
   el.innerHTML = families.map(f => `
     <div style="background:var(--white);border:1.5px solid #e8eaf0;border-radius:14px;padding:14px 16px;margin-bottom:10px;">
       <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-        <div><div style="font-weight:900;color:var(--dark);">${_escH(f.name)}</div>
+        <div><div style="font-weight:900;color:var(--dark);">${_escH(f.name)} <button onclick="openSetLogin('${f.id}','${_jsArg(f.name)}','parent')" style="background:none;border:1.5px solid #64748b;color:#475569;border-radius:8px;padding:1px 8px;font-family:Nunito,sans-serif;font-weight:800;font-size:11px;cursor:pointer;">🔑 Reset login</button></div>
           <div style="font-size:12px;color:var(--mid);font-weight:700;">${_escH(f.email)}${f.phone ? ' · ' + _escH(f.phone) : ''} · ${f.lastLoginAt ? 'last login ' + fmtDateShort(f.lastLoginAt) : 'not logged in yet'}</div></div>
         <div style="display:flex;gap:6px;align-items:center;">
           <select id="fam-add-${f.id}" style="max-width:200px;padding:7px 10px;border:1.5px solid #e8eaf0;border-radius:8px;font-family:'Nunito',sans-serif;font-size:12px;"><option value="">Add a child…</option>${options}</select>
@@ -2525,6 +2529,7 @@ function _renderFamilyList(el, families) {
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;">
         ${(f.children || []).map(c => `<span style="background:var(--blue-light);color:var(--blue);border-radius:50px;padding:5px 10px;font-size:12px;font-weight:800;">${_escH(c.name)} · ${_escH(c.staffId || '')}
+          <a href="#" title="Set this child's own login" onclick="openSetLogin('${c.id}','${_jsArg(c.name)}','student');return false;" style="text-decoration:none;margin-left:4px;">🔑</a>
           <a href="#" title="Remove from family" onclick="removeChildFromFamily('${f.id}','${c.id}','${_jsArg(c.name)}');return false;" style="color:#c53030;text-decoration:none;margin-left:4px;">✕</a></span>`).join('') || '<span style="font-size:12px;color:var(--light);">No children linked</span>'}
       </div>
     </div>`).join('');
@@ -2548,4 +2553,79 @@ async function removeChildFromFamily(parentId, studentId, name) {
   const token = localStorage.getItem('sn_access_token');
   await fetch(`${API}/api/families/${parentId}/children/${studentId}`, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } });
   renderFamilies();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SET LOGIN / RESET PASSWORD (students and parents)
+═══════════════════════════════════════════════════════════════ */
+let _setLoginUser = null;
+
+/** Open the "Set login" pop-up for a student or parent account. */
+function openSetLogin(userId, name, kind) {
+  _setLoginUser = { id: userId, name, kind: kind || 'student' };
+  document.getElementById('setLoginOverlay')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'setLoginOverlay';
+  ov.className = 'modal-overlay open';
+  ov.style.zIndex = 10002;
+  const css = 'width:100%;box-sizing:border-box;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:Nunito,sans-serif;font-size:14px;font-weight:700;outline:none;';
+  ov.innerHTML = `<div class="modal" style="max-width:460px;"><div class="modal-header"><div class="modal-title">🔑 Set login</div>
+    <button class="modal-close" onclick="closeSetLogin()">✕</button></div><div class="modal-body" id="setLoginBody">
+    <div style="background:var(--blue-light);border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:13px;font-weight:800;color:var(--blue);line-height:1.6;">
+      ${_escH(name)} (${kind === 'parent' ? 'family login' : 'student'}) gets a new password. They will be signed out of any device they are logged in on.
+    </div>
+    <label style="display:flex;gap:8px;align-items:center;font-size:13px;font-weight:800;margin-bottom:10px;cursor:pointer;">
+      <input type="radio" name="sl-mode" value="gen" checked onchange="document.getElementById('sl-pass').style.display='none'"> Generate a password for me
+    </label>
+    <label style="display:flex;gap:8px;align-items:center;font-size:13px;font-weight:800;margin-bottom:8px;cursor:pointer;">
+      <input type="radio" name="sl-mode" value="type" onchange="document.getElementById('sl-pass').style.display='block';document.getElementById('sl-pass').focus()"> Type a password
+    </label>
+    <input id="sl-pass" type="text" placeholder="At least 8 characters" style="${css}display:none;margin-bottom:10px;">
+    <label style="display:flex;gap:8px;align-items:center;font-size:13px;font-weight:800;margin:6px 0 16px;cursor:pointer;">
+      <input type="checkbox" id="sl-email" checked> Email the new login to the ${kind === 'parent' ? 'parent' : 'parent (or student)'}
+    </label>
+    <div style="display:flex;gap:10px;"><button class="btn btn-outline" style="flex:1;" onclick="closeSetLogin()">Cancel</button>
+      <button class="btn btn-primary" id="sl-btn" style="flex:2;" onclick="confirmSetLogin()">🔑 Set new password</button></div>
+  </div></div>`;
+  ov.addEventListener('click', e => { if (e.target === ov) closeSetLogin(); });
+  document.body.appendChild(ov);
+}
+
+function closeSetLogin() { document.getElementById('setLoginOverlay')?.remove(); }
+
+async function confirmSetLogin() {
+  const mode = document.querySelector('input[name="sl-mode"]:checked')?.value;
+  const typed = (document.getElementById('sl-pass')?.value || '').trim();
+  if (mode === 'type' && typed.length < 8) { showToast('The password must be at least 8 characters.', 'warning'); return; }
+  const btn = document.getElementById('sl-btn'); btn.disabled = true; btn.textContent = '⏳ Saving…';
+  try {
+    const res = await fetch(`${API}/api/users/${_setLoginUser.id}/set-password`, {
+      method: 'PUT',
+      headers: { 'Authorization': 'Bearer ' + localStorage.getItem('sn_access_token'), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: mode === 'type' ? typed : undefined, sendEmail: document.getElementById('sl-email').checked }),
+    });
+    const d = await res.json();
+    if (!res.ok || !d.success) throw new Error(d.error || 'Could not set the password');
+    const loginLabel = d.loginType === 'student_id' ? 'Student ID' : 'Email';
+    const wa = `Hello 👋 Here are the StemNest login details for *${d.name}*:\n\n` +
+      `🌐 stemnestacademy.co.uk/pages/login.html\n` +
+      `👤 ${loginLabel}: *${d.loginId}*\n🔑 Password: *${d.password}*\n\n` +
+      (d.loginType === 'student_id' ? `Type the student ID in the "Email Address or Student ID" box.\n` : '') +
+      `You can change the password after logging in (My Profile).\n\nStemNest Academy 💙`;
+    window._setLoginWA = wa;
+    document.getElementById('setLoginBody').innerHTML = `
+      <div style="background:#f0fdf4;border-radius:12px;padding:14px 16px;margin-bottom:12px;">
+        <div style="font-weight:900;color:#065f46;margin-bottom:8px;">✅ New login for ${_escH(d.name)}</div>
+        <div style="font-family:monospace;font-size:15px;line-height:1.8;">${loginLabel}: <strong>${_escH(d.loginId)}</strong><br>Password: <strong>${_escH(d.password)}</strong></div>
+        <div style="font-size:12px;font-weight:700;color:var(--mid);margin-top:8px;">${d.emailedTo ? '📧 Emailed to ' + _escH(d.emailedTo) : '📧 Not emailed — share it yourself.'}</div>
+      </div>
+      <div style="font-size:12px;font-weight:700;color:#b45309;margin-bottom:12px;">Copy it now — the password is not shown again.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-outline" style="flex:1;" onclick="navigator.clipboard.writeText(window._setLoginWA).then(()=>showToast('✅ WhatsApp message copied'))">📋 Copy WhatsApp message</button>
+        <button class="btn btn-primary" style="flex:1;" onclick="closeSetLogin()">Done</button>
+      </div>`;
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error', 8000);
+    btn.disabled = false; btn.textContent = '🔑 Set new password';
+  }
 }

@@ -125,7 +125,7 @@
       kv('Time zone', esc(s.timezone) + (s.timezoneKnown ? '' : ' <span style="font-size:11px;color:#b45309;">(not known — assumed WAT)</span>')) +
       kv('Student\'s time now', '<span id="rt-clock"></span>') +
       kv('Parent', esc(s.parentName)) + kv('Parent email', esc(s.parentEmail)) + kv('Phone', esc(s.phone || s.whatsapp)) +
-      kv('Login', loginEmail) + kv('Family login', fam) + kv('Joined', s.createdAt ? fmtD(String(s.createdAt).slice(0, 10)) : '') +
+      kv('Login', loginEmail + ' <button type="button" onclick="openSetLogin(\'' + s.id + '\',\'' + esc(s.name).replace(/'/g, '') + '\',\'student\')" style="margin-left:4px;background:none;border:1.5px solid #64748b;color:#475569;border-radius:8px;padding:1px 8px;font-family:Nunito,sans-serif;font-weight:800;font-size:11px;cursor:pointer;">🔑 Set login</button>') + kv('Family login', fam) + kv('Joined', s.createdAt ? fmtD(String(s.createdAt).slice(0, 10)) : '') +
       '</div>' +
       (s.paused ? '<div style="margin-top:14px;background:#fed7d7;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:800;color:#c53030;">This student is ' + (s.pauseKind === 'credits' ? 'on hold for credits' : 'paused') + '. Resume them from <a href="#" onclick="showPOSTab(\'pause-resume\');return false;">Pause &amp; Resume</a> (or confirm a payment) instead of rescheduling.</div>' : '') +
       (d.batches.length ? '<div style="margin-top:14px;background:#eef4ff;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:800;color:#1e40af;">👥 Also in group batch ' + d.batches.map(function (b) { return esc(b.batchRef) + ' (' + esc(b.tutorName || '') + ', ' + b.upcoming + ' upcoming)'; }).join(', ') +

@@ -598,4 +598,65 @@ router.put('/:id/update-name', requireAuth, requireRole('admin', 'super_admin', 
   } catch (err) { next(err); }
 });
 
+/* ── PUT /api/users/:id/set-password (admin, super_admin, postsales) ──
+   Give a student or parent a new password: typed by staff or generated.
+   Signs them out everywhere, optionally emails the new login to the parent,
+   and returns it once so staff can share it (e.g. on WhatsApp). Post-Sales
+   may only do this for students and parents. */
+router.put('/:id/set-password', requireAuth, requireRole('admin', 'super_admin', 'postsales'), async (req, res, next) => {
+  try {
+    const typed = String((req.body && req.body.password) || '').trim();
+    const sendEmail = !(req.body && req.body.sendEmail === false);
+    if (typed && typed.length < 8) return res.status(400).json({ success: false, error: 'The password must be at least 8 characters' });
+
+    const r = await pool.query(
+      `SELECT u.id, u.name, u.email, u.role, u.staff_id, u.is_active, sp.parent_email, sp.parent_name
+       FROM users u LEFT JOIN student_profiles sp ON sp.user_id = u.id WHERE u.id = $1`, [req.params.id]);
+    const u = r.rows[0];
+    if (!u) return res.status(404).json({ success: false, error: 'User not found' });
+    const allowed = req.user.role === 'postsales' ? ['student', 'parent'] : ['student', 'parent', 'tutor', 'sales', 'presales', 'postsales', 'operations', 'hr', 'admin'];
+    if (!allowed.includes(u.role)) return res.status(403).json({ success: false, error: 'You cannot change this account\'s password' });
+    if (!u.is_active) return res.status(400).json({ success: false, error: 'This account is deactivated' });
+
+    const password = typed || family.tempPassword();
+    await pool.query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [await bcrypt.hash(password, 12), u.id]);
+    /* Sign them out of every device */
+    await pool.query('UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL', [u.id]).catch(() => {});
+    await pool.query('UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = $1 AND used_at IS NULL', [u.id]).catch(() => {});
+
+    const idLogin = family.isAliasEmail(u.email);
+    const loginId = idLogin ? u.staff_id : u.email;
+    let emailedTo = null;
+    if (sendEmail) {
+      const to = u.role === 'student' ? (u.parent_email || (idLogin ? null : u.email)) : u.email;
+      if (to) {
+        const appUrl = process.env.APP_URL || 'https://stemnestacademy.co.uk';
+        const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+        const who = u.role === 'student' ? `${esc(u.name)}'s` : 'your';
+        await emailSvc.sendEmail({
+          to,
+          subject: u.role === 'student' ? `🔑 ${u.name}'s StemNest login` : '🔑 Your StemNest login',
+          html: `<div style="font-family:Arial,sans-serif;max-width:540px;margin:auto;padding:24px;line-height:1.6;color:#1a202c;">
+            <h2 style="color:#1a56db;">New login details</h2>
+            <p>Hi ${esc(u.role === 'student' ? (u.parent_name || u.name) : u.name)},</p>
+            <p>Here are ${who} new login details for StemNest Academy:</p>
+            <div style="background:#f0f4ff;border-left:4px solid #1a56db;border-radius:10px;padding:16px 20px;margin:16px 0;font-family:monospace;font-size:15px;">
+              <strong>${idLogin ? 'Student ID' : 'Email'}:</strong> ${esc(loginId)}<br>
+              <strong>Password:</strong> ${esc(password)}
+            </div>
+            ${idLogin ? '<p>Type the student ID (for example S-0032) in the "Email Address or Student ID" box on the login page.</p>' : ''}
+            <a href="${appUrl}/pages/login.html" style="display:inline-block;background:#1a56db;color:#fff;text-decoration:none;padding:12px 28px;border-radius:50px;font-weight:700;">Log in →</a>
+            <p style="font-size:13px;color:#718096;margin-top:18px;">You can change the password after logging in (My Profile). If you did not expect this email, please contact support@stemnestacademy.co.uk.</p>
+          </div>`,
+          template: 'password_set_by_staff',
+        }).then(() => { emailedTo = to; })
+          .catch(e => logger.warn(`[SET PASSWORD] Email to ${to} failed: ${e.message}`));
+      }
+    }
+
+    logger.info(`[SET PASSWORD] ${u.role} ${u.staff_id || u.email} by ${req.user.email}${emailedTo ? ' (emailed ' + emailedTo + ')' : ''}`);
+    res.json({ success: true, name: u.name, role: u.role, loginId, loginType: idLogin ? 'student_id' : 'email', password, emailedTo });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;
