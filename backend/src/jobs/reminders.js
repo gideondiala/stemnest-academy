@@ -93,8 +93,15 @@ async function runReminderCheck() {
           logger.warn(`[REMINDERS] ${win.type} email failed for ${booking.id} (${r.email}): ${e.message}`);
         }
       }
-      /* Nothing went out — release the claim so the next check retries */
-      if (!sentAny) await _unclaim(booking.id, win.type);
+      /* Nothing went out — release the claim so the next check retries,
+         but give up after a few tries so a mail outage never floods a parent */
+      if (!sentAny) {
+        const k = booking.id + '|' + win.type;
+        const n = (_failedTries.get(k) || 0) + 1;
+        _failedTries.set(k, n);
+        if (n < MAX_SEND_TRIES) await _unclaim(booking.id, win.type);
+        else logger.warn(`[REMINDERS] Giving up on ${win.type} for ${booking.id} after ${n} failed tries`);
+      }
     }
   } catch (err) {
     logger.error('[REMINDERS] Job error:', err.message);
@@ -249,6 +256,11 @@ function _build30MinEmail({ parentName, studentName, subject, formattedTime, for
 }
 
 /** Atomically record a reminder; true only for the caller that inserted it. */
+/* Failed sends per reminder (this process); cleared daily */
+const MAX_SEND_TRIES = 3;
+const _failedTries = new Map();
+setInterval(() => _failedTries.clear(), 24 * 60 * 60 * 1000).unref();
+
 async function _claim(bookingId, type) {
   try {
     const r = await pool.query(
