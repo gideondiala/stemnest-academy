@@ -14,6 +14,7 @@ const express = require('express');
 const { z }   = require('zod');
 const pool    = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/auth');
+const learning = require('../services/learningService');
 const logger  = require('../utils/logger');
 
 const router = express.Router();
@@ -63,11 +64,39 @@ router.post('/upload', requireAuth, requireRole('admin','super_admin'), async (r
        RETURNING id, pathway_id, grade_number, unit_number, unit_name, total_questions, pass_score`,
       [pathway_id, grade_number, unit_number, unit_name || null,
        questions.length, JSON.stringify(questions),
-       pass_score || 70, req.user.id]
+       pass_score || learning.DEFAULT_PASS, req.user.id]
     );
 
-    logger.info(`[QUIZ] Uploaded ${questions.length} questions for pathway=${pathway_id} grade=${grade_number} unit=${unit_number} by ${req.user.email}`);
-    res.json({ success: true, quiz: result.rows[0] });
+    /* Students who finished this unit in the last 14 days get the new quiz too */
+    let backfilled = 0;
+    try {
+      const bf = await pool.query(
+        `WITH last_lesson AS (
+           SELECT pl.id FROM pathway_lessons pl
+           JOIN pathway_units pu ON pu.id = pl.unit_id
+           JOIN pathway_grades pg ON pg.id = pl.grade_id
+           WHERE pg.pathway_id = $1 AND pg.grade_number = $2 AND pu.unit_number = $3 AND pl.is_active = TRUE
+           ORDER BY pl.lesson_number DESC LIMIT 1
+         ), finished AS (
+           SELECT b.student_id AS sid, b.id AS bid FROM bookings b
+           WHERE b.pathway_lesson_id = (SELECT id FROM last_lesson) AND b.student_id IS NOT NULL
+             AND b.status IN ('completed','partially_completed') AND b.date >= CURRENT_DATE - 14
+           UNION
+           SELECT (a.v)::uuid, b.id FROM bookings b, jsonb_array_elements_text(COALESCE(b.notes->'attendees', '[]'::jsonb)) AS a(v)
+           WHERE b.pathway_lesson_id = (SELECT id FROM last_lesson) AND b.batch_id IS NOT NULL
+             AND b.status IN ('completed','partially_completed') AND b.date >= CURRENT_DATE - 14
+         )
+         INSERT INTO quiz_assignments (student_id, quiz_id, booking_id, due_at)
+         SELECT sid, $4, bid, NOW() + make_interval(days => $5) FROM finished
+         ON CONFLICT (student_id, quiz_id) DO NOTHING
+         RETURNING id`,
+        [pathway_id, grade_number, unit_number, result.rows[0].id, learning.DUE_DAYS]
+      );
+      backfilled = bf.rows.length;
+    } catch (e) { logger.warn('[QUIZ] Backfill failed: ' + e.message); }
+
+    logger.info(`[QUIZ] Uploaded ${questions.length} questions for pathway=${pathway_id} grade=${grade_number} unit=${unit_number} by ${req.user.email}; assigned to ${backfilled} recent finisher(s)`);
+    res.json({ success: true, quiz: result.rows[0], assignedTo: backfilled });
   } catch (err) { next(err); }
 });
 
@@ -202,77 +231,98 @@ router.get('/:id', requireAuth, async (req, res, next) => {
    answers = [0, 2, 1, 3, ...] — one index per question
 ══════════════════════════════════════════════════════ */
 router.post('/:id/attempt', requireAuth, requireRole('student'), async (req, res, next) => {
+  const client = await pool.connect();
   try {
     const { answers } = req.body; // array of selected option indices
-
     if (!Array.isArray(answers)) {
       return res.status(400).json({ success: false, error: 'answers must be an array' });
     }
 
-    /* Fetch quiz with correct answers */
-    const quizResult = await pool.query(
-      'SELECT * FROM unit_quizzes WHERE id = $1',
-      [req.params.id]
-    );
+    await client.query('BEGIN');
+    const quizResult = await client.query('SELECT * FROM unit_quizzes WHERE id = $1', [req.params.id]);
     if (!quizResult.rows.length) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ success: false, error: 'Quiz not found' });
     }
     const quiz = quizResult.rows[0];
     const questions = quiz.questions || [];
 
+    /* The student's assignment for this quiz (created on the spot for quizzes opened directly) */
+    await client.query(
+      `INSERT INTO quiz_assignments (student_id, quiz_id, due_at)
+       VALUES ($1, $2, NOW() + make_interval(days => $3)) ON CONFLICT (student_id, quiz_id) DO NOTHING`,
+      [req.user.id, quiz.id, learning.DUE_DAYS]
+    );
+    const asg = (await client.query(
+      `SELECT * FROM quiz_assignments WHERE student_id = $1 AND quiz_id = $2 FOR UPDATE`, [req.user.id, quiz.id])).rows[0];
+    if (asg.attempts_used >= learning.QUIZ_ATTEMPTS) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ success: false, error: `You have used all ${learning.QUIZ_ATTEMPTS} attempts for this quiz` });
+    }
+
     /* Grade it */
     let correct = 0;
-    questions.forEach((q, i) => {
-      if (answers[i] === q.answer) correct++;
-    });
-
+    questions.forEach((q, i) => { if (answers[i] === q.answer) correct++; });
     const total      = questions.length;
     const percentage = total > 0 ? Math.round((correct / total) * 100 * 100) / 100 : 0;
-    const passed     = percentage >= (quiz.pass_score || 70);
+    const passScore  = quiz.pass_score || learning.DEFAULT_PASS;
+    const late       = !!(asg.due_at && new Date() > new Date(asg.due_at));
+    const points     = learning.penalised(percentage, late);       // out of 100, halved if late
+    const attemptNo  = asg.attempts_used + 1;
+    const improved   = asg.points == null || points > Number(asg.points);
+    const bestPct    = Math.max(Number(asg.best_percentage || 0), percentage);
+    const passedEver = asg.passed || percentage >= passScore;
 
-    /* Save or update attempt */
-    const result = await pool.query(
+    await client.query(
+      `UPDATE quiz_assignments
+       SET attempts_used = $1, last_attempt_at = NOW(), passed = $2, best_percentage = $3,
+           best_score = GREATEST(COALESCE(best_score, 0), $4),
+           points = GREATEST(COALESCE(points, 0), $5)
+       WHERE id = $6`,
+      [attemptNo, passedEver, bestPct, correct, points, asg.id]
+    );
+    /* quiz_attempts keeps the latest attempt (dashboard history) */
+    const result = await client.query(
       `INSERT INTO quiz_attempts
          (quiz_id, student_id, answers, score, total, percentage, passed, submitted_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
        ON CONFLICT (quiz_id, student_id)
-       DO UPDATE SET
-         answers = EXCLUDED.answers,
-         score = EXCLUDED.score,
-         percentage = EXCLUDED.percentage,
-         passed = EXCLUDED.passed,
-         submitted_at = NOW()
-       RETURNING id, score, total, percentage, passed, submitted_at`,
-      [req.params.id, req.user.id, JSON.stringify(answers), correct, total, percentage, passed]
+       DO UPDATE SET answers = EXCLUDED.answers, score = EXCLUDED.score, total = EXCLUDED.total,
+                     percentage = EXCLUDED.percentage, passed = EXCLUDED.passed, submitted_at = NOW()
+       RETURNING id, submitted_at`,
+      [quiz.id, req.user.id, JSON.stringify(answers), correct, total, percentage, percentage >= passScore]
     );
+    await client.query('COMMIT');
 
-    const attempt = result.rows[0];
-
-    logger.info(`[QUIZ] Student ${req.user.email} scored ${correct}/${total} (${percentage}%) on quiz ${req.params.id} — ${passed ? 'PASSED' : 'FAILED'}`);
-
-    /* Return result with per-question breakdown */
+    const attemptsLeft = learning.QUIZ_ATTEMPTS - attemptNo;
+    /* Correct answers are only revealed once the student passes or has no attempts left */
+    const reveal = percentage >= passScore || attemptsLeft === 0;
     const breakdown = questions.map((q, i) => ({
-      idx:      i,
-      q:        q.q,
-      options:  q.options,
-      selected: answers[i],
-      correct:  q.answer,
-      isRight:  answers[i] === q.answer,
+      idx: i, q: q.q, options: q.options, selected: answers[i],
+      isRight: answers[i] === q.answer,
+      ...(reveal ? { correct: q.answer } : {}),
     }));
 
+    logger.info(`[QUIZ] ${req.user.email} attempt ${attemptNo}/${learning.QUIZ_ATTEMPTS}: ${correct}/${total} (${percentage}%)${late ? ' late' : ''} on quiz ${quiz.id}`);
     res.json({
       success: true,
       result: {
-        score:      correct,
-        total,
-        percentage,
-        passed,
+        score: correct, total, percentage,
+        passed: percentage >= passScore, passScore,
+        attempt: attemptNo, attemptsLeft, late,
+        points, bestPoints: Math.max(Number(asg.points || 0), points), improved,
+        answersRevealed: reveal,
         breakdown,
-        attempt_id: attempt.id,
-        submitted_at: attempt.submitted_at,
+        attempt_id: result.rows[0].id,
+        submitted_at: result.rows[0].submitted_at,
       }
     });
-  } catch (err) { next(err); }
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    next(err);
+  } finally {
+    client.release();
+  }
 });
 
 /* ══════════════════════════════════════════════════════

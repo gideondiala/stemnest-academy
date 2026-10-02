@@ -328,7 +328,7 @@ async function submitQuizUpload() {
   const pathwayId  = document.getElementById('quizPathwaySelect')?.value;
   const gradeNum   = parseInt(document.getElementById('quizGradeSelect')?.value);
   const unitNum    = parseInt(document.getElementById('quizUnitSelect')?.value);
-  const passScore  = parseInt(document.getElementById('quizPassScore')?.value) || 70;
+  const passScore  = parseInt(document.getElementById('quizPassScore')?.value) || 60;
 
   if (!pathwayId)       { showToast('Please select a pathway.',     'error'); return; }
   if (!gradeNum)        { showToast('Please select a grade.',       'error'); return; }
@@ -379,4 +379,34 @@ async function submitQuizUpload() {
     if (btn) { btn.disabled = false; btn.textContent = '⬆️ Upload Quiz'; }
     showToast('Network error uploading quiz.', 'error');
   }
+}
+
+/* ── Paste questions (A–D options + "Answer: X") instead of a JSON file ── */
+function parsePastedQuiz() {
+  const text = (document.getElementById('quizPasteBox')?.value || '').replace(/\r/g, '');
+  const blocks = text.split(/\n\s*\n/).map(b => b.trim()).filter(Boolean);
+  const questions = [], errors = [];
+  blocks.forEach((b, i) => {
+    const lines = b.split('\n').map(l => l.trim()).filter(Boolean);
+    const q = (lines[0] || '').replace(/^(Q?\d+[.):]\s*)/i, '').trim();
+    const opts = ['A', 'B', 'C', 'D'].map(letter => {
+      const line = lines.find(l => new RegExp('^' + letter + '[).:\-]\s*', 'i').test(l));
+      return line ? line.replace(new RegExp('^' + letter + '[).:\-]\s*', 'i'), '').trim() : null;
+    });
+    const ans = (lines.find(l => /^answer\s*[:\-]/i.test(l)) || '').replace(/^answer\s*[:\-]\s*/i, '').trim().toUpperCase().charAt(0);
+    const idx = 'ABCD'.indexOf(ans);
+    if (!q) errors.push(`Block ${i + 1}: no question text`);
+    else if (opts.some(o => !o)) errors.push(`Q${i + 1}: needs options A), B), C) and D)`);
+    else if (idx < 0) errors.push(`Q${i + 1}: add a line like "Answer: B"`);
+    else questions.push({ q, options: opts, answer: idx });
+  });
+  if (!blocks.length) { _updateUploadPreview(null, 'Paste at least one question.'); return; }
+  if (errors.length) {
+    _updateUploadPreview(null, 'Please fix:\n• ' + errors.slice(0, 6).join('\n• ') + (errors.length > 6 ? `\n…and ${errors.length - 6} more` : ''));
+    _setUploadBtnState(false);
+    return;
+  }
+  _quizParsedData = { questions };
+  _updateUploadPreview(`✅ ${questions.length} pasted questions are ready. Choose the pathway, grade and unit above, then upload.`, null);
+  _setUploadBtnState(true);
 }

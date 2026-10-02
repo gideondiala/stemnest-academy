@@ -98,6 +98,7 @@
       <a class="sidebar-link"        data-tab="projects"      onclick="showTab('projects')">     <span class="sl-icon">📁</span> My Projects     <span class="sl-badge" id="projBadge">3</span></a>
       <a class="sidebar-link"        data-tab="quizzes"       onclick="showTab('quizzes')">      <span class="sl-icon">🧠</span> My Quizzes      <span class="sl-badge" id="quizBadge">2</span></a>
       <a class="sidebar-link"        data-tab="certificates"  onclick="showTab('certificates')"> <span class="sl-icon">🏆</span> Certificates</a>
+      <a class="sidebar-link"        data-tab="leaderboard"   onclick="showTab('leaderboard')">  <span class="sl-icon">🥇</span> Leaderboard</a>
       <a class="sidebar-link"        data-tab="nest"          onclick="showTab('nest')">          <span class="sl-icon">🪺</span> Learning Nest</a>
       <a class="sidebar-link"        data-tab="payments"      onclick="showTab('payments')">     <span class="sl-icon">💳</span> Credits &amp; Payments</a>
       <a class="sidebar-link"        data-tab="chat"          onclick="showTab('chat')">          <span class="sl-icon">💬</span> Chat with Tutor</a>
@@ -270,6 +271,11 @@
     <!-- ══════════════════════════════════════
          TAB: MY QUIZZES
     ══════════════════════════════════════ -->
+    <div id="tab-leaderboard" style="display:none;">
+      <div class="dash-section-header"><div class="dash-section-title">🥇 Leaderboard</div></div>
+      <div id="leaderboardBody"><div style="padding:24px;color:var(--light);font-weight:700;">⏳ Loading…</div></div>
+    </div>
+
     <div id="tab-quizzes" style="display:none;">
       <div class="dash-section-header">
         <div class="dash-section-title">🧠 My Quizzes</div>
@@ -588,6 +594,7 @@
 <script src="../js/student-dashboard.js"></script>
 <script src="../js/student-upgrades.js"></script>
 <script src="../js/student-pathway.js"></script>
+<script src="../js/student-learning.js"></script>
 <style>
 .proj-toggle-btn {
   padding: 10px 20px;

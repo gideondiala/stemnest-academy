@@ -1849,7 +1849,9 @@ async function openBatchDetail(batchId) {
         <strong>Schedule:</strong> ${formatBatchSchedule(b.schedule)} (WAT)<br>
         <strong>Classes Remaining:</strong> ${data.remainingClasses || 0}<br>
         <strong>Class Link:</strong> ${b.class_link ? `<a href="${_bEsc(b.class_link)}" target="_blank" style="color:var(--blue);">🔗 Open</a>` : '—'}
-        <button onclick="editBatchLink('${batchId}','${_bJs(b.class_link || '')}')" style="margin-left:8px;background:none;border:1.5px solid var(--blue);color:var(--blue);border-radius:8px;padding:2px 10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;">✏️ Edit link</button>
+        <button onclick="editBatchLink('${batchId}','${_bJs(b.class_link || '')}')" style="margin-left:8px;background:none;border:1.5px solid var(--blue);color:var(--blue);border-radius:8px;padding:2px 10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;">✏️ Edit link</button><br>
+        <strong>Next lesson:</strong> ${(data.nextClasses || [])[0] && data.nextClasses[0].lessonNumber ? 'Lesson ' + data.nextClasses[0].lessonNumber : '—'}
+        <button onclick="openBatchStartLesson('${batchId}','${_bJs(b.pathway_id || '')}',${b.grade_number || 'null'},${((data.nextClasses || [])[0] || {}).lessonNumber || 1})" style="margin-left:8px;background:none;border:1.5px solid var(--blue);color:var(--blue);border-radius:8px;padding:2px 10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;">🔢 Change starting lesson</button>
       </div>
       <div style="font-family:'Fredoka One',cursive;font-size:15px;color:var(--dark);margin-bottom:12px;">👩‍🎓 Students (${active.length}/3)</div>
       ${active.length ? active.map(memberCard).join('') : '<div style="font-size:13px;color:var(--light);font-weight:700;margin-bottom:8px;">No students in this batch.</div>'}
@@ -1863,6 +1865,44 @@ async function openBatchDetail(batchId) {
   } catch (err) {
     body.innerHTML = `<div style="padding:24px;color:var(--orange);font-weight:700;">⚠️ ${_bEsc(err.message)}</div>`;
   }
+}
+
+/** Renumber a batch's upcoming classes from lesson N (and set its pathway if it has none). */
+function openBatchStartLesson(batchId, pathwayId, gradeNumber, current) {
+  document.getElementById('bslOverlay')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'bslOverlay';
+  ov.className = 'modal-overlay open';
+  ov.style.zIndex = 10001;
+  const css = 'width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:Nunito,sans-serif;font-size:14px;font-weight:700;outline:none;background:#fff;';
+  ov.innerHTML = `<div class="modal" style="max-width:440px;"><div class="modal-header"><div class="modal-title">🔢 Change starting lesson</div>
+    <button class="modal-close" onclick="document.getElementById('bslOverlay').remove()">✕</button></div><div class="modal-body">
+    <div style="font-size:13px;font-weight:700;color:var(--mid);margin-bottom:14px;line-height:1.6;">The next class will teach this lesson and the rest follow in order. Dates and times stay the same.</div>
+    <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);">PATHWAY</label>
+      <select id="bsl-pathway" style="${css}"><option value="">— Keep as it is —</option>${_allPathways.map(p => `<option value="${p.id}" ${p.id === pathwayId ? 'selected' : ''}>${_bEsc((p.emoji || '') + ' ' + p.name)}</option>`).join('')}</select></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);">GRADE</label><input id="bsl-grade" type="number" min="1" value="${gradeNumber || ''}" style="${css}"></div>
+      <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);">NEXT LESSON *</label><input id="bsl-lesson" type="number" min="1" value="${current || 1}" style="${css}"></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:14px;"><button class="btn btn-outline" style="flex:1;" onclick="document.getElementById('bslOverlay').remove()">Cancel</button>
+    <button class="btn btn-primary" style="flex:2;" onclick="confirmBatchStartLesson('${batchId}','${pathwayId}')">Save</button></div></div></div>`;
+  document.body.appendChild(ov);
+}
+
+async function confirmBatchStartLesson(batchId, oldPathwayId) {
+  const pathwayId = document.getElementById('bsl-pathway').value;
+  const gradeNumber = parseInt(document.getElementById('bsl-grade').value, 10) || null;
+  const lessonNumber = parseInt(document.getElementById('bsl-lesson').value, 10);
+  if (!(lessonNumber >= 1)) { showToast('Enter the lesson number.', 'warning'); return; }
+  const body = { lessonNumber };
+  if (pathwayId && (pathwayId !== oldPathwayId || gradeNumber)) { body.pathwayId = pathwayId; body.gradeNumber = gradeNumber; }
+  if (body.pathwayId && !gradeNumber) { showToast('Enter the grade for this pathway.', 'warning'); return; }
+  const data = await _batchApi('/' + batchId + '/starting-lesson', 'PUT', body);
+  if (data.success) {
+    document.getElementById('bslOverlay')?.remove();
+    showToast(`✅ ${data.batchRef}: the next ${data.classes} classes now run lesson ${data.fromLesson} to ${data.lastLesson}.${data.beyondGrade ? ' ' + data.beyondGrade + ' classes go past the end of the grade.' : ''}`, 'success', 8000);
+    openBatchDetail(batchId); loadBatches();
+  } else showToast('Error: ' + (data.error || 'Unknown'), 'error', 8000);
 }
 
 function closeBatchDetailModal() {
@@ -2053,19 +2093,39 @@ function openCreateBatchModal() {
       ? '<div style="color:var(--light);font-size:13px;font-weight:700;">No students onboarded yet.</div>'
       : _allStudents.map(s => `
         <label style="display:flex;align-items:center;gap:10px;padding:8px 6px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:700;color:var(--dark);">
-          <input type="checkbox" value="${s.studentId}" style="width:16px;height:16px;cursor:pointer;">
+          <input type="checkbox" value="${s.studentId}" onchange="updateBatchProgressHint()" style="width:16px;height:16px;cursor:pointer;">
           ${_bEsc(s.studentName)} <span style="color:var(--light);font-size:11px;">${_bEsc(s.staffId || '')} · ${s.credits || 0} credits</span>
         </label>`).join('');
   }
 
   const startEl = document.getElementById('cb-start-date');
   if (startEl) startEl.value = new Date().toISOString().split('T')[0];
+  const lessonEl = document.getElementById('cb-start-lesson');
+  if (lessonEl) lessonEl.value = 1;
+  updateBatchProgressHint();
 
   const schedEl = document.getElementById('cb-schedule-rows');
   if (schedEl) schedEl.innerHTML = '';
   addBatchSchedRow();
 
   document.getElementById('createBatchOverlay').classList.add('open');
+}
+
+/** Show the selected students' progress and suggest where the batch should start. */
+function updateBatchProgressHint() {
+  const el = document.getElementById('cb-progress');
+  if (!el) return;
+  const ids = Array.from(document.querySelectorAll('#cb-students-list input[type="checkbox"]:checked')).map(cb => cb.value);
+  const picked = _allStudents.filter(s => ids.includes(s.studentId));
+  if (!picked.length) { el.textContent = 'The first class teaches this lesson. Use it when the students have already done some lessons.'; return; }
+  const done = picked.map(s => parseInt(s.lessonsCompleted, 10) || 0);
+  const lines = picked.map((s, i) => `${_bEsc(s.studentName)}: <strong>${done[i]}</strong> lesson${done[i] === 1 ? '' : 's'} done${s.pathwayName ? ' (' + _bEsc(s.pathwayName) + (s.currentGrade ? ' G' + s.currentGrade : '') + ')' : ''}`);
+  const same = done.every(d => d === done[0]);
+  const suggest = Math.min(...done) + 1;
+  el.innerHTML = lines.join(' · ') + '<br>' + (same
+    ? `Suggested start: <strong>lesson ${suggest}</strong>.`
+    : `⚠️ The students are at different points — a batch teaches one lesson at a time. Suggested start: <strong>lesson ${suggest}</strong> (the earliest), or group students who are at the same lesson.`) +
+    ` <a href="#" onclick="document.getElementById('cb-start-lesson').value=${suggest};return false;" style="color:var(--blue);font-weight:900;">Use ${suggest}</a>`;
 }
 
 function closeCreateBatchModal() {
@@ -2081,6 +2141,7 @@ async function confirmCreateBatch() {
   const classLink = (document.getElementById('cb-class-link')?.value || '').trim();
   const startDate = document.getElementById('cb-start-date')?.value;
   const notes     = document.getElementById('cb-notes')?.value;
+  const startingLesson = parseInt(document.getElementById('cb-start-lesson')?.value, 10) || 1;
   const schedule  = collectScheduleRows('cb-schedule-rows');
   const studentIds = Array.from(document.querySelectorAll('#cb-students-list input[type="checkbox"]:checked')).map(cb => cb.value);
 
@@ -2095,7 +2156,7 @@ async function confirmCreateBatch() {
   const btn = document.querySelector('#createBatchOverlay .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Creating…'; }
   try {
-    const data = await _batchApi('', 'POST', { tutorId, pathwayId, gradeNumber: gradeNum, classLink, schedule, startDate, studentIds, notes });
+    const data = await _batchApi('', 'POST', { tutorId, pathwayId, gradeNumber: gradeNum, startingLesson, classLink, schedule, startDate, studentIds, notes });
     if (data.success) {
       showToast(`✅ Batch ${data.batchRef} created with ${data.bookingsCreated} classes — first class ${fmtDateShort(data.firstClass?.d)} at ${fmtTime(data.firstClass?.t)} WAT.`);
       closeCreateBatchModal();

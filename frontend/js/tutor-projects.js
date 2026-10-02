@@ -98,13 +98,16 @@ function _renderTutorProjectsList() {
         <div style="background:var(--white);border:1.5px solid #e8eaf0;border-radius:16px;padding:18px 22px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">
           <div style="flex:1;min-width:200px;">
             <div style="font-weight:900;color:var(--dark);font-size:15px;margin-bottom:4px;">📝 ${p.title || 'Project'}</div>
-            <div style="font-size:13px;font-weight:700;color:var(--mid);margin-bottom:4px;">👤 ${p.student_name || '—'} · ${p.course_name || '—'}</div>
+            <div style="font-size:13px;font-weight:700;color:var(--mid);margin-bottom:4px;">👤 ${p.student_name || '—'}${p.student_staff_id ? ' (' + p.student_staff_id + ')' : ''}${p.lesson_number ? ' · Lesson ' + p.lesson_number : ''}${p.class_date ? ' · class ' + new Date(p.class_date + 'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : ''}</div>
+            ${p.is_late ? '<span style="display:inline-block;background:#fed7d7;color:#c53030;font-size:11px;font-weight:900;padding:2px 9px;border-radius:50px;margin-bottom:4px;">⚠️ Handed in late — half marks</span>' : ''}
+            ${p.submission_note ? `<div style="font-size:12px;color:var(--mid);font-weight:700;margin-top:4px;">💬 ${p.submission_note.replace(/</g,'&lt;')}</div>` : ''}
             ${p.submission ? `
               <div style="margin-top:8px;">
                 <a href="${p.submission}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;background:var(--blue-light);color:var(--blue);text-decoration:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;">
                   🔗 View Submission →
                 </a>
               </div>` : '<div style="font-size:12px;color:var(--light);margin-top:6px;">No submission link</div>'}
+            ${p.status === 'reviewed' ? `<div style="margin-top:6px;font-size:13px;font-weight:900;color:var(--green-dark);">Score ${p.score}/100${p.is_late ? ' → ' + p.points + ' points (late)' : ''}</div>` : ''}
             ${p.status === 'reviewed' && p.remarks ? `
               <div style="margin-top:8px;background:var(--green-light);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--green-dark);font-weight:700;">
                 ✅ Your feedback: "${p.remarks}"
@@ -115,7 +118,7 @@ function _renderTutorProjectsList() {
               ${p.status === 'reviewed' ? '✅ Reviewed' : '⏳ Pending Review'}
             </span>
             ${p.status === 'submitted' ? `
-              <button onclick="openProjectReviewModal('${p.id}','${(p.title||'Project').replace(/'/g,'')}')"
+              <button onclick="openProjectReviewModal('${p.id}','${(p.title||'Project').replace(/'/g,'')}',${p.is_late ? 'true' : 'false'})"
                 style="background:var(--blue);color:#fff;border:none;border-radius:10px;padding:8px 16px;font-family:'Nunito',sans-serif;font-weight:900;font-size:13px;cursor:pointer;white-space:nowrap;">
                 ✏️ Review
               </button>` : ''}
@@ -128,7 +131,7 @@ function _renderTutorProjectsList() {
 }
 
 /* ── Project Review Modal ── */
-function openProjectReviewModal(projectId, projectTitle) {
+function openProjectReviewModal(projectId, projectTitle, isLate) {
   document.getElementById('projReviewOverlay')?.remove();
   const overlay = document.createElement('div');
   overlay.id = 'projReviewOverlay';
@@ -141,12 +144,13 @@ function openProjectReviewModal(projectId, projectTitle) {
       </div>
       <div class="modal-body">
         <div style="font-weight:800;color:var(--dark);font-size:15px;margin-bottom:16px;">📝 ${projectTitle}</div>
+        ${isLate ? '<div style="background:#fed7d7;color:#c53030;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:800;margin-bottom:14px;">⚠️ This was handed in late — the student gets half of the score you give.</div>' : ''}
         <div class="pm-field">
           <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Feedback / Remarks *</label>
           <textarea id="pr-remarks" rows="4" placeholder="Write your feedback for the student..." style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;resize:vertical;"></textarea>
         </div>
         <div class="pm-field" style="margin-top:12px;">
-          <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Score (0–100, optional)</label>
+          <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Score out of 100 *</label>
           <input type="number" id="pr-score" min="0" max="100" placeholder="e.g. 85" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
         </div>
         <div style="display:flex;gap:12px;margin-top:20px;">
@@ -163,12 +167,14 @@ async function submitProjectReview(projectId) {
   const remarks = document.getElementById('pr-remarks')?.value.trim();
   const score   = document.getElementById('pr-score')?.value;
   if (!remarks) { showToast('Please write feedback before submitting.', 'error'); return; }
+  const n = parseInt(score, 10);
+  if (!(n >= 0 && n <= 100)) { showToast('Please give a score between 0 and 100.', 'error'); return; }
   try {
     const token = localStorage.getItem('sn_access_token');
     const res = await fetch(`https://api.stemnestacademy.co.uk/api/projects/${projectId}/review`, {
       method: 'PUT',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ remarks, score: score ? parseInt(score) : null })
+      body: JSON.stringify({ remarks, score: n })
     });
     const data = await res.json();
     document.getElementById('projReviewOverlay')?.remove();

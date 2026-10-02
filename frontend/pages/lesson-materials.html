@@ -274,7 +274,10 @@
     <img src="../assets/images/logo.png" alt="StemNest Academy">
     <span class="topbar-title">StemNest Academy</span>
   </a>
-  <button class="topbar-back" onclick="window.close()">✕ Close</button>
+  <div style="display:flex;gap:8px;">
+    <a class="topbar-back" id="dashLink" href="#" style="text-decoration:none;display:none;">← My dashboard</a>
+    <button class="topbar-back" onclick="window.close()">✕ Close</button>
+  </div>
 </div>
 
 <!-- Main content -->
@@ -310,6 +313,12 @@
       <button class="print-btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
     </div>
 
+    <!-- Teacher notes (tutors only — never sent to students) -->
+    <div class="section-card orange" id="sectionTeacherNotes" style="display:none;">
+      <div class="section-label">🧑‍🏫 Teacher Notes <span style="font-weight:700;text-transform:none;color:#a0aec0;">(only tutors see this)</span></div>
+      <div class="section-content" id="contentTeacherNotes"></div>
+    </div>
+
     <!-- Learning Objectives -->
     <div class="section-card blue" id="sectionObjectives">
       <div class="section-label">🎯 Learning Objectives</div>
@@ -342,11 +351,13 @@
           <div class="task-num">Task 1</div>
           <div class="task-desc" id="task1Desc"><span class="coming-soon">Content coming soon</span></div>
           <a id="task1Link" href="#" target="_blank" class="task-link" style="display:none;">🚀 Open Task 1</a>
+          <div class="work-box" id="work1"></div>
         </div>
         <div class="task-card" id="task2Card">
           <div class="task-num">Task 2</div>
           <div class="task-desc" id="task2Desc"><span class="coming-soon">Content coming soon</span></div>
           <a id="task2Link" href="#" target="_blank" class="task-link" style="display:none;">🚀 Open Task 2</a>
+          <div class="work-box" id="work2"></div>
         </div>
       </div>
     </div>
@@ -364,6 +375,12 @@
           <div class="hw-text" id="hw2Content"><span class="coming-soon">Content coming soon</span></div>
         </div>
       </div>
+    </div>
+
+    <!-- This class's assignment (students) -->
+    <div class="section-card blue" id="sectionAssignment" style="display:none;">
+      <div class="section-label">📝 Your assignment for this lesson</div>
+      <div class="section-content" id="contentAssignment"></div>
     </div>
 
     <!-- Portfolio Save (Grade 1-3 only) -->
@@ -465,7 +482,7 @@ async function loadLesson() {
 
     if (!data.success) {
       if (res.status === 403) {
-        showError('Materials locked 🔒', 'This lesson\'s materials are available after the class is completed. Keep learning!');
+        showError('Materials locked 🔒', data.error || 'This lesson opens when your class starts.');
       } else if (res.status === 404) {
         showError('Lesson not found', 'This lesson does not exist or has been removed.');
       } else {
@@ -529,6 +546,24 @@ async function loadLesson() {
       show('sectionPortfolio');
     }
 
+    /* Teacher notes (the API only sends them to tutors and staff) */
+    if (l.teacher_notes && l.teacher_notes.trim()) {
+      setText('contentTeacherNotes', l.teacher_notes);
+      show('sectionTeacherNotes');
+    }
+
+    /* Back to the right dashboard */
+    const dash = document.getElementById('dashLink');
+    if (dash) {
+      dash.href = data.viewer === 'student' ? '/pages/student-dashboard.html' : '/pages/tutor-dashboard.html';
+      dash.style.display = 'inline-block';
+    }
+
+    /* Work submitted in this class + this lesson's assignment */
+    LM.data = data;
+    renderWork(1); renderWork(2);
+    renderAssignment(data.assignment);
+
     /* ── Show the content ── */
     hide('stateLoading');
     show('lessonContent');
@@ -537,6 +572,82 @@ async function loadLesson() {
     showError('Connection error', 'Could not reach the server. Please check your connection and try again.');
     console.error('[LessonMaterials]', err);
   }
+}
+
+/* ══════════════ Class work (links) ══════════════ */
+const LM = { data: null };
+function lmEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function lmLink(url) {
+  const safe = /^https?:\/\//i.test(url) ? url : '#';
+  return `<a href="${lmEsc(safe)}" target="_blank" rel="noopener" style="color:#1a56db;font-weight:800;word-break:break-all;">${lmEsc(url)}</a>`;
+}
+
+function renderWork(task) {
+  const box = document.getElementById('work' + task);
+  const d = LM.data;
+  if (!box || !d || !d.booking) { if (box) box.innerHTML = ''; return; }
+  const subs = (d.submissions || []).filter(s => s.taskNo === task);
+  const wrap = 'margin-top:14px;border-top:1.5px dashed #e2e8f0;padding-top:12px;font-size:13px;';
+
+  if (d.viewer === 'tutor') {
+    box.innerHTML = `<div style="${wrap}"><div style="font-weight:900;color:#4a5568;margin-bottom:6px;">📥 Students' work (${subs.length})</div>` +
+      (subs.length ? subs.map(s => `<div style="margin-bottom:6px;"><strong>${lmEsc(s.studentName)}:</strong> ${lmLink(s.link)}${s.note ? `<div style="color:#718096;">${lmEsc(s.note)}</div>` : ''}</div>`).join('')
+                   : '<div style="color:#a0aec0;font-weight:700;">Nothing submitted yet.</div>') + '</div>';
+    return;
+  }
+  const mine = subs[0];
+  box.innerHTML = `<div style="${wrap}">
+    <div style="font-weight:900;color:#4a5568;margin-bottom:6px;">📤 Submit your work</div>
+    ${mine ? `<div style="background:#f0fdf4;border-radius:10px;padding:8px 10px;margin-bottom:8px;">✅ Submitted: ${lmLink(mine.link)}${mine.note ? `<div style="color:#718096;">${lmEsc(mine.note)}</div>` : ''}</div>` : ''}
+    <input id="workLink${task}" type="url" placeholder="Paste the link to your work (https://…)" value="${mine ? lmEsc(mine.link) : ''}"
+      style="width:100%;box-sizing:border-box;padding:9px 12px;border:2px solid #e2e8f0;border-radius:10px;font-family:Nunito,sans-serif;font-size:13px;margin-bottom:6px;">
+    <input id="workNote${task}" type="text" placeholder="Note for your tutor (optional)" value="${mine && mine.note ? lmEsc(mine.note) : ''}"
+      style="width:100%;box-sizing:border-box;padding:9px 12px;border:2px solid #e2e8f0;border-radius:10px;font-family:Nunito,sans-serif;font-size:13px;margin-bottom:6px;">
+    <button onclick="submitWork(${task})" id="workBtn${task}" style="background:#1a56db;color:#fff;border:none;border-radius:10px;padding:8px 16px;font-family:Nunito,sans-serif;font-weight:900;font-size:13px;cursor:pointer;">${mine ? 'Update link' : 'Submit link'}</button>
+    <div id="workMsg${task}" style="font-weight:800;margin-top:6px;"></div>
+    <div style="color:#a0aec0;font-size:11px;font-weight:700;margin-top:4px;">Tip: share your Scratch, Replit, Google Drive or Docs link (set to "anyone with the link can view").</div>
+  </div>`;
+}
+
+async function submitWork(task) {
+  const link = (document.getElementById('workLink' + task).value || '').trim();
+  const note = (document.getElementById('workNote' + task).value || '').trim();
+  const msg = document.getElementById('workMsg' + task);
+  const btn = document.getElementById('workBtn' + task);
+  if (!/^https?:\/\/\S+\.\S+/i.test(link)) { msg.style.color = '#c53030'; msg.textContent = 'Please paste a full link starting with https://'; return; }
+  btn.disabled = true; btn.textContent = '⏳ Saving…';
+  try {
+    const res = await fetch(`${API}/api/learning/class-submissions`, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + localStorage.getItem('sn_access_token'), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bookingId: LM.data.booking.id, taskNo: task, link, note }),
+    });
+    const d = await res.json();
+    if (!res.ok || !d.success) throw new Error(d.error || 'Could not save');
+    LM.data.submissions = (LM.data.submissions || []).filter(s => s.taskNo !== task).concat([{ ...d.submission, taskNo: task }]);
+    renderWork(task);
+    const m2 = document.getElementById('workMsg' + task); m2.style.color = '#065f46'; m2.textContent = '✅ Saved — your tutor can see it.';
+  } catch (e) {
+    msg.style.color = '#c53030'; msg.textContent = e.message; btn.disabled = false; btn.textContent = 'Submit link';
+  }
+}
+
+function renderAssignment(a) {
+  if (!a || (LM.data && LM.data.viewer !== 'student')) return;
+  const due = a.dueAt ? new Date(a.dueAt) : null;
+  let line = '';
+  if (a.status === 'reviewed') line = `⭐ Reviewed — score <strong>${a.score}/100</strong>${a.isLate ? ` (late: ${a.points} points)` : ''}${a.remarks ? `<div style="margin-top:6px;color:#4a5568;">“${lmEsc(a.remarks)}”</div>` : ''}`;
+  else if (a.status === 'submitted') line = `✅ Submitted${a.isLate ? ' (late — half marks)' : ''}: ${lmLink(a.submission)} — waiting for your tutor's review.`;
+  else {
+    const ms = due ? due - Date.now() : 0;
+    const days = Math.ceil(Math.abs(ms) / 86400000);
+    line = ms >= 0 ? `⏳ Due ${due.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })} — ${days} day${days === 1 ? '' : 's'} left.`
+                   : `<span style="color:#c53030;">⚠️ Overdue by ${days} day${days === 1 ? '' : 's'} — you can still hand it in for half marks.</span>`;
+  }
+  setText('contentAssignment', '');
+  document.getElementById('contentAssignment').innerHTML = `<div style="font-weight:800;">${lmEsc(a.title)}</div><div style="margin-top:6px;">${line}</div>` +
+    (a.status !== 'reviewed' ? `<a href="/pages/student-dashboard.html#projects" style="display:inline-block;margin-top:10px;background:#1a56db;color:#fff;text-decoration:none;border-radius:10px;padding:8px 16px;font-weight:900;font-size:13px;">Open in My Projects →</a>` : '');
+  show('sectionAssignment');
 }
 
 /* Load on page ready */

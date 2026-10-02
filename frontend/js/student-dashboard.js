@@ -145,14 +145,16 @@ async function _loadStudentFromAPI() {
           submission: p.submission || '',
           remarks:    p.remarks || '',
           score:      p.score,
-          reviewedBy: 'Tutor',
+          reviewedBy: p.tutor_name || 'Tutor',
+          raw:        p,
         };
         if (p.status === 'reviewed')   reviewedProjects.push(proj);
         else if (p.status === 'submitted') submittedProjects.push(proj);
         else pendingProjects.push(proj);
       });
 
-      /* Map quiz attempts from API */
+      /* Unit quizzes assigned to this student (see student-learning.js) */
+      window.QUIZ_ASSIGNMENTS = data.quizAttempts || [];
       pendingQuizzes   = [];
       completedQuizzes = [];
       (data.quizAttempts || []).forEach(a => {
@@ -557,7 +559,7 @@ function setGreeting() {
 }
 
 /* ── TAB SWITCHING ── */
-const ALL_TABS = ['overview','lessons','projects','quizzes','certificates','payments','nest','chat','refer'];
+const ALL_TABS = ['overview','lessons','projects','quizzes','certificates','payments','nest','chat','refer','leaderboard'];
 function showTab(tab) {
   ALL_TABS.forEach(t => {
     const el = document.getElementById('tab-' + t);

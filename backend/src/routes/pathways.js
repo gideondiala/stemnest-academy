@@ -80,8 +80,11 @@ router.get('/units-by-ids', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-/* GET /api/pathways/lesson/:lessonId — fetch single lesson for materials page
-   Accessible to any authenticated user (student, tutor, admin, postsales) */
+/* GET /api/pathways/lesson/:lessonId?bookingId=
+   Staff and tutors see everything (teacher notes included).
+   Students see a lesson only through one of their own classes, from the
+   moment that class starts — without the teacher notes. With a bookingId
+   the work submitted in that class (and its assignment) comes back too. */
 router.get('/lesson/:lessonId', requireAuth, async (req, res, next) => {
   try {
     const result = await pool.query(
@@ -99,7 +102,56 @@ router.get('/lesson/:lessonId', requireAuth, async (req, res, next) => {
       [req.params.lessonId]
     );
     if (!result.rows.length) return res.status(404).json({ success: false, error: 'Lesson not found' });
-    res.json({ success: true, lesson: result.rows[0] });
+    const lesson = result.rows[0];
+    const role = req.user.role;
+    const bookingId = /^[0-9a-f-]{36}$/i.test(String(req.query.bookingId || '')) ? req.query.bookingId : null;
+
+    let booking = null;
+    if (bookingId) {
+      booking = (await pool.query(
+        `SELECT b.id, b.student_id, b.batch_id, b.tutor_id, b.pathway_lesson_id, b.status,
+                to_char(b.date,'YYYY-MM-DD') AS date, to_char(b.time,'HH24:MI') AS time,
+                ((b.date + b.time) <= (NOW() AT TIME ZONE 'Africa/Lagos')) AS started
+         FROM bookings b WHERE b.id = $1`, [bookingId])).rows[0] || null;
+    }
+
+    if (role === 'student') {
+      const mine = booking && booking.pathway_lesson_id === lesson.id && (
+        booking.student_id === req.user.id ||
+        (booking.batch_id && (await pool.query(
+          `SELECT 1 FROM batch_members WHERE batch_id = $1 AND student_id = $2`, [booking.batch_id, req.user.id])).rows.length));
+      if (!mine) return res.status(403).json({ success: false, error: 'This lesson opens from one of your classes.', locked: true });
+      if (!booking.started) return res.status(403).json({ success: false, error: 'Lesson details open when your class starts.', locked: true });
+      delete lesson.teacher_notes;
+    } else if (role === 'parent') {
+      return res.status(403).json({ success: false, error: 'Open the lesson from your child’s dashboard.' });
+    }
+
+    /* Work submitted in this class */
+    let submissions = [], assignment = null;
+    if (booking) {
+      submissions = (await pool.query(
+        `SELECT cs.id, cs.student_id AS "studentId", u.name AS "studentName", cs.task_no AS "taskNo",
+                cs.link, cs.note, cs.created_at AS "createdAt", cs.updated_at AS "updatedAt"
+         FROM class_submissions cs JOIN users u ON u.id = cs.student_id
+         WHERE cs.booking_id = $1 ${role === 'student' ? 'AND cs.student_id = $2' : ''}
+         ORDER BY u.name, cs.task_no`,
+        role === 'student' ? [booking.id, req.user.id] : [booking.id])).rows;
+      if (role === 'student') {
+        assignment = (await pool.query(
+          `SELECT id, title, status, due_at AS "dueAt", submission, is_late AS "isLate", score, points, remarks
+           FROM projects WHERE booking_id = $1 AND student_id = $2`, [booking.id, req.user.id])).rows[0] || null;
+      }
+    }
+
+    res.json({
+      success: true,
+      lesson,
+      viewer: role === 'student' ? 'student' : 'tutor',
+      booking: booking ? { id: booking.id, date: booking.date, time: booking.time, status: booking.status, started: booking.started } : null,
+      submissions,
+      assignment,
+    });
   } catch (err) { next(err); }
 });
 

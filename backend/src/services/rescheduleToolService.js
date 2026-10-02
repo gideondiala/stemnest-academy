@@ -226,6 +226,8 @@ async function studentDetails(studentId) {
       tutor, classLink: s.classLink,
       pattern: derivePattern(s, enrol),
       upcoming: s.rows.length,
+      lessonsLinked: s.rows.filter(r => r.pathway_lesson_id).length,
+      nextLessonNumber: s.rows[0].lesson_number_in_grade || null,
       completed,
       lessonsCompleted: done,
       gradeTotal,
@@ -537,7 +539,88 @@ async function _notify(plan, input, reason) {
   }
 }
 
+/* ══════════════ Link lessons ══════════════ */
+
+/**
+ * Attach pathway lessons to a course's upcoming classes, in order, starting
+ * from `nextLesson`, and record the pathway enrolment (progress tracking).
+ * For classes booked before lessons were linked to classes.
+ */
+async function linkLessons(input, performedBy) {
+  const { studentId, courseKey, pathwayId } = input;
+  const gradeNumber = parseInt(input.gradeNumber, 10);
+  const nextLesson  = parseInt(input.nextLesson, 10);
+  if (!pathwayId) throw httpError(400, 'Choose the pathway');
+  if (!(gradeNumber >= 1)) throw httpError(400, 'Choose the grade');
+  if (!(nextLesson >= 1)) throw httpError(400, 'Enter the lesson number the next class should teach');
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const series = (await loadSeries(client, studentId, { lock: true })).find(s => s.key === courseKey);
+    if (!series) throw httpError(404, 'That course has no upcoming classes');
+    const pw = (await client.query('SELECT id, name FROM pathways WHERE id = $1', [pathwayId])).rows[0];
+    if (!pw) throw httpError(404, 'Pathway not found');
+    const all = await _gradeLessons(client, pathwayId, gradeNumber);
+    if (!all.length) throw httpError(400, `${pw.name} Grade ${gradeNumber} has no lessons yet`);
+    const lessons = all.filter(l => l.lesson_number >= nextLesson);
+    if (!lessons.length) throw httpError(400, `Grade ${gradeNumber} has only ${all.length} lessons`);
+
+    /* The enrolment this course belongs to */
+    let enrolmentId = series.enrolmentId;
+    const enrolFields = [pathwayId, gradeNumber, nextLesson - 1, all.length];
+    if (!enrolmentId) {
+      const ex = (await client.query(
+        `SELECT id FROM enrolments WHERE student_id = $1 AND pathway_id = $2 AND status IN ('active','paused')
+         ORDER BY created_at DESC LIMIT 1`, [studentId, pathwayId])).rows[0];
+      enrolmentId = ex ? ex.id : null;
+    }
+    if (enrolmentId) {
+      await client.query(
+        `UPDATE enrolments SET pathway_id = $1, current_grade = $2, lessons_completed = $3, total_lessons = $4,
+                tutor_id = COALESCE(tutor_id, $5), class_link = COALESCE(NULLIF(class_link, ''), $6), updated_at = NOW()
+         WHERE id = $7`, [...enrolFields, series.tutorId, series.classLink, enrolmentId]);
+    } else {
+      enrolmentId = (await client.query(
+        `INSERT INTO enrolments (student_id, pathway_id, current_grade, lessons_completed, total_lessons,
+                                 tutor_id, schedule, class_link, start_date, status, created_at, updated_at)
+         VALUES ($5, $1, $2, $3, $4, $6, $7, $8, $9::date, 'active', NOW(), NOW()) RETURNING id`,
+        [...enrolFields, studentId, series.tutorId, JSON.stringify(derivePattern(series, null)),
+         series.classLink, series.rows[0].d])).rows[0].id;
+    }
+
+    let linked = 0;
+    for (let i = 0; i < series.rows.length; i++) {
+      const l = lessons[i] || null;
+      const num = l ? l.lesson_number : (lessons[lessons.length - 1].lesson_number + (i - lessons.length + 1));
+      await client.query(
+        `UPDATE bookings SET enrolment_id = $1, pathway_lesson_id = $2, lesson_number_in_grade = $3,
+                lesson_name = $4, grade = $5,
+                notes = COALESCE(notes, '{}'::jsonb) || jsonb_build_object(
+                  'pathwayId', $6::text, 'gradeNumber', $7::int, 'lessonNumber', $3::int,
+                  'lessonTitle', $8::text, 'course', $9::text, 'totalLessons', $10::int)
+         WHERE id = $11`,
+        [enrolmentId, l ? l.id : null, num, l ? l.title : `${pw.name} — Lesson ${num}`, `Grade ${gradeNumber}`,
+         pathwayId, gradeNumber, l ? l.title : '', pw.name, all.length, series.rows[i].id]);
+      if (l) linked++;
+    }
+    await client.query('COMMIT');
+    logger.info(`[RESCHEDULE-TOOL] Linked ${linked}/${series.rows.length} classes of ${studentId} to ${pw.name} G${gradeNumber} from lesson ${nextLesson} by ${performedBy.email}`);
+    return {
+      success: true, linked, classes: series.rows.length, pathway: pw.name, gradeNumber,
+      fromLesson: nextLesson, toLesson: nextLesson + series.rows.length - 1,
+      beyondGrade: Math.max(0, series.rows.length - lessons.length),
+    };
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 module.exports = {
+  linkLessons,
   REQUESTERS, searchStudents, studentDetails, buildPlan, planForClient, applyReschedule,
   _internals: { generateSlots, normaliseSchedule, derivePattern },
 };

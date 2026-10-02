@@ -18,6 +18,7 @@ const { requireAuth, requireRole } = require('../middleware/auth');
 const notify   = require('../services/notificationService');
 const rescheduleSvc = require('../services/rescheduleService');
 const pauseSvc = require('../services/pauseService');
+const learningSvc = require('../services/learningService');
 const logger   = require('../utils/logger');
 
 const router = express.Router();
@@ -1411,6 +1412,9 @@ async function chargeStudentForClass(studentId, booking, bookingNotes) {
   } catch (progressErr) {
     logger.warn('[PROGRESS] Lesson tracking failed (non-fatal):', progressErr.message);
   }
+
+  /* The lesson's assignment, and the unit quiz after a unit's last lesson */
+  await learningSvc.assignAfterClass(studentId, booking);
 
   /* Fetch current credits before deduction */
   const credBefore = await pool.query(

@@ -153,7 +153,13 @@
           c.upcoming + ' upcoming · ' + c.completed + ' completed · lessons ' + c.lessonsCompleted + '/' + c.gradeTotal + ' done' +
           (c.notYetBooked ? ' · <span style="color:#b45309;">' + c.notYetBooked + ' not yet booked</span>' : '') +
           '<br>Next class: ' + esc(fmtD(c.nextClass.date)) + ' ' + esc(t12(c.nextClass.time)) + ' WAT' + (classLocal(c.nextClass.date, c.nextClass.time) ? ' (' + esc(classLocal(c.nextClass.date, c.nextClass.time)) + ' student)' : '') +
-          ' · last: ' + esc(fmtD(c.lastClass.date)) + '</div></label>';
+          ' · last: ' + esc(fmtD(c.lastClass.date)) +
+          (c.lessonsLinked < c.upcoming
+            ? '<div style="margin-top:6px;background:#fff8e1;border-radius:8px;padding:6px 10px;color:#92400e;">⚠️ ' + (c.upcoming - c.lessonsLinked) + ' of ' + c.upcoming + ' upcoming classes have no lesson attached — the tutor and student cannot open the lesson details. ' +
+              '<button type="button" onclick="event.preventDefault();RescheduleTool.openLink(\'' + esc(c.key) + '\')" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:4px 10px;font-family:Nunito,sans-serif;font-weight:900;font-size:12px;cursor:pointer;">🔗 Link lessons</button></div>'
+            : '<div style="margin-top:4px;color:#065f46;">✅ Lessons linked' + (c.nextLessonNumber ? ' · next class is lesson ' + c.nextLessonNumber : '') + ' <a href="#" onclick="event.preventDefault();RescheduleTool.openLink(\'' + esc(c.key) + '\')" style="color:var(--blue);">change</a></div>') +
+          '<div id="rt-link-' + esc(c.key).replace(/[^a-zA-Z0-9]/g, '') + '"></div>' +
+          '</div></label>';
       }).join(''));
       if (st.course && !s.paused) html += formHtml();
     }
@@ -382,7 +388,41 @@
     }
   }
 
+  /* ══════════════ Link lessons ══════════════ */
+  function linkBoxId(key) { return 'rt-link-' + String(key).replace(/[^a-zA-Z0-9]/g, ''); }
+  function openLink(key) {
+    var c = st.data.courses.find(function (x) { return x.key === key; });
+    if (!st.course || st.course.key !== key) { st.course = c; st.preview = null; render(); }
+    var box = $(linkBoxId(key)); if (!c || !box) return;
+    var pws = (typeof _allPathways !== 'undefined' ? _allPathways : []);
+    box.innerHTML = '<div style="margin-top:10px;background:#fff;border:1.5px solid #e8eaf0;border-radius:10px;padding:12px;" onclick="if(event.target===this){event.preventDefault();}event.stopPropagation()">' +
+      '<div style="font-size:12px;font-weight:800;color:var(--mid);margin-bottom:8px;">Attach lessons to the ' + c.upcoming + ' upcoming classes, in order. Progress tracking starts from here.</div>' +
+      '<div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:end;">' +
+      '<div><div style="font-size:11px;font-weight:900;color:var(--mid);">PATHWAY</div><select id="rtl-pw" onchange="RescheduleTool.linkGrades()" style="' + inputCss + '"><option value="">— choose —</option>' +
+        pws.map(function (p) { return '<option value="' + esc(p.id) + '" ' + (p.id === c.pathwayId ? 'selected' : '') + '>' + esc((p.emoji || '') + ' ' + p.name) + '</option>'; }).join('') + '</select></div>' +
+      '<div><div style="font-size:11px;font-weight:900;color:var(--mid);">GRADE</div><select id="rtl-grade" style="' + inputCss + '"></select></div>' +
+      '<div><div style="font-size:11px;font-weight:900;color:var(--mid);">NEXT LESSON</div><input id="rtl-next" type="number" min="1" value="' + (c.nextLessonNumber || (c.lessonsCompleted || 0) + 1) + '" style="' + inputCss + '"></div>' +
+      '<button type="button" onclick="RescheduleTool.saveLink(\'' + esc(key) + '\')" style="' + btnBlue + '">Save</button></div>' +
+      '<div style="font-size:11px;color:var(--light);font-weight:700;margin-top:6px;">"Next lesson" = the lesson the student\'s next class should teach (e.g. 4 if they have done 3).</div></div>';
+    linkGrades(c.gradeNumber);
+  }
+  function linkGrades(preselect) {
+    var pw = $('rtl-pw') && $('rtl-pw').value, sel = $('rtl-grade'); if (!sel) return;
+    var grades = (typeof _allGrades !== 'undefined' ? _allGrades : []).filter(function (g) { return g.pathway_id === pw; }).sort(function (a, b) { return a.grade_number - b.grade_number; });
+    sel.innerHTML = grades.map(function (g) { return '<option value="' + g.grade_number + '" ' + (+preselect === g.grade_number ? 'selected' : '') + '>Grade ' + g.grade_number + (parseInt(g.lesson_count) ? ' (' + g.lesson_count + ')' : '') + '</option>'; }).join('') || '<option value="">—</option>';
+  }
+  async function saveLink(key) {
+    var body = { studentId: st.data.student.id, courseKey: key, pathwayId: $('rtl-pw').value, gradeNumber: $('rtl-grade').value, nextLesson: $('rtl-next').value };
+    if (!body.pathwayId) { showToast('Choose the pathway.', 'warning'); return; }
+    try {
+      var r = await api('/link-lessons', 'POST', body);
+      showToast('✅ ' + r.linked + ' classes linked to ' + r.pathway + ' Grade ' + r.gradeNumber + ' (lessons ' + r.fromLesson + '–' + r.toLesson + ').' + (r.beyondGrade ? ' ' + r.beyondGrade + ' classes go past the end of the grade.' : ''), 'success', 9000);
+      await load(st.data.student.id);
+    } catch (e) { showToast('Error: ' + e.message, 'error', 8000); }
+  }
+
   window.RescheduleTool = {
+    openLink: openLink, linkGrades: linkGrades, saveLink: saveLink,
     init: init, search: search, load: load, pickCourse: pickCourse, addRow: addRow,
     dirty: dirty, reasonCount: reasonCount, runPreview: runPreview, useTime: useTime, apply: apply,
   };

@@ -44,4 +44,9 @@ router.post('/apply', async (req, res, next) => {
   catch (err) { fail(res, next, err); }
 });
 
+router.post('/link-lessons', async (req, res, next) => {
+  try { res.json(await svc.linkLessons(req.body || {}, req.user)); }
+  catch (err) { fail(res, next, err); }
+});
+
 module.exports = router;

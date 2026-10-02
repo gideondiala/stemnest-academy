@@ -195,11 +195,11 @@ async function checkStudentsAvailable(client, studentIds, exceptBatchId = null) 
 }
 
 /** Insert one shared booking per slot, carrying lesson rows in order. */
-async function insertBatchBookings(client, { batch, tutorId, tutorName, classLink, dates, lessons }) {
+async function insertBatchBookings(client, { batch, tutorId, tutorName, classLink, dates, lessons, startNumber = 1 }) {
   const gradeLabel = batch.grade_number ? `Grade ${batch.grade_number}` : 'Group';
   for (let i = 0; i < dates.length; i++) {
     const l = lessons[i] || {};
-    const lessonNum = l.lesson_number_in_grade || (i + 1);
+    const lessonNum = l.lesson_number_in_grade || (startNumber + i);
     await client.query(
       `INSERT INTO bookings
          (subject, grade, date, time, class_link, status, is_demo,
@@ -244,8 +244,10 @@ router.post('/', requireAuth, requireRole(...STAFF), tx(async (client, req) => {
   const tutor = await loadTutor(client, tutorId);
   await checkStudentsAvailable(client, studentIds);
 
-  const lessons = await pathwayLessons(client, pathwayId, gradeNumber, parseInt(startingLesson, 10) || 1);
-  const dates   = generateDates(startDate, schedule, lessons.length || 72);
+  const startNumber = Math.max(1, parseInt(startingLesson, 10) || 1);
+  const lessons = await pathwayLessons(client, pathwayId, gradeNumber, startNumber);
+  if (pathwayId && gradeNumber && !lessons.length) throw new HttpError(400, `This grade has no lessons from lesson ${startNumber} onwards`);
+  const dates   = generateDates(startDate, schedule, lessons.length || Math.max(1, 72 - (startNumber - 1)));
 
   const clash = await findClash(client, { tutorId, slots: dates, studentIds });
   if (clash) throw clashError(clash);
@@ -262,7 +264,7 @@ router.post('/', requireAuth, requireRole(...STAFF), tx(async (client, req) => {
   for (const sid of studentIds) {
     await client.query(`INSERT INTO batch_members (batch_id, student_id) VALUES ($1, $2)`, [batch.id, sid]);
   }
-  await insertBatchBookings(client, { batch, tutorId, tutorName: tutor.name, classLink, dates, lessons });
+  await insertBatchBookings(client, { batch, tutorId, tutorName: tutor.name, classLink, dates, lessons, startNumber });
 
   logger.info(`[BATCH] Created ${batchRef} (${studentIds.length} students, ${dates.length} classes) by ${req.user.email}`);
   return { _status: 201, success: true, batchId: batch.id, batchRef, bookingsCreated: dates.length, firstClass: dates[0] };
@@ -374,6 +376,45 @@ router.put('/:id', requireAuth, requireRole(...STAFF), tx(async (client, req) =>
   }
   logger.info(`[BATCH] ${batch.batch_ref} edited by ${req.user.email}`);
   return { success: true };
+}));
+
+/* ══════════════════════════════════════════════
+   PUT /api/batches/:id/starting-lesson — { lessonNumber }
+   Renumbers the batch's upcoming classes so the next one is lesson N,
+   each linked to its pathway lesson. Dates and times are unchanged.
+══════════════════════════════════════════════ */
+router.put('/:id/starting-lesson', requireAuth, requireRole(...STAFF), tx(async (client, req) => {
+  const n = parseInt(req.body && req.body.lessonNumber, 10);
+  if (!(n >= 1)) throw new HttpError(400, 'Enter the lesson number the next class should teach');
+  let batch = await loadBatch(client, req.params.id, { lock: true });
+  /* Optionally set the pathway + grade at the same time (batches created without one) */
+  const { pathwayId, gradeNumber } = req.body || {};
+  if (pathwayId) {
+    const g = parseInt(gradeNumber, 10);
+    if (!(g >= 1)) throw new HttpError(400, 'Choose the grade for this pathway');
+    await client.query(`UPDATE batches SET pathway_id = $1, grade_number = $2, updated_at = NOW() WHERE id = $3`, [pathwayId, g, batch.id]);
+    await client.query(`UPDATE bookings SET grade = $1 WHERE batch_id = $2 AND status = 'scheduled' AND date >= $3::date`, [`Grade ${g}`, batch.id, _todayWAT()]);
+    batch = await loadBatch(client, batch.id);
+  }
+  const classes = await futureClasses(client, batch.id, _todayWAT(), { lock: true });
+  if (!classes.length) throw new HttpError(400, 'This batch has no upcoming classes');
+  const lessons = await pathwayLessons(client, batch.pathway_id, batch.grade_number, n);
+  if (batch.pathway_id && batch.grade_number && !lessons.length) throw new HttpError(400, `This grade has no lesson ${n}`);
+
+  for (let i = 0; i < classes.length; i++) {
+    const l = lessons[i] || null;
+    const num = l ? l.lesson_number_in_grade : n + i;
+    await client.query(
+      `UPDATE bookings SET pathway_lesson_id = $1, lesson_number_in_grade = $2, lesson_name = $3 WHERE id = $4`,
+      [l ? l.pathway_lesson_id : null, num, l ? l.lesson_name : `Lesson ${num}`, classes[i].id]
+    );
+  }
+  const beyond = lessons.length && classes.length > lessons.length ? classes.length - lessons.length : 0;
+  logger.info(`[BATCH] ${batch.batch_ref} renumbered from lesson ${n} (${classes.length} classes) by ${req.user.email}`);
+  return {
+    success: true, batchRef: batch.batch_ref, classes: classes.length, fromLesson: n,
+    lastLesson: n + classes.length - 1, beyondGrade: beyond,
+  };
 }));
 
 /* ══════════════════════════════════════════════

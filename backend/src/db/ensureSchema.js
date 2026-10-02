@@ -132,6 +132,49 @@ const STATEMENTS = [
    )`,
   `CREATE INDEX IF NOT EXISTS idx_reschedule_log_student ON reschedule_log(student_id)`,
 
+  /* ── Lesson assignments (projects): one per student per class, due 7 days later ── */
+  `ALTER TABLE projects ADD COLUMN IF NOT EXISTS booking_id       UUID REFERENCES bookings(id) ON DELETE SET NULL`,
+  `ALTER TABLE projects ADD COLUMN IF NOT EXISTS lesson_id        UUID REFERENCES pathway_lessons(id) ON DELETE SET NULL`,
+  `ALTER TABLE projects ADD COLUMN IF NOT EXISTS kind             VARCHAR(20) DEFAULT 'manual'`,
+  `ALTER TABLE projects ADD COLUMN IF NOT EXISTS due_at           TIMESTAMPTZ`,
+  `ALTER TABLE projects ADD COLUMN IF NOT EXISTS submission_note  TEXT`,
+  `ALTER TABLE projects ADD COLUMN IF NOT EXISTS is_late          BOOLEAN DEFAULT FALSE`,
+  `ALTER TABLE projects ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_student_booking ON projects(student_id, booking_id) WHERE booking_id IS NOT NULL`,
+  `CREATE INDEX IF NOT EXISTS idx_projects_tutor_status ON projects(tutor_id, status)`,
+
+  /* ── Unit quizzes assigned to a student when a unit is finished: 3 attempts, best counts ── */
+  `CREATE TABLE IF NOT EXISTS quiz_assignments (
+     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     student_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     quiz_id          UUID NOT NULL REFERENCES unit_quizzes(id) ON DELETE CASCADE,
+     booking_id       UUID REFERENCES bookings(id) ON DELETE SET NULL,
+     assigned_at      TIMESTAMPTZ DEFAULT NOW(),
+     due_at           TIMESTAMPTZ,
+     attempts_used    INTEGER DEFAULT 0,
+     best_score       INTEGER,
+     best_percentage  NUMERIC(5,2),
+     points           NUMERIC(6,2) DEFAULT 0,
+     passed           BOOLEAN DEFAULT FALSE,
+     last_attempt_at  TIMESTAMPTZ,
+     reminder_sent_at TIMESTAMPTZ,
+     UNIQUE (student_id, quiz_id)
+   )`,
+
+  /* ── Work students submit during class (links only) ── */
+  `CREATE TABLE IF NOT EXISTS class_submissions (
+     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     booking_id  UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+     lesson_id   UUID REFERENCES pathway_lessons(id) ON DELETE SET NULL,
+     student_id  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     task_no     INTEGER NOT NULL,
+     link        TEXT NOT NULL,
+     note        TEXT,
+     created_at  TIMESTAMPTZ DEFAULT NOW(),
+     updated_at  TIMESTAMPTZ DEFAULT NOW(),
+     UNIQUE (booking_id, student_id, task_no)
+   )`,
+
   /* ── Referrals ── */
   `CREATE TABLE IF NOT EXISTS referrals (
      id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),

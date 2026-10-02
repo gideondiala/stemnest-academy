@@ -590,11 +590,16 @@ router.get('/dashboard/:role', requireAuth, async (req, res, next) => {
                     FROM users u
                     LEFT JOIN student_profiles sp ON sp.user_id = u.id
                     WHERE u.id = $1`, [userId]),
-        pool.query(`SELECT p.id, p.title, p.brief, p.due_date, p.status,
-                           p.submission, p.remarks, p.score, p.submitted_at, p.reviewed_at,
-                           c.name AS course_name
+        pool.query(`SELECT p.id, p.title, p.brief, p.due_date, p.due_at, p.status, p.kind,
+                           p.submission, p.submission_note, p.remarks, p.score, p.points, p.is_late,
+                           p.submitted_at, p.reviewed_at, p.booking_id, p.lesson_id,
+                           COALESCE(pw.name, c.name) AS course_name, pl.lesson_number, u_t.name AS tutor_name
                     FROM projects p
                     LEFT JOIN courses c ON c.id = p.course_id
+                    LEFT JOIN pathway_lessons pl ON pl.id = p.lesson_id
+                    LEFT JOIN pathway_grades pgx ON pgx.id = pl.grade_id
+                    LEFT JOIN pathways pw ON pw.id = pgx.pathway_id
+                    LEFT JOIN users u_t ON u_t.id = p.tutor_id
                     WHERE p.student_id = $1
                     ORDER BY p.created_at DESC LIMIT 100`, [userId]).catch(() => ({ rows: [] })),
         pool.query(`SELECT e.*,
@@ -608,16 +613,18 @@ router.get('/dashboard/:role', requireAuth, async (req, res, next) => {
                                                 AND pg.grade_number = e.current_grade
                     WHERE e.student_id = $1
                     ORDER BY e.created_at DESC`, [userId]).catch(() => ({ rows: [] })),
-        /* Quiz attempts — for the student's quizzes tab */
-        pool.query(`SELECT qa.id, qa.score, qa.total, qa.percentage, qa.passed,
-                           qa.submitted_at, qa.quiz_id,
-                           uq.unit_name, uq.grade_number, uq.unit_number, uq.pass_score,
+        /* Unit quizzes assigned to the student (3 attempts, best counts) with their latest attempt */
+        pool.query(`SELECT qas.quiz_id, qas.assigned_at, qas.due_at, qas.attempts_used, qas.best_score,
+                           qas.best_percentage, qas.points, qas.passed AS ever_passed, qas.last_attempt_at,
+                           qa.score, qa.total, qa.percentage, qa.passed, qa.submitted_at,
+                           uq.unit_name, uq.grade_number, uq.unit_number, uq.pass_score, uq.total_questions,
                            p.name AS pathway_name
-                    FROM quiz_attempts qa
-                    JOIN unit_quizzes uq ON uq.id = qa.quiz_id
+                    FROM quiz_assignments qas
+                    JOIN unit_quizzes uq ON uq.id = qas.quiz_id
+                    LEFT JOIN quiz_attempts qa ON qa.quiz_id = qas.quiz_id AND qa.student_id = qas.student_id
                     LEFT JOIN pathways p ON p.id = uq.pathway_id
-                    WHERE qa.student_id = $1
-                    ORDER BY qa.submitted_at DESC`, [userId]).catch(() => ({ rows: [] })),
+                    WHERE qas.student_id = $1
+                    ORDER BY qas.assigned_at DESC`, [userId]).catch(() => ({ rows: [] })),
         /* Certificates earned */
         pool.query(`SELECT c.id, c.pathway_name, c.grade_number, c.grade_name,
                            c.issued_at, c.certificate_url
