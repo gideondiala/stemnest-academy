@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="../assets/icons/icon.png">
+  <title>Chat Monitor – StemNest Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/global.css">
+  <script src="../js/auth-guard.js" data-roles="admin,super_admin"></script>
+  <style>
+    body { background: var(--bg); font-family: 'Nunito', sans-serif; margin: 0; }
+    .top { background: #fff; border-bottom: 1.5px solid #e8eaf0; padding: 14px 5%; display: flex; justify-content: space-between; align-items: center; }
+    .top h1 { font-family: 'Fredoka One', cursive; font-size: 24px; margin: 0; }
+    .wrap { max-width: 1200px; margin: 20px auto 60px; padding: 0 5%; display: grid; grid-template-columns: 340px 1fr; gap: 14px; }
+    .panel { background: #fff; border: 1.5px solid #e8eaf0; border-radius: 16px; overflow: hidden; }
+    .row { padding: 12px 14px; border-bottom: 1px solid #f1f3f8; cursor: pointer; }
+    .row:hover, .row.on { background: var(--blue-light); }
+    @media (max-width: 800px) { .wrap { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<div class="top"><h1>💬 Chat Monitor</h1><a href="admin-dashboard.html" style="font-weight:800;color:var(--blue);text-decoration:none;">← Admin</a></div>
+<div style="max-width:1200px;margin:16px auto 0;padding:0 5%;font-size:13px;font-weight:700;color:var(--mid);">
+  Read-only view of every student–tutor conversation, for safeguarding. Reading here does not mark messages as read.
+  <input id="q" placeholder="Filter by student or tutor…" oninput="renderList()" style="margin-left:10px;padding:7px 12px;border:2px solid #e8eaf0;border-radius:10px;font-family:Nunito,sans-serif;font-weight:700;">
+</div>
+<div class="wrap">
+  <div class="panel"><div id="list" style="max-height:640px;overflow-y:auto;">⏳ Loading…</div></div>
+  <div class="panel" style="display:flex;flex-direction:column;">
+    <div id="head" style="padding:12px 16px;border-bottom:1px solid #f1f3f8;font-weight:900;">Choose a conversation</div>
+    <div id="body" style="flex:1;overflow-y:auto;padding:14px 16px;max-height:600px;background:#fafbff;"></div>
+  </div>
+</div>
+<script>
+const API = 'https://api.stemnestacademy.co.uk/api/chat';
+const H = { 'Authorization': 'Bearer ' + localStorage.getItem('sn_access_token') };
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const linkify = s => esc(s).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+let threads = [], current = null;
+
+async function load() {
+  const r = await fetch(API + '/threads', { headers: H }); const d = await r.json();
+  if (!d.success) { document.getElementById('list').innerHTML = '<div style="padding:14px;color:#c53030;font-weight:800;">' + esc(d.error) + '</div>'; return; }
+  threads = d.threads; renderList();
+}
+function renderList() {
+  const f = (document.getElementById('q').value || '').toLowerCase();
+  const list = threads.filter(t => !f || (t.studentName + ' ' + t.tutorName + ' ' + (t.studentStaffId || '')).toLowerCase().includes(f));
+  document.getElementById('list').innerHTML = list.length ? list.map((t, i) => `<div class="row ${current === t ? 'on' : ''}" onclick="openThread(${threads.indexOf(t)})">
+      <div style="font-weight:900;font-size:14px;">${esc(t.studentName)} <span style="color:var(--light);font-size:12px;">${esc(t.studentStaffId || '')}</span> ⇄ ${esc(t.tutorName)}</div>
+      <div style="font-size:12px;color:var(--light);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(t.lastText || '')}</div>
+      <div style="font-size:11px;color:var(--mid);font-weight:800;">${t.messages} messages · ${new Date(t.lastAt).toLocaleString('en-GB')}${t.unreadByTutor ? ' · <span style="color:#e53e3e;">' + t.unreadByTutor + ' unread by tutor</span>' : ''}</div></div>`).join('')
+    : '<div style="padding:16px;color:var(--light);font-weight:700;">No conversations yet.</div>';
+}
+async function openThread(i) {
+  current = threads[i]; renderList();
+  document.getElementById('head').innerHTML = esc(current.studentName) + ' ⇄ ' + esc(current.tutorName);
+  const r = await fetch(`${API}/messages?studentId=${current.studentId}&tutorId=${current.tutorId}`, { headers: H }); const d = await r.json();
+  const body = document.getElementById('body');
+  body.innerHTML = (d.messages || []).map(m => {
+    const tutor = m.senderRole === 'tutor';
+    return `<div style="display:flex;justify-content:${tutor ? 'flex-start' : 'flex-end'};margin-bottom:10px;"><div style="max-width:78%;background:${tutor ? '#fff' : 'var(--blue-light)'};border:1.5px solid #e8eaf0;border-radius:14px;padding:9px 12px;font-size:14px;">
+      <div style="font-size:11px;font-weight:900;color:var(--mid);">${esc(m.senderName || '')} (${esc(m.senderRole)})</div>
+      ${m.body ? `<div style="white-space:pre-wrap;">${linkify(m.body)}</div>` : ''}${m.link ? `<div>🔗 ${linkify(m.link)}</div>` : ''}
+      <div style="font-size:10px;color:var(--light);text-align:right;">${new Date(m.createdAt).toLocaleString('en-GB')}</div></div></div>`;
+  }).join('') || '<div style="color:var(--light);font-weight:700;">No messages.</div>';
+  body.scrollTop = body.scrollHeight;
+}
+load(); setInterval(load, 60000);
+</script>
+</body>
+</html>

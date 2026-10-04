@@ -15,6 +15,7 @@ const notify  = require('../services/notificationService');
 const logger  = require('../utils/logger');
 const pauseSvc = require('../services/pauseService');
 const { nextStudentId } = require('../utils/studentId');
+const promoSvc = require('../services/promoterService');
 const fincra  = require('../services/fincraService');
 
 const router = express.Router();
@@ -313,8 +314,11 @@ router.post(
                    VALUES ($1, $2, 0, $3, $4, NOW())`,
                   [studentId, studentGrade, parentName || null, studentEmail]
                 );
-                /* The Pre-Sales handover for this demo is now onboarded */
+                /* The Pre-Sales handover for this demo is now onboarded; keep the promoter */
                 if (bookingId) {
+                  await tx.query(
+                    `UPDATE users SET promoter_id = b.promoter_id FROM bookings b
+                     WHERE b.id = $1 AND users.id = $2 AND b.promoter_id IS NOT NULL`, [bookingId, studentId]);
                   await tx.query(
                     `UPDATE enrollment_requests SET status = 'processed', processed_at = NOW(), student_id = $1,
                             payment_status = 'received'
@@ -416,6 +420,7 @@ router.post(
 
         /* Classes on hold for credits come back automatically */
         await pauseSvc.autoResumeAfterTopUp(studentId);
+        await promoSvc.rewardFirstPayment(studentId);
 
         /* Notify student in-app */
         await notify.saveNotification(
@@ -642,6 +647,8 @@ router.post('/manual-topup', requireAuth, requireRole('admin','super_admin','pos
 
     /* Classes on hold for credits come back automatically */
     const resume = await pauseSvc.autoResumeAfterTopUp(studentId);
+    /* A promoter earns their % of the student's first payment */
+    await promoSvc.rewardFirstPayment(studentId);
 
     logger.info(`[MANUAL-TOPUP] student=${studentId} name=${student.name} added=${creditsToAdd} new=${newCredits} by=${req.user.email}`);
 

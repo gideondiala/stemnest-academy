@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="../assets/icons/icon.png">
+  <title>Promoters – StemNest Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/global.css">
+  <script src="../js/auth-guard.js" data-roles="admin,super_admin"></script>
+  <style>
+    body { background: var(--bg); font-family: 'Nunito', sans-serif; margin: 0; }
+    .top { background: #fff; border-bottom: 1.5px solid #e8eaf0; padding: 14px 5%; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .top h1 { font-family: 'Fredoka One', cursive; font-size: 24px; margin: 0; color: var(--dark); }
+    .wrap { max-width: 1200px; margin: 24px auto 60px; padding: 0 5%; }
+    .card { background: #fff; border: 1.5px solid #e8eaf0; border-radius: 16px; padding: 18px 20px; margin-bottom: 16px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+    .f label { display: block; font-size: 11px; font-weight: 900; color: var(--mid); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 5px; }
+    .f input, .f textarea { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 2px solid #e8eaf0; border-radius: 10px; font-family: 'Nunito', sans-serif; font-size: 14px; font-weight: 700; outline: none; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; font-size: 11px; font-weight: 900; color: var(--mid); text-transform: uppercase; letter-spacing: .4px; padding: 10px; background: var(--bg); white-space: nowrap; }
+    td { padding: 10px; border-bottom: 1px solid #f1f3f8; font-weight: 700; vertical-align: top; }
+    .pill { display: inline-block; border-radius: 50px; padding: 2px 10px; font-size: 11px; font-weight: 900; }
+    .b { border: none; border-radius: 10px; padding: 8px 14px; font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 13px; cursor: pointer; }
+    .b-blue { background: var(--blue); color: #fff; } .b-green { background: var(--green); color: #fff; } .b-ghost { background: var(--bg); color: var(--mid); border: 1.5px solid #e8eaf0; }
+    .scroll { overflow-x: auto; }
+    .toast { position: fixed; bottom: 22px; right: 22px; background: #d4f8e8; color: #065f46; padding: 12px 18px; border-radius: 12px; font-weight: 800; display: none; z-index: 99; max-width: 380px; }
+  </style>
+</head>
+<body>
+<div class="top">
+  <h1>🤝 Promoters</h1>
+  <div style="display:flex;gap:8px;">
+    <a class="b b-ghost" href="admin-dashboard.html" style="text-decoration:none;">← Admin</a>
+    <button class="b b-blue" onclick="toggleNew()">➕ New promoter</button>
+  </div>
+</div>
+<div class="wrap">
+  <div class="card" style="background:var(--blue-light);border-color:#c7d7fe;font-size:13px;font-weight:700;color:#1e40af;line-height:1.7;">
+    Give each promoter their link. Anyone who opens it is remembered for 30 days; demo bookings and website enquiries they make are credited to the promoter.
+    When that student makes their <strong>first payment</strong>, the promoter earns their agreed percentage of it (once per student).
+  </div>
+
+  <div class="card" id="newCard" style="display:none;">
+    <div style="font-family:'Fredoka One',cursive;font-size:18px;margin-bottom:12px;">New promoter</div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr));">
+      <div class="f"><label>Name *</label><input id="nName"></div>
+      <div class="f"><label>Email</label><input id="nEmail" type="email"></div>
+      <div class="f"><label>Phone / WhatsApp</label><input id="nPhone"></div>
+      <div class="f"><label>Reward % of first payment *</label><input id="nPct" type="number" min="0" max="100" step="0.5" placeholder="e.g. 10"></div>
+      <div class="f"><label>Link code (optional)</label><input id="nCode" placeholder="e.g. TUNDE" style="text-transform:uppercase;"></div>
+      <div class="f"><label>Notes / agreement</label><input id="nNotes" placeholder="e.g. Instagram influencer"></div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;"><button class="b b-ghost" onclick="toggleNew()">Cancel</button><button class="b b-blue" onclick="createPromoter()">Create & get link</button></div>
+  </div>
+
+  <div class="card scroll" id="list">⏳ Loading…</div>
+  <div class="card scroll" id="detail" style="display:none;"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'https://api.stemnestacademy.co.uk';
+const SITE = 'https://stemnestacademy.co.uk';
+const H = () => ({ 'Authorization': 'Bearer ' + localStorage.getItem('sn_access_token'), 'Content-Type': 'application/json' });
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const linkFor = code => `${SITE}/pages/free-trial.html?ref=${code}`;
+function toast(m, err) { const t = document.getElementById('toast'); t.textContent = m; t.style.background = err ? '#fed7d7' : '#d4f8e8'; t.style.color = err ? '#c53030' : '#065f46'; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 5000); }
+function money(list, key) { return (list || []).filter(x => Number(x[key]) > 0).map(x => `${x.currency} ${Number(x[key]).toLocaleString()}`).join(' · ') || '—'; }
+function toggleNew() { const c = document.getElementById('newCard'); c.style.display = c.style.display === 'none' ? 'block' : 'none'; }
+function copy(text) { navigator.clipboard.writeText(text).then(() => toast('✅ Link copied')); }
+
+async function api(path, method, body) {
+  const r = await fetch(API + '/api/promoters' + path, { method: method || 'GET', headers: H(), body: body ? JSON.stringify(body) : undefined });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || d.success === false) throw new Error(d.error || 'Request failed');
+  return d;
+}
+
+async function load() {
+  const el = document.getElementById('list');
+  try {
+    const d = await api('');
+    if (!d.promoters.length) { el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--light);font-weight:800;">No promoters yet — click ➕ New promoter.</div>'; return; }
+    el.innerHTML = `<table><thead><tr><th>Promoter</th><th>Link</th><th>Reward</th><th>Link opens</th><th>Demos booked</th><th>Demos attended</th><th>Enquiries</th><th>Paying students</th><th>Owed</th><th>Paid out</th><th></th></tr></thead><tbody>` +
+      d.promoters.map(p => `<tr>
+        <td><div style="font-weight:900;">${esc(p.name)} ${p.is_active ? '' : '<span class="pill" style="background:#f3f4f6;color:#6b7280;">inactive</span>'}</div><div style="font-size:12px;color:var(--light);">${esc(p.phone || '')} ${esc(p.email || '')}</div></td>
+        <td><div style="font-family:monospace;font-size:12px;">?ref=${esc(p.code)}</div><button class="b b-ghost" style="padding:3px 10px;font-size:11px;margin-top:4px;" onclick="copy('${linkFor(p.code)}')">📋 Copy link</button></td>
+        <td>${Number(p.reward_pct)}%</td>
+        <td>${p.clicks}</td><td>${p.demos_booked}</td><td>${p.demos_attended}</td><td>${p.enquiries}</td>
+        <td><strong>${p.paying_students}</strong> <span style="color:var(--light);">/ ${p.students} students</span></td>
+        <td style="color:#b45309;">${money(p.rewards, 'owed')}</td>
+        <td style="color:#065f46;">${money(p.rewards, 'paid')}</td>
+        <td><button class="b b-blue" style="padding:6px 12px;font-size:12px;" onclick="openDetail('${p.id}')">Details</button></td>
+      </tr>`).join('') + '</tbody></table>';
+  } catch (e) { el.innerHTML = `<div style="color:#c53030;font-weight:800;">⚠️ ${esc(e.message)}</div>`; }
+}
+
+async function createPromoter() {
+  const body = {
+    name: document.getElementById('nName').value.trim(), email: document.getElementById('nEmail').value.trim(),
+    phone: document.getElementById('nPhone').value.trim(), rewardPct: document.getElementById('nPct').value,
+    code: document.getElementById('nCode').value.trim(), notes: document.getElementById('nNotes').value.trim(),
+  };
+  if (!body.name || body.rewardPct === '') { toast('Enter the name and the reward %', true); return; }
+  try {
+    const d = await api('', 'POST', body);
+    toggleNew(); ['nName','nEmail','nPhone','nPct','nCode','nNotes'].forEach(id => document.getElementById(id).value = '');
+    toast(`✅ ${d.promoter.name}'s link: ${linkFor(d.promoter.code)}`);
+    copy(linkFor(d.promoter.code));
+    load();
+  } catch (e) { toast(e.message, true); }
+}
+
+async function openDetail(id) {
+  const el = document.getElementById('detail');
+  el.style.display = 'block'; el.innerHTML = '⏳ Loading…'; el.scrollIntoView({ behavior: 'smooth' });
+  try {
+    const d = await api('/' + id), p = d.promoter;
+    el.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+        <div><div style="font-family:'Fredoka One',cursive;font-size:20px;">${esc(p.name)}</div>
+          <div style="font-size:12px;color:var(--light);font-weight:700;">${esc(linkFor(p.code))} · ${esc(p.notes || '')}</div></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="b b-ghost" onclick="editPct('${p.id}', ${Number(p.reward_pct)})">✏️ Reward ${Number(p.reward_pct)}%</button>
+          <button class="b b-ghost" onclick="toggleActive('${p.id}', ${!p.is_active})">${p.is_active ? '⏸ Deactivate' : '▶️ Activate'}</button>
+          <button class="b b-ghost" onclick="document.getElementById('detail').style.display='none'">Close</button>
+        </div>
+      </div>
+      <div style="font-weight:900;margin:8px 0;">💰 Rewards (first payments)</div>
+      ${d.rewards.length ? `<table><thead><tr><th>Student</th><th>First payment</th><th>Reward</th><th>Status</th><th></th></tr></thead><tbody>${d.rewards.map(r => `<tr>
+        <td>${esc(r.studentName)}</td><td>${esc(r.currency)} ${Number(r.amountPaid).toLocaleString()}</td>
+        <td><strong>${esc(r.currency)} ${Number(r.rewardAmount).toLocaleString()}</strong> <span style="color:var(--light);">(${Number(r.rewardPct)}%)</span></td>
+        <td>${r.status === 'paid' ? `<span class="pill" style="background:#d4f8e8;color:#065f46;">Paid ${new Date(r.paidAt).toLocaleDateString('en-GB')}</span>${r.paidNote ? '<div style="font-size:11px;color:var(--light);">' + esc(r.paidNote) + '</div>' : ''}` : '<span class="pill" style="background:#fef3c7;color:#b45309;">Owed</span>'}</td>
+        <td>${r.status === 'owed' ? `<button class="b b-green" style="padding:5px 10px;font-size:12px;" onclick="markPaid('${r.id}','${p.id}')">Mark paid</button>` : ''}</td></tr>`).join('')}</tbody></table>` : '<div style="color:var(--light);font-weight:700;margin-bottom:10px;">No paying students yet.</div>'}
+      <div style="font-weight:900;margin:16px 0 8px;">🎓 Students credited (${d.students.length})</div>
+      ${d.students.length ? `<table><thead><tr><th>Student</th><th>ID</th><th>Joined</th><th>First paid</th></tr></thead><tbody>${d.students.map(s => `<tr><td>${esc(s.name)}</td><td>${esc(s.staffId || '')}</td><td>${new Date(s.createdAt).toLocaleDateString('en-GB')}</td><td>${s.firstPaidAt ? new Date(s.firstPaidAt).toLocaleDateString('en-GB') : '—'}</td></tr>`).join('')}</tbody></table>` : '<div style="color:var(--light);font-weight:700;">None yet.</div>'}
+      <div style="margin:10px 0 0;font-size:12px;font-weight:700;color:var(--mid);">Student came through this promoter without the link? Credit them by student ID:
+        <input id="attrId" placeholder="S-0012" style="padding:6px 10px;border:2px solid #e8eaf0;border-radius:8px;font-family:Nunito,sans-serif;font-weight:700;width:110px;margin-left:6px;">
+        <button class="b b-blue" style="padding:6px 12px;font-size:12px;" onclick="attribute('${p.id}')">Credit</button></div>
+      <div style="font-weight:900;margin:16px 0 8px;">📅 Demo bookings (${d.bookings.length})</div>
+      ${d.bookings.length ? `<table><thead><tr><th>Student</th><th>Email</th><th>Demo date</th><th>Status</th><th>Booked</th></tr></thead><tbody>${d.bookings.map(b => `<tr><td>${esc(b.studentName)}</td><td>${esc(b.email || '')}</td><td>${esc(b.date || '')}</td><td>${esc(b.status)}</td><td>${new Date(b.bookedAt).toLocaleDateString('en-GB')}</td></tr>`).join('')}</tbody></table>` : '<div style="color:var(--light);font-weight:700;">None yet.</div>'}`;
+  } catch (e) { el.innerHTML = `<div style="color:#c53030;font-weight:800;">⚠️ ${esc(e.message)}</div>`; }
+}
+
+async function editPct(id, cur) {
+  const v = prompt('Reward % of the student\'s first payment (applies to future rewards):', cur);
+  if (v === null) return;
+  try { await api('/' + id, 'PUT', { rewardPct: v }); toast('✅ Reward updated'); load(); openDetail(id); } catch (e) { toast(e.message, true); }
+}
+async function toggleActive(id, on) {
+  try { await api('/' + id, 'PUT', { isActive: on }); toast(on ? '✅ Activated' : '⏸ Deactivated — the link stops crediting new bookings'); load(); openDetail(id); } catch (e) { toast(e.message, true); }
+}
+async function markPaid(rewardId, promoterId) {
+  const note = prompt('Payment note (e.g. bank transfer ref) — optional:', '');
+  if (note === null) return;
+  try { await api('/rewards/' + rewardId + '/paid', 'PUT', { note }); toast('✅ Marked as paid'); load(); openDetail(promoterId); } catch (e) { toast(e.message, true); }
+}
+async function attribute(promoterId) {
+  const sid = document.getElementById('attrId').value.trim();
+  if (!sid) return;
+  try {
+    const r = await fetch(API + '/api/reschedule-tool/students?q=' + encodeURIComponent(sid), { headers: H() });
+    const d = await r.json();
+    const s = (d.students || []).find(x => (x.staffId || '').toUpperCase() === sid.toUpperCase()) || (d.students || [])[0];
+    if (!s) { toast('No student found', true); return; }
+    if (!confirm(`Credit ${s.name} (${s.staffId}) to this promoter?`)) return;
+    const res = await api('/' + promoterId + '/attribute', 'POST', { studentId: s.id });
+    toast(res.rewardCreated ? '✅ Credited — reward recorded for their first payment' : '✅ Credited — the reward is recorded when they first pay');
+    load(); openDetail(promoterId);
+  } catch (e) { toast(e.message, true); }
+}
+load();
+</script>
+</body>
+</html>

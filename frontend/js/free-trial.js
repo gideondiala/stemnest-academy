@@ -279,7 +279,7 @@ async function submitStep1() {
     const res = await fetch('https://api.stemnestacademy.co.uk/api/bookings/partial', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studentName: name, grade, whatsapp: phone, countryCode: code, country: ccode, countryName, timezone: tz }),
+      body: JSON.stringify({ studentName: name, grade, whatsapp: phone, countryCode: code, country: ccode, countryName, timezone: tz, ref: (window.SNRef && SNRef.get()) || '' }),
     });
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'Save failed');
@@ -414,6 +414,7 @@ async function submitStep2() {
           timezone:    tz,
           date,
           time:        step2SelectedTime,
+          ref:         (window.SNRef && SNRef.get()) || '',
         }),
       });
       const data = await res.json();

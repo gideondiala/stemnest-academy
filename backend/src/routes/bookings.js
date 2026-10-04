@@ -19,6 +19,7 @@ const notify   = require('../services/notificationService');
 const rescheduleSvc = require('../services/rescheduleService');
 const pauseSvc = require('../services/pauseService');
 const learningSvc = require('../services/learningService');
+const promoSvc = require('../services/promoterService');
 const logger   = require('../utils/logger');
 
 const router = express.Router();
@@ -38,6 +39,7 @@ const bookingSchema = z.object({
   timezone:     z.string(),
   date:         z.string(),
   time:         z.string(),
+  ref:          z.string().max(40).optional().or(z.literal('')),
 }).refine(data => data.email || data.whatsapp, {
   message: 'Either email or WhatsApp number is required',
 });
@@ -80,7 +82,7 @@ const rescheduleSchema = z.object({
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 router.post('/partial', async (req, res, next) => {
   try {
-    const { studentName, grade, whatsapp, countryCode, country, countryName, timezone } = req.body;
+    const { studentName, grade, whatsapp, countryCode, country, countryName, timezone, ref } = req.body;
 
     if (!studentName || studentName.trim().length < 2) {
       return res.status(400).json({ success: false, error: 'Student name is required' });
@@ -114,10 +116,11 @@ router.post('/partial', async (req, res, next) => {
 
     const bookingId = bookingId_result.rows[0].id;
 
-    /* Set lesson_name for presales display */
+    /* Set lesson_name for presales display (and the promoter whose link brought them) */
+    const partialPromoter = await promoSvc.idForCode(pool, ref).catch(() => null);
     await pool.query(
-      'UPDATE bookings SET lesson_name = $1 WHERE id = $2',
-      [studentName.trim(), bookingId]
+      'UPDATE bookings SET lesson_name = $1, promoter_id = COALESCE($3, promoter_id) WHERE id = $2',
+      [studentName.trim(), bookingId, partialPromoter]
     ).catch(() => {});
 
     logger.info(`[PARTIAL BOOKING] ${studentName} Â· ${fullPhone} Â· ${bookingId}`);
@@ -843,9 +846,10 @@ router.post('/', async (req, res, next) => {
 
     const bookingId = result.rows[0].id;
 
+    const promoterId = await promoSvc.idForCode(pool, data.ref).catch(() => null);
     await pool.query(
-      `UPDATE bookings SET lesson_name = $1 WHERE id = $2`,
-      [data.studentName, bookingId]
+      `UPDATE bookings SET lesson_name = $1, promoter_id = COALESCE($3, promoter_id) WHERE id = $2`,
+      [data.studentName, bookingId, promoterId]
     ).catch(() => {});
 
     /* Notify parent */

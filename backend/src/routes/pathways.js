@@ -155,6 +155,30 @@ router.get('/lesson/:lessonId', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+/* GET /api/pathways/browse — pathways › grades › lessons (titles only) so tutors
+   can open any lesson plan, e.g. for a demo or a class not yet linked to a lesson */
+router.get('/browse', requireAuth, requireRole(...STAFF_ROLES, 'tutor'), async (req, res, next) => {
+  try {
+    const r = await pool.query(
+      `SELECT p.id AS pathway_id, p.name AS pathway_name, pg.grade_number, pg.name AS grade_name,
+              pl.id AS lesson_id, pl.lesson_number, pl.title
+       FROM pathways p
+       JOIN pathway_grades pg ON pg.pathway_id = p.id AND pg.is_active = TRUE
+       JOIN pathway_lessons pl ON pl.grade_id = pg.id AND pl.is_active = TRUE
+       WHERE p.is_active = TRUE
+       ORDER BY p.name, pg.grade_number, pl.lesson_number`);
+    const out = [];
+    for (const row of r.rows) {
+      let pw = out.find(x => x.id === row.pathway_id);
+      if (!pw) out.push(pw = { id: row.pathway_id, name: row.pathway_name, grades: [] });
+      let g = pw.grades.find(x => x.number === row.grade_number);
+      if (!g) pw.grades.push(g = { number: row.grade_number, name: row.grade_name, lessons: [] });
+      g.lessons.push({ id: row.lesson_id, number: row.lesson_number, title: row.title });
+    }
+    res.json({ success: true, pathways: out });
+  } catch (err) { next(err); }
+});
+
 /* GET /api/pathways/for-onboarding — postsales/admin */
 router.get('/for-onboarding', requireAuth, requireRole(...STAFF_ROLES), async (req, res, next) => {
   try {

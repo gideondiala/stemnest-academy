@@ -175,6 +175,66 @@ const STATEMENTS = [
      UNIQUE (booking_id, student_id, task_no)
    )`,
 
+  /* Lesson plans: where students save their work each session */
+  `ALTER TABLE pathway_lessons ADD COLUMN IF NOT EXISTS portfolio_save TEXT`,
+
+  /* ── Chat between a student (or their parent) and their tutor ── */
+  `CREATE TABLE IF NOT EXISTS chat_messages (
+     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     student_id          UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     tutor_id            UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     sender_id           UUID REFERENCES users(id) ON DELETE SET NULL,
+     sender_role         VARCHAR(20) NOT NULL,
+     body                TEXT,
+     link                TEXT,
+     created_at          TIMESTAMPTZ DEFAULT NOW(),
+     read_by_tutor_at    TIMESTAMPTZ,
+     read_by_student_at  TIMESTAMPTZ,
+     reminder_sent_at    TIMESTAMPTZ
+   )`,
+  `CREATE INDEX IF NOT EXISTS idx_chat_thread ON chat_messages(student_id, tutor_id, created_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_chat_tutor_unread ON chat_messages(tutor_id) WHERE read_by_tutor_at IS NULL`,
+
+  /* ── Promoters: referral links for demo bookings, paid a % of the student's first payment ── */
+  `CREATE TABLE IF NOT EXISTS promoters (
+     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     code          VARCHAR(40) UNIQUE NOT NULL,
+     name          VARCHAR(160) NOT NULL,
+     email         VARCHAR(255),
+     phone         VARCHAR(40),
+     reward_pct    NUMERIC(5,2) NOT NULL DEFAULT 0,
+     notes         TEXT,
+     is_active     BOOLEAN DEFAULT TRUE,
+     created_by    UUID REFERENCES users(id),
+     created_at    TIMESTAMPTZ DEFAULT NOW()
+   )`,
+  `CREATE TABLE IF NOT EXISTS promoter_clicks (
+     id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     promoter_id  UUID NOT NULL REFERENCES promoters(id) ON DELETE CASCADE,
+     page         VARCHAR(200),
+     visitor      VARCHAR(64),
+     created_at   TIMESTAMPTZ DEFAULT NOW()
+   )`,
+  `CREATE INDEX IF NOT EXISTS idx_promoter_clicks ON promoter_clicks(promoter_id, created_at)`,
+  `ALTER TABLE bookings ADD COLUMN IF NOT EXISTS promoter_id UUID REFERENCES promoters(id) ON DELETE SET NULL`,
+  `ALTER TABLE enrollment_requests ADD COLUMN IF NOT EXISTS promoter_id UUID REFERENCES promoters(id) ON DELETE SET NULL`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS promoter_id UUID REFERENCES promoters(id) ON DELETE SET NULL`,
+  `CREATE TABLE IF NOT EXISTS promoter_rewards (
+     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     promoter_id   UUID NOT NULL REFERENCES promoters(id) ON DELETE CASCADE,
+     student_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     payment_id    UUID REFERENCES payments(id) ON DELETE SET NULL,
+     amount_paid   NUMERIC(12,2) NOT NULL,
+     currency      VARCHAR(10) NOT NULL,
+     reward_pct    NUMERIC(5,2) NOT NULL,
+     reward_amount NUMERIC(12,2) NOT NULL,
+     status        VARCHAR(20) DEFAULT 'owed',
+     paid_at       TIMESTAMPTZ,
+     paid_note     TEXT,
+     created_at    TIMESTAMPTZ DEFAULT NOW(),
+     UNIQUE (student_id)
+   )`,
+
   /* ── Referrals ── */
   `CREATE TABLE IF NOT EXISTS referrals (
      id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -21,6 +21,7 @@ const logger   = require('../utils/logger');
 const { isValidTimeZone } = require('../utils/timezone');
 const { nextStudentId } = require('../utils/studentId');
 const family = require('../services/familyService');
+const promoSvc = require('../services/promoterService');
 const genFamilyPassword = () => family.tempPassword();
 
 const router = express.Router();
@@ -326,6 +327,12 @@ router.post('/', requireAuth, requireRole('admin', 'super_admin', 'postsales'), 
            WHERE id = $3`,
           [req.user.id, user.id, sp.enrollmentRequestId]
         );
+        /* The promoter whose link brought this student (via the demo or website enquiry) */
+        await client.query(
+          `UPDATE users SET promoter_id = er.promoter_id
+           FROM enrollment_requests er WHERE er.id = $1 AND users.id = $2 AND er.promoter_id IS NOT NULL`,
+          [sp.enrollmentRequestId, user.id]
+        );
       }
     } else if (data.role === 'tutor') {
       const colors = ['linear-gradient(135deg,var(--blue),#4f87f5)','linear-gradient(135deg,var(--green),#3dd9a4)','linear-gradient(135deg,var(--orange),#ffaa80)','linear-gradient(135deg,var(--purple),#a78bfa)'];
@@ -367,6 +374,8 @@ router.post('/', requireAuth, requireRole('admin', 'super_admin', 'postsales'), 
         to: data.email, name: data.name, role: data.role, loginUrl, password: data.password,
       }).catch(e => logger.error('Welcome email failed:', e.message));
     }
+
+    if (data.role === 'student' && paymentId) await promoSvc.rewardFirstPayment(user.id);
 
     if (familyResult && familyResult.created) {
       const kids = await family.childrenOf(pool, familyResult.parentId).catch(() => []);

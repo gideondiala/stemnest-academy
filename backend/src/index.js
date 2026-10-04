@@ -24,6 +24,9 @@ const syncRoutes         = require('./routes/sync');
 const familyRoutes       = require('./routes/families');
 const rescheduleToolRoutes = require('./routes/rescheduleTool');
 const learningRoutes     = require('./routes/learning');
+const chatRoutes         = require('./routes/chat');
+const promoterRoutes     = require('./routes/promoters');
+const curriculumImportRoutes = require('./routes/curriculumImport');
 const blogRoutes         = require('./routes/blogs');
 const enrollmentRoutes   = require('./routes/enrollments');
 const greyRoutes         = require('./routes/grey');
@@ -134,6 +137,9 @@ app.use('/api/sync',         syncRoutes);
 app.use('/api/families',     familyRoutes);
 app.use('/api/reschedule-tool', rescheduleToolRoutes);
 app.use('/api/learning',     learningRoutes);
+app.use('/api/chat',         chatRoutes);
+app.use('/api/promoters',    promoterRoutes);
+app.use('/api/curriculum-import', curriculumImportRoutes);
 app.use('/api/blogs',        blogRoutes);
 app.use('/api/enrollments',  enrollmentRoutes);
 app.use('/api/grey',         greyRoutes);
@@ -164,6 +170,7 @@ const server = app.listen(PORT, () => {
       startRetentionJob();
       startBookingExtensionJob();
       require("./services/learningService").startDueReminderJob();
+      chatRoutes.startChatReminderJob();
     });
 });
 

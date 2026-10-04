@@ -26,7 +26,7 @@ const router = express.Router();
 router.post('/request', async (req, res, next) => {
   try {
     const { studentName, age, email, phone, timezone, courseId, courseName, coursePrice, notes,
-            pathway_id, pathway_name, grade_number, has_device, expected_start } = req.body;
+            pathway_id, pathway_name, grade_number, has_device, expected_start, ref } = req.body;
     if (!studentName) return res.status(400).json({ success: false, error: 'studentName required' });
     if (!email && !phone) return res.status(400).json({ success: false, error: 'email or phone required' });
     const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -44,6 +44,9 @@ router.post('/request', async (req, res, next) => {
        /^\d{4}-\d{2}-\d{2}$/.test(expected_start || '') ? expected_start : null]
     );
 
+    const promoterId = await require('../services/promoterService').idForCode(pool, ref).catch(() => null);
+    if (promoterId) await pool.query('UPDATE enrollment_requests SET promoter_id = $1 WHERE id = $2', [promoterId, result.rows[0].id]).catch(() => {});
+
     logger.info(`[ENROLLMENT REQUEST] ${studentName} → ${courseName}`);
     res.status(201).json({ success: true, id: result.rows[0].id });
   } catch (err) { next(err); }
@@ -58,7 +61,7 @@ router.post('/handover', requireAuth, requireRole('presales','admin','super_admi
     if (!bookingId) return res.status(400).json({ success: false, error: 'bookingId required' });
 
     const b = await pool.query(
-      `SELECT id, subject, grade, notes, lesson_name, is_demo FROM bookings WHERE id = $1`, [bookingId]);
+      `SELECT id, subject, grade, notes, lesson_name, is_demo, promoter_id FROM bookings WHERE id = $1`, [bookingId]);
     if (!b.rows.length) return res.status(404).json({ success: false, error: 'Booking not found' });
     const booking = b.rows[0];
     let n = {};
@@ -83,6 +86,9 @@ router.post('/handover', requireAuth, requireRole('presales','admin','super_admi
        paid.rows.length ? 'received' : 'pending', bookingId]
     );
 
+    if (booking.promoter_id) {
+      await pool.query('UPDATE enrollment_requests SET promoter_id = $1 WHERE booking_id = $2 AND promoter_id IS NULL', [booking.promoter_id, bookingId]).catch(() => {});
+    }
     n.handedOverAt = new Date().toISOString();
     n.handedOverBy = req.user.email;
     await pool.query('UPDATE bookings SET notes = $1 WHERE id = $2', [JSON.stringify(n), bookingId]);

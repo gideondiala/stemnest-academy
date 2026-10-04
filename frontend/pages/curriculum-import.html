@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="../assets/icons/icon.png">
+  <title>Curriculum Import – StemNest Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/global.css">
+  <script src="../js/auth-guard.js" data-roles="admin,super_admin"></script>
+  <style>
+    body { background: var(--bg); font-family: 'Nunito', sans-serif; margin: 0; }
+    .top { background: #fff; border-bottom: 1.5px solid #e8eaf0; padding: 14px 5%; display: flex; justify-content: space-between; align-items: center; }
+    .top h1 { font-family: 'Fredoka One', cursive; font-size: 24px; margin: 0; }
+    .wrap { max-width: 1000px; margin: 24px auto 60px; padding: 0 5%; }
+    .card { background: #fff; border: 1.5px solid #e8eaf0; border-radius: 16px; padding: 20px; margin-bottom: 16px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; font-size: 11px; font-weight: 900; color: var(--mid); text-transform: uppercase; padding: 8px 10px; background: var(--bg); }
+    td { padding: 8px 10px; border-bottom: 1px solid #f1f3f8; font-weight: 700; }
+    .b { border: none; border-radius: 12px; padding: 11px 20px; font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 14px; cursor: pointer; }
+    .b:disabled { opacity: .5; cursor: default; }
+  </style>
+</head>
+<body>
+<div class="top"><h1>📚 Curriculum Import</h1><a href="admin-dashboard.html" style="font-weight:800;color:var(--blue);text-decoration:none;">← Admin</a></div>
+<div class="wrap">
+  <div class="card" style="background:var(--blue-light);border-color:#c7d7fe;font-size:13px;font-weight:700;color:#1e40af;line-height:1.7;">
+    Upload the <strong>curriculum-import.json</strong> file prepared from the Tech Pathways documents.
+    <br>• Lessons that don't exist yet are <strong>created</strong> (with their units).
+    <br>• Existing lessons only get the sections that are <strong>empty today</strong> — nothing you wrote is overwritten.
+    <br>• Exception: the <strong>revamped AI &amp; Automation Grade 4</strong> lessons replace the old versions.
+    <br>Click <strong>Preview</strong> first — nothing changes until you click <strong>Apply</strong>. You can run it again later; it only fills what is still empty.
+  </div>
+  <div class="card">
+    <input type="file" id="file" accept=".json,application/json" style="font-family:Nunito,sans-serif;font-weight:700;">
+    <div style="display:flex;gap:10px;margin-top:14px;">
+      <button class="b" id="btnPreview" style="background:var(--bg);border:1.5px solid #e8eaf0;color:var(--mid);" onclick="go(false)" disabled>👁 Preview</button>
+      <button class="b" id="btnApply" style="background:var(--green);color:#fff;" onclick="go(true)" disabled>✅ Apply</button>
+    </div>
+    <div id="status" style="margin-top:12px;font-weight:800;font-size:13px;color:var(--mid);"></div>
+  </div>
+  <div class="card" id="result" style="display:none;"></div>
+</div>
+<script>
+const API = 'https://api.stemnestacademy.co.uk/api/curriculum-import';
+let data = null, previewed = false;
+document.getElementById('file').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      data = JSON.parse(r.result);
+      if (!data.pathways) throw new Error('This is not a curriculum import file');
+      const n = Object.values(data.pathways).reduce((a, p) => a + Object.values(p.grades).reduce((b, g) => b + g.lessons.length, 0), 0);
+      document.getElementById('status').textContent = `File loaded: ${n} lessons. Click Preview.`;
+      document.getElementById('btnPreview').disabled = false; previewed = false; document.getElementById('btnApply').disabled = true;
+    } catch (err) { document.getElementById('status').textContent = '⚠️ ' + err.message; }
+  };
+  r.readAsText(f);
+});
+
+async function go(apply) {
+  if (!data) return;
+  if (apply && !confirm('Apply the import to the live platform now?')) return;
+  const jobs = [];
+  for (const [slug, p] of Object.entries(data.pathways)) for (const [g, v] of Object.entries(p.grades)) jobs.push({ pathway: slug, grade: +g, units: v.units, lessons: v.lessons });
+  const rows = []; const st = document.getElementById('status');
+  document.getElementById('btnPreview').disabled = document.getElementById('btnApply').disabled = true;
+  let i = 0;
+  for (const j of jobs) {
+    i++; st.textContent = `${apply ? 'Applying' : 'Checking'} ${i} of ${jobs.length}: ${j.pathway} Grade ${j.grade}…`;
+    try {
+      const res = await fetch(API + (apply ? '/apply' : '/preview'), {
+        method: 'POST', headers: { 'Authorization': 'Bearer ' + localStorage.getItem('sn_access_token'), 'Content-Type': 'application/json' },
+        body: JSON.stringify(j),
+      });
+      const d = await res.json();
+      if (!res.ok || !d.success) throw new Error(d.error || res.status);
+      rows.push(d);
+    } catch (e) { rows.push({ pathway: j.pathway, grade: j.grade, error: e.message }); }
+  }
+  const t = k => rows.reduce((a, r) => a + (r[k] || 0), 0);
+  document.getElementById('result').style.display = 'block';
+  document.getElementById('result').innerHTML = `<div style="font-family:'Fredoka One',cursive;font-size:18px;margin-bottom:10px;">${apply ? '✅ Applied' : '👁 Preview — nothing changed yet'}</div>
+    <div style="font-weight:800;margin-bottom:12px;">${t('lessonsCreated')} lessons to ${apply ? 'were ' : ''}create${apply ? 'd' : ''} · ${t('lessonsUpdated')} existing lessons ${apply ? 'updated' : 'get missing sections'} (${t('fieldsFilled')} sections) · ${t('lessonsReplaced')} revamped lessons replaced · ${t('unitsCreated')} new units</div>
+    <table><thead><tr><th>Pathway</th><th>Grade</th><th>New lessons</th><th>Updated</th><th>Sections filled</th><th>Replaced</th><th>New units</th><th>Unchanged</th><th>Note</th></tr></thead><tbody>${rows.map(r => `<tr>
+      <td>${r.pathwayName || r.pathway}</td><td>${r.grade}</td><td>${r.lessonsCreated ?? ''}</td><td>${r.lessonsUpdated ?? ''}</td><td>${r.fieldsFilled ?? ''}</td>
+      <td>${r.lessonsReplaced ?? ''}</td><td>${r.unitsCreated ?? ''}</td><td>${r.unchanged ?? ''}</td><td style="color:#c53030;">${r.error || r.skipped || ''}</td></tr>`).join('')}</tbody></table>`;
+  st.textContent = apply ? 'Done.' : 'Preview finished — check the numbers, then click Apply.';
+  document.getElementById('btnPreview').disabled = false;
+  document.getElementById('btnApply').disabled = apply ? true : false;
+}
+</script>
+</body>
+</html>

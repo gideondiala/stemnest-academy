@@ -195,3 +195,37 @@ window.addEventListener('resize', () => {
     } catch(e) {}
   } catch(e) { /* silent */ }
 })();
+
+/* ══════════════════════════════════════════════════════
+   PROMOTER LINKS — ?ref=CODE is remembered for 30 days and sent with
+   demo bookings / enrol enquiries so the promoter gets the credit.
+══════════════════════════════════════════════════════ */
+window.SNRef = (function () {
+  var KEY = 'sn_ref', DAYS = 30;
+  function read() {
+    try {
+      var v = JSON.parse(localStorage.getItem(KEY) || 'null');
+      if (v && v.code && Date.now() - v.at < DAYS * 86400000) return v;
+    } catch (e) {}
+    return null;
+  }
+  function visitorId() {
+    try {
+      var id = localStorage.getItem('sn_visitor');
+      if (!id) { id = Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('sn_visitor', id); }
+      return id;
+    } catch (e) { return ''; }
+  }
+  try {
+    var code = new URLSearchParams(window.location.search).get('ref');
+    if (code && /^[A-Za-z0-9_-]{2,40}$/.test(code)) {
+      code = code.toUpperCase();
+      localStorage.setItem(KEY, JSON.stringify({ code: code, at: Date.now() }));
+      fetch('https://api.stemnestacademy.co.uk/api/promoters/track', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: code, page: window.location.pathname, visitor: visitorId() }),
+      }).catch(function () {});
+    }
+  } catch (e) {}
+  return { get: function () { var v = read(); return v ? v.code : ''; } };
+})();

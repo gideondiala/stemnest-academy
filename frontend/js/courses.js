@@ -605,7 +605,7 @@ async function submitCheckout(courseId, courseName, coursePrice) {
         studentName: student,
         age, email, phone, timezone, notes,
         courseId, courseName, coursePrice,
-        source: 'website',
+        source: 'website', ref: (window.SNRef && SNRef.get()) || '',
       })
     });
 

@@ -306,6 +306,7 @@ async function submitPathwayEnrol() {
         courseName:   p ? p.name : _currentPathwaySlug,
         coursePrice:  p ? p.price : 80,
         source:       'website',
+        ref:          (window.SNRef && SNRef.get()) || '',
         pathway_id:   _currentPathwayId,
         pathway_name: p ? p.name : _currentPathwaySlug,
         grade_number: parseInt(grade),

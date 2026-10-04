@@ -733,9 +733,7 @@ function showBookingPopup(bookingId) {
             ${phone !== '—' ? `<button onclick="copyPhone('${phone}')" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:800;cursor:pointer;">📋 Copy</button>` : ''}
           </div>
         </div>
-        <a href="#" onclick="showToast('Class material page coming soon — will be set up per lesson topic.','info');return false;" style="display:flex;align-items:center;justify-content:space-between;background:var(--bg);border:1.5px solid #e8eaf0;border-radius:12px;padding:12px 16px;text-decoration:none;color:var(--dark);font-weight:800;font-size:13px;margin-bottom:14px;">
-          📖 Class Material &amp; Lesson Plan <span style="color:var(--blue);font-size:11px;">Coming Soon ↗</span>
-        </a>
+        ${lessonPlanButton(b)}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
           ${b.classLink
             ? `<a href="${b.classLink}" target="_blank" onclick="teacherJoinClass('${b.id}','${b.classLink}')" style="display:block;background:var(--blue);color:#fff;text-align:center;padding:12px;border-radius:12px;font-weight:900;font-size:13px;text-decoration:none;">🚀 Join Class</a>`
@@ -764,6 +762,7 @@ function showBookingPopup(bookingId) {
             📅 <strong>${b.date || '—'}</strong> at <strong>${timeDisplay}</strong>
           </div>
         </div>
+        ${lessonPlanButton(b)}
         <div id="batchPopupStudents" style="margin-bottom:14px;">
           <div style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:var(--light);margin-bottom:8px;">👩‍🎓 Students in this class</div>
           <div id="batchPopupStudentsList" style="font-size:13px;color:var(--light);font-weight:700;">⏳ Loading students…</div>
@@ -830,6 +829,7 @@ function showBookingPopup(bookingId) {
             ⏱ Duration: <strong>${b.duration || '60 mins'}</strong>
           </div>
         </div>
+        ${!b.pathwayLessonId ? lessonPlanButton(b) : ''}
         ${(b.activityLink || b.slidesLink || b.pathwayLessonId) ? `
         <div style="background:var(--bg);border-radius:12px;padding:14px;margin-bottom:14px;">
           <div style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:var(--light);margin-bottom:8px;">📎 Class Resources</div>
@@ -1393,4 +1393,62 @@ function _renderOverviewStats() {
   } catch(e) {
     console.warn('[Stats] Failed to render overview stats:', e.message);
   }
+}
+
+
+/* ══════════════════════════════════════════════════════
+   LESSON PLAN — open the class's lesson in a new tab, or pick one
+══════════════════════════════════════════════════════ */
+function lessonPlanButton(b) {
+  const css = 'display:flex;align-items:center;justify-content:space-between;background:#dbeafe;border:1.5px solid var(--blue);border-radius:12px;padding:12px 16px;text-decoration:none;color:var(--blue);font-weight:900;font-size:13px;margin-bottom:14px;cursor:pointer;';
+  if (b.pathwayLessonId) {
+    return `<a href="/pages/lesson-materials.html?lessonId=${b.pathwayLessonId}&bookingId=${b.id}" target="_blank" style="${css}">📖 View Lesson Details <span style="font-size:11px;">Opens in a new tab ↗</span></a>`;
+  }
+  return `<a href="#" onclick="openLessonPicker();return false;" style="${css}background:var(--bg);border-color:#e8eaf0;color:var(--dark);">📖 Find the lesson plan <span style="color:var(--blue);font-size:11px;">Choose lesson ↗</span></a>`;
+}
+
+let _lessonBrowse = null;
+async function openLessonPicker() {
+  document.getElementById('lessonPickerOverlay')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'lessonPickerOverlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(10,20,50,.6);z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;';
+  const sel = 'width:100%;padding:10px 12px;border:2px solid #e8eaf0;border-radius:10px;font-family:Nunito,sans-serif;font-size:14px;font-weight:700;outline:none;background:#fff;margin-bottom:10px;';
+  ov.innerHTML = `<div style="background:var(--white);border-radius:20px;padding:24px 26px;max-width:440px;width:100%;box-shadow:0 16px 60px rgba(0,0,0,.25);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <div style="font-family:'Fredoka One',cursive;font-size:20px;color:var(--dark);">📖 Find the lesson plan</div>
+      <button onclick="document.getElementById('lessonPickerOverlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--light);">✕</button>
+    </div>
+    <div style="font-size:12px;font-weight:700;color:var(--light);margin-bottom:14px;line-height:1.5;">This class isn't linked to a lesson yet (Post-Sales can link it). Pick the lesson to open its plan in a new tab.</div>
+    <select id="lpPathway" style="${sel}" onchange="lpFill('grade')"><option>⏳ Loading…</option></select>
+    <select id="lpGrade" style="${sel}" onchange="lpFill('lesson')"></select>
+    <select id="lpLesson" style="${sel}"></select>
+    <button onclick="lpOpen()" style="width:100%;background:var(--blue);color:#fff;border:none;border-radius:12px;padding:12px;font-family:Nunito,sans-serif;font-weight:900;font-size:14px;cursor:pointer;">Open lesson ↗</button>
+  </div>`;
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+  document.body.appendChild(ov);
+  try {
+    if (!_lessonBrowse) {
+      const res = await fetch('https://api.stemnestacademy.co.uk/api/pathways/browse', { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('sn_access_token') } });
+      const d = await res.json();
+      if (!d.success) throw new Error(d.error || 'Could not load lessons');
+      _lessonBrowse = d.pathways;
+    }
+    document.getElementById('lpPathway').innerHTML = _lessonBrowse.map((p, i) => `<option value="${i}">${p.name}</option>`).join('') || '<option>No lessons yet</option>';
+    lpFill('grade');
+  } catch (e) { showToast(e.message, 'error'); }
+}
+function lpFill(level) {
+  const p = (_lessonBrowse || [])[+document.getElementById('lpPathway').value];
+  if (!p) return;
+  if (level === 'grade') {
+    document.getElementById('lpGrade').innerHTML = p.grades.map((g, i) => `<option value="${i}">Grade ${g.number}${g.name ? ' — ' + g.name : ''} (${g.lessons.length} lessons)</option>`).join('');
+  }
+  const g = p.grades[+document.getElementById('lpGrade').value] || p.grades[0];
+  document.getElementById('lpLesson').innerHTML = (g ? g.lessons : []).map(l => `<option value="${l.id}">Lesson ${l.number}: ${String(l.title || '').replace(/</g, '&lt;')}</option>`).join('');
+}
+function lpOpen() {
+  const id = document.getElementById('lpLesson').value;
+  if (!id) return;
+  window.open('/pages/lesson-materials.html?lessonId=' + id, '_blank');
 }

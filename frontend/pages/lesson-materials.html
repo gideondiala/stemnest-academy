@@ -541,7 +541,7 @@ async function loadLesson() {
     setText('hw2Content', l.homework2);
 
     /* Portfolio Save — Grade 1–3 only */
-    if (isLowerGrade && l.portfolio_save && l.portfolio_save.trim()) {
+    if (l.portfolio_save && l.portfolio_save.trim()) {
       setText('contentPortfolio', l.portfolio_save);
       show('sectionPortfolio');
     }
