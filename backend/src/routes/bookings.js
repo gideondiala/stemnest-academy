@@ -19,6 +19,7 @@ const notify   = require('../services/notificationService');
 const rescheduleSvc = require('../services/rescheduleService');
 const pauseSvc = require('../services/pauseService');
 const learningSvc = require('../services/learningService');
+const classOps = require('../services/classOpsService');
 const promoSvc = require('../services/promoterService');
 const logger   = require('../utils/logger');
 
@@ -1311,6 +1312,17 @@ router.put('/:id/status', requireAuth, requireRole('admin','super_admin','tutor'
  * member of a batch class.
  */
 async function chargeStudentForClass(studentId, booking, bookingNotes) {
+  /* Never charge the same class twice */
+  const already = await pool.query(
+    `SELECT 1 FROM credit_transactions
+     WHERE student_id = $1 AND booking_id = $2 AND type = 'class_deduction' AND amount < 0 LIMIT 1`,
+    [studentId, booking.id]
+  );
+  if (already.rows.length) {
+    logger.info(`[CREDITS] Student ${studentId} already charged for booking ${booking.id} — skipped`);
+    return;
+  }
+
   /* â”€â”€ Track lesson completion â”€â”€ */
   try {
     /* Find the student's active enrolment for this pathway */
@@ -1433,14 +1445,20 @@ async function chargeStudentForClass(studentId, booking, bookingNotes) {
   const newCredits     = currentCredits - 1;
 
   /* Deduct credit (allow going negative) */
-  await pool.query(
-    `UPDATE student_profiles SET credits = credits - 1 WHERE user_id = $1`,
+  const upd = await pool.query(
+    `UPDATE student_profiles SET credits = COALESCE(credits, 0) - 1 WHERE user_id = $1 RETURNING credits`,
     [studentId]
   );
+  const balanceAfter = upd.rows.length ? parseInt(upd.rows[0].credits, 10) : newCredits;
+  const classDay = booking.date instanceof Date
+    ? booking.date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+    : String(booking.date || '').slice(0, 10);
   await pool.query(
-    `INSERT INTO credit_transactions (student_id, type, amount, description, booking_id)
-     VALUES ($1, 'class_deduction', -1, 'Class completed â€” 1 credit used', $2)`,
-    [studentId, booking.id]
+    `INSERT INTO credit_transactions (student_id, type, amount, description, booking_id, balance_after)
+     VALUES ($1, 'class_deduction', -1, $3, $2, $4)`,
+    [studentId, booking.id,
+     `Class completed${classDay ? ' (' + classDay + ')' : ''}${booking.subject ? ' · ' + booking.subject : ''} — 1 credit used`,
+     balanceAfter]
   );
 
   /* At -2 (2-class grace) the remaining classes go on hold until a top-up */
@@ -1585,7 +1603,6 @@ async function chargeStudentForClass(studentId, booking, bookingNotes) {
 router.post('/:id/report', requireAuth, requireRole('tutor'), async (req, res, next) => {
   try {
     const data = reportSchema.parse(req.body);
-
     /* Verify this booking belongs to this tutor */
     const bResult = await pool.query(
       'SELECT * FROM bookings WHERE id = $1 AND tutor_id = $2',
@@ -1594,6 +1611,49 @@ router.post('/:id/report', requireAuth, requireRole('tutor'), async (req, res, n
     if (!bResult.rows.length) {
       return res.status(403).json({ success: false, error: 'Booking not found or not yours' });
     }
+    const booking = bResult.rows[0];
+
+    /* A class is ended once: its credits and pay are settled at that point */
+    if (['completed', 'partially_completed'].includes(booking.status)) {
+      return res.status(409).json({ success: false, error: 'This class has already been ended. Please contact Admin if it needs changing.' });
+    }
+    if (booking.status === 'cancelled') {
+      return res.status(409).json({ success: false, error: 'This class was cancelled.' });
+    }
+
+    /* bookingNotes is used by post-class emails below */
+    let bookingNotes = {};
+    try { bookingNotes = typeof booking.notes === 'string' ? JSON.parse(booking.notes || '{}') : { ...(booking.notes || {}) }; } catch (e) {}
+
+    /* ── Who attended (paid classes): the 1-on-1 student, or the ticked batch members.
+       Each attendee is charged 1 credit and the tutor is paid by the number attending. ── */
+    let chargeIds = [];
+    let memberIds = [];
+    const attended = data.outcome !== 'incomplete';
+    if (attended && !booking.is_demo) {
+      if (booking.student_id) {
+        if (!Array.isArray(data.attendees) || data.attendees.includes(booking.student_id)) chargeIds = [booking.student_id];
+      } else if (booking.batch_id) {
+        /* Members on hold (paused) are not charged */
+        const members = await pool.query(
+          `SELECT bm.student_id FROM batch_members bm
+           LEFT JOIN student_profiles sp ON sp.user_id = bm.student_id
+           WHERE bm.batch_id = $1 AND bm.status = 'active' AND COALESCE(sp.class_paused, FALSE) = FALSE`,
+          [booking.batch_id]
+        );
+        memberIds = members.rows.map(r => r.student_id);
+        /* Default: everyone attended. The tutor unticks absent students. */
+        chargeIds = Array.isArray(data.attendees) ? memberIds.filter(id => data.attendees.includes(id)) : memberIds;
+      }
+      if (Array.isArray(data.attendees) && !chargeIds.length && (booking.student_id || booking.batch_id)) {
+        return res.status(400).json({ success: false, error: 'Tick the students who attended, or mark the class as incomplete.' });
+      }
+    }
+    const studentNames = chargeIds.length
+      ? (await pool.query('SELECT id, name FROM users WHERE id = ANY($1::uuid[])', [chargeIds])).rows
+          .sort((a, b) => chargeIds.indexOf(a.id) - chargeIds.indexOf(b.id)).map(r => r.name)
+      : [booking.student_name || bookingNotes.studentName].filter(Boolean);
+    const studentsCount = booking.is_demo ? 1 : Math.max(1, chargeIds.length);
 
     /* Save report — ON CONFLICT handles the case where teacher retries after a partial failure */
     await pool.query(
@@ -1615,117 +1675,46 @@ router.post('/:id/report', requireAuth, requireRole('tutor'), async (req, res, n
        data.recordingLink || null]
     );
 
-    /* Update booking status and notes */
-    const booking = bResult.rows[0];
-    let bNotesObj = {};
-    if (booking.notes) {
-      /* notes is JSONB (already an object) on most rows; older rows may hold a JSON string */
-      try { bNotesObj = typeof booking.notes === 'string' ? JSON.parse(booking.notes) : { ...booking.notes }; } catch(e) {}
-    }
-    /* bookingNotes is used by post-class emails below */
-    const bookingNotes = bNotesObj;
-
-    if (data.outcome === 'incomplete' && data.incompleteReason) {
-      bNotesObj.incompleteReason = data.incompleteReason;
-    }
-
-    await pool.query(
-      'UPDATE bookings SET status = $1, completed_at = NOW(), notes = $3 WHERE id = $2',
-      [data.outcome, req.params.id, Object.keys(bNotesObj).length > 0 ? JSON.stringify(bNotesObj) : null]
-    );
-
-    /* ── Auto-shift on incomplete: the lesson is redone in the next slot and
-       every later lesson in the series moves back by one slot
-       (same logic as the tutor's "next learning day" reschedule). ── */
-    if (data.outcome === 'incomplete' && (booking.student_id || booking.batch_id) && !booking.is_demo) {
-      const client = await pool.connect();
-      try {
-        await client.query('BEGIN');
-        const b = await rescheduleSvc.loadBooking(client, booking.id);
-        const { moves } = await rescheduleSvc.shiftSeriesForward(client, b, {
-          reason: 'Class incomplete' + (data.incompleteReason ? ' — ' + data.incompleteReason : ''),
-          actorLabel: 'tutor',
-        });
-        await client.query(`UPDATE bookings SET status = 'scheduled', completed_at = NULL WHERE id = $1`, [booking.id]);
-        await client.query('COMMIT');
-        rescheduleSvc.clearReminders(moves.map(m => m.id));
-        logger.info(`[INCOMPLETE-SHIFT] Booking ${booking.id} moved to ${moves[0].to.d} ${moves[0].to.t}; ${moves.length - 1} later lesson(s) shifted for student ${booking.student_id}`);
-      } catch (shiftErr) {
-        await client.query('ROLLBACK').catch(() => {});
-        logger.warn('[INCOMPLETE-SHIFT] Auto-shift failed (non-fatal):', shiftErr.message);
-      } finally {
-        client.release();
+    let movedTo = null;
+    if (data.outcome === 'incomplete') {
+      /* A paid lesson is redone in the next slot and the series moves back one slot */
+      ({ movedTo } = await classOps.applyIncomplete(booking, {
+        reason: data.incompleteReason, actorLabel: 'tutor', markedBy: req.user.id,
+      }));
+    } else {
+      await pool.query(
+        `UPDATE bookings SET status = $1, completed_at = NOW() WHERE id = $2`,
+        [data.outcome, booking.id]
+      );
+      for (const sid of chargeIds) {
+        try { await chargeStudentForClass(sid, booking, bookingNotes); }
+        catch (e) { logger.warn(`[CREDITS] Charge failed for ${sid}: ${e.message}`); }
       }
-    }
-
-    /* Deduct credit(s) if completed — the student, or each attending batch member */
-    if (data.outcome === 'completed' || data.outcome === 'partially_completed') {
-      if (booking.student_id) {
-        await chargeStudentForClass(booking.student_id, booking, bookingNotes);
-      } else if (booking.batch_id) {
-        /* Members on hold (paused) are not charged */
-        const members = await pool.query(
-          `SELECT bm.student_id FROM batch_members bm
-           LEFT JOIN student_profiles sp ON sp.user_id = bm.student_id
-           WHERE bm.batch_id = $1 AND bm.status = 'active' AND COALESCE(sp.class_paused, FALSE) = FALSE`,
-          [booking.batch_id]
-        );
-        const memberIds = members.rows.map(r => r.student_id);
-        /* Default: everyone attended. The tutor unticks absent students. */
-        const attendees = Array.isArray(data.attendees)
-          ? memberIds.filter(id => data.attendees.includes(id))
-          : memberIds;
-        for (const sid of attendees) {
-          try { await chargeStudentForClass(sid, booking, bookingNotes); }
-          catch (e) { logger.warn(`[CREDITS] Batch charge failed for ${sid}: ${e.message}`); }
-        }
+      if (booking.batch_id) {
         await pool.query(
           `UPDATE bookings SET notes = COALESCE(notes, '{}'::jsonb) || jsonb_build_object('attendees', $1::jsonb, 'absentees', $2::jsonb) WHERE id = $3`,
-          [JSON.stringify(attendees), JSON.stringify(memberIds.filter(id => !attendees.includes(id))), booking.id]
+          [JSON.stringify(chargeIds), JSON.stringify(memberIds.filter(id => !chargeIds.includes(id))), booking.id]
         );
-        logger.info(`[BATCH CLASS] ${booking.id}: ${attendees.length}/${memberIds.length} attended and charged`);
+        logger.info(`[BATCH CLASS] ${booking.id}: ${chargeIds.length}/${memberIds.length} attended and charged`);
       }
     }
 
-    logger.info(`[REPORT] Booking ${req.params.id} â†’ ${data.outcome}`);
+    logger.info(`[REPORT] Booking ${req.params.id} → ${data.outcome}`);
 
-    /* â”€â”€ Tutor earnings â€” add when class is completed â”€â”€ */
-    if (data.outcome === 'completed' && req.user.id) {
-      try {
-        /* Fetch pay rates from settings table */
-        const settingsResult = await pool.query(
-          `SELECT key, value FROM settings WHERE key IN ('paidPayRate','demoPayRate')`
-        ).catch(() => ({ rows: [] }));
-
-        const settingsMap = {};
-        (settingsResult.rows || []).forEach(r => { settingsMap[r.key] = parseFloat(r.value) || 0; });
-
-        const isDemo = booking.is_demo === true;
-        const payRate = isDemo
-          ? (settingsMap['demoPayRate'] || 5)    // fallback Â£5 for demo
-          : (settingsMap['paidPayRate'] || 20);  // fallback Â£20 for paid
-
-        /* Update tutor earnings */
-        await pool.query(
-          `UPDATE tutor_profiles SET earnings = COALESCE(earnings, 0) + $1 WHERE user_id = $2`,
-          [payRate, req.user.id]
-        );
-
-        /* Log to tutor_earnings_log for paysheet accuracy */
-        await pool.query(
-          `INSERT INTO tutor_earnings_log (tutor_id, booking_id, amount, type, created_at)
-           VALUES ($1, $2, $3, $4, NOW())
-           ON CONFLICT DO NOTHING`,
-          [req.user.id, req.params.id, payRate, isDemo ? 'demo' : 'paid']
-        ).catch(e => logger.warn('[EARNINGS] Log insert failed (non-fatal):', e.message));
-
-        logger.info(`[EARNINGS] Tutor ${req.user.id} earned Â£${payRate} for ${isDemo ? 'demo' : 'paid'} class`);
-      } catch (earningsErr) {
-        logger.warn('[EARNINGS] Tutor pay update failed (non-fatal):', earningsErr.message);
-      }
+    /* ── Tutor pay: by outcome and the number of students who attended ── */
+    let pay = null;
+    try {
+      pay = await classOps.recordEarning({
+        tutorId: req.user.id, booking, outcome: data.outcome, studentsCount, studentNames,
+      });
+    } catch (earningsErr) {
+      logger.warn('[EARNINGS] Tutor pay update failed (non-fatal):', earningsErr.message);
     }
 
-    res.json({ success: true, message: 'Report submitted' });
+    res.json({
+      success: true, message: 'Report submitted', movedTo,
+      pay: pay ? { amount: pay.amount, currency: pay.currency, studentsCount: pay.studentsCount } : null,
+    });
 
     /* â”€â”€ Fire "How was the class?" feedback email for completed demos â”€â”€ */
     if (data.outcome === 'completed' && booking.is_demo) {

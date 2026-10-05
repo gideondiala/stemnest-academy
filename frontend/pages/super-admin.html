@@ -97,6 +97,8 @@
       <a class="sidebar-link" href="promoters.html" target="_blank"><span class="sl-icon">🤝</span> Promoters</a>
       <a class="sidebar-link" href="chat-monitor.html" target="_blank"><span class="sl-icon">💬</span> Chat Monitor</a>
       <a class="sidebar-link" href="curriculum-import.html" target="_blank"><span class="sl-icon">📚</span> Curriculum Import</a>
+      <a class="sidebar-link" href="credit-topup.html" target="_blank"><span class="sl-icon">💳</span> Credits &amp; Payments</a>
+      <a class="sidebar-link" href="class-followup.html" target="_blank"><span class="sl-icon">⏰</span> Class Follow-up</a>
     </div>
     <div class="sidebar-bottom">
       <button class="logout-btn" onclick="window.location.href='login.html'">🚪 Log Out</button>
@@ -270,19 +272,26 @@
           <button class="btn btn-outline" style="font-size:13px;" onclick="document.getElementById('sigUpload').click()">✍️ Upload Signature</button>
         </div>
         <div class="sa-settings-card">
-          <div class="sa-settings-title">💷 Teacher Pay Rates</div>
-          <div class="sa-settings-desc">Set the amount paid to teachers per class. Applied automatically when a class is marked complete.</div>
+          <div class="sa-settings-title">₦ Tutor Pay Rates</div>
+          <div class="sa-settings-desc">Paid to the tutor (in Naira) for each class they end as completed. A paid class pays by how many students the tutor ticks as attended. A partially completed class pays one-third. New rates apply to classes ended after you save.</div>
           <div class="pm-field" style="margin-top:10px;">
-            <label>Demo Class Pay (£ per class)</label>
-            <input type="number" id="demoClassPay" placeholder="e.g. 5" min="0" step="0.50"
-              onchange="saveSettings('demoClassPay', this.value)">
+            <label>Demo class (₦)</label>
+            <input type="number" id="payRateDemo" placeholder="e.g. 2000" min="0" step="50">
           </div>
           <div class="pm-field" style="margin-top:8px;">
-            <label>Paid Class Pay (£ per class)</label>
-            <input type="number" id="paidClassPay" placeholder="e.g. 20" min="0" step="0.50"
-              onchange="saveSettings('paidClassPay', this.value)">
+            <label>Paid class — 1 student (₦)</label>
+            <input type="number" id="payRatePaid1" placeholder="e.g. 5000" min="0" step="50">
+          </div>
+          <div class="pm-field" style="margin-top:8px;">
+            <label>Paid class — 2 students completed (₦)</label>
+            <input type="number" id="payRatePaid2" placeholder="e.g. 7000" min="0" step="50">
+          </div>
+          <div class="pm-field" style="margin-top:8px;">
+            <label>Paid class — 3 or more students completed (₦)</label>
+            <input type="number" id="payRatePaid3" placeholder="e.g. 9000" min="0" step="50">
           </div>
           <button class="btn btn-primary" style="font-size:13px;margin-top:10px;" onclick="savePayRates()">💾 Save Pay Rates</button>
+          <div id="payRatesStatus" style="font-size:12px;font-weight:800;color:var(--light);margin-top:8px;"></div>
         </div>
         <div class="sa-settings-card">
           <div class="sa-settings-title">🎂 Birthday Message</div>
@@ -343,7 +352,7 @@
           <option value="other">📦 Other</option>
         </select>
       </div>
-      <div class="field" style="margin-top:12px;"><label>Amount (£) *</label><input type="number" id="exp-amount" placeholder="e.g. 500" min="0" step="0.01"></div>
+      <div class="field" style="margin-top:12px;"><label>Amount (₦) *</label><input type="number" id="exp-amount" placeholder="e.g. 500" min="0" step="0.01"></div>
       <div class="field" style="margin-top:12px;"><label>Date *</label><input type="date" id="exp-date"></div>
       <div class="field" style="margin-top:12px;"><label>Notes</label><textarea id="exp-notes" style="min-height:60px;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;width:100%;outline:none;" placeholder="Optional notes..."></textarea></div>
       <div class="modal-footer">
@@ -355,7 +364,7 @@
 </div>
 
 <script src="../js/utils.js"></script>
-<script src="../js/super-admin.js"></script>
+<script src="../js/super-admin.js?v=202610051900"></script>
 <script src="../js/mail-system.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {

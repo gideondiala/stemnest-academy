@@ -1137,7 +1137,7 @@ function renderSalesGrid() {
         <div class="tutor-card-name">${s.name}</div>
         <div class="tutor-card-subject">Learning Advisor</div>
         <div class="tutor-card-avail">🌍 ${s.region || '—'}</div>
-        <div class="tutor-card-avail" style="color:var(--green);">✅ ${converted} conversions · £${revenue.toLocaleString()}</div>
+        <div class="tutor-card-avail" style="color:var(--green);">✅ ${converted} conversions · ₦${revenue.toLocaleString()}</div>
         <div style="display:flex;gap:8px;margin-top:12px;justify-content:center;">
           <button class="ab-btn ab-btn-view" onclick="viewSalesPerson('${s.id}')">👁 View</button>
           <button class="ab-btn" style="background:var(--orange-light);color:var(--orange-dark);" onclick="deleteSalesPerson('${s.id}')">🗑 Remove</button>

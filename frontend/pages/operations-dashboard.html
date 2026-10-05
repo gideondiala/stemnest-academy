@@ -73,6 +73,7 @@
       <a class="sidebar-link"        data-tab="penalties"   onclick="showOpsTab('penalties')">  <span class="sl-icon">⚠️</span> Penalties</a>
       <a class="sidebar-link"        data-tab="class-log"   onclick="showOpsTab('class-log')">  <span class="sl-icon">📋</span> Class Log</a>
       <a class="sidebar-link"        data-tab="absent"      onclick="showOpsTab('absent')">     <span class="sl-icon">🚨</span> No-Show Teachers</a>
+      <a class="sidebar-link" href="class-followup.html" target="_blank"><span class="sl-icon">⏳</span> Classes Not Ended</a>
     </div>
     <div class="sidebar-bottom">
       <button class="logout-btn" onclick="window.location.href='login.html'">🚪 Log Out</button>
@@ -109,7 +110,7 @@
       </div>
       <div class="admin-table-wrap">
         <table class="admin-table">
-          <thead><tr><th>Teacher ID</th><th>Teacher Name</th><th>Session ID</th><th>Join Time</th><th>Date</th><th>Month</th><th>Status</th><th>Penalty</th></tr></thead>
+          <thead><tr><th>Teacher ID</th><th>Teacher Name</th><th>Class (WAT)</th><th>Joined (WAT)</th><th>Date</th><th>Month</th><th>Status</th><th>Penalty</th></tr></thead>
           <tbody id="lateJoinsBody"></tbody>
         </table>
       </div>
@@ -141,7 +142,7 @@
 <script src="../js/api.js"></script>
 <script src="../js/api-sync.js"></script>
 <script src="../js/utils.js"></script>
-<script src="../js/operations-dashboard.js"></script>
+<script src="../js/operations-dashboard.js?v=202610051900"></script>
 
 <!-- Absent tab HTML injected here -->
 <div id="tab-absent" style="display:none;">

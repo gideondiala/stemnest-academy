@@ -130,7 +130,7 @@
     parentCall: parentCall, parentUser: parentUser, clear: clear, logout: logout, renderBar: renderBar,
   };
 
-  if (/student-dashboard\.html/.test(window.location.pathname)) {
+  if (/student-dashboard(\.html)?$/.test(window.location.pathname)) {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', renderBar);
     else renderBar();
   }

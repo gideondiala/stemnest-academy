@@ -1553,6 +1553,8 @@ function openManualTopUp(studentId, studentName, studentEmail) {
   document.getElementById('tu-info').innerHTML =
     `<strong>${_escH(studentName)}</strong>${st.staffId ? ' · ' + _escH(st.staffId) : ''}<br>Current balance: <strong>${st.credits != null ? st.credits : (held ? held.credits : '—')}</strong> credits`;
   ['tu-credits', 'tu-amount', 'tu-ref', 'tu-notes'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  const tuDate = document.getElementById('tu-date');
+  if (tuDate) tuDate.value = new Date(Date.now() + 3600e3).toISOString().slice(0, 10);
   const hold = document.getElementById('tu-hold');
   const onHold = held || st.classPaused;
   hold.style.display = onHold ? 'block' : 'none';
@@ -1568,6 +1570,9 @@ async function confirmTopUpModal() {
   const currency = document.getElementById('tu-currency').value;
   const reference = document.getElementById('tu-ref').value.trim();
   const notes    = document.getElementById('tu-notes').value.trim();
+  const paidAt   = document.getElementById('tu-date')?.value || '';
+  const method   = document.getElementById('tu-method')?.value || 'bank_transfer';
+  if (!paidAt) { showToast('Enter the date the payment was made.', 'warning'); return; }
   if (!(credits > 0)) { showToast('Enter the number of credits to add.', 'warning'); return; }
   if (!(amount > 0))  { showToast('Enter the amount received.', 'warning'); return; }
 
@@ -1578,7 +1583,7 @@ async function confirmTopUpModal() {
     const res  = await fetch(`${API}/api/payments/manual-topup`, {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studentId: _topUpStudentId, credits, amount, currency, reference, notes: notes || 'Manual confirmation by Post-Sales' }),
+      body: JSON.stringify({ studentId: _topUpStudentId, credits, amount, currency, reference, notes, paidAt, method, kind: 'payment' }),
     });
     const data = await res.json();
     if (!data.success) { showToast('Error: ' + (data.error || 'Top-up failed'), 'error'); return; }
@@ -1616,7 +1621,8 @@ async function generatePaymentLink() {
   const studentName  = document.getElementById('pl-student')?.value.trim();
   const studentEmail = document.getElementById('pl-email')?.value.trim();
   const amount       = document.getElementById('pl-amount')?.value;
-  const currency     = document.getElementById('pl-currency')?.value || 'GBP';
+  const currency     = document.getElementById('pl-currency')?.value || 'NGN';
+  const provider     = document.getElementById('pl-provider')?.value || 'fincra';
   const credits      = document.getElementById('pl-credits')?.value;
   const notes        = document.getElementById('pl-notes')?.value.trim();
 
@@ -1631,7 +1637,7 @@ async function generatePaymentLink() {
     const res  = await fetch(`${API}/api/payments/create-link`, {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studentName, studentEmail, amount, currency, credits, notes }),
+      body: JSON.stringify({ studentName, studentEmail, amount, currency, credits, notes, provider }),
     });
     const data = await res.json();
     if (data.success && data.paymentUrl) {

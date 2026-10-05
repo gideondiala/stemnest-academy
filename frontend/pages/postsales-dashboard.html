@@ -74,6 +74,7 @@
       <a class="sidebar-link"        data-tab="scheduled" onclick="showPOSTab('scheduled')"><span class="sl-icon">📅</span> Scheduled Classes</a>
       <a class="sidebar-link"        data-tab="reschedule-tool" onclick="showPOSTab('reschedule-tool')"><span class="sl-icon">🔄</span> Reschedule Tool</a>
       <a class="sidebar-link"        data-tab="paylinks"  onclick="showPOSTab('paylinks')"> <span class="sl-icon">🔗</span> Payment Links</a>
+      <a class="sidebar-link" href="credit-topup.html" target="_blank"><span class="sl-icon">💳</span> Credits &amp; Top-ups</a>
       <a class="sidebar-link"        data-tab="converted" onclick="showPOSTab('converted')"><span class="sl-icon">✅</span> Converted</a>
       <a class="sidebar-link"        data-tab="website-enquiries" onclick="showPOSTab('website-enquiries')"><span class="sl-icon">🌐</span> Website Enquiries</a>
       <a class="sidebar-link"        data-tab="enrollment-requests" onclick="showPOSTab('enrollment-requests')"><span class="sl-icon">📋</span> Enrollment Requests <span class="sl-badge" id="enrollReqBadge">0</span></a>
@@ -227,10 +228,15 @@
             <div class="atf-field"><label>Course <span class="req">*</span></label><select id="pl-course"><option value="">Select course</option></select></div>
             <div class="atf-field"><label>Amount <span class="req">*</span></label><input type="number" id="pl-amount" placeholder="e.g. 99" min="0"></div>
             <div class="atf-field"><label>Credits (classes)</label><input type="number" id="pl-credits" placeholder="e.g. 4" min="1"></div>
+            <div class="atf-field"><label>Payment provider</label>
+              <select id="pl-provider">
+                <option value="fincra">Fincra — lower fees in Nigeria</option>
+                <option value="flutterwave">Flutterwave — more countries</option>
+              </select></div>
             <div class="atf-field"><label>Currency</label>
               <select id="pl-currency">
-                <option value="GBP">🇬🇧 GBP (£)</option>
                 <option value="NGN">🇳🇬 NGN (₦)</option>
+                <option value="GBP">🇬🇧 GBP (£)</option>
                 <option value="GHS">🇬🇭 GHS (₵)</option>
                 <option value="USD">🇺🇸 USD ($)</option>
                 <option value="AED">🇦🇪 AED</option>
@@ -444,7 +450,7 @@
 <script src="../js/api-sync.js"></script>
 <script src="../js/wa.js"></script>
 <script src="../js/utils.js"></script>
-<script src="../js/postsales-dashboard.js?v=202610021200"></script>
+<script src="../js/postsales-dashboard.js?v=202610051900"></script>
 <script src="../js/reschedule-tool.js?v=202610021200"></script>
 
 <!-- GREY PAYMENT MODAL -->
@@ -480,6 +486,14 @@
             </select>
             <input type="number" id="tu-amount" min="0" step="0.01" style="flex:1;min-width:0;padding:10px 12px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
           </div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Date paid *</label>
+          <input type="date" id="tu-date" style="width:100%;padding:10px 12px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;box-sizing:border-box;"></div>
+        <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Paid by *</label>
+          <select id="tu-method" style="width:100%;padding:10px 8px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;background:var(--white);">
+            <option value="bank_transfer">Bank transfer</option><option value="card">Card</option><option value="cash">Cash</option>
+            <option value="ussd">USSD</option><option value="mobile_money">Mobile money</option><option value="other">Other</option></select></div>
       </div>
       <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Payment reference</label>
         <input type="text" id="tu-ref" placeholder="e.g. bank transfer ref" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>

@@ -27,6 +27,7 @@ const learningRoutes     = require('./routes/learning');
 const chatRoutes         = require('./routes/chat');
 const promoterRoutes     = require('./routes/promoters');
 const curriculumImportRoutes = require('./routes/curriculumImport');
+const classOpsRoutes         = require('./routes/classOps');
 const blogRoutes         = require('./routes/blogs');
 const enrollmentRoutes   = require('./routes/enrollments');
 const greyRoutes         = require('./routes/grey');
@@ -99,6 +100,8 @@ app.use(rateLimit({
    Stripe signature verification — mount BEFORE json()
 ══════════════════════════════════════════════ */
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
+/* Fincra signs the exact bytes it sent */
+app.use('/api/payments/fincra/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
@@ -140,6 +143,7 @@ app.use('/api/learning',     learningRoutes);
 app.use('/api/chat',         chatRoutes);
 app.use('/api/promoters',    promoterRoutes);
 app.use('/api/curriculum-import', curriculumImportRoutes);
+app.use('/api/class-ops',    classOpsRoutes);
 app.use('/api/blogs',        blogRoutes);
 app.use('/api/enrollments',  enrollmentRoutes);
 app.use('/api/grey',         greyRoutes);
@@ -169,6 +173,7 @@ const server = app.listen(PORT, () => {
       startReminderJob();
       startRetentionJob();
       startBookingExtensionJob();
+      require('./services/classOpsService').startUnendedClassJob();
       require("./services/learningService").startDueReminderJob();
       chatRoutes.startChatReminderJob();
     });

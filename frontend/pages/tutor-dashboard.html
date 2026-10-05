@@ -123,10 +123,10 @@
         <div class="dstat-trend trend-up" id="statSessionsTrend">Loading…</div>
       </div>
       <div class="dstat ds-green">
-        <div class="dstat-icon di-green">💷</div>
-        <div class="dstat-val" id="overviewEarnings">£0</div>
-        <div class="dstat-label">Live Earnings</div>
-        <div class="dstat-trend trend-up">This month</div>
+        <div class="dstat-icon di-green">₦</div>
+        <div class="dstat-val" id="overviewEarnings">₦0</div>
+        <div class="dstat-label">This Month's Pay</div>
+        <div class="dstat-trend trend-up" onclick="showDashTab('payments')" style="cursor:pointer;color:var(--blue);">My Payments →</div>
       </div>
       <div class="dstat ds-purple">
         <div class="dstat-icon di-purple">⭐</div>
@@ -323,9 +323,9 @@
       <!-- Earnings cards -->
       <div class="dash-stats" style="margin-bottom:28px;">
         <div class="dstat ds-green">
-          <div class="dstat-icon di-green">💷</div>
-          <div class="dstat-val" id="liveEarnings">$0</div>
-          <div class="dstat-label">Live Earnings</div>
+          <div class="dstat-icon di-green">₦</div>
+          <div class="dstat-val" id="liveEarnings">₦0</div>
+          <div class="dstat-label">This Month's Pay</div>
           <div class="dstat-trend trend-up">This month</div>
         </div>
         <div class="dstat ds-purple">
@@ -572,12 +572,13 @@
 <script src="../js/api-sync.js"></script>
 <script src="../js/wa.js"></script>
 <script src="../js/utils.js"></script>
-<script src="../js/dashboard.js"></script>
+<script src="../js/dashboard.js?v=202610051900"></script>
 <script src="../js/tutor-companion.js"></script>
 <script src="../js/tutor-sessions.js"></script>
 <script src="../js/tutor-sessions-v2.js"></script>
 <script src="../js/course-scheduler.js"></script>
 <script src="../js/tutor-projects.js"></script>
-<script src="../js/chat.js"></script>
+<script src="../js/chat.js?v=202610051900"></script>
+<script src="../js/class-ops.js?v=202610051900"></script>
 </body>
 </html>

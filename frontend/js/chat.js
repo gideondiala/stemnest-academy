@@ -8,8 +8,9 @@
   'use strict';
   var API = 'https://api.stemnestacademy.co.uk/api/chat';
   var POLL_MS = 20000;
-  var isTutor = /tutor-dashboard\.html/.test(location.pathname);
-  var isStudent = /student-dashboard\.html/.test(location.pathname);
+  /* Pages are served with or without ".html" (/pages/tutor-dashboard) */
+  var isTutor = /tutor-dashboard(\.html)?$/.test(location.pathname);
+  var isStudent = /student-dashboard(\.html)?$/.test(location.pathname);
   if (!isTutor && !isStudent) return;
 
   var st = { threads: [], current: null, since: new Date().toISOString(), poll: null, firstCheck: true };
@@ -72,6 +73,8 @@
     if (nav && !document.getElementById('chatNavBadge')) {
       nav.insertAdjacentHTML('beforeend', ' <span class="sl-badge" id="chatNavBadge" style="display:none;background:#e53e3e;color:#fff;">0</span>');
     }
+    if (st.tabWrapped) return;
+    st.tabWrapped = true;
     var orig = window.showTab;
     window.showTab = function (t) { orig(t); if (t === 'chat') openInbox(); };
   }
@@ -100,7 +103,10 @@
 
   /* ══════════════ Threads & messages ══════════════ */
   async function openInbox() {
+    /* Older dashboard code may have replaced the chat area — put it back */
+    if (!document.getElementById('chatRoot') && isStudent) ensureStudentTab();
     if (!document.getElementById('chatThreads')) renderShell();
+    if (!document.getElementById('chatThreads')) return;
     try {
       var d = await api('/threads');
       st.threads = d.threads;
@@ -130,6 +136,7 @@
 
   async function openThread(otherId, quiet) {
     st.current = otherId;
+    if (!document.getElementById('chatHead')) return;
     var t = st.threads.find(function (x) { return x.id === otherId; }) || {};
     document.getElementById('chatHead').innerHTML = esc(t.name || '') + (t.staffId ? ' <span style="color:var(--light);font-weight:700;font-size:12px;">' + esc(t.staffId) + '</span>' : '');
     document.getElementById('chatForm').style.display = 'block';

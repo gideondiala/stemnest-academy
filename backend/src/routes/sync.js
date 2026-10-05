@@ -38,84 +38,41 @@ async function upsert(table, data, conflictKey) {
 ══════════════════════════════════════════════ */
 router.post('/class-reports', requireAuth, async (req, res, next) => {
   try {
-    const { bookingId, outcome, classQuality, studentInterest, purchasingPower,
-            incompleteReason, notes, recordingLink, payAmount, creditDeducted } = req.body;
+    /* Report details only (e.g. a recording link added later). Ending a class —
+       its status, the students' credits and the tutor's pay — goes through
+       POST /api/bookings/:id/report, so nothing here changes them. */
+    const { bookingId, classQuality, studentInterest, purchasingPower,
+            incompleteReason, notes, recordingLink } = req.body;
 
-    if (!bookingId || !outcome) {
-      return res.status(400).json({ success: false, error: 'bookingId and outcome required' });
+    if (!bookingId || !/^[0-9a-f-]{36}$/i.test(String(bookingId))) {
+      return res.status(400).json({ success: false, error: 'bookingId required' });
+    }
+    const bResult = await pool.query('SELECT id, tutor_id, status FROM bookings WHERE id = $1', [bookingId]);
+    const booking = bResult.rows[0];
+    if (!booking) return res.status(404).json({ success: false, error: 'Booking not found' });
+    const isStaff = ['admin', 'super_admin', 'operations'].includes(req.user.role);
+    if (!isStaff && booking.tutor_id !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'Not your class' });
     }
 
-    /* Save class report */
+    /* Fill in the given fields; keep everything else */
     await pool.query(
       `INSERT INTO class_reports
          (booking_id, tutor_id, outcome, class_quality, student_interest,
           purchasing_power, incomplete_reason, notes, recording_link)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        ON CONFLICT (booking_id) DO UPDATE SET
-         outcome = EXCLUDED.outcome,
-         class_quality = EXCLUDED.class_quality,
-         student_interest = EXCLUDED.student_interest,
-         purchasing_power = EXCLUDED.purchasing_power,
-         incomplete_reason = EXCLUDED.incomplete_reason,
-         notes = EXCLUDED.notes,
-         recording_link = EXCLUDED.recording_link`,
-      [bookingId, req.user.id, outcome, classQuality || null, studentInterest || null,
+         class_quality     = COALESCE(EXCLUDED.class_quality,     class_reports.class_quality),
+         student_interest  = COALESCE(EXCLUDED.student_interest,  class_reports.student_interest),
+         purchasing_power  = COALESCE(EXCLUDED.purchasing_power,  class_reports.purchasing_power),
+         incomplete_reason = COALESCE(EXCLUDED.incomplete_reason, class_reports.incomplete_reason),
+         notes             = COALESCE(EXCLUDED.notes,             class_reports.notes),
+         recording_link    = COALESCE(EXCLUDED.recording_link,    class_reports.recording_link)`,
+      [bookingId, booking.tutor_id || req.user.id, booking.status, classQuality || null, studentInterest || null,
        purchasingPower || null, incompleteReason || null, notes || null, recordingLink || null]
-    ).catch(async () => {
-      /* If conflict constraint doesn't exist, just insert */
-      await pool.query(
-        `INSERT INTO class_reports
-           (booking_id, tutor_id, outcome, class_quality, student_interest,
-            purchasing_power, incomplete_reason, notes, recording_link)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-        [bookingId, req.user.id, outcome, classQuality || null, studentInterest || null,
-         purchasingPower || null, incompleteReason || null, notes || null, recordingLink || null]
-      );
-    });
+    );
 
-    /* Update booking status and notes */
-    const bResult = await pool.query('SELECT student_id, notes FROM bookings WHERE id = $1', [bookingId]);
-    const booking = bResult.rows[0];
-    
-    let bNotesObj = {};
-    if (booking && booking.notes) {
-      try { bNotesObj = JSON.parse(booking.notes); } catch(e) {}
-    }
-    if (outcome === 'incomplete' && incompleteReason) {
-      bNotesObj.incompleteReason = incompleteReason;
-    }
-
-    await pool.query(
-      `UPDATE bookings SET status = $1, completed_at = NOW(), notes = $3 WHERE id = $2`,
-      [outcome, bookingId, Object.keys(bNotesObj).length > 0 ? JSON.stringify(bNotesObj) : null]
-    ).catch(() => {});
-
-    /* Deduct student credit if completed */
-    if (creditDeducted && (outcome === 'completed' || outcome === 'partially_completed')) {
-      const studentId = booking?.student_id;
-      if (studentId) {
-        await pool.query(
-          `UPDATE student_profiles SET credits = GREATEST(0, credits - 1) WHERE user_id = $1`,
-          [studentId]
-        ).catch(() => {});
-        await pool.query(
-          `INSERT INTO credit_transactions (student_id, type, amount, description, booking_id)
-           VALUES ($1, 'class_deduction', -1, 'Class completed — 1 credit used', $2)`,
-          [studentId, bookingId]
-        ).catch(() => {});
-      }
-    }
-
-    /* Update tutor earnings */
-    if (payAmount && payAmount > 0) {
-      await pool.query(
-        `UPDATE tutor_profiles SET earnings = earnings + $1, classes_done = classes_done + 1
-         WHERE user_id = $2`,
-        [payAmount, req.user.id]
-      ).catch(() => {});
-    }
-
-    logger.info(`[SYNC] Class report: booking ${bookingId} → ${outcome}`);
+    logger.info(`[SYNC] Class report details saved: booking ${bookingId}`);
     res.json({ success: true });
   } catch (err) { next(err); }
 });
@@ -174,6 +131,11 @@ router.post('/pipeline', requireAuth, async (req, res, next) => {
 ══════════════════════════════════════════════ */
 router.post('/late-joins', requireAuth, async (req, res, next) => {
   try {
+    /* Late joins are now recorded by the server when the tutor clicks Join
+       (POST /api/class-ops/:id/join); only staff may add one by hand. */
+    if (!['admin', 'super_admin', 'operations'].includes(req.user.role)) {
+      return res.json({ success: true });
+    }
     const { bookingId, tutorId, joinTime, minsLate, penalty, pardoned } = req.body;
     if (!bookingId) return res.status(400).json({ success: false, error: 'bookingId required' });
 
@@ -214,23 +176,30 @@ router.post('/credits', requireAuth, async (req, res, next) => {
 
     const studentId = userResult.rows[0].id;
 
-    /* Set absolute credit value */
-    if (credits !== undefined) {
-      await pool.query(
-        `INSERT INTO student_profiles (user_id, credits)
-         VALUES ($1, $2)
-         ON CONFLICT (user_id) DO UPDATE SET credits = $2`,
-        [studentId, parseInt(credits)]
-      ).catch(() => {});
+    /* Class credits are deducted by the class report itself (POST /api/bookings/:id/report),
+       so a tutor's log-only call has nothing left to do. */
+    if (!canSet || credits === undefined || isNaN(parseInt(credits))) {
+      return res.json({ success: true });
     }
 
-    /* Log transaction */
-    if (type) {
+    /* Set the absolute balance, and log the change so the student's credit activity adds up */
+    const before = await pool.query('SELECT credits FROM student_profiles WHERE user_id = $1', [studentId]);
+    const oldCredits = before.rows.length ? parseInt(before.rows[0].credits || 0, 10) : 0;
+    const newCredits = parseInt(credits, 10);
+    await pool.query(
+      `INSERT INTO student_profiles (user_id, credits)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id) DO UPDATE SET credits = $2`,
+      [studentId, newCredits]
+    );
+    if (newCredits !== oldCredits) {
       await pool.query(
-        `INSERT INTO credit_transactions (student_id, type, amount, description, booking_id)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [studentId, type, parseInt(credits) || 0, description || '', bookingId || null]
-      ).catch(() => {});
+        `INSERT INTO credit_transactions (student_id, type, amount, description, booking_id, balance_after, created_by)
+         VALUES ($1, 'adjustment', $2, $3, $4, $5, $6)`,
+        [studentId, newCredits - oldCredits,
+         description || `Balance set to ${newCredits} by ${req.user.email}`,
+         bookingId || null, newCredits, req.user.id]
+      );
     }
 
     res.json({ success: true });

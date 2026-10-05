@@ -272,6 +272,46 @@ const STATEMENTS = [
      created_at  TIMESTAMPTZ DEFAULT NOW(),
      UNIQUE (tutor_id, booking_id)
    )`,
+  /* Pay details per class, for the tutor's monthly pay sheet */
+  `ALTER TABLE tutor_earnings_log ADD COLUMN IF NOT EXISTS outcome        VARCHAR(30)`,
+  `ALTER TABLE tutor_earnings_log ADD COLUMN IF NOT EXISTS students_count INTEGER`,
+  `ALTER TABLE tutor_earnings_log ADD COLUMN IF NOT EXISTS student_names  TEXT`,
+  `ALTER TABLE tutor_earnings_log ADD COLUMN IF NOT EXISTS class_date     DATE`,
+  `ALTER TABLE tutor_earnings_log ADD COLUMN IF NOT EXISTS class_time     TIME`,
+  `ALTER TABLE tutor_earnings_log ADD COLUMN IF NOT EXISTS subject        TEXT`,
+  `ALTER TABLE tutor_earnings_log ADD COLUMN IF NOT EXISTS currency       VARCHAR(5)`,   /* NULL = before Naira pay (placeholder rates) */
+  `ALTER TABLE tutor_earnings_log ADD COLUMN IF NOT EXISTS updated_at     TIMESTAMPTZ`,
+  `CREATE INDEX IF NOT EXISTS idx_earnings_log_tutor ON tutor_earnings_log(tutor_id, created_at)`,
+
+  /* ── Class follow-up: first tutor join, and the 2-hour "please end the class" email ── */
+  `ALTER TABLE bookings ADD COLUMN IF NOT EXISTS tutor_joined_at   TIMESTAMPTZ`,
+  `ALTER TABLE bookings ADD COLUMN IF NOT EXISTS unended_warned_at TIMESTAMPTZ`,
+
+  /* ── Late joins (one per class) ── */
+  `ALTER TABLE late_joins ADD COLUMN IF NOT EXISTS class_start TIMESTAMPTZ`,
+  `ALTER TABLE late_joins ADD COLUMN IF NOT EXISTS nth_in_month INTEGER`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_late_joins_booking_one ON late_joins(booking_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_late_joins_tutor ON late_joins(tutor_id, created_at)`,
+
+  /* ── Credit activity log: payment details on each line ── */
+  `ALTER TABLE credit_transactions ADD COLUMN IF NOT EXISTS payment_id    UUID`,
+  `ALTER TABLE credit_transactions ADD COLUMN IF NOT EXISTS amount_paid   NUMERIC(12,2)`,
+  `ALTER TABLE credit_transactions ADD COLUMN IF NOT EXISTS currency      VARCHAR(5)`,
+  `ALTER TABLE credit_transactions ADD COLUMN IF NOT EXISTS method        VARCHAR(30)`,
+  `ALTER TABLE credit_transactions ADD COLUMN IF NOT EXISTS reference     TEXT`,
+  `ALTER TABLE credit_transactions ADD COLUMN IF NOT EXISTS paid_at       DATE`,
+  `ALTER TABLE credit_transactions ADD COLUMN IF NOT EXISTS balance_after INTEGER`,
+  `ALTER TABLE credit_transactions ADD COLUMN IF NOT EXISTS created_by    UUID`,
+  `CREATE INDEX IF NOT EXISTS idx_credit_tx_booking ON credit_transactions(booking_id)`,
+
+  /* ── Payments: provider (fincra / flutterwave / manual) and how it was paid ── */
+  `ALTER TABLE payments ADD COLUMN IF NOT EXISTS provider  VARCHAR(20)`,
+  `ALTER TABLE payments ADD COLUMN IF NOT EXISTS reference VARCHAR(80)`,
+  `ALTER TABLE payments ADD COLUMN IF NOT EXISTS method    VARCHAR(30)`,
+  `ALTER TABLE payments ADD COLUMN IF NOT EXISTS paid_at   DATE`,
+  `ALTER TABLE payments ADD COLUMN IF NOT EXISTS kind      VARCHAR(20)`,
+  `CREATE INDEX IF NOT EXISTS idx_payments_reference ON payments(reference)`,
+  `CREATE INDEX IF NOT EXISTS idx_payments_student   ON payments(student_id, created_at)`,
 ];
 
 async function ensureSchema() {

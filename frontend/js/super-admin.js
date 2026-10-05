@@ -170,9 +170,9 @@ function renderOverview(period) {
     kpiCard('📋', bookings.length,                                    'Total Bookings',    null, '') +
     kpiCard('📡', reports.filter(r => r.outcome === 'completed').length, 'Classes Completed', null, '') +
     kpiCard('❌', reports.filter(r => r.outcome === 'incomplete').length,'Classes Incomplete',null, '') +
-    kpiCard('💰', '£' + rev.toFixed(0),                               'Revenue',           null, '') +
-    kpiCard('💸', '£' + expenses.toFixed(0),                          'Expenses',          null, '') +
-    kpiCard('📈', `<span class="${profit >= 0 ? 'sa-profit-positive' : 'sa-profit-negative'}">£${profit.toFixed(0)}</span>`, 'Net Profit', null, '');
+    kpiCard('💰', '₦' + rev.toFixed(0),                               'Revenue',           null, '') +
+    kpiCard('💸', '₦' + expenses.toFixed(0),                          'Expenses',          null, '') +
+    kpiCard('📈', `<span class="${profit >= 0 ? 'sa-profit-positive' : 'sa-profit-negative'}">₦${profit.toFixed(0)}</span>`, 'Net Profit', null, '');
 
   // Demo chart (simple bar)
   renderBarChart('demoClassChart', bookings, period);
@@ -203,7 +203,7 @@ function renderSalesReport(period) {
     kpiCard('📋', bookings.length,    'Total Demos',    null, '') +
     kpiCard('✅', converted.length,   'Converted',      null, '') +
     kpiCard('❌', bookings.length - converted.length, 'Not Converted', null, '') +
-    kpiCard('💰', '£' + rev.toFixed(0), 'Revenue Won',  null, '') +
+    kpiCard('💰', '₦' + rev.toFixed(0), 'Revenue Won',  null, '') +
     kpiCard('📊', bookings.length ? Math.round(converted.length / bookings.length * 100) + '%' : '0%', 'Conversion Rate', null, '');
 
   // Per sales person
@@ -211,7 +211,7 @@ function renderSalesReport(period) {
     const pipeline = JSON.parse(localStorage.getItem('sn_pipeline_' + sp.id) || '[]');
     const spConverted = pipeline.filter(p => p.status === 'converted');
     const spRev = spConverted.reduce((s, p) => s + (parseFloat(p.paymentAmount) || 0), 0);
-    return [sp.name, sp.id, pipeline.length, spConverted.length, '£' + spRev.toFixed(0)];
+    return [sp.name, sp.id, pipeline.length, spConverted.length, '₦' + spRev.toFixed(0)];
   });
   document.getElementById('salesPersonTable').innerHTML = simpleTable(
     ['Name','ID','Total Pitched','Converted','Revenue'],
@@ -265,16 +265,16 @@ function renderRevenueReport(period) {
   const profit    = rev - expenses;
 
   document.getElementById('revenueKpiGrid').innerHTML =
-    kpiCard('💰', '£' + rev.toFixed(0),     'Gross Revenue', null, '') +
-    kpiCard('💸', '£' + expenses.toFixed(0), 'Total Expenses', null, '') +
-    kpiCard('📈', `<span class="${profit >= 0 ? 'sa-profit-positive' : 'sa-profit-negative'}">£${profit.toFixed(0)}</span>`, 'Net Profit', null, '');
+    kpiCard('💰', '₦' + rev.toFixed(0),     'Gross Revenue', null, '') +
+    kpiCard('💸', '₦' + expenses.toFixed(0), 'Total Expenses', null, '') +
+    kpiCard('📈', `<span class="${profit >= 0 ? 'sa-profit-positive' : 'sa-profit-negative'}">₦${profit.toFixed(0)}</span>`, 'Net Profit', null, '');
 
   // Revenue by subject
   const subjects = ['Coding','Maths','Sciences'];
   const revRows = subjects.map(s => {
     const subRev = bookings.filter(b => b.subject === s && (b.status === 'completed' || b.salesStatus === 'converted'))
       .reduce((sum, b) => sum + (parseFloat(b.paymentAmount) || 0), 0);
-    return [s, bookings.filter(b => b.subject === s).length, '£' + subRev.toFixed(0)];
+    return [s, bookings.filter(b => b.subject === s).length, '₦' + subRev.toFixed(0)];
   });
   document.getElementById('revenueTable').innerHTML = simpleTable(
     ['Subject','Bookings','Revenue'], revRows, 'No revenue data.'
@@ -289,15 +289,15 @@ function renderExpensesReport(period) {
   const profit   = rev - total;
 
   document.getElementById('expenseKpiGrid').innerHTML =
-    kpiCard('💸', '£' + total.toFixed(0),  'Total Expenses', null, '') +
-    kpiCard('💰', '£' + rev.toFixed(0),    'Revenue',        null, '') +
-    kpiCard('📈', `<span class="${profit >= 0 ? 'sa-profit-positive' : 'sa-profit-negative'}">£${profit.toFixed(0)}</span>`, 'Net Profit', null, '');
+    kpiCard('💸', '₦' + total.toFixed(0),  'Total Expenses', null, '') +
+    kpiCard('💰', '₦' + rev.toFixed(0),    'Revenue',        null, '') +
+    kpiCard('📈', `<span class="${profit >= 0 ? 'sa-profit-positive' : 'sa-profit-negative'}">₦${profit.toFixed(0)}</span>`, 'Net Profit', null, '');
 
   const catLabel = { salary:'💷 Teacher Salary', salary_sales:'💷 Sales Salary', salary_ops:'💷 Ops Salary', platform:'💻 Platform', marketing:'📣 Marketing', admin:'📋 Admin', other:'📦 Other' };
   const rows = expenses.map(e => [
     `<strong>${e.description}</strong>`,
     `<span class="exp-cat-badge">${catLabel[e.category] || e.category}</span>`,
-    '£' + parseFloat(e.amount).toFixed(2),
+    '₦' + parseFloat(e.amount).toFixed(2),
     formatSADate(e.date),
     e.notes || '—',
     `<button class="ab-btn" style="background:var(--orange-light);color:var(--orange-dark);" onclick="deleteExpense('${e.id}')">🗑</button>`,
@@ -376,7 +376,7 @@ function renderTeachersReport() {
       +'<td style="'+tdS+';font-size:12px;color:var(--mid);">'+(t.country||'—')+'</td>'
       +'<td style="'+tdS+';font-size:12px;color:var(--mid);">'+(t.availability||'—')+'</td>'
       +'<td style="'+tdS+';font-weight:700;color:var(--mid);">'+(data.classes||0)+'</td>'
-      +'<td style="'+tdS+';font-weight:800;color:var(--green-dark);">£'+(data.earnings||0).toFixed(0)+'</td>'
+      +'<td style="'+tdS+';font-weight:800;color:var(--green-dark);">₦'+(data.earnings||0).toFixed(0)+'</td>'
       +'<td style="'+tdS+';font-weight:700;color:var(--purple);">'+(data.points||0)+'</td>'
       +'<td style="'+tdS+'">'+statusBadge+'</td>'
       +'<td style="'+tdS+'">'+actionBtn+'</td>'
@@ -468,7 +468,7 @@ function renderStudentsReport() {
         +'<td style="'+tdS+';font-weight:700;color:var(--mid);">'+(b.subject||'—')+'</td>'
         +'<td style="'+tdS+';font-size:12px;color:var(--mid);">'+(b.email||'—')+'</td>'
         +'<td style="'+tdS+';font-weight:800;color:var(--blue);">'+(b.studentCredits||'—')+'</td>'
-        +'<td style="'+tdS+';font-weight:800;color:var(--green-dark);">'+(b.paymentAmount?'£'+b.paymentAmount:'—')+'</td>'
+        +'<td style="'+tdS+';font-weight:800;color:var(--green-dark);">'+(b.paymentAmount?'₦'+b.paymentAmount:'—')+'</td>'
         +'<td style="'+tdS+'"><span style="background:var(--green-light);color:var(--green-dark);font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">'+(b.studentOnboarded?'Onboarded':'Converted')+'</span></td>'
         +'</tr>';
     } else {
@@ -578,14 +578,7 @@ function loadSettings() {
     const el = document.getElementById('saFounderDob');
     if (el) el.value = settings.founderDob;
   }
-  if (settings.demoClassPay !== undefined) {
-    const el = document.getElementById('demoClassPay');
-    if (el) el.value = settings.demoClassPay;
-  }
-  if (settings.paidClassPay !== undefined) {
-    const el = document.getElementById('paidClassPay');
-    if (el) el.value = settings.paidClassPay;
-  }
+  loadPayRates();
 }
 
 function saveSettings(key, val) {
@@ -620,12 +613,45 @@ function uploadSignature(input) {
   reader.readAsDataURL(file);
 }
 
-function savePayRates() {
-  const demo = parseFloat(document.getElementById('demoClassPay')?.value || '5');
-  const paid = parseFloat(document.getElementById('paidClassPay')?.value || '20');
-  saveSettings('demoClassPay', demo);
-  saveSettings('paidClassPay', paid);
-  showToast('✅ Pay rates saved! Demo: £' + demo + ' · Paid: £' + paid);
+/* Tutor pay rates live on the server (settings table) — in Naira */
+const PAY_RATE_FIELDS = { demo: 'payRateDemo', paid1: 'payRatePaid1', paid2: 'payRatePaid2', paid3: 'payRatePaid3' };
+const _ngn = n => '₦' + Number(n || 0).toLocaleString('en-NG');
+
+async function loadPayRates() {
+  try {
+    const r = await fetch('https://api.stemnestacademy.co.uk/api/class-ops/pay-rates', {
+      headers: { 'Authorization': 'Bearer ' + localStorage.getItem('sn_access_token') },
+    });
+    const d = await r.json();
+    if (!d.success) throw new Error(d.error || 'Could not load pay rates');
+    Object.entries(PAY_RATE_FIELDS).forEach(([k, id]) => {
+      const el = document.getElementById(id);
+      if (el && d.rates.configured) el.value = d.rates[k];
+    });
+    const st = document.getElementById('payRatesStatus');
+    if (st) st.textContent = d.rates.configured ? 'Saved rates are shown above.' : '⚠️ Not set yet — tutors earn ₦0 per class until you save rates.';
+  } catch (e) { console.warn('[PayRates]', e.message); }
+}
+
+async function savePayRates() {
+  const body = {};
+  for (const [k, id] of Object.entries(PAY_RATE_FIELDS)) {
+    const v = document.getElementById(id)?.value;
+    if (v === '' || v == null || isNaN(parseFloat(v))) { showToast('Please fill in all four pay rates.', 'error'); return; }
+    body[k] = parseFloat(v);
+  }
+  try {
+    const r = await fetch('https://api.stemnestacademy.co.uk/api/class-ops/pay-rates', {
+      method: 'PUT',
+      headers: { 'Authorization': 'Bearer ' + localStorage.getItem('sn_access_token'), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (!d.success) throw new Error(d.error || 'Save failed');
+    const st = document.getElementById('payRatesStatus');
+    if (st) st.textContent = '✅ Saved ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    showToast(`✅ Pay rates saved — Demo ${_ngn(d.rates.demo)} · 1 student ${_ngn(d.rates.paid1)} · 2 students ${_ngn(d.rates.paid2)} · 3+ students ${_ngn(d.rates.paid3)}`);
+  } catch (e) { showToast('⚠️ ' + e.message, 'error'); }
 }
 
 function getPayRates() {

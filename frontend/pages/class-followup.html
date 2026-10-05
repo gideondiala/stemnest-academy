@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="../assets/icons/icon.png">
+  <title>Class Follow-up – StemNest Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/global.css">
+  <script src="../js/auth-guard.js" data-roles="admin,super_admin,operations"></script>
+  <style>
+    body { background: var(--bg); font-family: 'Nunito', sans-serif; margin: 0; }
+    .top { background: #fff; border-bottom: 1.5px solid #e8eaf0; padding: 14px 5%; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .top h1 { font-family: 'Fredoka One', cursive; font-size: 24px; margin: 0; }
+    .wrap { max-width: 1100px; margin: 22px auto 60px; padding: 0 16px; }
+    .card { background: #fff; border: 1.5px solid #e8eaf0; border-radius: 16px; padding: 20px; margin-bottom: 18px; }
+    .h { font-family: 'Fredoka One', cursive; font-size: 19px; margin: 0 0 4px; }
+    .muted { color: var(--light); font-size: 12px; font-weight: 700; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 640px; }
+    th { text-align: left; font-size: 11px; font-weight: 900; color: var(--mid); text-transform: uppercase; padding: 8px 10px; background: var(--bg); }
+    td { padding: 9px 10px; border-bottom: 1px solid #f1f3f8; font-weight: 700; vertical-align: top; }
+    .b { border: none; border-radius: 10px; padding: 8px 14px; font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 13px; cursor: pointer; }
+    .pill { display: inline-block; border-radius: 50px; padding: 2px 10px; font-size: 11px; font-weight: 900; }
+    .scroll { overflow-x: auto; }
+    select, input { padding: 8px 10px; border: 2px solid #e8eaf0; border-radius: 10px; font-family: 'Nunito', sans-serif; font-weight: 700; }
+  </style>
+</head>
+<body>
+<div class="top"><h1>⏰ Class Follow-up</h1><a href="javascript:history.back()" style="font-weight:800;color:var(--blue);text-decoration:none;">← Back</a></div>
+<div class="wrap">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;">
+      <div><div class="h">⏳ Classes not ended</div>
+        <div class="muted">Classes (from 5 Oct 2026) whose time has passed but the tutor has not ended. Tutors get a polite reminder email 2 hours after the class. If a class still isn't ended, mark it incomplete here — no pay is added, and a paid lesson moves to the student's next slot.</div></div>
+      <label class="muted"><input type="checkbox" id="onlyOverdue"> Only 2+ hours overdue</label>
+    </div>
+    <div class="scroll" style="margin-top:12px;"><table><thead><tr><th>Class (WAT)</th><th>Tutor</th><th>Student / batch</th><th>Waiting</th><th>Reminder</th><th></th></tr></thead><tbody id="unended"></tbody></table></div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;">
+      <div><div class="h">🕐 Late joins</div>
+        <div class="muted">Joining more than 4 minutes after the start is late. The first 2 each month are pardoned; from the 3rd, a $2 penalty is logged (not deducted from pay).</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;"><input type="month" id="month"><button class="b" style="background:var(--green);color:#fff;" id="csv">⬇ CSV</button></div>
+    </div>
+    <div id="lateSummary" style="margin-top:12px;"></div>
+    <div class="scroll" style="margin-top:12px;"><table><thead><tr><th>Tutor</th><th>ID</th><th>Class (WAT)</th><th>Joined (WAT)</th><th>Late by</th><th>#</th><th>Status</th></tr></thead><tbody id="late"></tbody></table></div>
+  </div>
+</div>
+
+<script src="../js/api.js"></script>
+<script>
+(function () {
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const $ = id => document.getElementById(id);
+  const mins = m => m >= 1440 ? Math.floor(m / 1440) + 'd ' + Math.floor((m % 1440) / 60) + 'h' : m >= 60 ? Math.floor(m / 60) + 'h ' + (m % 60) + 'm' : m + 'm';
+  let lateRows = [];
+
+  async function loadUnended() {
+    $('unended').innerHTML = '<tr><td colspan="6" class="muted">Loading…</td></tr>';
+    try {
+      const d = await apiCall('/api/class-ops/unended' + ($('onlyOverdue').checked ? '?overdue=1' : ''));
+      $('unended').innerHTML = d.classes.length ? d.classes.map(c => `<tr>
+        <td>${esc(c.date)} · ${esc(c.time)}${c.isDemo ? ' <span class="pill" style="background:#f5f3ff;color:#7c3aed;">demo</span>' : ''}<div class="muted">${esc(c.subject || '')}</div></td>
+        <td>${esc(c.tutorName)} <div class="muted">${esc(c.tutorStaffId || '')}${c.tutorJoinedAt ? ' · joined' : ' · did not click Join'}</div></td>
+        <td>${esc(c.batchRef ? 'Batch ' + c.batchRef : (c.studentName || '—'))}</td>
+        <td><span class="pill" style="background:${c.minsSinceEnd >= 120 ? '#fde8e8' : '#fff7ed'};color:${c.minsSinceEnd >= 120 ? '#c53030' : '#c2410c'};">${mins(c.minsSinceEnd)}</span></td>
+        <td class="muted">${c.warnedAt ? 'Emailed ' + new Date(c.warnedAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+        <td><button class="b" style="background:#fde8e8;color:#c53030;" data-id="${c.id}" data-label="${esc(c.date + ' ' + c.time + ' — ' + c.tutorName)}">Mark incomplete</button></td></tr>`).join('')
+        : '<tr><td colspan="6" class="muted" style="padding:20px;text-align:center;">🎉 Every class has been ended.</td></tr>';
+      document.querySelectorAll('#unended button[data-id]').forEach(btn => btn.onclick = () => markIncomplete(btn));
+    } catch (e) { $('unended').innerHTML = `<tr><td colspan="6" style="color:#c53030;">${esc(e.message)}</td></tr>`; }
+  }
+
+  async function markIncomplete(btn) {
+    const reason = prompt(`Mark this class incomplete?\n${btn.dataset.label}\n\nReason (shown to the tutor):`, 'Not ended by the tutor');
+    if (reason === null) return;
+    btn.disabled = true; btn.textContent = '⏳';
+    try {
+      const d = await apiCall('/api/class-ops/' + btn.dataset.id + '/mark-incomplete', { method: 'POST', body: { reason } });
+      btn.closest('tr').innerHTML = `<td colspan="6" class="muted">❌ Marked incomplete${d.movedTo ? ' — lesson moved to ' + esc(d.movedTo.d) + ' ' + esc(String(d.movedTo.t).slice(0, 5)) : ''}.</td>`;
+    } catch (e) { alert(e.message); btn.disabled = false; btn.textContent = 'Mark incomplete'; }
+  }
+
+  async function loadLate() {
+    $('late').innerHTML = '<tr><td colspan="7" class="muted">Loading…</td></tr>';
+    try {
+      const d = await apiCall('/api/class-ops/late-joins?month=' + $('month').value);
+      lateRows = d.lateJoins;
+      const by = {};
+      lateRows.forEach(l => { const k = l.tutorId; by[k] = by[k] || { name: l.tutorName, id: l.tutorStaffId, n: 0, pen: 0 }; by[k].n++; by[k].pen += l.penalty || 0; });
+      $('lateSummary').innerHTML = Object.values(by).sort((a, b) => b.n - a.n).map(t =>
+        `<span class="pill" style="background:${t.pen ? '#fde8e8' : '#eef4ff'};color:${t.pen ? '#c53030' : '#1e40af'};margin:0 6px 6px 0;">${esc(t.name)} · ${t.n} late${t.pen ? ' · $' + t.pen + ' penalty' : ''}</span>`).join('');
+      $('late').innerHTML = lateRows.length ? lateRows.map(l => `<tr>
+        <td>${esc(l.tutorName)}</td><td class="muted">${esc(l.tutorStaffId || '')}</td>
+        <td>${esc(l.classDate)} · ${esc(l.classTime)}<div class="muted">${esc(l.studentName || '')}${l.isDemo ? ' · demo' : ''}</div></td>
+        <td>${esc(l.joinTime)}</td><td style="color:#c53030;">${l.minsLate} min</td><td>${l.nthInMonth || ''}</td>
+        <td>${l.pardoned ? '<span class="pill" style="background:#dcfce7;color:#166534;">Pardoned</span>' : '<span class="pill" style="background:#fde8e8;color:#c53030;">$' + l.penalty + ' penalty</span>'}</td></tr>`).join('')
+        : '<tr><td colspan="7" class="muted" style="padding:20px;text-align:center;">No late joins this month.</td></tr>';
+    } catch (e) { $('late').innerHTML = `<tr><td colspan="7" style="color:#c53030;">${esc(e.message)}</td></tr>`; }
+  }
+
+  $('csv').onclick = () => {
+    if (!lateRows.length) return alert('No late joins to export.');
+    const head = ['Tutor', 'Tutor ID', 'Class date', 'Class time (WAT)', 'Student / batch', 'Joined at (WAT)', 'Minutes late', 'Late join # this month', 'Pardoned', 'Penalty ($)'];
+    const rows = lateRows.map(l => [l.tutorName, l.tutorStaffId || '', l.classDate, l.classTime, l.studentName || '', l.joinTime, l.minsLate, l.nthInMonth || '', l.pardoned ? 'Yes' : 'No', l.penalty || 0]);
+    const csv = [head].concat(rows).map(r => r.map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"').join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = 'late-joins-' + $('month').value + '.csv';
+    a.click();
+  };
+
+  $('month').value = new Date(Date.now() + 3600e3).toISOString().slice(0, 7);
+  $('month').onchange = loadLate;
+  $('onlyOverdue').onchange = loadUnended;
+  loadUnended(); loadLate();
+  setInterval(loadUnended, 5 * 60 * 1000);
+})();
+</script>
+</body>
+</html>

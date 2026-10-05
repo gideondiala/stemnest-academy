@@ -96,11 +96,11 @@ function _addEarnings(amount) {
   // Update display immediately
   var currentEl = document.getElementById('overviewEarnings');
   var liveEl    = document.getElementById('liveEarnings');
-  var current   = parseFloat((currentEl ? currentEl.textContent.replace('£','') : '0')) || 0;
+  var current   = parseFloat((currentEl ? currentEl.textContent.replace('₦','') : '0')) || 0;
   var newTotal  = (current + amount).toFixed(2);
 
-  if (currentEl) currentEl.textContent = '£' + newTotal;
-  if (liveEl)    liveEl.textContent    = '£' + newTotal;
+  if (currentEl) currentEl.textContent = '₦' + newTotal;
+  if (liveEl)    liveEl.textContent    = '₦' + newTotal;
 
   // Push to API so it persists across devices and refreshes
   var token = localStorage.getItem('sn_access_token');
@@ -638,7 +638,7 @@ function _showPartialReasonDialog(bookingId, booking, rates) {
     _updateBookingStatus(bookingId, 'partially_completed', { completedAt: new Date().toISOString() });
     recordClassSession(booking, 'partially_completed', reason, partialPay, true);
     _refreshOverviewCards();
-    showToast('\u26a1 Partially completed. \u00a3' + partialPay.toFixed(2) + ' added to earnings.', 'success');
+    showToast('\u26a1 Partially completed. \₦' + partialPay.toFixed(2) + ' added to earnings.', 'success');
     renderUpcomingCards();
   });
 }
@@ -757,9 +757,9 @@ function _refreshOverviewCards() {
       if (d.user) {
         var total = parseFloat(d.user.earnings || 0).toFixed(2);
         var earningsEl = document.getElementById('overviewEarnings');
-        if (earningsEl) earningsEl.textContent = '£' + total;
+        if (earningsEl) earningsEl.textContent = '₦' + total;
         var liveEl = document.getElementById('liveEarnings');
-        if (liveEl) liveEl.textContent = '£' + total;
+        if (liveEl) liveEl.textContent = '₦' + total;
 
         var pEl = document.getElementById('overviewPoints');
         if (pEl) pEl.textContent = d.user.points || 0;
@@ -873,7 +873,7 @@ function downloadMonthlyPaysheet(month, year) {
 
   // CSV header
   var rows = [
-    ['Date', 'Student', 'Subject', 'Grade', 'Type', 'Outcome', 'Pay (£)']
+    ['Date', 'Student', 'Subject', 'Grade', 'Type', 'Outcome', 'Pay (₦)']
   ];
 
   var totalPay = 0;
@@ -992,7 +992,7 @@ function renderEarningsSheet() {
             (s.outcome || '—') + '</td>' +
           '<td style="padding:10px 12px;font-size:12px;color:var(--mid,#4a5568);">' + (s.reason || '—') + '</td>' +
           '<td style="padding:10px 12px;font-size:13px;font-weight:800;color:var(--green,#38a169);">' +
-            '\u00a3' + (typeof s.payAmount === 'number' ? s.payAmount.toFixed(2) : '0.00') + '</td>' +
+            '\₦' + (typeof s.payAmount === 'number' ? s.payAmount.toFixed(2) : '0.00') + '</td>' +
           '<td style="padding:10px 12px;font-size:13px;text-align:center;">' +
             (s.creditDeducted ? '\u2705' : '\u2014') + '</td>' +
         '</tr>';
@@ -1017,7 +1017,7 @@ function renderEarningsSheet() {
         '\u2b07\ufe0f Download ' + monthNames[prevMonth - 1] + '</button>' +
       '</div>' +
       '<div style="font-size:13px;font-weight:700;color:var(--mid,#4a5568);">' +
-        prevArchive.sessionCount + ' sessions · Total: \u00a3' + (prevArchive.totalPay || 0).toFixed(2) +
+        prevArchive.sessionCount + ' sessions · Total: \₦' + (prevArchive.totalPay || 0).toFixed(2) +
       '</div>' +
       '</div>'
     : '<div style="background:var(--bg,#f7f8fc);border-radius:16px;padding:16px 24px;margin-top:24px;' +
@@ -1044,7 +1044,7 @@ function renderEarningsSheet() {
       '</div>' +
       '<div style="display:flex;gap:10px;align-items:center;">' +
         '<div style="font-size:14px;font-weight:800;color:var(--green,#38a169);">' +
-          'Total: \u00a3' + totalPay.toFixed(2) +
+          'Total: \₦' + totalPay.toFixed(2) +
         '</div>' +
         '<button onclick="downloadMonthlyPaysheet(' + curMonth + ',' + curYear + ')" ' +
         'style="background:var(--green,#38a169);color:#fff;border:none;border-radius:10px;' +
@@ -1065,7 +1065,7 @@ function renderEarningsSheet() {
       '<th style="padding:10px 12px;text-align:left;font-size:12px;font-weight:800;color:var(--mid,#4a5568);">Type</th>' +
       '<th style="padding:10px 12px;text-align:left;font-size:12px;font-weight:800;color:var(--mid,#4a5568);">Outcome</th>' +
       '<th style="padding:10px 12px;text-align:left;font-size:12px;font-weight:800;color:var(--mid,#4a5568);">Reason</th>' +
-      '<th style="padding:10px 12px;text-align:left;font-size:12px;font-weight:800;color:var(--mid,#4a5568);">Pay (\u00a3)</th>' +
+      '<th style="padding:10px 12px;text-align:left;font-size:12px;font-weight:800;color:var(--mid,#4a5568);">Pay (\₦)</th>' +
       '<th style="padding:10px 12px;text-align:center;font-size:12px;font-weight:800;color:var(--mid,#4a5568);">Credits</th>' +
     '</tr>' +
     '</thead>' +

@@ -271,6 +271,9 @@ async function _loadTutorFromAPI() {
           batchId:         b.batch_id || notes.batchRef ? (b.batch_id || '') : '',
           batchRef:        notes.batchRef || '',
           isBatchClass:    notes.isBatchClass === true || !!b.batch_id,
+          durationMins:    b.duration_mins || 60,
+          incompleteHistory: Array.isArray(notes.incompleteHistory) ? notes.incompleteHistory : [],
+          tutorJoinedAt:   b.tutor_joined_at || null,
         };
       });
     }
@@ -429,6 +432,84 @@ function getTutorBookings() {
   } catch { return []; }
 }
 
+/* ══════════════════════════════════════════════════════
+   CALENDAR SLOT STATUS
+   upcoming → live → "end class" (time passed, not ended)
+   → overdue (2+ hours after the end, not ended), or the
+   outcome: completed / partially completed / incomplete /
+   teacher absent. A paid lesson marked incomplete moves to
+   its next slot, so the missed slot is drawn from
+   booking.incompleteHistory as a "ghost".
+══════════════════════════════════════════════════════ */
+const CAL_STATES = {
+  live:       { icon: '🟢', text: 'Live now',            bg: '#ecfdf5', border: '#0e9f6e', fg: '#065f46' },
+  toend:      { icon: '⏳', text: 'Time passed — End class', bg: '#fffbeb', border: '#f59e0b', fg: '#92400e' },
+  overdue:    { icon: '⚠️', text: 'Not ended — overdue',  bg: '#fef2f2', border: '#dc2626', fg: '#991b1b', dashed: true },
+  completed:  { icon: '✅', text: 'Completed',           bg: '#dcfce7', border: '#16a34a', fg: '#14532d' },
+  partially_completed: { icon: '◐', text: 'Partly completed', bg: '#ccfbf1', border: '#0d9488', fg: '#134e4a' },
+  incomplete: { icon: '❌', text: 'Incomplete',          bg: '#f1f5f9', border: '#94a3b8', fg: '#475569', strike: true },
+  teacher_absent: { icon: '🚫', text: 'Tutor absent',    bg: '#fee2e2', border: '#7f1d1d', fg: '#7f1d1d' },
+};
+
+function calSlotState(b) {
+  if (b._ghost) return 'incomplete';
+  if (CAL_STATES[b.status] && b.status !== 'live') return b.status;
+  if (b.status !== 'scheduled') return null;
+  /* Class times are Nigeria time (WAT, UTC+1) */
+  const hm = String(b.time || '').match(/^(\d{1,2}):(\d{2})/);
+  let start = /^\d{4}-\d{2}-\d{2}$/.test(b.date || '') && hm
+    ? new Date(`${b.date}T${hm[1].padStart(2, '0')}:${hm[2]}:00+01:00`)
+    : (typeof parseClassDateTime === 'function' ? parseClassDateTime(b.date, b.time) : null);
+  if (!start || isNaN(start)) return null;
+  const end = new Date(start.getTime() + (parseInt(b.durationMins, 10) || 60) * 60000);
+  const now = new Date();
+  if (now < start) return null;
+  if (now < end) return 'live';
+  return (now - end) >= 2 * 3600000 ? 'overdue' : 'toend';
+}
+
+function getCalendarBookings() {
+  try {
+    const all = window.TUTOR_DATA?.bookings || [];
+    const myStaffId = TUTOR.id, myDbId = TUTOR.dbId;
+    const mine = all.filter(b => {
+      const bid = b.assignedTutorId || '';
+      return (myStaffId && bid === myStaffId) || (myDbId && bid === myDbId) ||
+             (myStaffId && b.tutor_staff_id === myStaffId) || (myDbId && b.tutor_id === myDbId);
+    });
+    const shown = mine.filter(b => ['scheduled', 'completed', 'partially_completed', 'incomplete', 'teacher_absent'].includes(b.status));
+    /* Missed slots of lessons that were moved after being marked incomplete */
+    const ghosts = [];
+    mine.forEach(b => (b.incompleteHistory || []).forEach((h, i) => {
+      if (!h || !h.date || !h.time) return;
+      if (h.date === b.date && String(h.time).slice(0, 5) === String(b.time).slice(0, 5)) return;
+      ghosts.push({ ...b, id: b.id + '~' + i, _ghost: true, _ghostOf: b.id, date: h.date, time: h.time,
+                    status: 'incomplete', isRecurring: false, _reason: h.reason, _by: h.by });
+    }));
+    return shown.concat(ghosts);
+  } catch { return []; }
+}
+
+function showGhostSlotInfo(ghostId) {
+  const g = getCalendarBookings().find(x => x.id === ghostId);
+  if (!g) return;
+  const real = (window.TUTOR_DATA?.bookings || []).find(x => x.id === g._ghostOf);
+  const moved = real && real.status === 'scheduled' ? ` The lesson moved to ${real.date} at ${String(real.time).slice(0, 5)}.` : '';
+  showToast(`❌ Marked incomplete${g._by === 'admin' ? ' by Admin' : ''}${g._reason ? ' — ' + g._reason : ''}.${moved}`, 'info');
+}
+
+function calLegendHTML() {
+  const items = [
+    ['upcoming', '📚', 'Upcoming', '#1a56db', '#eef4ff'],
+    ...['live', 'toend', 'overdue', 'completed', 'partially_completed', 'incomplete', 'teacher_absent']
+      .map(k => [k, CAL_STATES[k].icon, CAL_STATES[k].text.replace(' — End class', ''), CAL_STATES[k].border, CAL_STATES[k].bg]),
+  ];
+  return `<div class="wcal-legend" style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px;font-family:'Nunito',sans-serif;">` +
+    items.map(([k, ic, t, bd, bg]) =>
+      `<span style="display:inline-flex;align-items:center;gap:5px;background:${bg};border:1.5px ${k === 'overdue' ? 'dashed' : 'solid'} ${bd};border-radius:50px;padding:3px 10px;font-size:11px;font-weight:800;color:#1e293b;">${ic} ${t}</span>`
+    ).join('') + `</div>`;
+}
+
 /* Get bookings from API — called by renderWeeklyCalendar if API is available */
 async function getTutorBookingsFromAPI() {
   try {
@@ -485,7 +566,7 @@ function renderWeeklyCalendar() {
 
   const days       = getWeekDates(weekOffset);
   const avail      = getAvailability();
-  const bookings   = getTutorBookings();
+  const bookings   = getCalendarBookings();
   const now        = new Date();
   const todayKey   = toDateKey(now);
   const nowMins    = now.getHours() * 60 + now.getMinutes();
@@ -580,7 +661,7 @@ function renderWeeklyCalendar() {
       const dayBookings = bookingMap[dk] || [];
       /* A booking at time T occupies slots T and T+30 (1 hour = 2 half-slots) */
       const bookedEntry = dayBookings.find(entry => {
-        return slot.mins >= entry.timeMins && slot.mins < entry.timeMins + 60;
+        return slot.mins + 30 > entry.timeMins && slot.mins < entry.timeMins + 60;
       });
 
       const isAvail  = !!avail[key];
@@ -597,7 +678,8 @@ function renderWeeklyCalendar() {
         /* ── BOOKED SLOT ── */
         const b       = bookedEntry.booking;
         const isDemo  = b.isDemoClass === true;
-        const isFirst = slot.mins === bookedEntry.timeMins;
+        /* The half-hour cell the class starts in (classes may start off the half hour) */
+        const isFirst = slot.mins <= bookedEntry.timeMins && bookedEntry.timeMins < slot.mins + 30;
         const isSuspended = b.creditsSuspended === true;
 
         /* Suspended student — grey slot with warning */
@@ -616,6 +698,27 @@ function renderWeeklyCalendar() {
             html += `<td class="wcal-slot wcal-paid-booked wcal-booked-cont"
               style="background:#f5f3ff;border:2px solid #7c3aed;opacity:.85;"
               onclick="showSuspendedSlotWarning('${b.id}')"></td>`;
+          }
+        } else if (calSlotState(b)) {
+          /* ── Started / passed / ended class — colour by status ── */
+          const stKey = calSlotState(b);
+          const st    = CAL_STATES[stKey];
+          const click = b._ghost ? `showGhostSlotInfo('${b.id}')` : `showBookingPopup('${b.id}')`;
+          const style = `background:${st.bg};border:2px ${st.dashed ? 'dashed' : 'solid'} ${st.border};cursor:pointer;` +
+                        (stKey === 'live' ? 'box-shadow:0 0 0 3px rgba(14,159,110,.25);' : '');
+          if (isFirst) {
+            const who = b.isBatchClass && b.batchRef ? b.batchRef : b.studentName;
+            html += `<td class="wcal-slot wcal-st-${stKey}" style="${style}" onclick="${click}" title="${st.text}: ${who}${isDemo ? ' (demo)' : ''}">
+              <div class="wcal-booked-inner" style="background:transparent;">
+                <div class="wcal-booked-label" style="color:${st.fg};${st.strike ? 'text-decoration:line-through;' : ''}">${st.icon} ${who}</div>
+                <div class="wcal-booked-sub" style="color:${st.fg};font-weight:800;">${st.text}${isDemo ? ' · Demo' : ''}</div>
+                ${stKey === 'toend' || stKey === 'overdue'
+                  ? `<button onclick="event.stopPropagation();openEndClassDialogV2('${b.id}')" style="margin-top:4px;background:${st.border};color:#fff;border:none;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:900;cursor:pointer;font-family:'Nunito',sans-serif;">🔴 End class</button>`
+                  : ''}
+              </div>
+            </td>`;
+          } else {
+            html += `<td class="wcal-slot wcal-st-${stKey} wcal-booked-cont" style="${style}" onclick="${click}"></td>`;
           }
         } else {
 
@@ -688,7 +791,7 @@ function renderWeeklyCalendar() {
   });
 
   html += `</tbody></table></div>`;
-  container.innerHTML = html;
+  container.innerHTML = calLegendHTML() + html;
 }
 
 /* ── Show booking detail popup from calendar slot click ── */
@@ -1274,10 +1377,8 @@ function submitEndClassReport() {
 /* ── Sync overview earnings badges (called after end class report) ── */
 function syncOverviewStats() {
   try {
-    const el1 = document.getElementById('overviewEarnings');
     const el2 = document.getElementById('overviewPoints');
-    if (el1 && window.TUTOR_DATA?.earnings !== undefined)
-      el1.textContent = '£' + (parseFloat(window.TUTOR_DATA.earnings) || 0).toFixed(0);
+    if (typeof window.refreshTutorPay === 'function') window.refreshTutorPay();
     if (el2 && window.TUTOR_DATA?.points !== undefined)
       el2.textContent = window.TUTOR_DATA.points || 0;
   } catch(e) {}
@@ -1347,13 +1448,10 @@ function _renderOverviewStats() {
         headers: { 'Authorization': 'Bearer ' + token }
       }).then(r => r.json()).then(d => {
         if (d.user) {
-          const earnings = parseFloat(d.user.earnings || 0).toFixed(2);
           const points   = d.user.points   || 0;
 
-          const earningsEl = document.getElementById('overviewEarnings');
-          if (earningsEl) earningsEl.textContent = '£' + earnings;
-          const liveEl = document.getElementById('liveEarnings');
-          if (liveEl) liveEl.textContent = '£' + earnings;
+          /* This month's pay in Naira (class-ops.js) */
+          if (typeof window.refreshTutorPay === 'function') window.refreshTutorPay();
 
           const pointsEl = document.getElementById('overviewPoints');
           if (pointsEl) pointsEl.textContent = points;

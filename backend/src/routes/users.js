@@ -166,6 +166,8 @@ const studentProfileSchema = z.object({
   amount:       z.coerce.number().min(0).optional().nullable(),
   currency:     z.string().max(10).optional().nullable(),
   paymentReference:    z.string().max(120).optional().nullable(),
+  paymentMethod:       z.string().max(30).optional().nullable(),
+  paidAt:              z.string().max(10).optional().nullable(),
   timezone:     z.string().optional().nullable(),
   enrollmentRequestId: z.string().uuid().optional().nullable(),
   joinFamily:   z.boolean().optional(),
@@ -261,24 +263,29 @@ router.post('/', requireAuth, requireRole('admin', 'super_admin', 'postsales'), 
          str(sp.parentName), parentEmail]
       );
 
-      if (credits > 0) {
-        await client.query(
-          `INSERT INTO credit_transactions (student_id, type, amount, description)
-           VALUES ($1, 'topup', $2, $3)`,
-          [user.id, credits, `Onboarding — ${credits} credit${credits !== 1 ? 's' : ''} added by ${req.user.email}`]
-        );
-      }
-
       if (sp.amount && sp.amount > 0) {
         const pay = await client.query(
           `INSERT INTO payments (student_id, sales_id, amount, currency, credits_purchased,
-                                 status, notes, created_at, confirmed_at)
-           VALUES ($1, $2, $3, $4, $5, 'confirmed', $6, NOW(), NOW())
+                                 status, notes, created_at, confirmed_at, provider, reference, method, paid_at, kind)
+           VALUES ($1, $2, $3, $4, $5, 'confirmed', $6, NOW(), NOW(), 'manual', $7, $8,
+                   COALESCE($9::date, (NOW() AT TIME ZONE 'Africa/Lagos')::date), 'onboarding')
            RETURNING id`,
-          [user.id, req.user.id, sp.amount, (str(sp.currency) || 'GBP').toUpperCase(), credits,
-           JSON.stringify({ method: 'manual', reference: str(sp.paymentReference), recordedBy: req.user.email, onboarding: true })]
+          [user.id, req.user.id, sp.amount, (str(sp.currency) || 'NGN').toUpperCase(), credits,
+           JSON.stringify({ method: 'manual', reference: str(sp.paymentReference), recordedBy: req.user.email, onboarding: true }),
+           str(sp.paymentReference) || null, str(sp.paymentMethod) || null,
+           /^\d{4}-\d{2}-\d{2}$/.test(str(sp.paidAt) || '') ? str(sp.paidAt) : null]
         );
         paymentId = pay.rows[0].id;
+      }
+
+      if (credits > 0) {
+        await client.query(
+          `INSERT INTO credit_transactions
+             (student_id, type, amount, description, payment_id, amount_paid, currency, method, reference, paid_at, balance_after, created_by)
+           SELECT $1, 'onboarding', $2, $3, p.id, p.amount, p.currency, p.method, p.reference, p.paid_at, $2, $5
+           FROM (SELECT 1) one LEFT JOIN payments p ON p.id = $4`,
+          [user.id, credits, `Onboarding — ${credits} credit${credits !== 1 ? 's' : ''} added`, paymentId, req.user.id]
+        );
       }
 
       if (pathwayId) {

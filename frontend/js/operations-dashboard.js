@@ -26,10 +26,30 @@ async function _loadOpsFromAPI() {
       window.OPS_DATA.bookings = JSON.parse(localStorage.getItem('sn_bookings') || '[]');
     }
     
-    window.OPS_DATA.lateJoins = JSON.parse(localStorage.getItem('sn_late_joins') || '[]');
+    /* Late joins are recorded by the server when a tutor clicks Join */
+    const lRes = await fetch('https://api.stemnestacademy.co.uk/api/class-ops/late-joins?month=all', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const lData = await lRes.json();
+    window.OPS_DATA.lateJoins = (lData.lateJoins || []).map(l => {
+      const d = new Date((l.classDate || l.joinTime.slice(0, 10)) + 'T12:00:00');
+      return {
+        tutorId:   l.tutorStaffId || '—',
+        tutorName: l.tutorName,
+        sessionId: `${l.classDate} ${l.classTime} · ${l.studentName || ''}${l.isDemo ? ' (demo)' : ''}`,
+        joinTime:  l.joinTime,
+        minsLate:  l.minsLate,
+        nth:       l.nthInMonth,
+        date:      d.toISOString(),
+        month:     d.getFullYear() + '-' + (d.getMonth() + 1),
+        pardoned:  l.pardoned,
+        penalty:   l.penalty,
+        bookingId: l.bookingId,
+      };
+    });
     window.OPS_DATA.classReports = JSON.parse(localStorage.getItem('sn_class_reports') || '[]');
     window.OPS_DATA.absentTeachers = JSON.parse(localStorage.getItem('sn_absent_teachers') || '[]');
-    
+
   } catch (e) {
     console.warn('[Operations] API load failed:', e.message);
     window.OPS_DATA.lateJoins = JSON.parse(localStorage.getItem('sn_late_joins') || '[]');
@@ -59,7 +79,7 @@ function showOpsTab(tab) {
 
 function refreshOps() { showOpsTab(OPS_TABS.find(t => document.getElementById('tab-'+t)?.style.display !== 'none') || 'late-joins'); showToast('✅ Refreshed!'); }
 
-function getLateJoins() { try { return window.OPS_DATA.lateJoins.length ? window.OPS_DATA.lateJoins : JSON.parse(localStorage.getItem('sn_late_joins') || '[]'); } catch { return []; } }
+function getLateJoins() { return window.OPS_DATA.lateJoins || []; }
 function getClassReports() { try { return window.OPS_DATA.classReports.length ? window.OPS_DATA.classReports : JSON.parse(localStorage.getItem('sn_class_reports') || '[]'); } catch { return []; } }
 
 function updateOpsStats() {
@@ -98,7 +118,7 @@ function renderLateJoins() {
       <td><span style="font-family:'Fredoka One',cursive;color:var(--blue);">${l.tutorId}</span></td>
       <td><strong>${l.tutorName}</strong></td>
       <td style="font-size:12px;">${l.sessionId || '—'}</td>
-      <td style="font-size:12px;">${l.joinTime || '—'}</td>
+      <td style="font-size:12px;">${l.joinTime || '—'}${l.minsLate != null ? `<br><strong style="color:#c53030;">${l.minsLate} min late</strong>` : ''}${l.nth ? ` <span style="color:var(--light);">· #${l.nth} this month</span>` : ''}</td>
       <td style="font-size:12px;">${new Date(l.date).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</td>
       <td>${l.month}</td>
       <td><span class="ab-status ${l.pardoned ? 'ab-scheduled' : 'ab-pending'}">${l.pardoned ? '✅ Pardoned' : '⚠️ Penalised'}</span></td>
@@ -156,10 +176,13 @@ function renderClassLog() {
 }
 
 function exportLateJoinsCSV() {
-  const list = getLateJoins();
+  let list = getLateJoins();
+  const m = document.getElementById('lateMonthFilter')?.value || '';
+  if (m) list = list.filter(l => l.month === m);
   if (!list.length) { showToast('No data to export.', 'error'); return; }
-  const headers = ['Teacher ID','Teacher Name','Session ID','Join Time','Date','Month','Pardoned','Penalty ($)'];
-  const rows = list.map(l => [l.tutorId, l.tutorName, l.sessionId||'', l.joinTime||'', new Date(l.date).toLocaleDateString('en-GB'), l.month, l.pardoned?'Yes':'No', l.penalty||0].map(v=>`"${v}"`).join(','));
+  const headers = ['Teacher ID','Teacher Name','Class (WAT)','Joined at (WAT)','Minutes late','Late join # this month','Month','Pardoned','Penalty ($)'];
+  const rows = list.map(l => [l.tutorId, l.tutorName, l.sessionId||'', l.joinTime||'', l.minsLate ?? '', l.nth ?? '', l.month, l.pardoned?'Yes':'No', l.penalty||0]
+    .map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));
   const csv  = [headers.join(','), ...rows].join('\n');
   const blob = new Blob([csv], {type:'text/csv'});
   const url  = URL.createObjectURL(blob);

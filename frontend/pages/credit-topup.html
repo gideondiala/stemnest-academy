@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="../assets/icons/icon.png">
+  <title>Credits &amp; Payments – StemNest Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/global.css">
+  <script src="../js/auth-guard.js" data-roles="admin,super_admin,postsales,sales,presales"></script>
+  <style>
+    body { background: var(--bg); font-family: 'Nunito', sans-serif; margin: 0; }
+    .top { background: #fff; border-bottom: 1.5px solid #e8eaf0; padding: 14px 5%; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .top h1 { font-family: 'Fredoka One', cursive; font-size: 24px; margin: 0; }
+    .wrap { max-width: 1050px; margin: 22px auto 60px; padding: 0 16px; }
+    .card { background: #fff; border: 1.5px solid #e8eaf0; border-radius: 16px; padding: 20px; margin-bottom: 16px; }
+    .lbl { display: block; font-size: 11px; font-weight: 900; color: var(--mid); text-transform: uppercase; letter-spacing: .4px; margin: 12px 0 5px; }
+    .in { width: 100%; box-sizing: border-box; padding: 11px 13px; border: 2px solid #e8eaf0; border-radius: 12px; font-family: 'Nunito', sans-serif; font-size: 14px; font-weight: 700; background: #fff; }
+    .in:focus { outline: none; border-color: var(--blue); }
+    .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0 14px; }
+    .b { border: none; border-radius: 12px; padding: 12px 22px; font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 14px; cursor: pointer; }
+    .b:disabled { opacity: .5; cursor: default; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .tab { border: 2px solid #e8eaf0; background: #fff; border-radius: 50px; padding: 9px 18px; font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 14px; cursor: pointer; color: var(--mid); }
+    .tab.on { background: var(--blue); border-color: var(--blue); color: #fff; }
+    .res { border: 1.5px solid #e8eaf0; border-radius: 12px; padding: 11px 14px; margin-bottom: 8px; cursor: pointer; display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+    .res:hover { border-color: var(--blue); background: #f5f8ff; }
+    .res.sel { border-color: var(--blue); background: #eef4ff; }
+    .pill { display: inline-block; border-radius: 50px; padding: 2px 10px; font-size: 11px; font-weight: 900; }
+    .choice { display: flex; gap: 10px; flex-wrap: wrap; }
+    .choice label { flex: 1; min-width: 200px; border: 2px solid #e8eaf0; border-radius: 14px; padding: 12px 14px; cursor: pointer; }
+    .choice input { margin-right: 6px; }
+    .choice label:has(input:checked) { border-color: var(--blue); background: #f5f8ff; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; font-size: 11px; font-weight: 900; color: var(--mid); text-transform: uppercase; padding: 8px 10px; background: var(--bg); }
+    td { padding: 8px 10px; border-bottom: 1px solid #f1f3f8; font-weight: 700; vertical-align: top; }
+    .muted { color: var(--light); font-size: 12px; font-weight: 700; }
+    @media (max-width: 600px) { .top h1 { font-size: 20px; } }
+  </style>
+</head>
+<body>
+<div class="top"><h1>💳 Credits &amp; Payments</h1><a href="javascript:history.back()" style="font-weight:800;color:var(--blue);text-decoration:none;">← Back</a></div>
+<div class="wrap">
+
+  <!-- 1. Find the student -->
+  <div class="card">
+    <div style="font-family:'Fredoka One',cursive;font-size:19px;margin-bottom:4px;">1 · Find the student</div>
+    <div class="muted">Search by student ID (S-0123), name, email, parent's name or email, or a family login.</div>
+    <input class="in" id="q" placeholder="e.g. S-0081, Ada, mum@example.com" style="margin-top:10px;" autocomplete="off">
+    <div id="results" style="margin-top:10px;"></div>
+  </div>
+
+  <div id="work" style="display:none;">
+    <div class="card" id="picked"></div>
+
+    <div class="tabs">
+      <button class="tab on" data-t="manual" id="tabManual">🏦 Manual top-up</button>
+      <button class="tab" data-t="link">🔗 Payment link</button>
+      <button class="tab" data-t="log">📋 Credit activity</button>
+    </div>
+
+    <!-- Manual top-up -->
+    <div class="card" id="pane-manual">
+      <div style="font-family:'Fredoka One',cursive;font-size:19px;margin-bottom:4px;">2 · Add credits</div>
+      <div class="muted">For a payment we have confirmed outside the payment links (e.g. a bank transfer to our account), or a free referral reward.</div>
+      <span class="lbl">What is this?</span>
+      <div class="choice">
+        <label><input type="radio" name="kind" value="payment" checked><strong>Payment received</strong><div class="muted">The parent paid us</div></label>
+        <label><input type="radio" name="kind" value="referral_reward"><strong>🎁 Referral reward</strong><div class="muted">Free credits for a referral that paid</div></label>
+      </div>
+      <div id="payFields">
+        <div class="row">
+          <div><span class="lbl">Amount paid</span><input class="in" id="mAmount" type="number" min="0" step="0.01" placeholder="e.g. 45000"></div>
+          <div><span class="lbl">Currency</span><select class="in" id="mCurrency"><option>NGN</option><option>GBP</option><option>USD</option><option>EUR</option><option>CAD</option><option>GHS</option><option>KES</option></select></div>
+          <div><span class="lbl">Date paid</span><input class="in" id="mDate" type="date"></div>
+        </div>
+        <div class="row">
+          <div><span class="lbl">Paid by</span><select class="in" id="mMethod">
+            <option value="bank_transfer">Bank transfer</option><option value="card">Card</option><option value="cash">Cash</option>
+            <option value="ussd">USSD</option><option value="mobile_money">Mobile money</option><option value="other">Other</option></select></div>
+          <div><span class="lbl">Reference (optional)</span><input class="in" id="mRef" placeholder="Bank / transfer reference"></div>
+        </div>
+      </div>
+      <div class="row">
+        <div><span class="lbl">Credits to add</span><input class="in" id="mCredits" type="number" min="1" step="1" placeholder="e.g. 8"></div>
+        <div><span class="lbl" id="mNoteLbl">Note (optional)</span><input class="in" id="mNotes" placeholder="Shows on the student's credit activity"></div>
+      </div>
+      <div style="margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <button class="b" id="mSave" style="background:var(--green);color:#fff;">✅ Add credits</button>
+        <span id="mStatus" class="muted"></span>
+      </div>
+    </div>
+
+    <!-- Payment link -->
+    <div class="card" id="pane-link" style="display:none;">
+      <div style="font-family:'Fredoka One',cursive;font-size:19px;margin-bottom:4px;">2 · Create a payment link</div>
+      <div class="muted">The newest link is what the student's <strong>Top up</strong> button opens. Credits are added automatically when the payment comes through.</div>
+      <span class="lbl">Payment provider</span>
+      <div class="choice" id="providers"></div>
+      <div class="row">
+        <div><span class="lbl">Amount</span><input class="in" id="lAmount" type="number" min="1" step="0.01" placeholder="e.g. 45000"></div>
+        <div><span class="lbl">Currency</span><select class="in" id="lCurrency"><option>NGN</option><option>GBP</option><option>USD</option><option>EUR</option><option>CAD</option><option>GHS</option><option>KES</option><option>ZAR</option></select></div>
+        <div><span class="lbl">Credits it buys</span><input class="in" id="lCredits" type="number" min="1" step="1" placeholder="e.g. 8"></div>
+      </div>
+      <span class="lbl">Description (optional)</span><input class="in" id="lNotes" placeholder="e.g. 8 Coding classes — October">
+      <label style="display:flex;gap:8px;align-items:center;margin-top:12px;font-weight:800;font-size:13px;"><input type="checkbox" id="lEmail" checked> Email the link to the parent</label>
+      <div style="margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <button class="b" id="lCreate" style="background:var(--blue);color:#fff;">🔗 Create link</button>
+        <span id="lStatus" class="muted"></span>
+      </div>
+      <div id="lResult" style="margin-top:12px;"></div>
+    </div>
+
+    <!-- Credit activity -->
+    <div class="card" id="pane-log" style="display:none;"></div>
+  </div>
+</div>
+
+<script src="../js/api.js"></script>
+<script>
+(function () {
+  const ROLE = (JSON.parse(localStorage.getItem('sn_api_user') || '{}').role) || '';
+  const CAN_TOP_UP = ['admin', 'super_admin', 'postsales'].includes(ROLE);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const money = (a, c) => { try { return new Intl.NumberFormat('en-NG', { style: 'currency', currency: c || 'NGN' }).format(a); } catch { return (c || '') + ' ' + a; } };
+  const $ = id => document.getElementById(id);
+  let picked = null, timer = null;
+
+  $('mDate').value = new Date(Date.now() + 3600e3).toISOString().slice(0, 10);
+  if (!CAN_TOP_UP) { $('tabManual').style.display = 'none'; }
+
+  /* ── Search ── */
+  $('q').addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(search, 300); });
+  async function search() {
+    const q = $('q').value.trim();
+    if (q.length < 2) { $('results').innerHTML = ''; return; }
+    $('results').innerHTML = '<div class="muted">Searching…</div>';
+    try {
+      const d = await apiCall('/api/payments/student-search?q=' + encodeURIComponent(q));
+      $('results').innerHTML = d.students.length ? d.students.map(s => `
+        <div class="res${picked && picked.id === s.id ? ' sel' : ''}" data-id="${s.id}">
+          <div><div style="font-weight:900;">${esc(s.name)} <span class="muted">${esc(s.staffId || '')}</span></div>
+            <div class="muted">${esc(s.parentName || s.familyName || '')}${s.parentEmail ? ' · ' + esc(s.parentEmail) : ''}${s.familyName ? ' · family: ' + esc(s.familyName) : ''}</div></div>
+          <div style="text-align:right;"><span class="pill" style="background:${(s.credits || 0) <= 0 ? '#fde8e8' : '#dcfce7'};color:${(s.credits || 0) <= 0 ? '#c53030' : '#166534'};">${s.credits ?? 0} credits</span>
+            ${s.paused ? '<div class="muted" style="color:#7c3aed;">on hold</div>' : ''}</div>
+        </div>`).join('') : '<div class="muted">No students found.</div>';
+      document.querySelectorAll('.res').forEach(el => el.onclick = () => pick(d.students.find(s => s.id === el.dataset.id)));
+    } catch (e) { $('results').innerHTML = '<div class="muted" style="color:#c53030;">' + esc(e.message) + '</div>'; }
+  }
+
+  function pick(s) {
+    picked = s;
+    document.querySelectorAll('.res').forEach(el => el.classList.toggle('sel', el.dataset.id === s.id));
+    $('work').style.display = 'block';
+    $('picked').innerHTML = `<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;">
+      <div><div style="font-family:'Fredoka One',cursive;font-size:20px;">${esc(s.name)} <span class="muted">${esc(s.staffId || '')}</span></div>
+        <div class="muted">${esc(s.parentName || '')}${s.parentEmail ? ' · ' + esc(s.parentEmail) : ''}${s.email && s.email !== s.parentEmail ? ' · ' + esc(s.email) : ''}</div></div>
+      <div style="text-align:right;"><div style="font-family:'Fredoka One',cursive;font-size:26px;color:${(s.credits || 0) <= 0 ? '#c53030' : '#0e9f6e'};">${s.credits ?? 0} credits</div>
+        ${s.openLink ? `<div class="muted">Open link: ${esc(money(s.openLink.amount, s.openLink.currency))} · ${esc(s.openLink.provider || 'fincra')}</div>` : ''}</div></div>`;
+    showPane(CAN_TOP_UP ? 'manual' : 'link');
+    $('work').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  /* ── Tabs ── */
+  document.querySelectorAll('.tab').forEach(t => t.onclick = () => showPane(t.dataset.t));
+  function showPane(name) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.t === name));
+    ['manual', 'link', 'log'].forEach(p => $('pane-' + p).style.display = p === name ? 'block' : 'none');
+    if (name === 'log') loadLog();
+    if (name === 'link') loadProviders();
+  }
+
+  /* ── Manual top-up ── */
+  document.querySelectorAll('input[name="kind"]').forEach(r => r.onchange = () => {
+    const ref = document.querySelector('input[name="kind"]:checked').value === 'referral_reward';
+    $('payFields').style.display = ref ? 'none' : 'block';
+    $('mNoteLbl').textContent = ref ? 'Who did they refer? (shows on their credit activity)' : 'Note (optional)';
+  });
+  $('mSave').onclick = async () => {
+    if (!picked) return;
+    const kind = document.querySelector('input[name="kind"]:checked').value;
+    const credits = parseInt($('mCredits').value, 10);
+    const body = { studentId: picked.id, credits, kind, notes: $('mNotes').value.trim() };
+    if (!(credits > 0)) return status('mStatus', 'Enter the number of credits.', true);
+    if (kind === 'payment') {
+      Object.assign(body, { amount: parseFloat($('mAmount').value), currency: $('mCurrency').value, paidAt: $('mDate').value,
+                            method: $('mMethod').value, reference: $('mRef').value.trim() });
+      if (!(body.amount > 0)) return status('mStatus', 'Enter the amount paid.', true);
+      if (!body.paidAt) return status('mStatus', 'Enter the date paid.', true);
+    }
+    const what = kind === 'payment' ? `${money(body.amount, body.currency)} paid by ${$('mMethod').selectedOptions[0].text.toLowerCase()} — ` : 'Referral reward — ';
+    if (!confirm(`${what}add ${credits} credit${credits === 1 ? '' : 's'} to ${picked.name}?`)) return;
+    $('mSave').disabled = true; status('mStatus', 'Saving…');
+    try {
+      const d = await apiCall('/api/payments/manual-topup', { method: 'POST', body });
+      picked.credits = d.newCredits;
+      status('mStatus', `✅ Done — ${picked.name} now has ${d.newCredits} credits.${d.resume && d.resume.resumed ? ' Paused classes are back on.' : ''}`);
+      ['mAmount', 'mRef', 'mCredits', 'mNotes'].forEach(id => $(id).value = '');
+      pick(picked);
+    } catch (e) { status('mStatus', '⚠️ ' + e.message, true); }
+    $('mSave').disabled = false;
+  };
+
+  /* ── Payment links ── */
+  let providers = null;
+  async function loadProviders() {
+    if (providers) return;
+    try { providers = (await apiCall('/api/payments/providers')).providers; } catch { providers = [{ id: 'fincra', name: 'Fincra', ready: true }]; }
+    const firstReady = (providers.find(p => p.ready) || {}).id;
+    $('providers').innerHTML = providers.map(p => `<label><input type="radio" name="prov" value="${p.id}" ${p.id === firstReady ? 'checked' : ''} ${p.ready ? '' : 'disabled'}>
+      <strong>${esc(p.name)}</strong>${p.ready ? '' : ' <span class="pill" style="background:#fff3e0;color:#e65100;">not set up yet</span>'}<div class="muted">${esc(p.note || '')}</div></label>`).join('');
+  }
+  $('lCreate').onclick = async () => {
+    if (!picked) return;
+    const prov = document.querySelector('input[name="prov"]:checked');
+    const body = { studentId: picked.id, provider: prov ? prov.value : 'fincra', amount: parseFloat($('lAmount').value),
+                   currency: $('lCurrency').value, credits: parseInt($('lCredits').value, 10) || 0, notes: $('lNotes').value.trim(),
+                   sendEmail: $('lEmail').checked };
+    if (!(body.amount > 0)) return status('lStatus', 'Enter the amount.', true);
+    if (!(body.credits > 0)) return status('lStatus', 'Enter the credits this payment buys.', true);
+    $('lCreate').disabled = true; status('lStatus', 'Creating link…');
+    try {
+      const d = await apiCall('/api/payments/create-link', { method: 'POST', body });
+      status('lStatus', '✅ Link created' + (body.sendEmail ? ' and emailed to the parent.' : '.'));
+      $('lResult').innerHTML = `<div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:12px;padding:12px 14px;">
+        <div class="muted">Ref ${esc(d.reference)} · ${esc(d.provider)}</div>
+        <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;"><input class="in" readonly value="${esc(d.paymentUrl)}" style="flex:1;min-width:220px;" id="lUrl">
+        <button class="b" style="background:#0e9f6e;color:#fff;" onclick="navigator.clipboard.writeText(document.getElementById('lUrl').value).then(()=>this.textContent='Copied ✓')">Copy</button></div></div>`;
+      picked.openLink = { amount: body.amount, currency: body.currency, provider: d.provider };
+      pick(picked); showPane('link');
+    } catch (e) { status('lStatus', '⚠️ ' + e.message, true); }
+    $('lCreate').disabled = false;
+  };
+
+  /* ── Credit activity ── */
+  const TYPE = { onboarding: '🎉 Enrolment', topup: '💳 Payment', referral_reward: '🎁 Referral reward', class_deduction: '📚 Class completed',
+                 adjustment: '✏️ Adjustment', opening_balance: '📌 Opening balance' };
+  async function loadLog() {
+    const el = $('pane-log');
+    el.innerHTML = '<div class="muted">Loading…</div>';
+    try {
+      const d = await apiCall('/api/payments/credit-log/' + picked.id);
+      el.innerHTML = `<div style="font-family:'Fredoka One',cursive;font-size:19px;margin-bottom:10px;">Credit activity — balance ${d.balance}</div>
+        <div style="overflow-x:auto;"><table><thead><tr><th>Date</th><th>Activity</th><th>Details</th><th style="text-align:right;">Credits</th><th style="text-align:right;">Balance</th></tr></thead><tbody>
+        ${d.entries.map(e => `<tr><td class="muted">${e.createdAt ? new Date(e.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}</td>
+          <td>${TYPE[e.type] || esc(e.type)}</td>
+          <td class="muted">${esc([e.amountPaid ? money(e.amountPaid, e.currency) : '', e.method ? e.method.replace(/_/g, ' ') : '', e.paidAt ? 'paid ' + e.paidAt : '', e.reference ? 'ref ' + e.reference : '',
+                                   e.classDate ? e.classDate + ' ' + (e.classTime || '') : '', e.tutorName || '', e.type === 'class_deduction' || e.type === 'topup' ? '' : e.description || ''].filter(Boolean).join(' · '))}</td>
+          <td style="text-align:right;color:${e.amount > 0 ? '#0e9f6e' : '#c53030'};">${e.type === 'opening_balance' ? e.amount : (e.amount > 0 ? '+' : '') + e.amount}</td>
+          <td style="text-align:right;">${e.balanceAfter}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">No activity yet.</td></tr>'}
+        </tbody></table></div>`;
+    } catch (e) { el.innerHTML = '<div class="muted" style="color:#c53030;">' + esc(e.message) + '</div>'; }
+  }
+
+  function status(id, msg, bad) { $(id).textContent = msg; $(id).style.color = bad ? '#c53030' : ''; }
+  const pre = new URLSearchParams(location.search).get('q');
+  if (pre) { $('q').value = pre; search(); }
+})();
+</script>
+</body>
+</html>
