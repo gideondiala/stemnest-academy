@@ -808,6 +808,41 @@ router.post('/manual-topup', requireAuth, requireRole('admin','super_admin','pos
         logger.warn('[MANUAL-TOPUP] Email error:', emailErr.message);
       }
     }
+    /* Referral reward: a thank-you email to the parent (unless switched off) */
+    let rewardEmailed = false;
+    if (kind === 'referral_reward' && recipientEmail && req.body.sendEmail !== false) {
+      try {
+        const emailSvc = require('../services/emailService');
+        const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const appUrl = process.env.APP_URL || 'https://stemnestacademy.co.uk';
+        const first = String(recipientName || '').trim().split(/\s+/)[0] || 'there';
+        const childFirst = String(student.name || '').trim().split(/\s+/)[0] || 'your child';
+        const why = String(notes || '').trim();
+        await emailSvc.sendEmail({
+          to: recipientEmail,
+          subject: `🎁 Thank you for your referral — ${creditsToAdd} free class${creditsToAdd !== 1 ? 'es' : ''} for ${childFirst}!`,
+          html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:24px;color:#1a202c;line-height:1.6;">
+            <div style="background:linear-gradient(135deg,#0e9f6e,#1a56db);border-radius:16px;padding:28px 24px;text-align:center;color:#fff;">
+              <div style="font-size:42px;line-height:1;">🎉</div>
+              <h1 style="margin:10px 0 4px;font-size:24px;">Congratulations!</h1>
+              <div style="font-size:15px;opacity:.95;">You've earned a referral reward</div>
+            </div>
+            <p style="margin-top:22px;">Hi ${esc(first)},</p>
+            <p>Thank you so much for recommending StemNest Academy${why ? ` — <strong>${esc(why)}</strong>` : ''}. Referrals from families like yours mean the world to us.</p>
+            <div style="background:#f0fdf4;border-left:4px solid #0e9f6e;border-radius:10px;padding:16px 20px;margin:18px 0;">
+              As a thank-you, we've added <strong>${creditsToAdd} free class credit${creditsToAdd !== 1 ? 's' : ''}</strong> to ${esc(student.name)}'s account.<br>
+              New balance: <strong>${newCredits} credit${newCredits !== 1 ? 's' : ''}</strong>
+            </div>
+            <p>The credits are ready to use straight away and show on ${esc(childFirst)}'s dashboard under <strong>Credits &amp; Payments</strong>.</p>
+            <a href="${appUrl}/pages/student-dashboard.html?topup=1" style="display:inline-block;background:#1a56db;color:#fff;text-decoration:none;padding:12px 28px;border-radius:50px;font-weight:700;">View credits →</a>
+            <p style="margin-top:22px;">Know another family who'd love StemNest? Every friend you refer who joins earns you more free classes. 💙</p>
+            <p style="font-size:13px;color:#718096;">— The StemNest Academy team</p>
+          </div>`,
+          template: 'referral_reward',
+        });
+        rewardEmailed = true;
+      } catch (e) { logger.warn('[MANUAL-TOPUP] Referral reward email failed:', e.message); }
+    }
     await notify.saveNotification(studentId, 'credits_added',
       kind === 'referral_reward' ? '🎁 Referral reward' : '✅ Payment received',
       `${creditsToAdd} class credit${creditsToAdd !== 1 ? 's' : ''} added. Your balance is now ${newCredits}.`
@@ -820,7 +855,7 @@ router.post('/manual-topup', requireAuth, requireRole('admin','super_admin','pos
 
     logger.info(`[MANUAL-TOPUP] ${kind} student=${studentId} name=${student.name} added=${creditsToAdd} new=${newCredits} by=${req.user.email}`);
 
-    res.json({ success: true, newCredits, paymentId, resume });
+    res.json({ success: true, newCredits, paymentId, resume, rewardEmailed, emailedTo: rewardEmailed ? recipientEmail : null });
 
   } catch (err) { next(err); }
 });

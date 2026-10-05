@@ -86,6 +86,7 @@
         <div><span class="lbl">Credits to add</span><input class="in" id="mCredits" type="number" min="1" step="1" placeholder="e.g. 8"></div>
         <div><span class="lbl" id="mNoteLbl">Note (optional)</span><input class="in" id="mNotes" placeholder="Shows on the student's credit activity"></div>
       </div>
+      <label id="mEmailWrap" style="display:none;gap:8px;align-items:center;margin-top:12px;font-weight:800;font-size:13px;"><input type="checkbox" id="mEmail" checked> Email the parent a thank-you / congratulations message</label>
       <div style="margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
         <button class="b" id="mSave" style="background:var(--green);color:#fff;">✅ Add credits</button>
         <span id="mStatus" class="muted"></span>
@@ -175,13 +176,14 @@
   document.querySelectorAll('input[name="kind"]').forEach(r => r.onchange = () => {
     const ref = document.querySelector('input[name="kind"]:checked').value === 'referral_reward';
     $('payFields').style.display = ref ? 'none' : 'block';
+    $('mEmailWrap').style.display = ref ? 'flex' : 'none';
     $('mNoteLbl').textContent = ref ? 'Who did they refer? (shows on their credit activity)' : 'Note (optional)';
   });
   $('mSave').onclick = async () => {
     if (!picked) return;
     const kind = document.querySelector('input[name="kind"]:checked').value;
     const credits = parseInt($('mCredits').value, 10);
-    const body = { studentId: picked.id, credits, kind, notes: $('mNotes').value.trim() };
+    const body = { studentId: picked.id, credits, kind, notes: $('mNotes').value.trim(), sendEmail: kind === 'referral_reward' ? $('mEmail').checked : undefined };
     if (!(credits > 0)) return status('mStatus', 'Enter the number of credits.', true);
     if (kind === 'payment') {
       Object.assign(body, { amount: parseFloat($('mAmount').value), currency: $('mCurrency').value, paidAt: $('mDate').value,
@@ -195,7 +197,7 @@
     try {
       const d = await apiCall('/api/payments/manual-topup', { method: 'POST', body });
       picked.credits = d.newCredits;
-      status('mStatus', `✅ Done — ${picked.name} now has ${d.newCredits} credits.${d.resume && d.resume.resumed ? ' Paused classes are back on.' : ''}`);
+      status('mStatus', `✅ Done — ${picked.name} now has ${d.newCredits} credits.${d.rewardEmailed ? ' Thank-you email sent to ' + d.emailedTo + '.' : ''}${d.resume && d.resume.resumed ? ' Paused classes are back on.' : ''}`);
       ['mAmount', 'mRef', 'mCredits', 'mNotes'].forEach(id => $(id).value = '');
       pick(picked);
     } catch (e) { status('mStatus', '⚠️ ' + e.message, true); }
