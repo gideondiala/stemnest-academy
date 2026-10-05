@@ -932,11 +932,10 @@ function showBookingPopup(bookingId) {
             ⏱ Duration: <strong>${b.duration || '60 mins'}</strong>
           </div>
         </div>
-        ${!b.pathwayLessonId ? lessonPlanButton(b) : ''}
-        ${(b.activityLink || b.slidesLink || b.pathwayLessonId) ? `
+        ${lessonPlanButton(b)}
+        ${(b.activityLink || b.slidesLink) ? `
         <div style="background:var(--bg);border-radius:12px;padding:14px;margin-bottom:14px;">
           <div style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:var(--light);margin-bottom:8px;">📎 Class Resources</div>
-          ${b.pathwayLessonId ? `<a href="/pages/lesson-materials.html?lessonId=${b.pathwayLessonId}&bookingId=${b.id}" target="_blank" style="display:flex;align-items:center;gap:8px;background:#dbeafe;border:1.5px solid var(--blue);border-radius:10px;padding:10px 14px;text-decoration:none;color:var(--blue);font-weight:900;font-size:13px;margin-bottom:8px;">📖 View Lesson Materials <span style="margin-left:auto;font-size:11px;">Open ↗</span></a>` : ''}
           ${b.activityLink ? `<a href="${b.activityLink}" target="_blank" style="display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid #e8eaf0;border-radius:10px;padding:10px 14px;text-decoration:none;color:var(--dark);font-weight:800;font-size:13px;margin-bottom:8px;">🔗 Activity / Class Material <span style="margin-left:auto;color:var(--blue);font-size:11px;">Open ↗</span></a>` : ''}
           ${b.slidesLink ? `<a href="${b.slidesLink}" target="_blank" style="display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid #e8eaf0;border-radius:10px;padding:10px 14px;text-decoration:none;color:var(--dark);font-weight:800;font-size:13px;">📊 Slides <span style="margin-left:auto;color:var(--blue);font-size:11px;">Open ↗</span></a>` : ''}
         </div>` : ''}
@@ -1499,14 +1498,16 @@ function _renderOverviewStats() {
 ══════════════════════════════════════════════════════ */
 function lessonPlanButton(b) {
   const css = 'display:flex;align-items:center;justify-content:space-between;background:#dbeafe;border:1.5px solid var(--blue);border-radius:12px;padding:12px 16px;text-decoration:none;color:var(--blue);font-weight:900;font-size:13px;margin-bottom:14px;cursor:pointer;';
+  /* Every class can open any lesson plan; a linked class also opens its own lesson directly */
   if (b.pathwayLessonId) {
-    return `<a href="/pages/lesson-materials.html?lessonId=${b.pathwayLessonId}&bookingId=${b.id}" target="_blank" style="${css}">📖 View Lesson Details <span style="font-size:11px;">Opens in a new tab ↗</span></a>`;
+    return `<a href="/pages/lesson-materials.html?lessonId=${b.pathwayLessonId}&bookingId=${b.id}" target="_blank" style="${css}margin-bottom:6px;">📖 View Lesson Details <span style="font-size:11px;">Opens in a new tab ↗</span></a>` +
+      `<a href="#" onclick="openLessonPicker('${b.pathwayLessonId}');return false;" style="display:block;text-align:right;font-size:12px;font-weight:800;color:var(--blue);text-decoration:none;margin:0 2px 14px;">📚 Find another lesson plan ↗</a>`;
   }
   return `<a href="#" onclick="openLessonPicker();return false;" style="${css}background:var(--bg);border-color:#e8eaf0;color:var(--dark);">📖 Find the lesson plan <span style="color:var(--blue);font-size:11px;">Choose lesson ↗</span></a>`;
 }
 
 let _lessonBrowse = null;
-async function openLessonPicker() {
+async function openLessonPicker(currentLessonId) {
   document.getElementById('lessonPickerOverlay')?.remove();
   const ov = document.createElement('div');
   ov.id = 'lessonPickerOverlay';
@@ -1517,7 +1518,9 @@ async function openLessonPicker() {
       <div style="font-family:'Fredoka One',cursive;font-size:20px;color:var(--dark);">📖 Find the lesson plan</div>
       <button onclick="document.getElementById('lessonPickerOverlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--light);">✕</button>
     </div>
-    <div style="font-size:12px;font-weight:700;color:var(--light);margin-bottom:14px;line-height:1.5;">This class isn't linked to a lesson yet (Post-Sales can link it). Pick the lesson to open its plan in a new tab.</div>
+    <div style="font-size:12px;font-weight:700;color:var(--light);margin-bottom:14px;line-height:1.5;">${currentLessonId
+      ? "This class's lesson is selected below. Choose any other lesson to open its plan in a new tab."
+      : "This class isn't linked to a lesson yet (Post-Sales can link it). Pick the lesson to open its plan in a new tab."}</div>
     <select id="lpPathway" style="${sel}" onchange="lpFill('grade')"><option>⏳ Loading…</option></select>
     <select id="lpGrade" style="${sel}" onchange="lpFill('lesson')"></select>
     <select id="lpLesson" style="${sel}"></select>
@@ -1533,7 +1536,18 @@ async function openLessonPicker() {
       _lessonBrowse = d.pathways;
     }
     document.getElementById('lpPathway').innerHTML = _lessonBrowse.map((p, i) => `<option value="${i}">${p.name}</option>`).join('') || '<option>No lessons yet</option>';
+    /* Start on the class's own lesson when it has one */
+    let at = null;
+    if (currentLessonId) {
+      _lessonBrowse.some((p, pi) => p.grades.some((g, gi) => g.lessons.some(l => (l.id === currentLessonId) && (at = { pi, gi }))));
+    }
+    if (at) document.getElementById('lpPathway').value = String(at.pi);
     lpFill('grade');
+    if (at) {
+      document.getElementById('lpGrade').value = String(at.gi);
+      lpFill('lesson');
+      document.getElementById('lpLesson').value = currentLessonId;
+    }
   } catch (e) { showToast(e.message, 'error'); }
 }
 function lpFill(level) {
