@@ -47,12 +47,10 @@ const STATEMENTS = [
   `ALTER TABLE bookings ADD COLUMN IF NOT EXISTS batch_id UUID REFERENCES batches(id) ON DELETE SET NULL`,
   `CREATE INDEX IF NOT EXISTS idx_bookings_batch ON bookings(batch_id)`,
 
-  /* Batch classes from before the migration lost their batch link and
-     members. Batches are being onboarded afresh, so free these slots
-     on the tutors' calendars (cancelled, not deleted). */
-  `UPDATE bookings SET status = 'cancelled'
-     WHERE status = 'scheduled' AND batch_id IS NULL AND student_id IS NULL
-       AND notes->>'isBatchClass' = 'true'`,
+  /* (Removed 5 Oct 2026: a statement here cancelled every old-style batch
+     class — no batch_id, no student — on each server start. It cancelled
+     the future classes of BATCH-001…005 while those batches were still being
+     taught. Schema setup must never change class data.) */
 
   /* ── Pause / resume ── */
   `ALTER TABLE enrolments ADD COLUMN IF NOT EXISTS paused_at            TIMESTAMPTZ`,
