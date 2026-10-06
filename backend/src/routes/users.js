@@ -1,13 +1,13 @@
 /**
  * Users routes
- * GET    /api/users/me/notifications  Ã¢â‚¬â€ get my notifications
+ * GET    /api/users/me/notifications  — get my notifications
  * PUT    /api/users/me/notifications/:id/read
- * GET    /api/users/:id               Ã¢â‚¬â€ get user profile
- * PUT    /api/users/:id               Ã¢â‚¬â€ update own profile
- * PUT    /api/users/:id/password      Ã¢â‚¬â€ change password
- * GET    /api/users (admin only)      Ã¢â‚¬â€ list all users
- * POST   /api/users (admin only)      Ã¢â‚¬â€ create user
- * DELETE /api/users/:id (admin only)  Ã¢â‚¬â€ deactivate user
+ * GET    /api/users/:id               — get user profile
+ * PUT    /api/users/:id               — update own profile
+ * PUT    /api/users/:id/password      — change password
+ * GET    /api/users (admin only)      — list all users
+ * POST   /api/users (admin only)      — create user
+ * DELETE /api/users/:id (admin only)  — deactivate user
  */
 
 const { isExposedPassword, EXPOSED_MESSAGE } = require('../utils/passwordPolicy');
@@ -63,7 +63,7 @@ function validateCreateRole(req, data) {
   }
 }
 
-/* Ã¢â€â‚¬Ã¢â€â‚¬ GET /api/users/me/notifications Ã¢â€â‚¬Ã¢â€â‚¬ */
+/* ── GET /api/users/me/notifications ── */
 router.get('/me/notifications', requireAuth, async (req, res, next) => {
   try {
     const result = await pool.query(
@@ -77,7 +77,7 @@ router.get('/me/notifications', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-/* Ã¢â€â‚¬Ã¢â€â‚¬ PUT /api/users/me/notifications/:id/read Ã¢â€â‚¬Ã¢â€â‚¬ */
+/* ── PUT /api/users/me/notifications/:id/read ── */
 router.put('/me/notifications/:id/read', requireAuth, async (req, res, next) => {
   try {
     await pool.query(
@@ -102,7 +102,7 @@ router.put('/me/timezone', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-/* Ã¢â€â‚¬Ã¢â€â‚¬ GET /api/users Ã¢â€â‚¬Ã¢â€â‚¬ */
+/* ── GET /api/users ── */
 /* Admin/super_admin: full access. Presales/postsales: can only list tutors and sales. */
 router.get('/', requireAuth, async (req, res, next) => {
   try {
@@ -117,7 +117,7 @@ router.get('/', requireAuth, async (req, res, next) => {
       return res.status(403).json({ success: false, error: 'Access denied' });
     }
 
-    /* Staff (non-admin) can only query tutors or sales Ã¢â‚¬â€ not all users */
+    /* Staff (non-admin) can only query tutors or sales — not all users */
     if (!isAdmin && role && !['tutor', 'sales'].includes(role)) {
       return res.status(403).json({ success: false, error: 'Access denied for this role filter' });
     }
@@ -418,7 +418,7 @@ router.post('/', requireAuth, requireRole('admin', 'super_admin', 'postsales'), 
   }
 });
 
-/* Ã¢â€â‚¬Ã¢â€â‚¬ GET /api/users/:id Ã¢â€â‚¬Ã¢â€â‚¬ */
+/* ── GET /api/users/:id ── */
 router.get('/:id', requireAuth, async (req, res, next) => {
   try {
     /* Users can only fetch their own profile unless admin */
@@ -447,7 +447,7 @@ router.get('/:id', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-/* Ã¢â€â‚¬Ã¢â€â‚¬ PUT /api/users/:id Ã¢â€â‚¬Ã¢â€â‚¬ */
+/* ── PUT /api/users/:id ── */
 router.put('/:id', requireAuth, async (req, res, next) => {
   try {
     if (req.user.id !== req.params.id && !['admin','super_admin'].includes(req.user.role)) {
@@ -485,7 +485,7 @@ router.put('/:id', requireAuth, async (req, res, next) => {
   }
 });
 
-/* Ã¢â€â‚¬Ã¢â€â‚¬ PUT /api/users/:id/password Ã¢â€â‚¬Ã¢â€â‚¬ */
+/* ── PUT /api/users/:id/password ── */
 router.put('/:id/password', requireAuth, async (req, res, next) => {
   try {
     if (req.user.id !== req.params.id) {
@@ -522,7 +522,7 @@ router.put('/:id/password', requireAuth, async (req, res, next) => {
         const appUrl = process.env.APP_URL || 'https://stemnestacademy.co.uk';
         await emailSvc.sendEmail({
           to:      u.email,
-          subject: 'Ã°Å¸â€â€™ Your StemNest password has been changed',
+          subject: '🔒 Your StemNest password has been changed',
           html: `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <style>
   body{font-family:'Helvetica Neue',Arial,sans-serif;background:#f4f6fb;margin:0;padding:0;}
@@ -535,14 +535,14 @@ router.put('/:id/password', requireAuth, async (req, res, next) => {
   .footer{background:#f4f6fb;padding:18px 36px;text-align:center;font-size:12px;color:#718096;}
 </style></head>
 <body><div class="container">
-  <div class="header"><h1>Ã°Å¸â€â€™ Password Changed</h1></div>
+  <div class="header"><h1>🔒 Password Changed</h1></div>
   <div class="body">
     <p>Hi ${u.name},</p>
     <p>Your StemNest Academy password was successfully changed on <strong>${new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</strong>.</p>
-    <div class="warn-box">Ã¢Å¡Â Ã¯Â¸Â If you did <strong>not</strong> make this change, please reset your password immediately using the button below or contact us at <strong>support@stemnestacademy.co.uk</strong></div>
-    <a href="${appUrl}/pages/login.html" class="btn">Go to Login Ã¢â€ â€™</a>
+    <div class="warn-box">⚠️ If you did <strong>not</strong> make this change, please reset your password immediately using the button below or contact us at <strong>support@stemnestacademy.co.uk</strong></div>
+    <a href="${appUrl}/pages/login.html" class="btn">Go to Login →</a>
   </div>
-  <div class="footer">Ã‚Â© ${new Date().getFullYear()} StemNest Academy Ltd Ã‚Â· <a href="${appUrl}" style="color:#1a56db;">stemnestacademy.co.uk</a></div>
+  <div class="footer">© ${new Date().getFullYear()} StemNest Academy Ltd · <a href="${appUrl}" style="color:#1a56db;">stemnestacademy.co.uk</a></div>
 </div></body></html>`,
           template: 'password_changed',
         }).catch(e => logger.warn('[PASSWORD CHANGE] Confirmation email failed:', e.message));
@@ -555,7 +555,7 @@ router.put('/:id/password', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-/* Ã¢â€â‚¬Ã¢â€â‚¬ DELETE /api/users/:id (admin only Ã¢â‚¬â€ soft delete) Ã¢â€â‚¬Ã¢â€â‚¬ */
+/* ── DELETE /api/users/:id (admin only — soft delete) ── */
 router.delete('/:id', requireAuth, requireRole('admin', 'super_admin', 'postsales'), async (req, res, next) => {
   try {
     const userId = req.params.id;
@@ -590,7 +590,7 @@ router.delete('/:id', requireAuth, requireRole('admin', 'super_admin', 'postsale
   } catch (err) { next(err); }
 });
 
-/* Ã¢â€â‚¬Ã¢â€â‚¬ PUT /api/users/:id/update-name (admin/postsales Ã¢â‚¬â€ update any user's name) Ã¢â€â‚¬Ã¢â€â‚¬ */
+/* ── PUT /api/users/:id/update-name (admin/postsales — update any user's name) ── */
 router.put('/:id/update-name', requireAuth, requireRole('admin', 'super_admin', 'postsales'), async (req, res, next) => {
   try {
     const { name } = req.body;
@@ -609,10 +609,10 @@ router.put('/:id/update-name', requireAuth, requireRole('admin', 'super_admin', 
     /* Also update lesson_name on bookings where it stored the student's name */
     await pool.query(`
       UPDATE bookings SET lesson_name = $1
-      WHERE student_id = $2 AND (lesson_name = 'Ã¢â‚¬â€' OR lesson_name IS NULL OR lesson_name = '')
+      WHERE student_id = $2 AND (lesson_name = '—' OR lesson_name IS NULL OR lesson_name = '')
     `, [cleanName, req.params.id]);
 
-    logger.info(`[UPDATE NAME] ${req.params.id} Ã¢â€ â€™ "${cleanName}" by ${req.user.email}`);
+    logger.info(`[UPDATE NAME] ${req.params.id} → "${cleanName}" by ${req.user.email}`);
     res.json({ success: true, user: result.rows[0] });
   } catch (err) { next(err); }
 });

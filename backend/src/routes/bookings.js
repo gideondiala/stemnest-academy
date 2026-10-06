@@ -1,12 +1,12 @@
 /**
  * Bookings routes
- * GET    /api/bookings              â€” list (filtered by role)
- * POST   /api/bookings              â€” create demo booking (public)
- * GET    /api/bookings/:id          â€” get single booking
- * PUT    /api/bookings/:id/assign   â€” assign tutor + sales (admin/presales)
- * PUT    /api/bookings/:id/status   â€” update status (tutor/admin)
- * POST   /api/bookings/:id/report   â€” submit end-of-class report (tutor)
- * POST   /api/bookings/:id/reschedule â€” reschedule lesson (presales/tutor)
+ * GET    /api/bookings              — list (filtered by role)
+ * POST   /api/bookings              — create demo booking (public)
+ * GET    /api/bookings/:id          — get single booking
+ * PUT    /api/bookings/:id/assign   — assign tutor + sales (admin/presales)
+ * PUT    /api/bookings/:id/status   — update status (tutor/admin)
+ * POST   /api/bookings/:id/report   — submit end-of-class report (tutor)
+ * POST   /api/bookings/:id/reschedule — reschedule lesson (presales/tutor)
  */
 
 const express = require('express');
@@ -25,7 +25,7 @@ const logger   = require('../utils/logger');
 
 const router = express.Router();
 
-/* â”€â”€ Validation â”€â”€ */
+/* ── Validation ── */
 const bookingSchema = z.object({
   studentName:  z.string().min(2),
   age:          z.string(),
@@ -47,7 +47,7 @@ const bookingSchema = z.object({
 
 const assignSchema = z.object({
   tutorId:    z.string().uuid(),
-  salesId:    z.string().optional(),   // UUID or staff_id â€” resolved server-side
+  salesId:    z.string().optional(),   // UUID or staff_id — resolved server-side
   classLink:  z.string().url(),
   date:       z.string().optional(),   // allow updating date
   time:       z.string().optional(),   // allow updating time
@@ -76,11 +76,11 @@ const rescheduleSchema = z.object({
   reason: z.string().optional()
 });
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   POST /api/bookings/partial  (public â€” Step 1 quick save)
+/* ══════════════════════════════════════════════
+   POST /api/bookings/partial  (public — Step 1 quick save)
    Saves minimal booking data immediately when parent clicks Next
    Creates a pending_partial booking visible in presales
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+══════════════════════════════════════════════ */
 router.post('/partial', async (req, res, next) => {
   try {
     const { studentName, grade, whatsapp, countryCode, country, countryName, timezone, ref } = req.body;
@@ -110,7 +110,7 @@ router.post('/partial', async (req, res, next) => {
           country:      countryName || '',
           countryCode:  countryCode || '',
           timezone:     timezone || '',
-          partial:      true,   // flag â€” Step 2 not yet completed
+          partial:      true,   // flag — Step 2 not yet completed
         })
       ]
     );
@@ -124,17 +124,17 @@ router.post('/partial', async (req, res, next) => {
       [studentName.trim(), bookingId, partialPromoter]
     ).catch(() => {});
 
-    logger.info(`[PARTIAL BOOKING] ${studentName} Â· ${fullPhone} Â· ${bookingId}`);
+    logger.info(`[PARTIAL BOOKING] ${studentName} · ${fullPhone} · ${bookingId}`);
     res.status(201).json({ success: true, bookingId });
   } catch (err) {
     next(err);
   }
 });
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   PUT /api/bookings/:id/complete  (public â€” Step 2 completion)
+/* ══════════════════════════════════════════════
+   PUT /api/bookings/:id/complete  (public — Step 2 completion)
    Appends email, date, time, device, parentName to existing partial booking
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+══════════════════════════════════════════════ */
 router.put('/:id/complete', async (req, res, next) => {
   try {
     const { email, date, time, device, parentName, age } = req.body;
@@ -154,7 +154,7 @@ router.put('/:id/complete', async (req, res, next) => {
     let notes = {};
     try { notes = typeof booking.notes === 'string' ? JSON.parse(booking.notes || '{}') : (booking.notes || {}); } catch {}
     notes.email      = email.toLowerCase().trim();
-    notes.parentName = parentName || 'â€”';
+    notes.parentName = parentName || '—';
     notes.device     = device;
     notes.partial    = false; // Step 2 complete
     if (age) notes.age = age;
@@ -220,22 +220,22 @@ router.put('/:id/complete', async (req, res, next) => {
       const emailService = require('../services/emailService');
       await emailService.sendEmail({
         to:      'operations@stemnestacademy.co.uk',
-        subject: `ðŸŽ“ Demo Booking Completed â€” ${notes.studentName} (Coding)`,
+        subject: `🎓 Demo Booking Completed — ${notes.studentName} (Coding)`,
         html: `
           <div style="font-family:Arial,sans-serif;max-width:500px;padding:24px;">
-            <h2 style="color:#1a56db;">New Demo Class Booking âœ…</h2>
+            <h2 style="color:#1a56db;">New Demo Class Booking ✅</h2>
             <p><strong>Student:</strong> ${notes.studentName}</p>
-            <p><strong>Grade:</strong> ${notes.grade || 'â€”'}</p>
+            <p><strong>Grade:</strong> ${notes.grade || '—'}</p>
             <p><strong>WhatsApp:</strong> ${notes.whatsapp}</p>
             <p><strong>Email:</strong> ${email}</p>
             <p><strong>Date:</strong> ${date}</p>
-            <p><strong>Time:</strong> ${time} (${notes.timezone || 'â€”'})</p>
+            <p><strong>Time:</strong> ${time} (${notes.timezone || '—'})</p>
             <p><strong>WAT:</strong> ${watTime}</p>
             <p><strong>Device:</strong> ${device}</p>
-            <p><strong>Country:</strong> ${notes.country || 'â€”'}</p>
+            <p><strong>Country:</strong> ${notes.country || '—'}</p>
             <a href="https://stemnestacademy.co.uk/pages/presales-dashboard.html"
                style="display:inline-block;margin-top:12px;background:#1a56db;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:700;">
-              Open Pre-Sales Dashboard â†’
+              Open Pre-Sales Dashboard →
             </a>
           </div>`,
         template: 'booking_completed',
@@ -258,15 +258,15 @@ router.put('/:id/complete', async (req, res, next) => {
       });
     } catch {}
 
-    logger.info(`[BOOKING COMPLETED] ${notes.studentName} Â· Coding Â· ${date}`);
+    logger.info(`[BOOKING COMPLETED] ${notes.studentName} · Coding · ${date}`);
     res.json({ success: true, bookingId: req.params.id });
   } catch (err) { next(err); }
 });
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   PUT /api/bookings/:id/edit-fields  (presales â€” edit any field)
+/* ══════════════════════════════════════════════
+   PUT /api/bookings/:id/edit-fields  (presales — edit any field)
    Allows presales to manually update any booking field
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+══════════════════════════════════════════════ */
 router.put('/:id/edit-fields', requireAuth, requireRole('admin','super_admin','presales'), async (req, res, next) => {
   try {
     const bResult = await pool.query('SELECT * FROM bookings WHERE id = $1', [req.params.id]);
@@ -312,11 +312,11 @@ router.put('/:id/edit-fields', requireAuth, requireRole('admin','super_admin','p
   } catch (err) { next(err); }
 });
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   GET /api/bookings/lookup  (public â€” by email or whatsapp)
+/* ══════════════════════════════════════════════
+   GET /api/bookings/lookup  (public — by email or whatsapp)
    Used by the join-class page so students can find their booking
    without needing to log in.
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+══════════════════════════════════════════════ */
 const lookupLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
@@ -383,9 +383,9 @@ router.get('/lookup', lookupLimiter, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ══════════════════════════════════════════════
    GET /api/bookings  (authenticated)
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+══════════════════════════════════════════════ */
 router.get('/', requireAuth, async (req, res, next) => {
   try {
     const { status, subject, limit = 100, offset = 0, from, to } = req.query;
@@ -446,11 +446,11 @@ router.get('/', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ══════════════════════════════════════════════
    POST /api/bookings/bulk-schedule  (postsales/admin)
    Creates multiple paid sessions for a student without
    sending demo emails. Sends ONE summary email only.
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+══════════════════════════════════════════════ */
 /* Booking date + time are WAT. The whole grade is booked up front (72
    lessons, or the grade's real lesson count) so parents always see the
    full plan; classes are put on hold automatically when credits run out. */
@@ -739,15 +739,15 @@ router.post('/bulk-schedule', requireAuth, requireRole('admin','super_admin','po
   }
 });
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   POST /api/bookings  (public â€” demo booking)
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+/* ══════════════════════════════════════════════
+   POST /api/bookings  (public — demo booking)
+══════════════════════════════════════════════ */
 router.post('/', async (req, res, next) => {
   try {
     const data = bookingSchema.parse(req.body);
 
     /* Convert student's local time to WAT (Africa/Lagos).
-       TESTED AND VERIFIED approach â€” passes all timezone tests including
+       TESTED AND VERIFIED approach — passes all timezone tests including
        Australia (UTC+10), India (UTC+5:30), Nigeria (UTC+1), UK BST, USA EDT, etc.
        
        Method: Use noon UTC as a reference to find the timezone offset,
@@ -757,7 +757,7 @@ router.post('/', async (req, res, next) => {
     let tzAbbr  = '';
     try {
       if (data.timezone && data.date && data.time) {
-        /* Normalise time to 24-hour HH:MM format â€” handles both "20:00" and "8:00 PM" */
+        /* Normalise time to 24-hour HH:MM format — handles both "20:00" and "8:00 PM" */
         let normalizedTime = data.time;
         const ampmMatch = data.time.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
         if (ampmMatch) {
@@ -870,36 +870,36 @@ router.post('/', async (req, res, next) => {
     const emailService = require('../services/emailService');
     emailService.sendEmail({
       to: 'operations@stemnestacademy.co.uk',
-      subject: `ðŸŽ“ New Demo Booked â€” ${data.studentName} (${data.subject})`,
+      subject: `🎓 New Demo Booked — ${data.studentName} (${data.subject})`,
       html: `
         <div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;padding:24px;">
-          <h2 style="color:#1a56db;">New Demo Class Booking ðŸŽ“</h2>
+          <h2 style="color:#1a56db;">New Demo Class Booking 🎓</h2>
           <table style="width:100%;border-collapse:collapse;font-size:14px;">
             <tr><td style="padding:8px 0;font-weight:700;color:#718096;width:140px;">Student</td><td style="padding:8px 0;font-weight:800;">${data.studentName}</td></tr>
             <tr><td style="padding:8px 0;font-weight:700;color:#718096;">Subject</td><td style="padding:8px 0;">${data.subject}</td></tr>
-            <tr><td style="padding:8px 0;font-weight:700;color:#718096;">Grade/Age</td><td style="padding:8px 0;">${data.grade} Â· Age ${data.age}</td></tr>
+            <tr><td style="padding:8px 0;font-weight:700;color:#718096;">Grade/Age</td><td style="padding:8px 0;">${data.grade} · Age ${data.age}</td></tr>
             ${data.gender ? `<tr><td style="padding:8px 0;font-weight:700;color:#718096;">Gender</td><td style="padding:8px 0;">${data.gender}</td></tr>` : ''}
             ${data.country ? `<tr><td style="padding:8px 0;font-weight:700;color:#718096;">Country</td><td style="padding:8px 0;">${data.country}</td></tr>` : ''}
             <tr><td style="padding:8px 0;font-weight:700;color:#718096;">Date</td><td style="padding:8px 0;">${data.date}</td></tr>
             <tr><td style="padding:8px 0;font-weight:700;color:#718096;">Time (Local)</td><td style="padding:8px 0;">${data.time} (${data.timezone})</td></tr>
             <tr><td style="padding:8px 0;font-weight:700;color:#718096;">Time (WAT)</td><td style="padding:8px 0;color:#1a56db;font-weight:800;">${watTime}</td></tr>
-            <tr><td style="padding:8px 0;font-weight:700;color:#718096;">Email</td><td style="padding:8px 0;">${data.email || 'â€”'}</td></tr>
-            <tr><td style="padding:8px 0;font-weight:700;color:#718096;">WhatsApp</td><td style="padding:8px 0;">${data.whatsapp || 'â€”'}</td></tr>
+            <tr><td style="padding:8px 0;font-weight:700;color:#718096;">Email</td><td style="padding:8px 0;">${data.email || '—'}</td></tr>
+            <tr><td style="padding:8px 0;font-weight:700;color:#718096;">WhatsApp</td><td style="padding:8px 0;">${data.whatsapp || '—'}</td></tr>
             <tr><td style="padding:8px 0;font-weight:700;color:#718096;">Booking ID</td><td style="padding:8px 0;font-family:monospace;">${bookingId}</td></tr>
           </table>
           <div style="margin-top:20px;background:#f0f4ff;border-radius:10px;padding:14px;font-size:13px;color:#1e40af;font-weight:700;">
-            âš¡ Action needed: Assign a teacher and schedule this demo class in the Pre-Sales dashboard.
+            ⚡ Action needed: Assign a teacher and schedule this demo class in the Pre-Sales dashboard.
           </div>
           <a href="https://stemnestacademy.co.uk/pages/presales-dashboard.html" 
              style="display:inline-block;margin-top:16px;background:#1a56db;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:700;">
-            Open Pre-Sales Dashboard â†’
+            Open Pre-Sales Dashboard →
           </a>
         </div>
       `,
       template: 'booking_notification',
     }).catch(e => logger.warn('[BOOKING NOTIFICATION] Email failed:', e.message));
 
-    logger.info(`[BOOKING CREATED] ${data.studentName} Â· ${data.subject} Â· ${data.date}`);
+    logger.info(`[BOOKING CREATED] ${data.studentName} · ${data.subject} · ${data.date}`);
     res.status(201).json({ success: true, bookingId });
   } catch (err) {
     if (err.name === 'ZodError') {
@@ -909,9 +909,9 @@ router.post('/', async (req, res, next) => {
   }
 });
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ══════════════════════════════════════════════
    GET /api/bookings/scheduled-students  (postsales/admin)
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+══════════════════════════════════════════════ */
 router.get('/scheduled-students', requireAuth, requireRole('admin','super_admin','postsales'), async (req, res, next) => {
   try {
     const result = await pool.query(`
@@ -956,8 +956,8 @@ router.put('/reschedule-student', requireAuth, requireRole('admin','super_admin'
   try {
     const {
       studentId,      // UUID of the student user
-      startDate,      // YYYY-MM-DD â€” reschedule takes effect from this date
-      classLink,      // optional â€” keep existing if not provided
+      startDate,      // YYYY-MM-DD — reschedule takes effect from this date
+      classLink,      // optional — keep existing if not provided
       schedule,       // [{ weekday: 1, time: '11:30' }, ...]
       tutorId,        // keep existing if not provided
     } = req.body;
@@ -994,9 +994,9 @@ router.put('/reschedule-student', requireAuth, requireRole('admin','super_admin'
 
     /* Get tutor name */
     const tutorRes = await pool.query('SELECT name FROM users WHERE id = $1', [resolvedTutorId]);
-    const tutorName = tutorRes.rows[0]?.name || 'â€”';
+    const tutorName = tutorRes.rows[0]?.name || '—';
 
-    /* Build new schedule dates â€” same number of sessions as existing */
+    /* Build new schedule dates — same number of sessions as existing */
     const newDates = [];
     const start = new Date(startDate + 'T12:00:00Z');
 
@@ -1121,7 +1121,7 @@ router.put('/change-tutor', requireAuth, requireRole('admin','super_admin','post
       await pool.query('UPDATE enrolments SET tutor_id = $1, updated_at = NOW() WHERE id = ANY($2::uuid[])', [newTutorId, enrolIds]);
     }
 
-    logger.info(`[CHANGE-TUTOR] Student ${studentId}: ${affected.rows.length} bookings â†’ tutor ${newTutorId} (${newTutorName})`);
+    logger.info(`[CHANGE-TUTOR] Student ${studentId}: ${affected.rows.length} bookings → tutor ${newTutorId} (${newTutorName})`);
     res.json({ success: true, updated: affected.rows.length, newTutorName });
 
   } catch (err) { next(err); }
@@ -1159,9 +1159,9 @@ router.get('/:id', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ══════════════════════════════════════════════
    PUT /api/bookings/:id/assign
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+══════════════════════════════════════════════ */
 router.put('/:id/assign', requireAuth, requireRole('admin','super_admin','presales','postsales'), async (req, res, next) => {
   try {
     const { tutorId, salesId, classLink, notes, date, time } = assignSchema.parse(req.body);
@@ -1189,7 +1189,7 @@ router.put('/:id/assign', requireAuth, requireRole('admin','super_admin','presal
     const booking = bResult.rows[0];
     if (!booking) return res.status(404).json({ success: false, error: 'Booking not found' });
 
-    /* Update booking â€” always set tutor, sales, link, status; optionally update date/time */
+    /* Update booking — always set tutor, sales, link, status; optionally update date/time */
     const updateFields = [
       'tutor_id = $1',
       'sales_id = $2',
@@ -1229,13 +1229,13 @@ router.put('/:id/assign', requireAuth, requireRole('admin','super_admin','presal
       classLink,
     });
 
-    /* Notify parent â€” congratulatory email with join link and Google Meet guide */
+    /* Notify parent — congratulatory email with join link and Google Meet guide */
     const parentEmail = bookingNotes.email || '';
     if (parentEmail) {
       try {
         const emailService = require('../services/emailService');
-        const bookingDate = date || (booking.date ? new Date(booking.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'â€”');
-        const bookingTime = time || booking.time || 'â€”';
+        const bookingDate = date || (booking.date ? new Date(booking.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '—');
+        const bookingTime = time || booking.time || '—';
         await emailService.sendDemoScheduledParentEmail({
           to:         parentEmail,
           parentName: bookingNotes.parentName || '',
@@ -1271,7 +1271,7 @@ router.put('/:id/assign', requireAuth, requireRole('admin','super_admin','presal
       }
     }
 
-    logger.info(`[ASSIGN] Booking ${req.params.id} â†’ tutor ${tutorId}`);
+    logger.info(`[ASSIGN] Booking ${req.params.id} → tutor ${tutorId}`);
     res.json({ success: true, message: 'Class assigned and notifications sent' });
   } catch (err) {
     if (err.name === 'ZodError') {
@@ -1281,9 +1281,9 @@ router.put('/:id/assign', requireAuth, requireRole('admin','super_admin','presal
   }
 });
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ══════════════════════════════════════════════
    PUT /api/bookings/:id/status  (admin/tutor)
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+══════════════════════════════════════════════ */
 router.put('/:id/status', requireAuth, requireRole('admin','super_admin','tutor','presales','postsales'), async (req, res, next) => {
   try {
     const { status } = req.body;
@@ -1300,7 +1300,7 @@ router.put('/:id/status', requireAuth, requireRole('admin','super_admin','tutor'
       [status, req.params.id]
     );
 
-    logger.info(`[STATUS] Booking ${req.params.id} â†’ ${status} by ${req.user.email}`);
+    logger.info(`[STATUS] Booking ${req.params.id} → ${status} by ${req.user.email}`);
     res.json({ success: true, message: 'Status updated' });
   } catch (err) { next(err); }
 });
@@ -1323,7 +1323,7 @@ async function chargeStudentForClass(studentId, booking, bookingNotes) {
     return;
   }
 
-  /* â”€â”€ Track lesson completion â”€â”€ */
+  /* ── Track lesson completion ── */
   try {
     /* Find the student's active enrolment for this pathway */
     const enrolResult = await pool.query(
@@ -1406,14 +1406,14 @@ async function chargeStudentForClass(studentId, booking, bookingNotes) {
               const appUrl = process.env.APP_URL || 'https://stemnestacademy.co.uk';
               emailSvc.sendEmail({
                 to:      recipientEmail,
-                subject: `ðŸŽ“ ${sData.name} has earned a StemNest Certificate!`,
+                subject: `🎓 ${sData.name} has earned a StemNest Certificate!`,
                 html: `<div style="font-family:Arial,sans-serif;max-width:500px;padding:24px;text-align:center;">
-                  <h1 style="color:#0e9f6e;">ðŸ† Certificate of Completion</h1>
+                  <h1 style="color:#0e9f6e;">🏆 Certificate of Completion</h1>
                   <p><strong>${sData.name}</strong> has successfully completed<br>
-                  <strong>${pathway?.name || 'STEMNest Pathway'} â€” Grade ${enrolment.current_grade}</strong></p>
+                  <strong>${pathway?.name || 'STEMNest Pathway'} — Grade ${enrolment.current_grade}</strong></p>
                   <a href="${appUrl}/pages/student-dashboard.html"
                      style="display:inline-block;margin-top:16px;background:#1a56db;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;">
-                    View Certificate â†’
+                    View Certificate →
                   </a>
                 </div>`,
                 template: 'certificate_awarded',
@@ -1471,9 +1471,9 @@ async function chargeStudentForClass(studentId, booking, bookingNotes) {
     autoPause = await pauseSvc.autoPauseForCredits(studentId);
   }
 
-  logger.info(`[CREDITS] Student ${studentId}: ${currentCredits} â†’ ${newCredits}`);
+  logger.info(`[CREDITS] Student ${studentId}: ${currentCredits} → ${newCredits}`);
 
-  /* â”€â”€ Credit threshold notifications â”€â”€ */
+  /* ── Credit threshold notifications ── */
   if (student) {
     const emailSvc   = require('../services/emailService');
     const recipientEmail = student.parent_email || student.email;
@@ -1482,11 +1482,11 @@ async function chargeStudentForClass(studentId, booking, bookingNotes) {
     const appUrl = process.env.APP_URL || 'https://stemnestacademy.co.uk';
     const topUpUrl = `${appUrl}/pages/student-dashboard.html?topup=1`;
 
-    /* 3 credits remaining â€” soft nudge */
+    /* 3 credits remaining — soft nudge */
     if (newCredits === 3) {
       emailSvc.sendEmail({
         to:      recipientEmail,
-        subject: `ðŸ“š ${studentName} has 3 classes left â€” top up soon`,
+        subject: `📚 ${studentName} has 3 classes left — top up soon`,
         html: emailSvc._buildCreditNudgeEmail({
           parentName: recipientName, studentName, credits: 3,
           urgency: 'soft', topUpUrl,
@@ -1495,7 +1495,7 @@ async function chargeStudentForClass(studentId, booking, bookingNotes) {
         template: 'credit_nudge_3',
       }).catch(e => logger.warn('[CREDITS] Email (3) failed:', e.message));
 
-      /* â”€â”€ Alert the assigned Learning Advisor at 2 credits (triggers at 3 to give them time) â”€â”€ */
+      /* ── Alert the assigned Learning Advisor at 2 credits (triggers at 3 to give them time) ── */
       try {
         const assignedSalesResult = await pool.query(
           `SELECT u.id, u.name, u.email FROM users u
@@ -1509,13 +1509,13 @@ async function chargeStudentForClass(studentId, booking, bookingNotes) {
           const appUrl = process.env.APP_URL || 'https://stemnestacademy.co.uk';
           emailSvc.sendEmail({
             to:      la.email,
-            subject: `ðŸ”” ${studentName} has 3 credits left â€” time to discuss renewal`,
+            subject: `🔔 ${studentName} has 3 credits left — time to discuss renewal`,
             html: `<div style="font-family:Arial,sans-serif;max-width:500px;padding:24px;">
-              <h2 style="color:#1a56db;">Retention Alert ðŸ””</h2>
+              <h2 style="color:#1a56db;">Retention Alert 🔔</h2>
               <p>Hi ${la.name},</p>
               <p><strong>${studentName}</strong> now has <strong>3 class credits remaining</strong>. This is your signal to reach out and discuss renewal before classes run out.</p>
               <p><strong>Action:</strong> Contact the parent now and generate a renewal payment link from your dashboard.</p>
-              <a href="${appUrl}/pages/sales-dashboard.html" style="display:inline-block;margin-top:12px;background:#1a56db;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:700;">Open Sales Dashboard â†’</a>
+              <a href="${appUrl}/pages/sales-dashboard.html" style="display:inline-block;margin-top:12px;background:#1a56db;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:700;">Open Sales Dashboard →</a>
             </div>`,
             template: 'la_retention_alert',
           }).catch(e => logger.warn('[CREDITS] LA alert email failed:', e.message));
@@ -1524,7 +1524,7 @@ async function chargeStudentForClass(studentId, booking, bookingNotes) {
         logger.warn('[CREDITS] LA alert lookup failed:', laErr.message);
       }
 
-      /* â”€â”€ Save renewal follow-up record for automated sequence â”€â”€ */
+      /* ── Save renewal follow-up record for automated sequence ── */
       await pool.query(
         `INSERT INTO renewal_followups (student_id, student_name, credits_at_trigger, triggered_at)
          VALUES ($1, $2, $3, NOW())
@@ -1539,11 +1539,11 @@ async function chargeStudentForClass(studentId, booking, bookingNotes) {
       ).catch(e => logger.warn('[CREDITS] Renewal followup record failed:', e.message));
     }
 
-    /* 1 credit remaining â€” urgent nudge */
+    /* 1 credit remaining — urgent nudge */
     if (newCredits === 1) {
       emailSvc.sendEmail({
         to:      recipientEmail,
-        subject: `âš ï¸ Only 1 class left for ${studentName} â€” top up now`,
+        subject: `⚠️ Only 1 class left for ${studentName} — top up now`,
         html: emailSvc._buildCreditNudgeEmail({
           parentName: recipientName, studentName, credits: 1,
           urgency: 'urgent', topUpUrl,
@@ -1553,11 +1553,11 @@ async function chargeStudentForClass(studentId, booking, bookingNotes) {
       }).catch(e => logger.warn('[CREDITS] Email (1) failed:', e.message));
     }
 
-    /* 0 credits â€” warning, existing classes still honoured */
+    /* 0 credits — warning, existing classes still honoured */
     if (newCredits === 0) {
       emailSvc.sendEmail({
         to:      recipientEmail,
-        subject: `ðŸ”´ ${studentName}'s credits have run out â€” action needed`,
+        subject: `🔴 ${studentName}'s credits have run out — action needed`,
         html: emailSvc._buildCreditNudgeEmail({
           parentName: recipientName, studentName, credits: 0,
           urgency: 'critical', topUpUrl,
@@ -1567,11 +1567,11 @@ async function chargeStudentForClass(studentId, booking, bookingNotes) {
       }).catch(e => logger.warn('[CREDITS] Email (0) failed:', e.message));
     }
 
-    /* -1 credits â€” discontinuation warning */
+    /* -1 credits — discontinuation warning */
     if (newCredits === -1) {
       emailSvc.sendEmail({
         to:      recipientEmail,
-        subject: `ðŸš¨ ${studentName}'s classes will be discontinued soon`,
+        subject: `🚨 ${studentName}'s classes will be discontinued soon`,
         html: emailSvc._buildCreditNudgeEmail({
           parentName: recipientName, studentName, credits: -1,
           urgency: 'critical', topUpUrl,
@@ -1581,11 +1581,11 @@ async function chargeStudentForClass(studentId, booking, bookingNotes) {
       }).catch(e => logger.warn('[CREDITS] Email (-1) failed:', e.message));
     }
 
-    /* -2 credits â€” classes put on hold (sent once, when the hold happens) */
+    /* -2 credits — classes put on hold (sent once, when the hold happens) */
     if (autoPause.paused) {
       emailSvc.sendEmail({
         to:      recipientEmail,
-        subject: `ðŸ”’ ${studentName}'s classes have been paused`,
+        subject: `🔒 ${studentName}'s classes have been paused`,
         html: emailSvc._buildCreditNudgeEmail({
           parentName: recipientName, studentName, credits: newCredits,
           urgency: 'suspended', topUpUrl,
@@ -1597,9 +1597,9 @@ async function chargeStudentForClass(studentId, booking, bookingNotes) {
   }
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ══════════════════════════════════════════════
    POST /api/bookings/:id/report  (tutor)
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+══════════════════════════════════════════════ */
 router.post('/:id/report', requireAuth, requireRole('tutor'), async (req, res, next) => {
   try {
     const data = reportSchema.parse(req.body);
@@ -1716,7 +1716,7 @@ router.post('/:id/report', requireAuth, requireRole('tutor'), async (req, res, n
       pay: pay ? { amount: pay.amount, currency: pay.currency, studentsCount: pay.studentsCount } : null,
     });
 
-    /* â”€â”€ Fire "How was the class?" feedback email for completed demos â”€â”€ */
+    /* ── Fire "How was the class?" feedback email for completed demos ── */
     if (data.outcome === 'completed' && booking.is_demo) {
       try {
         const emailService = require('../services/emailService');
@@ -1737,7 +1737,7 @@ router.post('/:id/report', requireAuth, requireRole('tutor'), async (req, res, n
       }
     }
 
-    /* â”€â”€ Fire post-class summary email for all completed classes (paid + demo) â”€â”€ */
+    /* ── Fire post-class summary email for all completed classes (paid + demo) ── */
     if (data.outcome === 'completed') {
       try {
         const emailService = require('../services/emailService');
@@ -1797,9 +1797,9 @@ router.post('/:id/report', requireAuth, requireRole('tutor'), async (req, res, n
   }
 });
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ══════════════════════════════════════════════
    PUT /api/bookings/:id/cancel
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+══════════════════════════════════════════════ */
 router.put('/:id/cancel', async (req, res, next) => {
   try {
     const data = cancelSchema.parse(req.body);
@@ -1828,9 +1828,9 @@ router.put('/:id/cancel', async (req, res, next) => {
   }
 });
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ══════════════════════════════════════════════
    POST /api/bookings/:id/reschedule
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+══════════════════════════════════════════════ */
 router.post('/:id/reschedule', async (req, res, next) => {
   try {
     const data = rescheduleSchema.parse(req.body);
@@ -1864,25 +1864,25 @@ router.post('/:id/reschedule', async (req, res, next) => {
   }
 });
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ══════════════════════════════════════════════
    GET /api/bookings/scheduled-students  (postsales/admin)
    Returns one row per student who has future scheduled paid bookings.
    Used by the Post-Sales Scheduled tab.
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+══════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════
    PUT /api/bookings/reschedule-student  (postsales/admin)
    Cancels all future bookings for a student and creates new ones
    following the new schedule, preserving lesson sequence.
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+══════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════
    PUT /api/bookings/change-tutor  (postsales/admin)
    Reassigns all future bookings for a student to a new tutor.
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   GET /api/bookings/:id/rate  (public â€” from email link)
+══════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════
+   GET /api/bookings/:id/rate  (public — from email link)
    Parent clicks a star rating in the feedback email.
    Records the rating and shows a thank-you page.
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+══════════════════════════════════════════════ */
 router.get('/:id/rate', async (req, res, next) => {
   try {
     const rating = parseInt(req.query.rating);
@@ -1917,13 +1917,13 @@ router.get('/:id/rate', async (req, res, next) => {
     logger.info(`[RATING] Booking ${req.params.id} rated ${rating}/5 by parent`);
 
     /* Return a friendly thank-you page */
-    const stars = 'â˜…'.repeat(rating) + 'â˜†'.repeat(5 - rating);
+    const stars = '★'.repeat(rating) + '☆'.repeat(5 - rating);
     res.send(`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Thank You â€” StemNest Academy</title>
+  <title>Thank You — StemNest Academy</title>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&family=Fredoka+One&display=swap" rel="stylesheet">
   <style>
     body { font-family: 'Nunito', sans-serif; background: #f4f6fb; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
@@ -1937,25 +1937,25 @@ router.get('/:id/rate', async (req, res, next) => {
 </head>
 <body>
   <div class="card">
-    <div class="emoji">${rating >= 4 ? 'ðŸŒŸ' : rating >= 3 ? 'ðŸ˜Š' : 'ðŸ™'}</div>
+    <div class="emoji">${rating >= 4 ? '🌟' : rating >= 3 ? '😊' : '🙏'}</div>
     <h1>Thank you${rating >= 4 ? ', amazing!' : '!'}</h1>
     <div class="stars">${stars}</div>
-    <p>Your ${rating}/5 star rating has been recorded. We really appreciate your feedback â€” it helps us improve every class.</p>
+    <p>Your ${rating}/5 star rating has been recorded. We really appreciate your feedback — it helps us improve every class.</p>
     ${rating >= 4
-      ? '<p>We\'re delighted your child enjoyed the class! Our team will be in touch to discuss continuing their learning journey. ðŸš€</p>'
+      ? '<p>We\'re delighted your child enjoyed the class! Our team will be in touch to discuss continuing their learning journey. 🚀</p>'
       : '<p>We\'re sorry the class didn\'t fully meet your expectations. Our team will reach out to understand how we can do better.</p>'
     }
-    <a href="https://stemnestacademy.co.uk">Visit StemNest Academy â†’</a>
+    <a href="https://stemnestacademy.co.uk">Visit StemNest Academy →</a>
   </div>
 </body>
 </html>`);
   } catch (err) { next(err); }
 });
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ══════════════════════════════════════════════
    POST /api/bookings/:id/reschedule-actioned
    Marks the rescheduleNote as actioned after presales schedules it
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+══════════════════════════════════════════════ */
 router.post('/:id/reschedule-actioned', requireAuth, requireRole('admin','super_admin','presales'), async (req, res, next) => {
   try {
     const bResult = await pool.query('SELECT notes FROM bookings WHERE id = $1', [req.params.id]);
@@ -1974,10 +1974,10 @@ router.post('/:id/reschedule-actioned', requireAuth, requireRole('admin','super_
   } catch (err) { next(err); }
 });
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ══════════════════════════════════════════════
    DELETE /api/bookings/:id  (admin/presales)
-   Hard-delete a booking record â€” used to remove test data
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+   Hard-delete a booking record — used to remove test data
+══════════════════════════════════════════════ */
 router.delete('/:id', requireAuth, requireRole('admin','super_admin','presales'), async (req, res, next) => {
   try {
     const result = await pool.query('DELETE FROM bookings WHERE id = $1 RETURNING id', [req.params.id]);
