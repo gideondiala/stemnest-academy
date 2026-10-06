@@ -226,6 +226,11 @@ async function handleLogin() {
       document.getElementById('btnIcon').textContent = '❌';
       document.getElementById('btnText').textContent = err.message === 'Invalid email or password'
         ? 'Invalid credentials' : 'Login failed — try again';
+      if (/no longer safe/.test(err.message || '')) {
+        document.getElementById('btnText').textContent = 'Please set a new password';
+        showToast(err.message, 'error');
+        if (typeof openForgotPassword === 'function') openForgotPassword();
+      }
       btn.style.animation = 'none';
       btn.offsetHeight;
       btn.style.animation = 'shake .4s ease';
@@ -237,67 +242,18 @@ async function handleLogin() {
     }
   }
 
-  /* ── Fallback: localStorage (offline / demo mode) ── */
+  /* No offline login: the server checks every password */
+  btn.style.opacity       = '1';
+  btn.style.pointerEvents = '';
+  document.getElementById('btnIcon').textContent = '❌';
+  document.getElementById('btnText').textContent = 'Cannot connect — check your internet';
+  btn.style.animation = 'none';
+  btn.offsetHeight;
+  btn.style.animation = 'shake .4s ease';
   setTimeout(() => {
-    btn.style.opacity       = '1';
-    btn.style.pointerEvents = '';
-
-    if (currentRole === 'tutor') {
-      const teachers = JSON.parse(localStorage.getItem('sn_teachers') || '[]');
-      const teacher  = teachers.find(t => t.email.toLowerCase() === email.toLowerCase() && t.password === pw);
-      const salesPersons = JSON.parse(localStorage.getItem('sn_sales_persons') || '[]');
-      const salesPerson  = salesPersons.find(s => s.email.toLowerCase() === email.toLowerCase() && s.password === pw);
-      const staff = JSON.parse(localStorage.getItem('sn_staff') || '[]');
-      const staffMember = staff.find(s => s.email.toLowerCase() === email.toLowerCase() && s.password === pw);
-
-      if (teacher) {
-        localStorage.setItem('sn_logged_in_teacher', teacher.id);
-        document.getElementById('btnIcon').textContent = '✅';
-        document.getElementById('btnText').textContent = `Welcome back, ${teacher.name.split(' ')[0]}!`;
-        setTimeout(() => navigate('tutor-dashboard'), 700);
-      } else if (salesPerson) {
-        localStorage.setItem('sn_logged_in_sales', salesPerson.id);
-        document.getElementById('btnIcon').textContent = '✅';
-        document.getElementById('btnText').textContent = `Welcome, ${salesPerson.name.split(' ')[0]}!`;
-        setTimeout(() => navigate('sales-dashboard'), 700);
-      } else if (staffMember) {
-        document.getElementById('btnIcon').textContent = '✅';
-        document.getElementById('btnText').textContent = 'Welcome! Redirecting…';
-        setTimeout(() => navigate(staffMember.role), 700);
-      } else if (email === 'admin@stemnestacademy.co.uk' && pw === 'admin123') {
-        document.getElementById('btnIcon').textContent = '✅';
-        document.getElementById('btnText').textContent = 'Welcome, Admin!';
-        setTimeout(() => navigate('admin-dashboard'), 700);
-      } else if (email === 'founder@stemnestacademy.co.uk' && pw === 'Founder2024!') {
-        document.getElementById('btnIcon').textContent = '✅';
-        document.getElementById('btnText').textContent = 'Welcome, Founder!';
-        setTimeout(() => navigate('super-admin'), 700);
-      } else {
-        document.getElementById('btnIcon').textContent = '❌';
-        document.getElementById('btnText').textContent = 'Invalid credentials';
-        btn.style.animation = 'none';
-        btn.offsetHeight;
-        btn.style.animation = 'shake .4s ease';
-        setTimeout(() => {
-          document.getElementById('btnIcon').textContent = loginConfig[currentRole].btnIcon;
-          document.getElementById('btnText').textContent = loginConfig[currentRole].btnText;
-        }, 1500);
-      }
-    } else {
-      // Student login — no offline fallback. API must be available.
-      document.getElementById('btnIcon').textContent = '❌';
-      document.getElementById('btnText').textContent = 'Cannot connect — check your internet';
-      btn.style.animation = 'none';
-      btn.offsetHeight;
-      btn.style.animation = 'shake .4s ease';
-      setTimeout(() => {
-        document.getElementById('btnIcon').textContent = loginConfig[currentRole].btnIcon;
-        document.getElementById('btnText').textContent = loginConfig[currentRole].btnText;
-        btn.style.opacity       = '1';
-        btn.style.pointerEvents = '';
-      }, 2000);
-    }
-  }, 1200);
+    document.getElementById('btnIcon').textContent = loginConfig[currentRole].btnIcon;
+    document.getElementById('btnText').textContent = loginConfig[currentRole].btnText;
+  }, 2000);
 }
 
 /* ══════════════════════════════════════════════════════
@@ -342,49 +298,9 @@ async function submitForgotPassword() {
     }
   }
 
-  /* Fallback: localStorage demo mode */
+  /* The reset link can only be sent by the server */
   if (btn) { btn.textContent = 'Send Reset Link'; btn.disabled = false; }
-
-  let found = null, registry = null, registryKey = null;
-  const teachers = JSON.parse(localStorage.getItem('sn_teachers') || '[]');
-  const teacher  = teachers.find(t => t.email.toLowerCase() === email);
-  if (teacher) { found = teacher; registry = teachers; registryKey = 'sn_teachers'; }
-
-  if (!found) {
-    const sales = JSON.parse(localStorage.getItem('sn_sales_persons') || '[]');
-    const sp    = sales.find(s => s.email.toLowerCase() === email);
-    if (sp) { found = sp; registry = sales; registryKey = 'sn_sales_persons'; }
-  }
-  if (!found) {
-    const staff = JSON.parse(localStorage.getItem('sn_staff') || '[]');
-    const sm    = staff.find(s => s.email.toLowerCase() === email);
-    if (sm) { found = sm; registry = staff; registryKey = 'sn_staff'; }
-  }
-  if (!found) {
-    const students = JSON.parse(localStorage.getItem('sn_students') || '[]');
-    const st       = students.find(s => s.email.toLowerCase() === email);
-    if (st) { found = st; registry = students; registryKey = 'sn_students'; }
-  }
-  if (!found && email === 'admin@stemnestacademy.co.uk')   found = { name:'Admin',   email, password:'admin123',   _isAdmin:true };
-  if (!found && email === 'founder@stemnestacademy.co.uk') found = { name:'Founder', email, password:'Founder2024!', _isFounder:true };
-
-  if (!found) { showToast('No account found with that email address.', 'error'); return; }
-
-  const tempPw = 'SN' + Math.random().toString(36).slice(2, 8).toUpperCase() + '!';
-  if (registry && registryKey) {
-    const idx = registry.findIndex(u => u.email.toLowerCase() === email);
-    if (idx !== -1) { registry[idx].password = tempPw; localStorage.setItem(registryKey, JSON.stringify(registry)); }
-  }
-
-  document.getElementById('forgotStep1').style.display = 'none';
-  document.getElementById('forgotStep2').style.display = 'block';
-  document.getElementById('forgotSuccessMsg').textContent =
-    `A temporary password has been sent to ${email}. Use it to log in, then change your password.`;
-  const tempBox = document.getElementById('forgotTempPwBox');
-  if (tempBox) {
-    tempBox.style.display = 'block';
-    tempBox.innerHTML = `<strong>Temp Password (demo mode):</strong><br><span style="font-family:'Courier New',monospace;font-size:16px;color:var(--blue);font-weight:900;">${tempPw}</span>`;
-  }
+  showToast('Could not reach the server — please check your internet and try again.', 'error');
 }
 
 /* Bind overlay close */
@@ -393,12 +309,3 @@ document.addEventListener('DOMContentLoaded', () => {
   overlay?.addEventListener('click', e => { if (e.target === overlay) closeForgotPassword(); });
 });
 
-/* ── PASSWORD REGISTRY (for Super Admin chart) ── */
-function updatePasswordRegistry(user) {
-  const reg = JSON.parse(localStorage.getItem('sn_password_registry') || '[]');
-  const idx = reg.findIndex(u => u.id === user.id || u.email === user.email);
-  const entry = { id: user.id || user.email, name: user.name, email: user.email, role: user.role || 'user', password: user.password, updatedAt: new Date().toISOString() };
-  if (idx !== -1) reg[idx] = entry;
-  else reg.unshift(entry);
-  localStorage.setItem('sn_password_registry', JSON.stringify(reg));
-}

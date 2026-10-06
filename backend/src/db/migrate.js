@@ -8,7 +8,8 @@ const fs   = require('fs');
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 if (!process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = 'postgres://stemnest_user:StemNestDB2024Secure@stemnest-db.cfk6s86i4abg.eu-west-2.rds.amazonaws.com:5432/stemnest';
+  console.error('DATABASE_URL is not set — put it in backend/.env (never in the code).');
+  process.exit(1);
 }
 const pool = require('../config/db');
 

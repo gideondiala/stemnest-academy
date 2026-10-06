@@ -211,7 +211,7 @@ stemnest-academy/
 | `hr` | hr@stemnestacademy.co.uk | /pages/hr-dashboard |
 | `student` | (created on onboarding) | /pages/student-dashboard |
 
-**All passwords:** `StemNest2024!` (except admin: `admin123`, founder: `Founder2024!`)
+**Passwords:** never written in this repo — each person sets their own (Admin → Set password).
 
 ---
 
@@ -365,7 +365,7 @@ A CloudFront Function (`stemnest-url-rewrite`) handles clean URLs:
 
 ### Database change:
 1. Write SQL migration in `backend/src/db/`
-2. Run on server: `psql postgresql://stemnest_user:StemNestDB2024Secure@stemnest-db.cfk6s86i4abg.eu-west-2.rds.amazonaws.com:5432/stemnest -f backend/src/db/your-migration.sql`
+2. Run on server: `psql "$DATABASE_URL" -f backend/src/db/your-migration.sql`
 
 ### Add new email address:
 1. Log into Zoho Mail → Add User

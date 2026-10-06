@@ -1,3 +1,5 @@
+-- Run with: psql "$DATABASE_URL" -v seed_password='<strong password>' -f supabase-seed.sql
+-- (development only — never commit real passwords)
 -- ═══════════════════════════════════════════════════════════════
 -- StemNest Academy — Supabase Seed Data
 -- Run this in Supabase SQL Editor AFTER supabase-setup.sql
@@ -11,67 +13,67 @@
 INSERT INTO users (name, email, password_hash, role, staff_id, email_verified, is_active)
 VALUES
 
--- Founder / Super Admin  (password: Founder2024!)
+-- Founder / Super Admin  (password: set with -v seed_password=...)
 ('Founder',
  'founder@stemnestacademy.co.uk',
- crypt('Founder2024!', gen_salt('bf', 12)),
+ crypt(:'seed_password', gen_salt('bf', 12)),
  'super_admin', 'FOUNDER001', TRUE, TRUE),
 
--- Admin  (password: admin123)
+-- Admin  (password: set with -v seed_password=...)
 ('Admin',
  'admin@stemnestacademy.co.uk',
- crypt('admin123', gen_salt('bf', 12)),
+ crypt(:'seed_password', gen_salt('bf', 12)),
  'admin', 'ADMIN001', TRUE, TRUE),
 
--- Tutors  (password: StemNest2024!)
+-- Tutors  (password: set with -v seed_password=...)
 ('Sarah Rahman',
  'sarah.rahman@stemnestacademy.co.uk',
- crypt('StemNest2024!', gen_salt('bf', 12)),
+ crypt(:'seed_password', gen_salt('bf', 12)),
  'tutor', 'CT001', TRUE, TRUE),
 
 ('James Okafor',
  'james.okafor@stemnestacademy.co.uk',
- crypt('StemNest2024!', gen_salt('bf', 12)),
+ crypt(:'seed_password', gen_salt('bf', 12)),
  'tutor', 'MT001', TRUE, TRUE),
 
 ('Lisa Patel',
  'lisa.patel@stemnestacademy.co.uk',
- crypt('StemNest2024!', gen_salt('bf', 12)),
+ crypt(:'seed_password', gen_salt('bf', 12)),
  'tutor', 'ST001', TRUE, TRUE),
 
 ('Marcus King',
  'marcus.king@stemnestacademy.co.uk',
- crypt('StemNest2024!', gen_salt('bf', 12)),
+ crypt(:'seed_password', gen_salt('bf', 12)),
  'tutor', 'CT002', TRUE, TRUE),
 
--- Sales / Academic Counselor  (password: StemNest2024!)
+-- Sales / Academic Counselor  (password: set with -v seed_password=...)
 ('Alex Johnson',
  'alex.johnson@stemnestacademy.co.uk',
- crypt('StemNest2024!', gen_salt('bf', 12)),
+ crypt(:'seed_password', gen_salt('bf', 12)),
  'sales', 'SP001', TRUE, TRUE),
 
--- Operations  (password: StemNest2024!)
+-- Operations  (password: set with -v seed_password=...)
 ('Operations Team',
  'ops@stemnestacademy.co.uk',
- crypt('StemNest2024!', gen_salt('bf', 12)),
+ crypt(:'seed_password', gen_salt('bf', 12)),
  'operations', 'OPS001', TRUE, TRUE),
 
--- Pre-Sales  (password: StemNest2024!)
+-- Pre-Sales  (password: set with -v seed_password=...)
 ('Pre-Sales Team',
  'presales@stemnestacademy.co.uk',
- crypt('StemNest2024!', gen_salt('bf', 12)),
+ crypt(:'seed_password', gen_salt('bf', 12)),
  'presales', 'PS001', TRUE, TRUE),
 
--- Post-Sales  (password: StemNest2024!)
+-- Post-Sales  (password: set with -v seed_password=...)
 ('Post-Sales Team',
  'postsales@stemnestacademy.co.uk',
- crypt('StemNest2024!', gen_salt('bf', 12)),
+ crypt(:'seed_password', gen_salt('bf', 12)),
  'postsales', 'POS001', TRUE, TRUE),
 
--- HR  (password: StemNest2024!)
+-- HR  (password: set with -v seed_password=...)
 ('HR Team',
  'hr@stemnestacademy.co.uk',
- crypt('StemNest2024!', gen_salt('bf', 12)),
+ crypt(:'seed_password', gen_salt('bf', 12)),
  'hr', 'HR001', TRUE, TRUE)
 
 ON CONFLICT (email) DO UPDATE
@@ -127,7 +129,7 @@ ORDER BY created_at;
 -- ═══════════════════════════════════════════════════════════════
 -- SEED COMPLETE — 11 users expected in results above
 -- Passwords:
---   founder@stemnestacademy.co.uk  →  Founder2024!
---   admin@stemnestacademy.co.uk    →  admin123
---   everyone else                  →  StemNest2024!
+--   founder@stemnestacademy.co.uk  →  the seed_password you pass to psql
+--   admin@stemnestacademy.co.uk  →  the seed_password you pass to psql
+--   everyone else  →  the seed_password you pass to psql
 -- ═══════════════════════════════════════════════════════════════

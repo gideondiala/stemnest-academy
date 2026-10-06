@@ -6,7 +6,7 @@
 
 **File:** `frontend/pages/admin-dashboard.html`
 **JS:** `frontend/js/admin-dashboard.js`
-**Login:** `admin@stemnestacademy.co.uk` / `StemNest2024!`
+**Login:** `admin@stemnestacademy.co.uk` (password not stored in the repo)
 
 ### Status: ✅ COMPLETE — API-driven
 
@@ -68,7 +68,7 @@ function nextTeacherId(subject) {
 
 **File:** `frontend/pages/super-admin.html`
 **JS:** `frontend/js/super-admin.js`
-**Login:** `founder@stemnestacademy.co.uk` / `Founder2024!`
+**Login:** `founder@stemnestacademy.co.uk` (password not stored in the repo)
 
 ### Status: ✅ COMPLETE — API-driven
 
@@ -102,7 +102,7 @@ Populates `window.SA_DATA = { bookings: [], tutors: [], sales: [] }`.
 
 **File:** `frontend/pages/presales-dashboard.html`
 **JS:** `frontend/js/presales-dashboard.js`
-**Login:** `presales@stemnestacademy.co.uk` / `StemNest2024!`
+**Login:** `presales@stemnestacademy.co.uk` (password not stored in the repo)
 
 ### Status: ✅ COMPLETE — API-driven
 
@@ -143,7 +143,7 @@ PUT /api/bookings/:id/assign
 
 **File:** `frontend/pages/postsales-dashboard.html`
 **JS:** `frontend/js/postsales-dashboard.js`
-**Login:** `postsales@stemnestacademy.co.uk` / `StemNest2024!`
+**Login:** `postsales@stemnestacademy.co.uk` (password not stored in the repo)
 
 ### Status: ✅ COMPLETE — API-driven
 

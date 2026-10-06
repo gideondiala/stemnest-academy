@@ -10,6 +10,7 @@
  * DELETE /api/users/:id (admin only)  Ã¢â‚¬â€ deactivate user
  */
 
+const { isExposedPassword, EXPOSED_MESSAGE } = require('../utils/passwordPolicy');
 const express = require('express');
 const bcrypt  = require('bcrypt');
 const { z }   = require('zod');
@@ -238,6 +239,7 @@ router.post('/', requireAuth, requireRole('admin', 'super_admin', 'postsales'), 
       }
     }
 
+    if (isExposedPassword(data.password)) throw Object.assign(new Error(EXPOSED_MESSAGE), { status: 400 });
     const passwordHash = await bcrypt.hash(data.password, 12);
     const result = await client.query(
       `INSERT INTO users (name, email, password_hash, role, staff_id, phone, whatsapp, timezone)
@@ -505,6 +507,7 @@ router.put('/:id/password', requireAuth, async (req, res, next) => {
     const valid = await bcrypt.compare(currentPassword, user.password_hash);
     if (!valid) return res.status(401).json({ success: false, error: 'Current password is incorrect' });
 
+    if (isExposedPassword(newPassword)) return res.status(400).json({ success: false, error: EXPOSED_MESSAGE });
     const newHash = await bcrypt.hash(newPassword, 12);
     await pool.query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [newHash, req.params.id]);
 
@@ -624,6 +627,7 @@ router.put('/:id/set-password', requireAuth, requireRole('admin', 'super_admin',
     const typed = String((req.body && req.body.password) || '').trim();
     const sendEmail = !(req.body && req.body.sendEmail === false);
     if (typed && typed.length < 8) return res.status(400).json({ success: false, error: 'The password must be at least 8 characters' });
+    if (typed && isExposedPassword(typed)) return res.status(400).json({ success: false, error: EXPOSED_MESSAGE });
 
     const r = await pool.query(
       `SELECT u.id, u.name, u.email, u.role, u.staff_id, u.is_active, sp.parent_email, sp.parent_name

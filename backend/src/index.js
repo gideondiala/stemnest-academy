@@ -102,6 +102,7 @@ app.use(rateLimit({
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
 /* Fincra signs the exact bytes it sent */
 app.use('/api/payments/fincra/webhook', express.raw({ type: 'application/json' }));
+app.use('/api/grey/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 

@@ -118,7 +118,7 @@ The presales dashboard uses `GET /api/sync/dashboard/presales` (not `GET /api/bo
 
 ## 13. Admin Password Was Reset
 
-The admin account password was reset to `StemNest2024!` during debugging. The founder password is `Founder2024!`. These are in `TEST_CREDENTIALS.txt`.
+Staff passwords are never written in this repo. These are in `TEST_CREDENTIALS.txt`.
 
 ---
 

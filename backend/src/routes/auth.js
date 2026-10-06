@@ -9,6 +9,7 @@
  * GET  /api/auth/me
  */
 
+const { isExposedPassword, EXPOSED_MESSAGE } = require('../utils/passwordPolicy');
 require('dotenv').config();
 const express   = require('express');
 const bcrypt    = require('bcrypt');
@@ -95,6 +96,16 @@ router.post('/login', authLimiter, async (req, res, next) => {
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
       return res.status(401).json({ success: false, error: 'Invalid email or password' });
+    }
+
+    /* A published password no longer opens the account (switched on with
+       BLOCK_EXPOSED_PASSWORDS=true once the owners have changed theirs) */
+    if (process.env.BLOCK_EXPOSED_PASSWORDS === 'true' && isExposedPassword(password)) {
+      logger.warn(`[LOGIN] Blocked published password for ${user.email}`);
+      return res.status(403).json({
+        success: false, code: 'PASSWORD_EXPOSED',
+        error: 'This password is no longer safe to use. Please click "Forgot password" to set a new one.',
+      });
     }
 
     /* Update last login */
@@ -308,6 +319,8 @@ router.post('/reset-password', authLimiter, async (req, res, next) => {
     }
 
     const record = result.rows[0];
+
+    if (isExposedPassword(password)) return res.status(400).json({ success: false, error: EXPOSED_MESSAGE });
 
     /* Hash new password */
     const passwordHash = await bcrypt.hash(password, 12);

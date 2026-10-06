@@ -50,7 +50,7 @@ On clicking **Book My FREE Demo Class**:
 ## Step 2: Pre-Sales Schedules the Demo
 
 **Dashboard:** `https://stemnestacademy.co.uk/pages/presales-dashboard.html`
-**Login:** `presales@stemnestacademy.co.uk` / `StemNest2024!`
+**Login:** `presales@stemnestacademy.co.uk` (password not stored in the repo)
 
 - Pre-Sales sees booking in "Incoming" tab
 - Clicks "Schedule Class" → modal opens
@@ -140,7 +140,7 @@ pending (partial) → pending (complete) → scheduled → completed
 ## Step 2: Pre-Sales Schedules the Demo
 
 **Dashboard:** `https://stemnestacademy.co.uk/pages/presales-dashboard.html`
-**Login:** `presales@stemnestacademy.co.uk` / `StemNest2024!`
+**Login:** `presales@stemnestacademy.co.uk` (password not stored in the repo)
 
 - Pre-Sales sees booking in "Incoming" tab
 - Clicks "Schedule Class" → modal opens
@@ -236,7 +236,7 @@ pending (partial) → pending (complete) → scheduled → completed
 ## Step 8: Post-Sales Onboards the Student
 
 **Dashboard:** `https://stemnestacademy.co.uk/pages/postsales-dashboard.html`
-**Login:** `postsales@stemnestacademy.co.uk` / `StemNest2024!`
+**Login:** `postsales@stemnestacademy.co.uk` (password not stored in the repo)
 
 1. Post-Sales sees converted student in pipeline
 2. Clicks "Onboard Student" → fills form

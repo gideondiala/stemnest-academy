@@ -169,15 +169,15 @@ Give each tester their credentials from `TEST_CREDENTIALS.txt`:
 
 | Role | Email | Password |
 |---|---|---|
-| Founder | founder@stemnest.co.uk | Founder2024! |
-| Admin | admin@stemnest.co.uk | admin123 |
-| Teacher (Coding) | sarah.rahman@stemnest.co.uk | StemNest2024! |
-| Teacher (Maths) | james.okafor@stemnest.co.uk | StemNest2024! |
-| Sales | alex.johnson@stemnest.co.uk | StemNest2024! |
-| Pre-Sales | presales@stemnest.co.uk | StemNest2024! |
-| Post-Sales | postsales@stemnest.co.uk | StemNest2024! |
-| Operations | ops@stemnest.co.uk | StemNest2024! |
-| HR | hr@stemnest.co.uk | StemNest2024! |
+| Founder | founder@stemnest.co.uk | *(not stored here)* |
+| Admin | admin@stemnest.co.uk | *(not stored here)* |
+| Teacher (Coding) | sarah.rahman@stemnest.co.uk | *(not stored here)* |
+| Teacher (Maths) | james.okafor@stemnest.co.uk | *(not stored here)* |
+| Sales | alex.johnson@stemnest.co.uk | *(not stored here)* |
+| Pre-Sales | presales@stemnest.co.uk | *(not stored here)* |
+| Post-Sales | postsales@stemnest.co.uk | *(not stored here)* |
+| Operations | ops@stemnest.co.uk | *(not stored here)* |
+| HR | hr@stemnest.co.uk | *(not stored here)* |
 | Student | any email + any password | — |
 
 **Important:** Each tester uses their own device/browser. Data is stored locally in each browser — users cannot see each other's data yet. That comes in Phase 2 with the backend.

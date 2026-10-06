@@ -117,19 +117,18 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
   try {
     const signature = req.headers['x-webhook-signature'] || '';
     const secret    = process.env.GREY_WEBHOOK_SECRET || '';
-    const body      = req.body; /* raw Buffer — express.raw() above */
+    const body      = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body || {})); /* raw — see index.js */
 
-    /* ── Verify HMAC-SHA256 signature ── */
-    if (secret && signature) {
-      const expected = 'sha256=' + crypto
-        .createHmac('sha256', secret)
-        .update(body)
-        .digest('hex');
-
-      if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
-        logger.warn('[GREY WEBHOOK] Invalid signature — rejected');
-        return res.status(401).json({ success: false, error: 'Invalid signature' });
-      }
+    /* ── Verify HMAC-SHA256 signature (required: an unsigned call is never trusted) ── */
+    if (!secret) {
+      logger.warn('[GREY WEBHOOK] GREY_WEBHOOK_SECRET not set — rejected');
+      return res.status(503).json({ success: false, error: 'Webhook not configured' });
+    }
+    const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(body).digest('hex');
+    const a = Buffer.from(String(signature)), b = Buffer.from(expected);
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+      logger.warn('[GREY WEBHOOK] Invalid signature — rejected');
+      return res.status(401).json({ success: false, error: 'Invalid signature' });
     }
 
     const payload = JSON.parse(body.toString());

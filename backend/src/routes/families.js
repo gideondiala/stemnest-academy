@@ -16,6 +16,7 @@
  *   DELETE /api/families/:parentId/children/:studentId
  */
 
+const { isExposedPassword, EXPOSED_MESSAGE } = require('../utils/passwordPolicy');
 const express   = require('express');
 const bcrypt    = require('bcrypt');
 const jwt       = require('jsonwebtoken');
@@ -137,6 +138,7 @@ router.post('/register', familyLimiter, (req, res, next) => {
       await family.convertChildToIdLogin(client, child.id);
     }
 
+    if (isExposedPassword(d.password)) throw httpError(400, EXPOSED_MESSAGE);
     const hash = await bcrypt.hash(d.password, 12);
     const p = await client.query(
       `INSERT INTO users (name, email, password_hash, role, phone, is_active)
