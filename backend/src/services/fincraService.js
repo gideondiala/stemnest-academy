@@ -35,7 +35,7 @@ async function createCheckout({ amount, currency, customerName, customerEmail, r
 
   const payload = {
     amount:   Math.round(parseFloat(amount)), // Fincra expects integer
-    currency: (currency || 'GBP').toUpperCase(),
+    currency: (currency || 'NGN').toUpperCase(),
     customer: {
       name:  customerName  || 'StemNest Parent',
       email: customerEmail || '',

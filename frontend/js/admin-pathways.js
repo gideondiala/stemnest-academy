@@ -57,7 +57,7 @@ async function renderPathwaysTable() {
         <div style="font-weight:800;color:var(--dark);">${p.emoji || '🚀'} ${p.name}</div>
         <div style="font-size:11px;color:var(--light);">${p.tagline || ''}</div>
       </td>
-      <td style="font-weight:800;color:var(--green-dark);">£${parseFloat(p.price||0).toFixed(0)}/mo</td>
+      <td style="font-weight:800;color:var(--green-dark);">₦${Number(parseFloat(p.price||0).toFixed(0)).toLocaleString()}/mo</td>
       <td style="font-weight:700;color:var(--mid);">${p.grade_count || 0} / 12</td>
       <td>
         <span style="background:${p.is_active?'var(--green-light)':'#f0f2f8'};color:${p.is_active?'var(--green-dark)':'var(--light)'};font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">

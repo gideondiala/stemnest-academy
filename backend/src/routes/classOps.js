@@ -52,7 +52,7 @@ router.get('/late-joins', requireAuth, requireRole(...OPS_ROLES, 'tutor'), async
     const rows = await ops.lateJoins({ month, tutorId: targetTutor(req) });
     res.json({
       success: true, month, lateJoins: rows,
-      rules: { lateAfterMins: ops.LATE_AFTER_MINS, pardonedPerMonth: ops.PARDONED_PER_MONTH, penalty: ops.LATE_PENALTY, penaltyCurrency: 'USD' },
+      rules: { lateAfterMins: ops.LATE_AFTER_MINS, pardonedPerMonth: ops.PARDONED_PER_MONTH, penalty: ops.LATE_PENALTY, penaltyCurrency: 'NGN' },
     });
   } catch (err) { next(err); }
 });

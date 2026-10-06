@@ -1175,7 +1175,7 @@ function renderPaymentRecords() {
         return '<tr style="border-bottom:1px solid #f0f2f8;' + bg + '">' +
           '<td style="' + tdS + ';font-size:12px;color:var(--light);font-weight:700;">' + date + '</td>' +
           '<td style="' + tdS + ';font-weight:700;color:var(--dark);">' + (p.course || '—') + '</td>' +
-          '<td style="' + tdS + ';font-weight:800;color:var(--green-dark);">' + (p.currency || '£') + (p.amount || '—') + '</td>' +
+          '<td style="' + tdS + ';font-weight:800;color:var(--green-dark);">' + (p.currency && p.currency !== 'NGN' ? p.currency + ' ' : '₦') + (p.amount || '—') + '</td>' +
           '<td style="' + tdS + ';font-weight:800;color:var(--blue);">+' + (p.credits || '—') + ' credits</td>' +
           '<td style="' + tdS + '"><span style="background:var(--green-light);color:var(--green-dark);font-size:11px;font-weight:900;padding:3px 10px;border-radius:50px;">✅ Confirmed</span></td>' +
         '</tr>';

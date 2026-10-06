@@ -809,7 +809,7 @@ function renderCoursesTable() {
       <td><span class="ab-subject ab-${c.subject}">${subjectLabel[c.subject] || c.subject}</span></td>
       <td><span style="font-size:12px;font-weight:800;color:${levelColor[c.level]||'var(--mid)'};">${c.level||'—'}</span></td>
       <td style="font-size:12px;">${c.age}</td>
-      <td><strong>£${c.price}</strong></td>
+      <td><strong>₦${Number(c.price || 0).toLocaleString()}</strong></td>
       <td>${c.classes}</td>
       <td>${(c.students||0).toLocaleString()}</td>
       <td>

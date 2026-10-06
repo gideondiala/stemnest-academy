@@ -289,6 +289,12 @@ const STATEMENTS = [
   `ALTER TABLE late_joins ADD COLUMN IF NOT EXISTS class_start TIMESTAMPTZ`,
   `ALTER TABLE late_joins ADD COLUMN IF NOT EXISTS nth_in_month INTEGER`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_late_joins_booking_one ON late_joins(booking_id)`,
+  /* Penalty is in Naira (₦1,000) — widen the column, and convert the few
+     late joins logged at the old $2 rate (only those; safe to re-run) */
+  `ALTER TABLE late_joins ALTER COLUMN penalty TYPE NUMERIC(10,2)`,
+  `UPDATE late_joins SET penalty = 1000 WHERE pardoned = FALSE AND penalty = 2`,
+  /* Payments are recorded in Naira */
+  `ALTER TABLE payments ALTER COLUMN currency SET DEFAULT 'NGN'`,
   `CREATE INDEX IF NOT EXISTS idx_late_joins_tutor ON late_joins(tutor_id, created_at)`,
 
   /* ── Credit activity log: payment details on each line ── */

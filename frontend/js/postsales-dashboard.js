@@ -129,7 +129,7 @@ function updateStats() {
       return d.getMonth() === month && d.getFullYear() === year && p.status === 'confirmed';
     })
     .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
-  setText('posStat4', '£' + monthRevenue.toFixed(0));
+  setText('posStat4', '₦' + Math.round(monthRevenue).toLocaleString());
 
   // Badges
   const lowCredit = students.filter(s => (s.credits || 0) <= 2 && !s.creditsSuspended);
@@ -265,7 +265,7 @@ function renderPaidStudents() {
     const dob = s.dateOfBirth ? fmtDateShort(s.dateOfBirth) : (s.age ? s.age + ' yrs' : '—');
     const enrolled = fmtDateShort(s.enrolledAt || s.createdAt);
     const amount = s.amountPaid
-      ? (s.amountCurrency || '£') + parseFloat(s.amountPaid).toFixed(2)
+      ? (s.amountCurrency && s.amountCurrency !== 'NGN' ? s.amountCurrency + ' ' : '₦') + parseFloat(s.amountPaid).toLocaleString()
       : '—';
     const creditBadge = (s.credits || 0) <= 0
       ? `<span style="color:#c53030;background:#fed7d7;padding:2px 8px;border-radius:50px;font-size:11px;">${s.credits || 0}</span>`
@@ -521,7 +521,7 @@ async function renderWebsiteEnquiries() {
         <td style="${tdS}">${r.email || '—'}</td>
         <td style="${tdS}">${r.phone || '—'}</td>
         <td style="${tdS};color:var(--blue);font-weight:800;">${r.course_name || r.course_name_db || '—'}</td>
-        <td style="${tdS}">${r.course_price || r.course_price_db ? '£'+(r.course_price||r.course_price_db) : '—'}</td>
+        <td style="${tdS}">${r.course_price || r.course_price_db ? '₦'+Number(r.course_price||r.course_price_db).toLocaleString() : '—'}</td>
         <td style="${tdS}">${fmtDateShort(r.created_at)}</td>
         <td style="${tdS};text-align:center;">${statusBadge}</td>
         <td style="${tdS};text-align:center;">
@@ -1456,7 +1456,7 @@ async function confirmManualOnboard(joinFamily) {
   const gradeNum   = parseInt(v('mob-pathway-grade')) || null;
   const credits    = parseInt(v('mob-credits')) || 0;
   const amount     = parseFloat(v('mob-amount')) || null;
-  const currency   = v('mob-currency') || 'GBP';
+  const currency   = v('mob-currency') || 'NGN';
   const paymentRef = v('mob-payref');
   const timezone   = v('mob-timezone');
   const password   = v('mob-password');

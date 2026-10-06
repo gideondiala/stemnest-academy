@@ -97,7 +97,7 @@
       apiCall('/api/class-ops/' + bookingId + '/join', { method: 'POST' }).then(function (d) {
         if (!d || !d.late || d.alreadyJoined) return;
         if (d.pardoned) toast('⚠️ You joined ' + d.minsLate + ' min late. Late join ' + d.nthInMonth + ' of ' + d.pardonedPerMonth + ' pardoned this month.', 'info');
-        else toast('⚠️ You joined ' + d.minsLate + ' min late — late join #' + d.nthInMonth + ' this month, so a $' + d.penalty + ' penalty has been logged.', 'error');
+        else toast('⚠️ You joined ' + d.minsLate + ' min late — late join #' + d.nthInMonth + ' this month, so a ₦' + Number(d.penalty).toLocaleString() + ' penalty has been logged.', 'error');
         refreshLate();
       }).catch(function () {});
     }
@@ -109,7 +109,7 @@
   function showLate() {
     var n = state.late.length;
     setText('lateJoins', n);
-    setText('lateJoinNote', n <= 2 ? n + '/2 pardoned this month' : (n - 2) + ' × $2 penalty logged');
+    setText('lateJoinNote', n <= 2 ? n + '/2 pardoned this month' : (n - 2) + ' × ₦1,000 penalty logged');
   }
 
   /* ══════════════ END CLASS ══════════════ */

@@ -1000,7 +1000,7 @@ router.post('/enquiry', async (req, res, next) => {
 
     await pool.query(
       `INSERT INTO payments (amount, currency, status, notes, created_at)
-       VALUES ($1, 'GBP', 'enquiry', $2, NOW())`,
+       VALUES ($1, 'NGN', 'enquiry', $2, NOW())`,
       [
         parseFloat(coursePrice) || 0,
         JSON.stringify({

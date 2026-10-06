@@ -122,7 +122,7 @@ function renderLateJoins() {
       <td style="font-size:12px;">${new Date(l.date).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</td>
       <td>${l.month}</td>
       <td><span class="ab-status ${l.pardoned ? 'ab-scheduled' : 'ab-pending'}">${l.pardoned ? '✅ Pardoned' : '⚠️ Penalised'}</span></td>
-      <td>${l.penalty ? `<strong style="color:#c53030;">-$${l.penalty}</strong>` : '—'}</td>
+      <td>${l.penalty ? `<strong style="color:#c53030;">₦${Number(l.penalty).toLocaleString()}</strong>` : '—'}</td>
     </tr>`).join('');
 }
 
@@ -143,7 +143,7 @@ function renderPenalties() {
   tbody.innerHTML = rows.map(r => {
     const pardoned  = r.joins.filter(j => j.pardoned).length;
     const penalised = r.joins.filter(j => !j.pardoned).length;
-    const total     = penalised * 2;
+    const total     = r.joins.filter(j => !j.pardoned).reduce((t, j) => t + (Number(j.penalty) || 0), 0);
     return `<tr>
       <td><span style="font-family:'Fredoka One',cursive;color:var(--blue);">${r.tutorId}</span></td>
       <td><strong>${r.tutorName}</strong></td>
@@ -151,7 +151,7 @@ function renderPenalties() {
       <td>${r.joins.length}</td>
       <td>${pardoned}</td>
       <td>${penalised}</td>
-      <td><strong style="color:${total > 0 ? '#c53030' : 'var(--green)'};">${total > 0 ? '-$' + total : '$0'}</strong></td>
+      <td><strong style="color:${total > 0 ? '#c53030' : 'var(--green)'};">${total > 0 ? '₦' + total.toLocaleString() : '₦0'}</strong></td>
     </tr>`;
   }).join('');
 }
@@ -180,7 +180,7 @@ function exportLateJoinsCSV() {
   const m = document.getElementById('lateMonthFilter')?.value || '';
   if (m) list = list.filter(l => l.month === m);
   if (!list.length) { showToast('No data to export.', 'error'); return; }
-  const headers = ['Teacher ID','Teacher Name','Class (WAT)','Joined at (WAT)','Minutes late','Late join # this month','Month','Pardoned','Penalty ($)'];
+  const headers = ['Teacher ID','Teacher Name','Class (WAT)','Joined at (WAT)','Minutes late','Late join # this month','Month','Pardoned','Penalty (₦)'];
   const rows = list.map(l => [l.tutorId, l.tutorName, l.sessionId||'', l.joinTime||'', l.minsLate ?? '', l.nth ?? '', l.month, l.pardoned?'Yes':'No', l.penalty||0]
     .map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));
   const csv  = [headers.join(','), ...rows].join('\n');

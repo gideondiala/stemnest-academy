@@ -1,0 +1,44 @@
+name: Set Flutterwave keys
+
+# Run by hand after adding the repository secrets FLW_SECRET_KEY and
+# FLW_SECRET_HASH. Writes them into the server's backend/.env and restarts
+# the API. Values are never printed.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  set-keys:
+    name: Write Flutterwave keys to the server
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write keys and restart the API
+        uses: appleboy/ssh-action@v1.2.5
+        env:
+          FLW_SECRET_KEY: ${{ secrets.FLW_SECRET_KEY }}
+          FLW_SECRET_HASH: ${{ secrets.FLW_SECRET_HASH }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: FLW_SECRET_KEY,FLW_SECRET_HASH
+          script: |
+            set -e
+            cd /home/ubuntu/stemnest-academy/backend
+            [ -n "$FLW_SECRET_KEY" ]  || { echo "FLW_SECRET_KEY secret is missing";  exit 1; }
+            [ -n "$FLW_SECRET_HASH" ] || { echo "FLW_SECRET_HASH secret is missing"; exit 1; }
+            cp .env "/home/ubuntu/env-before-flw-$(date +%Y%m%d-%H%M%S)"
+            grep -v '^FLW_SECRET_KEY=' .env | grep -v '^FLW_SECRET_HASH=' > .env.new
+            printf 'FLW_SECRET_KEY=%s\nFLW_SECRET_HASH=%s\n' "$FLW_SECRET_KEY" "$FLW_SECRET_HASH" >> .env.new
+            mv .env.new .env
+            echo "key starts with: $(printf '%s' "$FLW_SECRET_KEY" | cut -c1-8)…  (${#FLW_SECRET_KEY} chars); hash ${#FLW_SECRET_HASH} chars"
+            pm2 reload stemnest-api --update-env
+            sleep 8
+            node -e "require('dotenv').config(); console.log('server sees Flutterwave key:', !!process.env.FLW_SECRET_KEY, '| hash:', !!process.env.FLW_SECRET_HASH)"
+            curl -s -o /dev/null -w "API health: %{http_code}\n" http://localhost:3000/api/health

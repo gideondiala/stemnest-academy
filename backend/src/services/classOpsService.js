@@ -10,7 +10,7 @@
  * A partially completed class pays one third of its rate.
  *
  * Late joins: joining more than 4 minutes after the start is late. The first
- * two in a month are pardoned; from the third, a $2 penalty is logged (it is
+ * two in a month are pardoned; from the third, a ₦1,000 penalty is logged (it is
  * never deducted from earnings).
  */
 
@@ -20,8 +20,8 @@ const rescheduleSvc = require('./rescheduleService');
 
 const LATE_AFTER_MINS      = 4;
 const PARDONED_PER_MONTH   = 2;
-const LATE_PENALTY         = 2;      /* USD, logged only */
-const LATE_PENALTY_CURRENCY = 'USD';
+const LATE_PENALTY         = 1000;   /* Naira, logged only (never deducted) */
+const LATE_PENALTY_CURRENCY = 'NGN';
 const UNENDED_WARN_AFTER_MINS = 120;  /* after the class end time */
 /* The end-your-class follow-up applies to classes from this date on */
 const FOLLOW_UP_FROM = '2026-10-05';

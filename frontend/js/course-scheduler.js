@@ -491,7 +491,7 @@ function confirmEnrolment() {
     const course = getCourseList().find(c => c.id === courseId);
     const total  = course ? (course.lessons ? course.lessons.length : course.classes) : '?';
     if (typeof showToast === 'function') {
-      showToast('Γ£à Enrolment created! ' + total + ' lessons scheduled for ' + (demo ? demo.studentName : 'student') + '.', 'success');
+      showToast('✅ Enrolment created! ' + total + ' lessons scheduled for ' + (demo ? demo.studentName : 'student') + '.', 'success');
     }
 
     // Refresh any open tabs

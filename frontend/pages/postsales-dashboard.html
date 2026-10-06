@@ -99,7 +99,7 @@
       <div class="dstat ds-orange"><div class="dstat-icon di-orange">🎓</div><div class="dstat-val" id="posStat1">0</div><div class="dstat-label">Awaiting Schedule</div><div class="dstat-trend trend-neutral">Paid, not yet booked</div></div>
       <div class="dstat ds-blue"><div class="dstat-icon di-blue">📅</div><div class="dstat-val" id="posStat2">0</div><div class="dstat-label">Classes Scheduled</div><div class="dstat-trend trend-up">On teacher calendar</div></div>
       <div class="dstat ds-green"><div class="dstat-icon di-green">✅</div><div class="dstat-val" id="posStat3">0</div><div class="dstat-label">Converted</div><div class="dstat-trend trend-up">Paid</div></div>
-      <div class="dstat ds-purple"><div class="dstat-icon di-purple">💰</div><div class="dstat-val" id="posStat4">£0</div><div class="dstat-label">Revenue Won</div><div class="dstat-trend trend-up">This month</div></div>
+      <div class="dstat ds-purple"><div class="dstat-icon di-purple">💰</div><div class="dstat-val" id="posStat4">₦0</div><div class="dstat-label">Revenue Won</div><div class="dstat-trend trend-up">This month</div></div>
     </div>
 
     <!-- GROUP BATCHES -->
@@ -234,14 +234,7 @@
                 <option value="flutterwave">Flutterwave — more countries</option>
               </select></div>
             <div class="atf-field"><label>Currency</label>
-              <select id="pl-currency">
-                <option value="NGN">🇳🇬 NGN (₦)</option>
-                <option value="GBP">🇬🇧 GBP (£)</option>
-                <option value="GHS">🇬🇭 GHS (₵)</option>
-                <option value="USD">🇺🇸 USD ($)</option>
-                <option value="AED">🇦🇪 AED</option>
-                <option value="ZAR">🇿🇦 ZAR (R)</option>
-              </select>
+              <select id="pl-currency"><option value="NGN">🇳🇬 NGN (₦)</option></select>
             </div>
             <div class="atf-field"><label>Notes</label><input type="text" id="pl-notes" placeholder="e.g. Python for Beginners — 4 sessions"></div>
           </div>
@@ -450,7 +443,7 @@
 <script src="../js/api-sync.js"></script>
 <script src="../js/wa.js"></script>
 <script src="../js/utils.js"></script>
-<script src="../js/postsales-dashboard.js?v=202610051900"></script>
+<script src="../js/postsales-dashboard.js?v=202610061500"></script>
 <script src="../js/reschedule-tool.js?v=202610021200"></script>
 
 <!-- GREY PAYMENT MODAL -->
@@ -480,10 +473,7 @@
           <input type="number" id="tu-credits" min="1" style="width:100%;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;"></div>
         <div class="pm-field"><label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Amount received *</label>
           <div style="display:flex;gap:6px;">
-            <select id="tu-currency" style="width:90px;padding:10px 6px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:13px;outline:none;background:var(--white);">
-              <option value="NGN">NGN ₦</option><option value="GBP">GBP £</option><option value="USD">USD $</option><option value="EUR">EUR €</option>
-              <option value="GHS">GHS ₵</option><option value="KES">KES</option><option value="ZAR">ZAR R</option><option value="CAD">CAD $</option><option value="AED">AED</option>
-            </select>
+            <select id="tu-currency" style="width:90px;padding:10px 6px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:13px;outline:none;background:var(--white);"><option value="NGN">🇳🇬 NGN (₦)</option></select>
             <input type="number" id="tu-amount" min="0" step="0.01" style="flex:1;min-width:0;padding:10px 12px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
           </div></div>
       </div>
@@ -552,25 +542,7 @@
         <div class="pm-field">
           <label style="font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Amount Paid</label>
           <div style="display:flex;gap:6px;">
-            <select id="mob-currency" style="width:100px;padding:10px 8px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:13px;outline:none;background:var(--white);flex-shrink:0;">
-              <option value="GBP">🇬🇧 GBP £</option>
-              <option value="NGN">🇳🇬 NGN ₦</option>
-              <option value="USD">🇺🇸 USD $</option>
-              <option value="EUR">🇪🇺 EUR €</option>
-              <option value="GHS">🇬🇭 GHS ₵</option>
-              <option value="KES">🇰🇪 KES KSh</option>
-              <option value="ZAR">🇿🇦 ZAR R</option>
-              <option value="CAD">🇨🇦 CAD $</option>
-              <option value="AUD">🇦🇺 AUD $</option>
-              <option value="AED">🇦🇪 AED د.إ</option>
-              <option value="INR">🇮🇳 INR ₹</option>
-              <option value="SGD">🇸🇬 SGD $</option>
-              <option value="MYR">🇲🇾 MYR RM</option>
-              <option value="JPY">🇯🇵 JPY ¥</option>
-              <option value="CNY">🇨🇳 CNY ¥</option>
-              <option value="BRL">🇧🇷 BRL R$</option>
-              <option value="OTHER">🌍 Other</option>
-            </select>
+            <select id="mob-currency" style="width:100px;padding:10px 8px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:13px;outline:none;background:var(--white);flex-shrink:0;"><option value="NGN">🇳🇬 NGN (₦)</option></select>
             <input type="number" id="mob-amount" placeholder="e.g. 99" min="0" step="0.01"
               style="flex:1;padding:10px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
           </div>

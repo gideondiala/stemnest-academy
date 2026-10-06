@@ -366,8 +366,8 @@ function renderPaymentsTab() {
             ${pkg.popular ? `<div style="background:${pkg.color};color:#fff;font-size:10px;font-weight:900;padding:2px 10px;border-radius:50px;display:inline-block;margin-bottom:8px;">MOST POPULAR</div><br>` : '<br>'}
             <div style="font-family:'Fredoka One',cursive;font-size:28px;color:${pkg.color};">${pkg.classes}</div>
             <div style="font-size:12px;font-weight:900;color:var(--mid);margin-bottom:6px;">classes</div>
-            <div style="font-family:'Fredoka One',cursive;font-size:22px;color:var(--dark);">£${pkg.price}</div>
-            <div style="font-size:11px;color:var(--light);font-weight:700;">£${(pkg.price / pkg.classes).toFixed(2)}/class</div>
+            <div style="font-family:'Fredoka One',cursive;font-size:22px;color:var(--dark);">₦${pkg.price}</div>
+            <div style="font-size:11px;color:var(--light);font-weight:700;">₦${(pkg.price / pkg.classes).toFixed(2)}/class</div>
           </div>`).join('')}
       </div>
 
@@ -404,7 +404,7 @@ function renderPaymentsTab() {
              ${payments.map((p, i) => `
                <tr style="border-bottom:1px solid #f0f2f8;${i%2===0?'':'background:#fafbff;}'}">
                  <td style="padding:12px 16px;font-size:12px;color:var(--mid);font-weight:700;">${p.created_at ? new Date(p.created_at).toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'}) : '—'}</td>
-                 <td style="padding:12px 16px;font-weight:800;color:var(--dark);">£${parseFloat(p.amount || 0).toFixed(2)}</td>
+                 <td style="padding:12px 16px;font-weight:800;color:var(--dark);">₦${parseFloat(p.amount || 0).toFixed(2)}</td>
                  <td style="padding:12px 16px;font-weight:700;color:var(--mid);">${p.credits_purchased || '—'} class${p.credits_purchased !== 1 ? 'es' : ''}</td>
                  <td style="padding:12px 16px;font-size:12px;color:var(--mid);">${p.course_name || 'StemNest'}</td>
                  <td style="padding:12px 16px;">
@@ -446,8 +446,8 @@ function selectTopUpPackage(classes, price) {
   const lbl  = document.getElementById('topupSelectedLabel');
   const det  = document.getElementById('topupSelectedDetail');
   if (info) info.style.display = 'block';
-  if (lbl)  lbl.textContent  = `${classes} classes — £${price}`;
-  if (det)  det.textContent  = `${selectedPkg?.label || ''} package · £${(price / classes).toFixed(2)} per class · Instant activation after payment`;
+  if (lbl)  lbl.textContent  = `${classes} classes — ₦${price}`;
+  if (det)  det.textContent  = `${selectedPkg?.label || ''} package · ₦${(price / classes).toFixed(2)} per class · Instant activation after payment`;
 
   const btn = document.getElementById('topupPayBtn');
   if (btn) {
@@ -455,7 +455,7 @@ function selectTopUpPackage(classes, price) {
     btn.style.background  = selectedPkg?.color || 'var(--blue)';
     btn.style.color       = '#fff';
     btn.style.cursor      = 'pointer';
-    btn.textContent       = `💳 Pay £${price} for ${classes} classes →`;
+    btn.textContent       = `💳 Pay ₦${price} for ${classes} classes →`;
   }
 }
 
@@ -483,7 +483,7 @@ async function initiateTopUp() {
         studentName:  profile.name,
         studentEmail: profile.parent_email || profile.email,
         amount:       _selectedTopUpPackage.price,
-        currency:     'GBP',
+        currency:     'NGN',
         credits:      _selectedTopUpPackage.classes,
         notes:        `Top-up: ${_selectedTopUpPackage.classes} classes`,
       }),
@@ -514,7 +514,7 @@ async function initiateTopUp() {
     if (btn) { btn.disabled = true; btn.textContent = '✅ Payment link ready — see below'; btn.style.background = '#0e9f6e'; }
   } catch (err) {
     showToast('Error: ' + err.message, 'error');
-    if (btn) { btn.disabled = false; btn.textContent = `💳 Pay £${_selectedTopUpPackage.price} for ${_selectedTopUpPackage.classes} classes →`; }
+    if (btn) { btn.disabled = false; btn.textContent = `💳 Pay ₦${_selectedTopUpPackage.price} for ${_selectedTopUpPackage.classes} classes →`; }
   }
 }
 

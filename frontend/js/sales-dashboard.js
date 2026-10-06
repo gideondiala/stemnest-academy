@@ -290,7 +290,7 @@ function updateStats() {
   setText('sStat1', upcoming.length);
   setText('sStat2', pipeline.filter(p => p.status !== 'converted' && p.status !== 'lost').length);
   setText('sStat3', converted.length);
-  setText('sStat4', '£' + revenue.toLocaleString());
+  setText('sStat4', '₦' + revenue.toLocaleString());
   setText('upcomingBadge', upcoming.length);
   setText('leadsBadge', leads.filter(l => l.status === 'new').length);
 
@@ -492,7 +492,7 @@ function buildPipelineCard(p, showEdit = false) {
         <div class="pc-meta">
           📚 ${p.subject} · 📅 ${formatDateSimple(p.date)} · ${p.course || '—'}<br>
           Interest: <span style="color:#f59e0b;">${stars}</span> · Power: ${p.purchasingPower || '—'}
-          ${p.paymentAmount ? ` · 💷 £${p.paymentAmount}` : ''}
+          ${p.paymentAmount ? ` · 💰 ₦${Number(p.paymentAmount).toLocaleString()}` : ''}
         </div>
         ${p.notes ? `<div class="pc-notes">${p.notes}</div>` : ''}
       </div>
@@ -591,7 +591,7 @@ function _populatePitchCourseDropdown(subjectHint, selectedCourse) {
   if (pathways.length > 0) {
     html += '<optgroup label="📚 Pathways">';
     html += pathways.map(p =>
-      `<option value="${p.name}" ${selectedCourse === p.name ? 'selected' : ''}>${p.name}${p.price ? ' — £' + p.price : ''}</option>`
+      `<option value="${p.name}" ${selectedCourse === p.name ? 'selected' : ''}>${p.name}${p.price ? ' — ₦' + Number(p.price).toLocaleString() : ''}</option>`
     ).join('');
     html += '</optgroup>';
   }
@@ -599,7 +599,7 @@ function _populatePitchCourseDropdown(subjectHint, selectedCourse) {
   if (courses.length > 0) {
     html += '<optgroup label="🎓 Courses">';
     html += courses.map(c =>
-      `<option value="${c.name}" ${selectedCourse === c.name ? 'selected' : ''}>${c.name}${c.price ? ' — £' + c.price + '/mo' : ''}</option>`
+      `<option value="${c.name}" ${selectedCourse === c.name ? 'selected' : ''}>${c.name}${c.price ? ' — ₦' + Number(c.price).toLocaleString() + '/mo' : ''}</option>`
     ).join('');
     html += '</optgroup>';
   }
@@ -873,8 +873,13 @@ function openRenewalPaymentModal(studentId, studentName, email, whatsapp) {
         📧 ${email || '—'} &nbsp;·&nbsp; 📱 ${whatsapp || '—'}
       </div>
       <div style="margin-bottom:16px;">
-        <label style="font-size:13px;font-weight:800;color:var(--mid);display:block;margin-bottom:6px;">Renewal Amount (£)</label>
-        <input type="number" id="renewalAmount" placeholder="e.g. 120" min="1"
+        <label style="font-size:13px;font-weight:800;color:var(--mid);display:block;margin-bottom:6px;">Renewal Amount (₦)</label>
+        <input type="number" id="renewalAmount" placeholder="e.g. 60000" min="1"
+          style="width:100%;padding:12px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:700;outline:none;box-sizing:border-box;">
+      </div>
+      <div style="margin-bottom:16px;">
+        <label style="font-size:13px;font-weight:800;color:var(--mid);display:block;margin-bottom:6px;">Credits (classes)</label>
+        <input type="number" id="renewalCredits" placeholder="e.g. 8" min="1"
           style="width:100%;padding:12px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:700;outline:none;box-sizing:border-box;">
       </div>
       <div style="margin-bottom:20px;">
@@ -920,8 +925,8 @@ async function sendRenewalPaymentLink(studentId, studentName, email, whatsapp) {
         studentName,
         studentEmail: email,
         amount,
-        currency:  'GBP',
-        credits:   Math.round(amount / 15),
+        currency:  'NGN',
+        credits:   parseInt(document.getElementById('renewalCredits')?.value || '0', 10) || undefined,
         notes:     note,
       }),
     });
@@ -1050,17 +1055,14 @@ function renderFollowUp() {
 ══════════════════════════════════════════════ */
 
 /* Shared exchange rates */
-const _RATES = { NGN_PER_GBP: 2050, USD_PER_GBP: 1.27 };
-
 async function generatePaymentLink(bookingId) {
   const b = getMyBookings().find(x => x.id === bookingId);
   if (!b) { showToast('Booking not found.', 'error'); return; }
 
-  /* Read the agreed GBP amount from the pitch modal */
-  const gbpAmountInput = document.getElementById('pitchPaymentAmount');
-  const gbpAmount      = gbpAmountInput ? parseFloat(gbpAmountInput.value) : 0;
+  /* The agreed price from the pitch modal (Naira) */
+  const amtInput = document.getElementById('pitchPaymentAmount');
+  const agreed   = amtInput ? parseFloat(amtInput.value) : 0;
 
-  /* Reuse or create modal */
   document.getElementById('fincraPayLinkOverlay')?.remove();
   const overlay = document.createElement('div');
   overlay.id = 'fincraPayLinkOverlay';
@@ -1074,51 +1076,30 @@ async function generatePaymentLink(bookingId) {
         <div style="font-family:'Fredoka One',cursive;font-size:19px;color:var(--dark);">💳 Generate Payment Link</div>
         <button onclick="document.getElementById('fincraPayLinkOverlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--light);">✕</button>
       </div>
-
       <div style="background:var(--bg);border-radius:12px;padding:12px 14px;margin-bottom:18px;font-size:13px;font-weight:700;color:var(--mid);">
         👤 <strong style="color:var(--dark);">${b.studentName}</strong> &nbsp;·&nbsp; 📧 ${b.email} &nbsp;·&nbsp; 📱 ${b.whatsapp || '—'}
       </div>
-
-      <div style="margin-bottom:14px;">
-        <label style="font-size:13px;font-weight:800;color:var(--mid);display:block;margin-bottom:6px;">GBP Amount (agreed price in £) *</label>
-        <input type="number" id="slPayGBP" value="${gbpAmount > 0 ? gbpAmount : ''}" placeholder="e.g. 150" min="1"
-          oninput="_slUpdateConvertedAmounts()"
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+      <div>
+        <label style="font-size:13px;font-weight:800;color:var(--mid);display:block;margin-bottom:6px;">Amount (₦) *</label>
+        <input type="number" id="slPayNGN" value="${agreed > 0 ? agreed : ''}" placeholder="e.g. 60000" min="1"
           style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:700;outline:none;box-sizing:border-box;">
       </div>
-
-      <div style="margin-bottom:16px;">
-        <label style="font-size:13px;font-weight:800;color:var(--mid);display:block;margin-bottom:8px;">Payment Currency *</label>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div id="slCurNGNCard" onclick="document.getElementById('slCurNGN').checked=true;_slUpdateConvertedAmounts();"
-            style="border:2px solid #e8eaf0;border-radius:12px;padding:14px;text-align:center;cursor:pointer;">
-            <input type="radio" name="slPayCurrency" value="NGN" id="slCurNGN" onchange="_slUpdateConvertedAmounts()" style="display:none;">
-            <div style="font-size:22px;">🇳🇬</div>
-            <div style="font-weight:900;color:var(--dark);font-size:13px;">Nigerian Naira</div>
-            <div id="slNGNAmt" style="font-size:12px;font-weight:800;color:#065f46;margin-top:4px;"></div>
-          </div>
-          <div id="slCurUSDCard" onclick="document.getElementById('slCurUSD').checked=true;_slUpdateConvertedAmounts();"
-            style="border:2px solid #e8eaf0;border-radius:12px;padding:14px;text-align:center;cursor:pointer;">
-            <input type="radio" name="slPayCurrency" value="USD" id="slCurUSD" onchange="_slUpdateConvertedAmounts()" style="display:none;">
-            <div style="font-size:22px;">🇺🇸</div>
-            <div style="font-weight:900;color:var(--dark);font-size:13px;">US Dollar</div>
-            <div id="slUSDAmt" style="font-size:12px;font-weight:800;color:#065f46;margin-top:4px;"></div>
-          </div>
-        </div>
-        <div style="font-size:11px;color:var(--light);font-weight:700;margin-top:6px;">
-          Rate: £1 = ₦${_RATES.NGN_PER_GBP.toLocaleString()} &nbsp;|&nbsp; £1 = $${_RATES.USD_PER_GBP}
-        </div>
-      </div>
-
-      <div style="margin-bottom:18px;">
-        <label style="font-size:13px;font-weight:800;color:var(--mid);display:block;margin-bottom:6px;">
-          Amount in chosen currency <span id="slFinalCurLabel" style="color:var(--blue);">(select above)</span>
-        </label>
-        <input type="number" id="slPayFinalAmt" placeholder="Auto-filled"
+      <div>
+        <label style="font-size:13px;font-weight:800;color:var(--mid);display:block;margin-bottom:6px;">Credits (classes) *</label>
+        <input type="number" id="slPayCredits" placeholder="e.g. 8" min="1"
           style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:700;outline:none;box-sizing:border-box;">
       </div>
-
+    </div>
+    <div style="margin-bottom:14px;">
+      <label style="font-size:13px;font-weight:800;color:var(--mid);display:block;margin-bottom:6px;">Payment provider</label>
+      <select id="slPayProvider" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;outline:none;background:#fff;">
+        <option value="fincra">Fincra — lower fees in Nigeria</option>
+        <option value="flutterwave">Flutterwave — parents abroad</option>
+      </select>
+      <div style="font-size:11px;color:var(--light);font-weight:700;margin-top:4px;">All prices are in Naira. Parents abroad pay the Naira amount with their card (their bank converts it).</div>
+    </div>
       <div id="slPayLinkDisplay"></div>
-
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <button onclick="document.getElementById('fincraPayLinkOverlay').remove()"
           style="background:var(--bg);border:1.5px solid #e8eaf0;border-radius:12px;padding:12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;color:var(--mid);">
@@ -1133,44 +1114,16 @@ async function generatePaymentLink(bookingId) {
 
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
   document.body.appendChild(overlay);
-
-  /* Trigger auto-fill if GBP already entered */
-  if (gbpAmount > 0) setTimeout(_slUpdateConvertedAmounts, 50);
-}
-
-function _slUpdateConvertedAmounts() {
-  const gbp    = parseFloat(document.getElementById('slPayGBP')?.value || '0');
-  const ngnAmt = gbp > 0 ? Math.round(gbp * _RATES.NGN_PER_GBP) : 0;
-  const usdAmt = gbp > 0 ? Math.round(gbp * _RATES.USD_PER_GBP * 100) / 100 : 0;
-
-  const ngnEl = document.getElementById('slNGNAmt');
-  const usdEl = document.getElementById('slUSDAmt');
-  if (ngnEl) ngnEl.textContent = gbp > 0 ? '≈ ₦' + ngnAmt.toLocaleString() : '';
-  if (usdEl) usdEl.textContent = gbp > 0 ? '≈ $' + usdAmt.toFixed(2) : '';
-
-  const ngnChecked = document.getElementById('slCurNGN')?.checked;
-  const usdChecked = document.getElementById('slCurUSD')?.checked;
-
-  const ngnCard = document.getElementById('slCurNGNCard');
-  const usdCard = document.getElementById('slCurUSDCard');
-  if (ngnCard) { ngnCard.style.borderColor = ngnChecked ? '#0e9f6e' : '#e8eaf0'; ngnCard.style.background = ngnChecked ? '#f0fdf4' : '#fff'; }
-  if (usdCard) { usdCard.style.borderColor = usdChecked ? '#0e9f6e' : '#e8eaf0'; usdCard.style.background = usdChecked ? '#f0fdf4' : '#fff'; }
-
-  const finalEl = document.getElementById('slPayFinalAmt');
-  const labelEl = document.getElementById('slFinalCurLabel');
-  if (ngnChecked && finalEl) { finalEl.value = gbp > 0 ? ngnAmt : ''; if (labelEl) labelEl.textContent = '(Nigerian Naira — ₦)'; }
-  else if (usdChecked && finalEl) { finalEl.value = gbp > 0 ? usdAmt : ''; if (labelEl) labelEl.textContent = '(US Dollar — $)'; }
 }
 
 async function _slDoGenerateLink(bookingId, studentName, email, waNum) {
-  const gbpAmount   = parseFloat(document.getElementById('slPayGBP')?.value      || '0');
-  const finalAmount = parseFloat(document.getElementById('slPayFinalAmt')?.value  || '0');
-  const currency    = document.querySelector('input[name="slPayCurrency"]:checked')?.value || '';
+  const amount   = parseFloat(document.getElementById('slPayNGN')?.value || '0');
+  const credits  = parseInt(document.getElementById('slPayCredits')?.value || '0', 10);
+  const provider = document.getElementById('slPayProvider')?.value || 'fincra';
 
-  if (!gbpAmount || gbpAmount <= 0)    { showToast('Please enter the GBP amount.', 'error'); return; }
-  if (!currency)                        { showToast('Please select NGN or USD.', 'error'); return; }
-  if (!finalAmount || finalAmount <= 0) { showToast('Please confirm the amount in the chosen currency.', 'error'); return; }
-  if (!email)                           { showToast('No parent email on this booking.', 'error'); return; }
+  if (!amount || amount <= 0)   { showToast('Please enter the amount in Naira.', 'error'); return; }
+  if (!credits || credits <= 0) { showToast('Please enter the number of credits (classes).', 'error'); return; }
+  if (!email)                   { showToast('No parent email on this booking.', 'error'); return; }
 
   const btn = document.getElementById('slPayGenBtn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Generating…'; }
@@ -1181,30 +1134,24 @@ async function _slDoGenerateLink(bookingId, studentName, email, waNum) {
       method:  'POST',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        studentName,
-        studentEmail: email,
-        amount:   finalAmount,
-        currency,
-        credits:  Math.round(gbpAmount / 15),
-        notes:    'StemNest course enrolment — ' + studentName,
-        bookingId,
+        studentName, studentEmail: email, amount, currency: 'NGN', credits, provider,
+        notes: 'StemNest course enrolment — ' + studentName, bookingId,
       }),
     });
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'Failed to generate link');
 
-    const sym = currency === 'NGN' ? '₦' : '$';
     const display = document.getElementById('slPayLinkDisplay');
     if (display) {
       const waMsg = encodeURIComponent(
         'Hi! Your StemNest payment link for ' + studentName + ': ' + data.paymentUrl +
-        '\n\nAmount: ' + sym + finalAmount.toLocaleString() + ' ' + currency +
-        '\nCard, bank transfer & USSD accepted. Valid 48 hours.'
+        '\n\nAmount: ₦' + amount.toLocaleString() + ' for ' + credits + ' classes' +
+        '\nCard, bank transfer & USSD accepted.'
       );
       display.innerHTML = `
         <div style="background:#f0fdf4;border-radius:12px;padding:14px 16px;margin-bottom:14px;border:2px solid #0e9f6e;">
           <div style="font-weight:900;color:#065f46;font-size:13px;margin-bottom:8px;">✅ Link generated and emailed to parent!</div>
-          <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;">${sym}${finalAmount.toLocaleString()} ${currency} &nbsp;·&nbsp; £${gbpAmount} equivalent</div>
+          <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;">₦${amount.toLocaleString()} · ${credits} classes · ${provider === 'flutterwave' ? 'Flutterwave' : 'Fincra'}</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
             <input type="text" value="${data.paymentUrl}" readonly style="flex:1;padding:7px 10px;border:2px solid #e8eaf0;border-radius:8px;font-size:11px;font-family:monospace;min-width:0;">
             <button onclick="navigator.clipboard.writeText('${data.paymentUrl}').then(()=>showToast('Copied!'))" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:7px 10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;">📋</button>
@@ -1213,15 +1160,13 @@ async function _slDoGenerateLink(bookingId, studentName, email, waNum) {
         </div>`;
     }
 
-    /* Update button to "Done — Close" */
     if (btn) {
       btn.disabled = false;
       btn.textContent = '✅ Done — Close';
       btn.style.background = '#0e9f6e';
       btn.onclick = function() {
         document.getElementById('fincraPayLinkOverlay').remove();
-        /* Move student to Pipeline */
-        _slMoveToConvertedPipeline(bookingId, studentName, email, waNum, currency, finalAmount, gbpAmount, '');
+        _slMoveToConvertedPipeline(bookingId, studentName, email, waNum, 'NGN', amount, amount, '');
         updateStats();
         renderPipeline();
         showPSTab ? showPSTab('pipeline') : showSalesTab('pipeline');

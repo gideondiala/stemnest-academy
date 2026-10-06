@@ -1345,7 +1345,7 @@ function renderEnrolments() {
                 <div style="font-size:12px;font-weight:700;color:var(--mid);">📧 ${enr.email || '—'}</div>
                 <div style="font-size:12px;font-weight:700;color:var(--mid);">📱 ${enr.whatsapp || '—'}</div>
               </td>
-              <td style="${tdS};font-weight:800;color:var(--green-dark);">${enr.paymentAmount ? '£' + enr.paymentAmount : '—'}</td>
+              <td style="${tdS};font-weight:800;color:var(--green-dark);">${enr.paymentAmount ? '₦' + Number(enr.paymentAmount).toLocaleString() : '—'}</td>
               <td style="${tdS};font-weight:700;color:var(--blue);">💼 ${enr.salesPersonName || '—'}</td>
               <td style="${tdS}">
                 ${enr.enrolled
@@ -1614,7 +1614,6 @@ async function deleteBooking(bookingId, studentName) {
 ══════════════════════════════════════════════════════ */
 
 /* Exchange rates — update monthly */
-const _RATES = { NGN_PER_GBP: 2050, USD_PER_GBP: 1.27 };
 
 async function generatePaymentForScheduled(bookingId) {
   const b = (window.PS_DATA.bookings || []).find(x => x.id === bookingId) || {};
@@ -1650,56 +1649,26 @@ function _buildPaymentModalHTML(studentName, email, whatsapp, bookingId) {
       Generating payment link for <strong>${studentName}</strong>.
       Parent pays by card, bank transfer or USSD.
     </div>
-
-    <div style="margin-bottom:14px;">
-      <label style="font-size:13px;font-weight:800;color:var(--mid);display:block;margin-bottom:6px;">GBP Amount (agreed price in £) *</label>
-      <input type="number" id="psPayGBP" placeholder="e.g. 150" min="1"
-        oninput="_psUpdateConvertedAmounts()"
-        style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:700;outline:none;box-sizing:border-box;">
-      <div style="font-size:11px;color:var(--light);font-weight:700;margin-top:4px;">Enter the agreed price — we'll convert it for the payment link.</div>
-    </div>
-
-    <div style="margin-bottom:16px;">
-      <label style="font-size:13px;font-weight:800;color:var(--mid);display:block;margin-bottom:8px;">Payment Currency *</label>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <label style="cursor:pointer;">
-          <input type="radio" name="psPayCurrency" value="NGN" id="psCurNGN" onchange="_psUpdateConvertedAmounts()" style="display:none;">
-          <div id="psCurNGNCard"
-            onclick="document.getElementById('psCurNGN').checked=true;_psUpdateConvertedAmounts();"
-            style="border:2px solid #e8eaf0;border-radius:12px;padding:14px;text-align:center;cursor:pointer;transition:.15s;">
-            <div style="font-size:22px;">🇳🇬</div>
-            <div style="font-weight:900;color:var(--dark);font-size:14px;">Nigerian Naira</div>
-            <div style="font-size:12px;font-weight:700;color:var(--light);">NGN</div>
-            <div id="psNGNAmt" style="font-size:13px;font-weight:800;color:#065f46;margin-top:4px;"></div>
-          </div>
-        </label>
-        <label style="cursor:pointer;">
-          <input type="radio" name="psPayCurrency" value="USD" id="psCurUSD" onchange="_psUpdateConvertedAmounts()" style="display:none;">
-          <div id="psCurUSDCard"
-            onclick="document.getElementById('psCurUSD').checked=true;_psUpdateConvertedAmounts();"
-            style="border:2px solid #e8eaf0;border-radius:12px;padding:14px;text-align:center;cursor:pointer;transition:.15s;">
-            <div style="font-size:22px;">🇺🇸</div>
-            <div style="font-weight:900;color:var(--dark);font-size:14px;">US Dollar</div>
-            <div style="font-size:12px;font-weight:700;color:var(--light);">USD</div>
-            <div id="psUSDAmt" style="font-size:13px;font-weight:800;color:#065f46;margin-top:4px;"></div>
-          </div>
-        </label>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+      <div>
+        <label style="font-size:13px;font-weight:800;color:var(--mid);display:block;margin-bottom:6px;">Amount (₦) *</label>
+        <input type="number" id="psPayNGN" value="" placeholder="e.g. 60000" min="1"
+          style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:700;outline:none;box-sizing:border-box;">
       </div>
-      <div style="font-size:11px;color:var(--light);font-weight:700;margin-top:6px;">
-        Rate: £1 = ₦${_RATES.NGN_PER_GBP.toLocaleString()} &nbsp;|&nbsp; £1 = $${_RATES.USD_PER_GBP}
-        &nbsp;·&nbsp; <em>Adjust the amount below if needed.</em>
+      <div>
+        <label style="font-size:13px;font-weight:800;color:var(--mid);display:block;margin-bottom:6px;">Credits (classes) *</label>
+        <input type="number" id="psPayCredits" placeholder="e.g. 8" min="1"
+          style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:700;outline:none;box-sizing:border-box;">
       </div>
     </div>
-
     <div style="margin-bottom:14px;">
-      <label style="font-size:13px;font-weight:800;color:var(--mid);display:block;margin-bottom:6px;">
-        Amount in chosen currency <span id="psFinalCurLabel" style="color:var(--blue);">(select currency above)</span>
-      </label>
-      <input type="number" id="psPayFinalAmt" placeholder="Auto-filled from conversion"
-        style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:700;outline:none;box-sizing:border-box;">
-      <div style="font-size:11px;color:var(--light);font-weight:700;margin-top:4px;">You can edit this if the parent negotiated a different local price.</div>
+      <label style="font-size:13px;font-weight:800;color:var(--mid);display:block;margin-bottom:6px;">Payment provider</label>
+      <select id="psPayProvider" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;outline:none;background:#fff;">
+        <option value="fincra">Fincra — lower fees in Nigeria</option>
+        <option value="flutterwave">Flutterwave — parents abroad</option>
+      </select>
+      <div style="font-size:11px;color:var(--light);font-weight:700;margin-top:4px;">All prices are in Naira. Parents abroad pay the Naira amount with their card (their bank converts it).</div>
     </div>
-
     <div style="margin-bottom:14px;">
       <label style="font-size:13px;font-weight:800;color:var(--mid);display:block;margin-bottom:6px;">Course / Package (optional)</label>
       <input type="text" id="psPayCourse" placeholder="e.g. AI & Automation Pathway"
@@ -1727,49 +1696,16 @@ function _buildPaymentModalHTML(studentName, email, whatsapp, bookingId) {
     </div>`;
 }
 
-function _psUpdateConvertedAmounts() {
-  const gbp = parseFloat(document.getElementById('psPayGBP')?.value || '0');
-  const ngnAmt = gbp > 0 ? Math.round(gbp * _RATES.NGN_PER_GBP) : 0;
-  const usdAmt = gbp > 0 ? Math.round(gbp * _RATES.USD_PER_GBP * 100) / 100 : 0;
-
-  const ngnEl = document.getElementById('psNGNAmt');
-  const usdEl = document.getElementById('psUSDAmt');
-  if (ngnEl) ngnEl.textContent = gbp > 0 ? '≈ ₦' + ngnAmt.toLocaleString() : '';
-  if (usdEl) usdEl.textContent = gbp > 0 ? '≈ $' + usdAmt.toFixed(2) : '';
-
-  /* Update final amount field and card highlighting */
-  const ngnChecked = document.getElementById('psCurNGN')?.checked;
-  const usdChecked = document.getElementById('psCurUSD')?.checked;
-
-  const ngnCard = document.getElementById('psCurNGNCard');
-  const usdCard = document.getElementById('psCurUSDCard');
-  if (ngnCard) ngnCard.style.borderColor = ngnChecked ? '#0e9f6e' : '#e8eaf0';
-  if (usdCard) usdCard.style.borderColor = usdChecked ? '#0e9f6e' : '#e8eaf0';
-  if (ngnCard) ngnCard.style.background  = ngnChecked ? '#f0fdf4' : '#fff';
-  if (usdCard) usdCard.style.background  = usdChecked ? '#f0fdf4' : '#fff';
-
-  const finalEl  = document.getElementById('psPayFinalAmt');
-  const labelEl  = document.getElementById('psFinalCurLabel');
-  if (ngnChecked && finalEl) {
-    finalEl.value = gbp > 0 ? ngnAmt : '';
-    if (labelEl) labelEl.textContent = '(Nigerian Naira — ₦)';
-  } else if (usdChecked && finalEl) {
-    finalEl.value = gbp > 0 ? usdAmt : '';
-    if (labelEl) labelEl.textContent = '(US Dollar — $)';
-  }
-}
-
 async function _psGenerateFincraLink(bookingId, studentName, whatsapp) {
-  const gbpAmount   = parseFloat(document.getElementById('psPayGBP')?.value      || '0');
-  const finalAmount = parseFloat(document.getElementById('psPayFinalAmt')?.value  || '0');
-  const currency    = document.querySelector('input[name="psPayCurrency"]:checked')?.value || '';
-  const course      = document.getElementById('psPayCourse')?.value.trim()  || '';
-  const email       = document.getElementById('psPayEmail')?.value.trim()   || '';
+  const amount   = parseFloat(document.getElementById('psPayNGN')?.value || '0');
+  const credits  = parseInt(document.getElementById('psPayCredits')?.value || '0', 10);
+  const provider = document.getElementById('psPayProvider')?.value || 'fincra';
+  const course   = document.getElementById('psPayCourse')?.value.trim() || '';
+  const email    = document.getElementById('psPayEmail')?.value.trim()  || '';
 
-  if (!gbpAmount || gbpAmount <= 0) { showToast('Please enter the GBP amount.', 'error'); return; }
-  if (!currency)                     { showToast('Please select a payment currency (NGN or USD).', 'error'); return; }
-  if (!finalAmount || finalAmount <= 0) { showToast('Please confirm the amount in the chosen currency.', 'error'); return; }
-  if (!email)                        { showToast('Please enter the parent email address.', 'error'); return; }
+  if (!amount || amount <= 0)   { showToast('Please enter the amount in Naira.', 'error'); return; }
+  if (!credits || credits <= 0) { showToast('Please enter the number of credits (classes).', 'error'); return; }
+  if (!email)                   { showToast('Please enter the parent email address.', 'error'); return; }
 
   const btn = document.getElementById('psPayGenBtn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Generating…'; }
@@ -1780,13 +1716,8 @@ async function _psGenerateFincraLink(bookingId, studentName, whatsapp) {
       method:  'POST',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        studentName,
-        studentEmail: email,
-        amount:   finalAmount,
-        currency,
-        credits:  Math.round(gbpAmount / 15),
-        notes:    course || ('StemNest demo class — ' + studentName),
-        bookingId,
+        studentName, studentEmail: email, amount, currency: 'NGN', credits, provider,
+        notes: course || ('StemNest classes — ' + studentName), bookingId,
       }),
     });
     const data = await res.json();
@@ -1795,21 +1726,15 @@ async function _psGenerateFincraLink(bookingId, studentName, whatsapp) {
     const display = document.getElementById('psPayLinkDisplay');
     if (display) {
       const waNum = whatsapp && whatsapp !== '—' ? whatsapp.replace(/[\s\-\(\)\+]/g, '') : '';
-      const sym   = currency === 'NGN' ? '₦' : '$';
       const waMsg = encodeURIComponent(
         'Hi! Here is your StemNest Academy payment link for ' + studentName + ': ' +
-        data.paymentUrl + '\n\nAmount: ' + sym + finalAmount.toLocaleString() +
-        '\nYou can pay by card, bank transfer or USSD. Link valid for 48 hours.'
+        data.paymentUrl + '\n\nAmount: ₦' + amount.toLocaleString() + ' for ' + credits + ' classes' +
+        '\nYou can pay by card, bank transfer or USSD.'
       );
-
       display.innerHTML = `
         <div style="background:#f0fdf4;border-radius:12px;padding:16px 18px;margin-bottom:14px;border:2px solid #0e9f6e;">
-          <div style="font-weight:900;color:#065f46;font-size:14px;margin-bottom:10px;">
-            ✅ Payment link created! Emailed to parent automatically.
-          </div>
-          <div style="font-size:13px;font-weight:700;color:#374151;margin-bottom:10px;">
-            ${sym}${finalAmount.toLocaleString()} ${currency} &nbsp;·&nbsp; GBP equivalent: £${gbpAmount}
-          </div>
+          <div style="font-weight:900;color:#065f46;font-size:14px;margin-bottom:10px;">✅ Payment link created! Emailed to parent automatically.</div>
+          <div style="font-size:13px;font-weight:700;color:#374151;margin-bottom:10px;">₦${amount.toLocaleString()} · ${credits} classes</div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
             <input type="text" value="${data.paymentUrl}" readonly
               style="flex:1;padding:8px 10px;border:2px solid #e8eaf0;border-radius:10px;font-size:11px;font-family:monospace;min-width:0;background:#fff;">
@@ -1822,7 +1747,7 @@ async function _psGenerateFincraLink(bookingId, studentName, whatsapp) {
             💬 Send via WhatsApp
           </a>` : ''}
           <div style="font-size:11px;color:#a0aec0;font-weight:700;margin-top:8px;text-align:center;">
-            Fincra · Card, Bank Transfer & USSD · Ref: ${data.reference}
+            ${provider === 'flutterwave' ? 'Flutterwave' : 'Fincra'} · Card, Bank Transfer & USSD · Ref: ${data.reference}
           </div>
         </div>`;
     }

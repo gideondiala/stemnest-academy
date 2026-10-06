@@ -47,7 +47,7 @@ async function rewardFirstPayment(studentId, db = pool) {
       `INSERT INTO promoter_rewards (promoter_id, student_id, payment_id, amount_paid, currency, reward_pct, reward_amount)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        ON CONFLICT (student_id) DO NOTHING RETURNING id`,
-      [s.promoter_id, studentId, pay.id, pay.amount, pay.currency || 'GBP', pct, reward]);
+      [s.promoter_id, studentId, pay.id, pay.amount, pay.currency || 'NGN', pct, reward]);
     if (r.rows.length) logger.info(`[PROMOTER] Reward ${reward} ${pay.currency} (${pct}%) recorded for promoter ${s.promoter_id}, student ${studentId}`);
     return r.rows[0] || null;
   } catch (e) {
