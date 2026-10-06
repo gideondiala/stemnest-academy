@@ -71,12 +71,12 @@ async function _loadPresalesFromAPI() {
         return {
           id:              b.id,
           dbId:            b.id,
-          studentName:     b.lesson_name || notes.studentName || '—',
-          age:             notes.age || b.grade || '—',
+          studentName:     notes.studentName || b.student_name || b.lesson_name || '—',
+          age:             notes.age || b.age || b.grade || '—',
           grade:           b.grade || notes.grade || '—',
-          email:           b.student_email || notes.email || '—',
-          whatsapp:        notes.whatsapp || '—',
-          parentName:      notes.parentName || '—',
+          email:           b.student_email || notes.email || b.email || '—',
+          whatsapp:        notes.whatsapp || b.whatsapp || '—',
+          parentName:      notes.parentName || b.parent_name || '—',
           subject:         b.subject || '—',
           date:            b.date ? b.date.split('T')[0] : '—',
           time:            notes.time || b.time || '—',
@@ -591,7 +591,7 @@ async function confirmScheduleDemo() {
 
     if (!data.success) {
       showToast('Failed to schedule: ' + (data.error || 'Unknown error'), 'error');
-      return;
+      return false;
     }
 
     closeScheduleModal();
@@ -602,6 +602,7 @@ async function confirmScheduleDemo() {
     renderIncoming();
     renderScheduled();
     showToast('✅ Demo scheduled with ' + (teacher?.name || 'teacher') + ' on ' + date + ' at ' + to12h(time) + '!');
+    return true;
 
   } catch (e) {
     if (btn) { btn.disabled = false; btn.textContent = '✅ Confirm & Schedule'; }
@@ -1104,7 +1105,8 @@ function renderReschedule() {
   const el   = document.getElementById('rescheduleRequestsList');
   if (!el) return;
   
-  const list = getBookings().filter(b => b.rescheduleNote).map(b => ({
+  /* Only requests still waiting — a scheduled request moves back to Scheduled Classes */
+  const list = getBookings().filter(b => b.rescheduleNote && !b.rescheduleNote.actioned).map(b => ({
       ...b,
       originalDate: b.date,
       originalTime: b.time,
@@ -1114,7 +1116,7 @@ function renderReschedule() {
   }));
 
   if (!list.length) {
-    el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--light);font-weight:700;">No reschedule requests.</div>';
+    el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--light);font-weight:700;">No reschedule requests waiting.</div>';
     return;
   }
 
@@ -1199,7 +1201,8 @@ function actionReschedule(reqId) {
   const _bookingIdForReschedule = item.bookingId;
   const _origConfirm = window.confirmScheduleDemo;
   window.confirmScheduleDemo = async function() {
-    await _origConfirm();
+    const ok = await _origConfirm();
+    if (!ok) return;                       /* not scheduled — keep the request open */
     window.confirmScheduleDemo = _origConfirm;
 
     /* Mark reschedule note as actioned in the DB */
@@ -1209,10 +1212,20 @@ function actionReschedule(reqId) {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + tok, 'Content-Type': 'application/json' },
       });
+      const bk = getBookings().find(x => x.id === _bookingIdForReschedule);
+      if (bk && bk.rescheduleNote) bk.rescheduleNote.actioned = true;
     } catch(e) { console.warn('[Reschedule] Mark actioned failed:', e.message); }
 
     updatePSStats();
     renderReschedule();
+    if (typeof renderScheduled === 'function') renderScheduled();
+  };
+  /* Closing the modal without scheduling puts the normal Schedule button back */
+  const _origClose = window.closeScheduleModal;
+  window.closeScheduleModal = function() {
+    _origClose();
+    window.confirmScheduleDemo = _origConfirm;
+    window.closeScheduleModal = _origClose;
   };
 
   document.getElementById('scheduleModalOverlay').classList.add('open');

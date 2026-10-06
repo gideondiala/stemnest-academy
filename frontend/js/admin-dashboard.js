@@ -1459,7 +1459,7 @@ async function _loadStudents() {
   try {
     const token = localStorage.getItem('sn_access_token');
     if (!token) return;
-    const res = await fetch('https://api.stemnestacademy.co.uk/api/users?role=student', {
+    const res = await fetch('https://api.stemnestacademy.co.uk/api/users?role=student&includeInactive=1', {
       headers: { 'Authorization': 'Bearer ' + token }
     });
     if (!res.ok) return;

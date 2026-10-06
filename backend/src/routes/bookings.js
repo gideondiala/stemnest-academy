@@ -346,13 +346,14 @@ router.get('/lookup', lookupLimiter, async (req, res, next) => {
     const result = await pool.query(
       `SELECT b.id, b.subject, b.grade, b.date, b.time, b.status,
               b.class_link, b.notes, b.booked_at, b.lesson_name,
+              b.email AS col_email, b.whatsapp AS col_whatsapp, b.student_name AS col_name,
               u_t.name AS tutor_name
        FROM bookings b
        LEFT JOIN users u_t ON u_t.id = b.tutor_id
        WHERE b.is_demo = TRUE
          AND ${isEmail
-           ? `LOWER(b.notes::text) LIKE $1`
-           : `REGEXP_REPLACE(b.notes::text, '[^0-9]', '', 'g') LIKE $1`}
+           ? `(LOWER(b.notes::text) LIKE $1 OR LOWER(COALESCE(b.email, '')) LIKE $1)`
+           : `(REGEXP_REPLACE(b.notes::text, '[^0-9]', '', 'g') LIKE $1 OR REGEXP_REPLACE(COALESCE(b.whatsapp, ''), '[^0-9]', '', 'g') LIKE $1)`}
        ORDER BY b.booked_at DESC
        LIMIT 50`,
       [isEmail ? '%' + raw.toLowerCase() + '%' : '%' + phoneKey + '%']
@@ -362,9 +363,11 @@ router.get('/lookup', lookupLimiter, async (req, res, next) => {
     for (const b of result.rows) {
       let notes = {};
       try { notes = typeof b.notes === 'string' ? JSON.parse(b.notes || '{}') : (b.notes || {}); } catch { continue; }
+      const email = notes.email || b.col_email || '';
+      const phone = notes.whatsapp || b.col_whatsapp || '';
       const match = isEmail
-        ? String(notes.email || '').trim().toLowerCase() === raw.toLowerCase()
-        : _phoneKey(notes.whatsapp) === phoneKey;
+        ? String(email).trim().toLowerCase() === raw.toLowerCase()
+        : _phoneKey(phone) === phoneKey;
       if (!match) continue;
       /* Only the fields the join-class page needs */
       bookings.push({
@@ -372,8 +375,8 @@ router.get('/lookup', lookupLimiter, async (req, res, next) => {
         status: b.status, class_link: b.class_link, booked_at: b.booked_at,
         lesson_name: b.lesson_name, tutor_name: b.tutor_name,
         notes: {
-          studentName: notes.studentName, age: notes.age, grade: notes.grade,
-          email: notes.email, whatsapp: notes.whatsapp, time: notes.time, timezone: notes.timezone,
+          studentName: notes.studentName || b.col_name, age: notes.age, grade: notes.grade,
+          email, whatsapp: phone, time: notes.time, timezone: notes.timezone,
         },
       });
       if (bookings.length >= 10) break;
@@ -547,7 +550,7 @@ router.post('/bulk-schedule', requireAuth, requireRole('admin','super_admin','po
       throw Object.assign(new Error(`${student.name} is paused — resume them from Pause & Resume instead`), { status: 400 });
     }
 
-    const tut = await client.query(`SELECT id, name, email FROM users WHERE id = $1 AND role = 'tutor'`, [tutorId]);
+    const tut = await client.query(`SELECT id, name, email FROM users WHERE id = $1 AND role = 'tutor' AND is_active = TRUE`, [tutorId]);
     if (!tut.rows.length) throw Object.assign(new Error('Teacher not found'), { status: 404 });
     const tutor = tut.rows[0];
 
@@ -848,10 +851,21 @@ router.post('/', async (req, res, next) => {
     const bookingId = result.rows[0].id;
 
     const promoterId = await promoSvc.idForCode(pool, data.ref).catch(() => null);
+    /* Contact details are also kept in their own columns, so they survive
+       any later change to the notes (join-class lookup uses either) */
     await pool.query(
-      `UPDATE bookings SET lesson_name = $1, promoter_id = COALESCE($3, promoter_id) WHERE id = $2`,
-      [data.studentName, bookingId, promoterId]
-    ).catch(() => {});
+      `UPDATE bookings SET lesson_name = $1, promoter_id = COALESCE($3, promoter_id),
+              student_name = $1, email = NULLIF($4, ''), whatsapp = NULLIF($5, ''),
+              parent_name = $6, age = $7, country = NULLIF($8, ''), timezone = $9,
+              device = $10, gender = NULLIF($11, '')
+       WHERE id = $2`,
+      [String(data.studentName || '').slice(0, 120), bookingId, promoterId,
+       String(data.email || '').slice(0, 255), String(data.whatsapp || '').slice(0, 30),
+       data.parentName ? String(data.parentName).slice(0, 120) : null,
+       data.age != null ? String(data.age).slice(0, 10) : null,
+       String(data.country || '').slice(0, 80), data.timezone ? String(data.timezone).slice(0, 80) : null,
+       data.device ? String(data.device).slice(0, 50) : null, String(data.gender || '').slice(0, 20)]
+    ).catch(e => logger.warn('[BOOKING] Could not save contact columns: ' + e.message));
 
     /* Notify parent */
     await notify.notifyDemoConfirmed({
@@ -1091,8 +1105,8 @@ router.put('/change-tutor', requireAuth, requireRole('admin','super_admin','post
     const effectiveDate = startDate || new Date().toISOString().split('T')[0];
 
     /* Get new tutor name for notes update */
-    const tutorRes = await pool.query('SELECT name FROM users WHERE id = $1', [newTutorId]);
-    if (!tutorRes.rows.length) return res.status(404).json({ success: false, error: 'New tutor not found' });
+    const tutorRes = await pool.query(`SELECT name FROM users WHERE id = $1 AND role = 'tutor' AND is_active = TRUE`, [newTutorId]);
+    if (!tutorRes.rows.length) return res.status(404).json({ success: false, error: 'New tutor not found or no longer active' });
     const newTutorName = tutorRes.rows[0].name;
 
     /* Get affected bookings */
@@ -1174,6 +1188,9 @@ router.put('/:id/assign', requireAuth, requireRole('admin','super_admin','presal
     }
     const tutor = tutorResult.rows[0];
     if (!tutor) return res.status(404).json({ success: false, error: 'Tutor not found: ' + tutorId });
+    if (tutor.role !== 'tutor' || tutor.is_active === false) {
+      return res.status(400).json({ success: false, error: `${tutor.name} is not an active tutor — please choose another tutor.` });
+    }
 
     /* Support both UUID and staff_id for salesId */
     let salesDbId = salesId || null;
@@ -1811,13 +1828,12 @@ router.put('/:id/cancel', async (req, res, next) => {
     // Note: We are allowing cancellation without auth because booking ID is a UUID.
     // In a stricter system, we would verify an email or require auth.
 
-    let bNotesObj = {};
-    if (booking.notes) { try { bNotesObj = JSON.parse(booking.notes); } catch(e) {} }
-    bNotesObj.cancelReason = data.reason;
-
+    /* Add to the notes — never replace them (they hold the student's name, email and phone) */
     await pool.query(
-      `UPDATE bookings SET status = 'cancelled', notes = $1 WHERE id = $2`,
-      [JSON.stringify(bNotesObj), req.params.id]
+      `UPDATE bookings SET status = 'cancelled',
+              notes = COALESCE(notes, '{}'::jsonb) || jsonb_build_object('cancelReason', $1::text)
+       WHERE id = $2`,
+      [data.reason, req.params.id]
     );
 
     logger.info(`[CANCEL] Booking ${req.params.id} cancelled. Reason: ${data.reason}`);
@@ -1841,19 +1857,18 @@ router.post('/:id/reschedule', async (req, res, next) => {
 
     // Note: Allowing without auth as booking ID is a UUID.
 
-    let bNotesObj = {};
-    if (booking.notes) { try { bNotesObj = JSON.parse(booking.notes); } catch(e) {} }
-    
-    bNotesObj.rescheduleNote = {
+    /* Add the request to the notes — never replace them (they hold the student's details) */
+    const rescheduleNote = {
       date: data.date,
       time: data.time,
       reason: data.reason || 'Reschedule requested by user',
-      actioned: false
+      actioned: false,
+      requestedAt: new Date().toISOString(),
     };
-
     await pool.query(
-      `UPDATE bookings SET notes = $1 WHERE id = $2`,
-      [JSON.stringify(bNotesObj), req.params.id]
+      `UPDATE bookings SET notes = COALESCE(notes, '{}'::jsonb) || jsonb_build_object('rescheduleNote', $1::jsonb)
+       WHERE id = $2`,
+      [JSON.stringify(rescheduleNote), req.params.id]
     );
 
     logger.info(`[RESCHEDULE] Booking ${req.params.id} reschedule requested for ${data.date} ${data.time}`);

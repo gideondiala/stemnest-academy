@@ -138,6 +138,8 @@ router.get('/', requireAuth, async (req, res, next) => {
     if (role) {
       params.push(role);
       query += ` AND users.role = $${params.length}`;
+      /* Lists of a role (tutors, sales…) feed pickers — deactivated accounts never belong there */
+      if (req.query.includeInactive !== '1') query += ` AND users.is_active = TRUE`;
     }
     if (search) {
       params.push(`%${search}%`);

@@ -281,7 +281,7 @@ async function buildPlan(db, input, { lock = false } = {}) {
   const enrol = await _enrolment(db, series.enrolmentId);
 
   const tutorId = input.tutorId || series.tutorId;
-  const tutor = (await db.query(`SELECT id, name, email FROM users WHERE id = $1 AND role = 'tutor'`, [tutorId])).rows[0];
+  const tutor = (await db.query(`SELECT id, name, email FROM users WHERE id = $1 AND role = 'tutor' AND is_active = TRUE`, [tutorId])).rows[0];
   if (!tutor) throw httpError(404, 'Teacher not found');
   const classLink = String(input.classLink || series.classLink || '').trim();
 
