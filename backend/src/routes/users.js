@@ -510,6 +510,8 @@ router.put('/:id/password', requireAuth, async (req, res, next) => {
     if (isExposedPassword(newPassword)) return res.status(400).json({ success: false, error: EXPOSED_MESSAGE });
     const newHash = await bcrypt.hash(newPassword, 12);
     await pool.query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [newHash, req.params.id]);
+    /* Anyone signed in with the old password is signed out */
+    await pool.query('DELETE FROM refresh_tokens WHERE user_id = $1', [req.params.id]).catch(() => {});
 
     /* Send password-change confirmation email */
     try {

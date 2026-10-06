@@ -669,13 +669,35 @@ function saveBirthdayMsg() {
   showToast('✅ Birthday message saved!');
 }
 
-function saveSACredentials() {
-  const email = document.getElementById('saEmail')?.value.trim();
-  const pw    = document.getElementById('saPassword')?.value;
-  if (!email) { showToast('Please enter an email.', 'error'); return; }
-  saveSettings('saEmail', email);
-  if (pw) saveSettings('saPassword', pw);
-  showToast('✅ Credentials updated!');
+/* Change the real login password (server-side) */
+async function saveSACredentials() {
+  const cur = document.getElementById('saCurrentPassword')?.value || '';
+  const pw  = document.getElementById('saPassword')?.value || '';
+  const pw2 = document.getElementById('saPassword2')?.value || '';
+  const st  = document.getElementById('saPwStatus');
+  const say = (m, bad) => { if (st) { st.textContent = m; st.style.color = bad ? '#c53030' : '#0e9f6e'; } };
+  if (!cur) return say('Enter your current password.', true);
+  if (pw.length < 12) return say('Use at least 12 characters for the Founder account.', true);
+  if (pw !== pw2) return say('The two new passwords do not match.', true);
+  if (pw === cur) return say('The new password must be different.', true);
+  let me = null;
+  try { me = JSON.parse(localStorage.getItem('sn_api_user') || 'null'); } catch (e) {}
+  if (!me || !me.id) return say('Please log out and log in again, then try.', true);
+  say('Saving…');
+  try {
+    const r = await fetch('https://api.stemnestacademy.co.uk/api/users/' + me.id + '/password', {
+      method: 'PUT',
+      headers: { 'Authorization': 'Bearer ' + localStorage.getItem('sn_access_token'), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentPassword: cur, newPassword: pw }),
+    });
+    const d = await r.json();
+    if (!r.ok || !d.success) throw new Error(d.error || 'Could not change the password');
+    ['saCurrentPassword', 'saPassword', 'saPassword2'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    /* Clear the old browser-only copy of credentials, if any */
+    try { const s = JSON.parse(localStorage.getItem('sn_sa_settings') || '{}'); delete s.saPassword; delete s.saEmail; localStorage.setItem('sn_sa_settings', JSON.stringify(s)); } catch (e) {}
+    say('✅ Password changed. Use the new one next time you log in.');
+    showToast('✅ Your login password has been changed.');
+  } catch (e) { say('⚠️ ' + e.message, true); }
 }
 
 /* ── EXPORT ALL CSV ── */

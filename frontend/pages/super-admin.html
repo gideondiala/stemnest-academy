@@ -300,12 +300,14 @@
           <button class="btn btn-primary" style="font-size:13px;" onclick="saveBirthdayMsg()">Save Message</button>
         </div>
         <div class="sa-settings-card">
-          <div class="sa-settings-title">🔑 Super Admin Access</div>
-          <div class="sa-settings-desc">Manage super admin credentials.</div>
-          <div class="pm-field" style="margin-top:10px;"><label>Email</label><input type="email" id="saEmail" placeholder="founder@stemnestacademy.co.uk"></div>
-          <div class="pm-field" style="margin-top:8px;"><label>New Password</label><input type="password" id="saPassword" placeholder="New password"></div>
-          <div class="pm-field" style="margin-top:8px;"><label>Your Date of Birth</label><input type="date" id="saFounderDob" onchange="saveSettings('founderDob',this.value)" title="Used for birthday greeting"></div>
-          <button class="btn btn-primary" style="font-size:13px;margin-top:10px;" onclick="saveSACredentials()">Update Credentials</button>
+          <div class="sa-settings-title">🔑 Change My Login Password</div>
+          <div class="sa-settings-desc">Changes the password you log in with. Other devices are signed out, and a confirmation email is sent.</div>
+          <div class="pm-field" style="margin-top:10px;"><label>Current password</label><input type="password" id="saCurrentPassword" autocomplete="current-password" placeholder="Your current password"></div>
+          <div class="pm-field" style="margin-top:8px;"><label>New password</label><input type="password" id="saPassword" autocomplete="new-password" placeholder="At least 12 characters"></div>
+          <div class="pm-field" style="margin-top:8px;"><label>Confirm new password</label><input type="password" id="saPassword2" autocomplete="new-password" placeholder="Type it again"></div>
+          <button class="btn btn-primary" style="font-size:13px;margin-top:10px;" onclick="saveSACredentials()">🔒 Change Password</button>
+          <div id="saPwStatus" style="font-size:12px;font-weight:800;margin-top:8px;"></div>
+          <div class="pm-field" style="margin-top:16px;"><label>Your Date of Birth</label><input type="date" id="saFounderDob" onchange="saveSettings('founderDob',this.value)" title="Used for birthday greeting"></div>
         </div>
       </div>
     </div>
@@ -364,7 +366,7 @@
 </div>
 
 <script src="../js/utils.js"></script>
-<script src="../js/super-admin.js?v=202610051900"></script>
+<script src="../js/super-admin.js?v=202610061200"></script>
 <script src="../js/mail-system.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
