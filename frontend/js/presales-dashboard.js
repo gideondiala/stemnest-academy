@@ -1653,6 +1653,7 @@ async function generatePaymentForScheduled(bookingId) {
   }
 
   document.getElementById('psPaymentBody').innerHTML = _buildPaymentModalHTML(studentName, email, whatsapp, bookingId);
+  _fillPathwaySelect('psPayCourse');
   modal.classList.add('open');
 }
 
@@ -1683,9 +1684,10 @@ function _buildPaymentModalHTML(studentName, email, whatsapp, bookingId) {
       <div style="font-size:11px;color:var(--light);font-weight:700;margin-top:4px;">All prices are in Naira. Parents abroad pay the Naira amount with their card (their bank converts it).</div>
     </div>
     <div style="margin-bottom:14px;">
-      <label style="font-size:13px;font-weight:800;color:var(--mid);display:block;margin-bottom:6px;">Course / Package (optional)</label>
-      <input type="text" id="psPayCourse" placeholder="e.g. AI & Automation Pathway"
-        style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;outline:none;box-sizing:border-box;">
+      <label style="font-size:13px;font-weight:800;color:var(--mid);display:block;margin-bottom:6px;">Tech pathway the parent chose</label>
+      <select id="psPayCourse" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;outline:none;background:#fff;">
+        <option value="">⏳ Loading pathways…</option>
+      </select>
     </div>
 
     <div style="margin-bottom:18px;">
@@ -1713,12 +1715,13 @@ async function _psGenerateFincraLink(bookingId, studentName, whatsapp) {
   const amount   = parseFloat(document.getElementById('psPayNGN')?.value || '0');
   const credits  = parseInt(document.getElementById('psPayCredits')?.value || '0', 10);
   const provider = document.getElementById('psPayProvider')?.value || 'fincra';
-  const course   = document.getElementById('psPayCourse')?.value.trim() || '';
+  const course   = document.getElementById('psPayCourse')?.value || '';
   const email    = document.getElementById('psPayEmail')?.value.trim()  || '';
 
   if (!amount || amount <= 0)   { showToast('Please enter the amount in Naira.', 'error'); return; }
   if (!credits || credits <= 0) { showToast('Please enter the number of credits (classes).', 'error'); return; }
   if (!email)                   { showToast('Please enter the parent email address.', 'error'); return; }
+  if (!course)                  { showToast('Please select the tech pathway the parent chose.', 'error'); return; }
 
   const btn = document.getElementById('psPayGenBtn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Generating…'; }
@@ -1730,7 +1733,7 @@ async function _psGenerateFincraLink(bookingId, studentName, whatsapp) {
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         studentName, studentEmail: email, amount, currency: 'NGN', credits, provider,
-        notes: course || ('StemNest classes — ' + studentName), bookingId,
+        notes: (course && course !== 'Other' ? course : 'StemNest classes') + ' — ' + credits + ' classes', bookingId,
       }),
     });
     const data = await res.json();
@@ -1763,6 +1766,12 @@ async function _psGenerateFincraLink(bookingId, studentName, whatsapp) {
             ${provider === 'flutterwave' ? 'Flutterwave' : 'Fincra'} · Card, Bank Transfer & USSD · Ref: ${data.reference}
           </div>
         </div>`;
+    }
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '✅ Done — Close';
+      btn.style.background = '#0e9f6e';
+      btn.onclick = function() { document.getElementById('psPaymentModalOverlay').classList.remove('open'); };
     }
     showToast('✅ Payment link generated!');
   } catch (err) {
@@ -1903,3 +1912,21 @@ async function confirmEnrolment() {
 /* addScheduleRow and _buildEnrolScheduleRow kept for the existing enrolment modal HTML
    in case it is used elsewhere — they do nothing in the new handoff flow */
 function addScheduleRow() {}
+
+/* Fill a pathway dropdown (payment link forms) */
+async function _fillPathwaySelect(selId) {
+  const sel = document.getElementById(selId);
+  if (!sel) return;
+  try {
+    if (!window._payPathways) {
+      const r = await fetch('https://api.stemnestacademy.co.uk/api/pathways', { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('sn_access_token') } });
+      const d = await r.json();
+      window._payPathways = (d.pathways || d || []).filter(p => p && p.name && p.is_active !== false);
+    }
+    sel.innerHTML = '<option value="">— Select the pathway —</option>' +
+      window._payPathways.map(p => `<option value="${String(p.name).replace(/"/g, '&quot;')}">${p.emoji ? p.emoji + ' ' : ''}${p.name}</option>`).join('') +
+      '<option value="Other">Other / not decided</option>';
+  } catch (e) {
+    sel.innerHTML = '<option value="">Could not load pathways</option><option value="Other">Other / not decided</option>';
+  }
+}

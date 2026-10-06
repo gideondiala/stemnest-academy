@@ -1099,6 +1099,12 @@ async function generatePaymentLink(bookingId) {
       </select>
       <div style="font-size:11px;color:var(--light);font-weight:700;margin-top:4px;">All prices are in Naira. Parents abroad pay the Naira amount with their card (their bank converts it).</div>
     </div>
+      <div style="margin-bottom:14px;">
+        <label style="font-size:13px;font-weight:800;color:var(--mid);display:block;margin-bottom:6px;">Tech pathway the parent chose</label>
+        <select id="slPayCourse" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;outline:none;background:#fff;">
+          <option value="">⏳ Loading pathways…</option>
+        </select>
+      </div>
       <div id="slPayLinkDisplay"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <button onclick="document.getElementById('fincraPayLinkOverlay').remove()"
@@ -1114,16 +1120,19 @@ async function generatePaymentLink(bookingId) {
 
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
   document.body.appendChild(overlay);
+  _fillPathwaySelect('slPayCourse');
 }
 
 async function _slDoGenerateLink(bookingId, studentName, email, waNum) {
   const amount   = parseFloat(document.getElementById('slPayNGN')?.value || '0');
   const credits  = parseInt(document.getElementById('slPayCredits')?.value || '0', 10);
   const provider = document.getElementById('slPayProvider')?.value || 'fincra';
+  const course   = document.getElementById('slPayCourse')?.value || '';
 
   if (!amount || amount <= 0)   { showToast('Please enter the amount in Naira.', 'error'); return; }
   if (!credits || credits <= 0) { showToast('Please enter the number of credits (classes).', 'error'); return; }
   if (!email)                   { showToast('No parent email on this booking.', 'error'); return; }
+  if (!course)                  { showToast('Please select the tech pathway the parent chose.', 'error'); return; }
 
   const btn = document.getElementById('slPayGenBtn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Generating…'; }
@@ -1135,7 +1144,7 @@ async function _slDoGenerateLink(bookingId, studentName, email, waNum) {
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         studentName, studentEmail: email, amount, currency: 'NGN', credits, provider,
-        notes: 'StemNest course enrolment — ' + studentName, bookingId,
+        notes: (course && course !== 'Other' ? course : 'StemNest classes') + ' — ' + credits + ' classes', bookingId,
       }),
     });
     const data = await res.json();
@@ -1166,7 +1175,7 @@ async function _slDoGenerateLink(bookingId, studentName, email, waNum) {
       btn.style.background = '#0e9f6e';
       btn.onclick = function() {
         document.getElementById('fincraPayLinkOverlay').remove();
-        _slMoveToConvertedPipeline(bookingId, studentName, email, waNum, 'NGN', amount, amount, '');
+        _slMoveToConvertedPipeline(bookingId, studentName, email, waNum, 'NGN', amount, amount, course);
         updateStats();
         renderPipeline();
         showPSTab ? showPSTab('pipeline') : showSalesTab('pipeline');
@@ -1648,4 +1657,22 @@ function savePitchRecording(bookingId) {
 
   showToast('✅ Pitch recording saved!');
   renderPitchRecords();
+}
+
+/* Fill a pathway dropdown (payment link forms) */
+async function _fillPathwaySelect(selId) {
+  const sel = document.getElementById(selId);
+  if (!sel) return;
+  try {
+    if (!window._payPathways) {
+      const r = await fetch('https://api.stemnestacademy.co.uk/api/pathways', { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('sn_access_token') } });
+      const d = await r.json();
+      window._payPathways = (d.pathways || d || []).filter(p => p && p.name && p.is_active !== false);
+    }
+    sel.innerHTML = '<option value="">— Select the pathway —</option>' +
+      window._payPathways.map(p => `<option value="${String(p.name).replace(/"/g, '&quot;')}">${p.emoji ? p.emoji + ' ' : ''}${p.name}</option>`).join('') +
+      '<option value="Other">Other / not decided</option>';
+  } catch (e) {
+    sel.innerHTML = '<option value="">Could not load pathways</option><option value="Other">Other / not decided</option>';
+  }
 }
