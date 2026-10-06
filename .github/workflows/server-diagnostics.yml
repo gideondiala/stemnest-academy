@@ -1,0 +1,30 @@
+name: Server diagnostics
+
+# Run by hand. Tests the API's database connection on the server and shows
+# recent API errors. Passwords are masked; nothing is changed.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    name: Check the API server
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test database connection and show recent errors
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/ubuntu/stemnest-academy/backend
+            echo "== .env database line (password hidden) =="
+            grep '^DATABASE_URL=' .env | sed -E 's#^(DATABASE_URL=[^:]+://[^:]+:)([^@]*)(@.*)$#\1<\2>\3#' | awk -F'[<>]' '{print $1 "<" length($2) " chars>" $3}' | tr -d '\r'
+            echo "carriage returns in .env lines: $(grep -c $'\r' .env)"
+            echo "== direct connection test =="
+            node -e "require('dotenv').config(); const {Client}=require('pg'); const c=new Client({connectionString:process.env.DATABASE_URL, ssl:{rejectUnauthorized:false}, connectionTimeoutMillis:10000}); c.connect().then(()=>c.query('SELECT 1')).then(()=>{console.log('DB CONNECT OK');process.exit(0)}).catch(e=>{console.log('DB CONNECT ERROR:', String(e.message).replace(/:\/\/[^@]*@/g,'://***@'));process.exit(0)})"
+            echo "== recent API errors =="
+            pm2 logs stemnest-api --err --lines 30 --nostream 2>&1 | sed -E 's#(://[^:]+:)[^@]+@#\1***@#g' | grep -iE "error|fail|denied|tenant|sasl|password" | tail -12
