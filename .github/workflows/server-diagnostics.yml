@@ -15,16 +15,23 @@ jobs:
     steps:
       - name: Test database connection and show recent errors
         uses: appleboy/ssh-action@v1.2.5
+        env:
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          envs: DB_PASSWORD
           script: |
             cd /home/ubuntu/stemnest-academy/backend
             echo "== .env database line (password hidden) =="
             grep '^DATABASE_URL=' .env | sed -E 's#^(DATABASE_URL=[^:]+://[^:]+:)([^@]*)(@.*)$#\1<\2>\3#' | awk -F'[<>]' '{print $1 "<" length($2) " chars>" $3}' | tr -d '\r'
-            echo "carriage returns in .env lines: $(grep -c $'\r' .env)"
-            echo "== direct connection test =="
-            node -e "require('dotenv').config(); const {Client}=require('pg'); const c=new Client({connectionString:process.env.DATABASE_URL, ssl:{rejectUnauthorized:false}, connectionTimeoutMillis:10000}); c.connect().then(()=>c.query('SELECT 1')).then(()=>{console.log('DB CONNECT OK');process.exit(0)}).catch(e=>{console.log('DB CONNECT ERROR:', String(e.message).replace(/:\/\/[^@]*@/g,'://***@'));process.exit(0)})"
+            echo "secret length: ${#DB_PASSWORD}"
+            echo "== .env password equals the GitHub secret? =="
+            node -e "require('dotenv').config(); const m=(process.env.DATABASE_URL||'').match(/:\/\/[^:]+:([^@]*)@/); console.log(m && m[1]===process.env.DB_PASSWORD ? 'yes' : 'NO')"
+            echo "== connection tests with the GitHub secret =="
+            for target in "postgres.foentsgwrcazaehkbdqv@aws-1-eu-west-1.pooler.supabase.com:5432" "postgres.foentsgwrcazaehkbdqv@aws-1-eu-west-1.pooler.supabase.com:6543" "postgres@db.foentsgwrcazaehkbdqv.supabase.co:5432"; do
+              node -e "const [u,hp]=process.argv[1].split('@'); const [h,p]=hp.split(':'); const {Client}=require('pg'); const c=new Client({user:u,host:h,port:+p,database:'postgres',password:process.env.DB_PASSWORD,ssl:{rejectUnauthorized:false},connectionTimeoutMillis:10000}); c.connect().then(()=>c.query('SELECT 1')).then(()=>{console.log(process.argv[1]+' -> OK');process.exit(0)}).catch(e=>{console.log(process.argv[1]+' -> '+e.message);process.exit(0)})" "$target"
+            done
             echo "== recent API errors =="
-            pm2 logs stemnest-api --err --lines 30 --nostream 2>&1 | sed -E 's#(://[^:]+:)[^@]+@#\1***@#g' | grep -iE "error|fail|denied|tenant|sasl|password" | tail -12
+            pm2 logs stemnest-api --err --lines 30 --nostream 2>&1 | sed -E 's#(://[^:]+:)[^@]+@#\1***@#g' | grep -iE "error|fail|denied|tenant|sasl|password" | tail -6
