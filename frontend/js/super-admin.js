@@ -792,6 +792,53 @@ window.showSATab = function(tab) {
 let _credActiveGroup = 'staff'; // 'staff' | 'tutors' | 'students'
 let _credAllUsers    = null;    // cached after first load
 
+/* ── Staff / tutor accounts: set a new password, or deactivate ── */
+async function credSetPassword(userId, name, email) {
+  const typed = prompt(
+    `Set a new login password for ${name}${email ? ' (' + email + ')' : ''}.\n\n` +
+    `Leave this EMPTY to generate a strong password automatically,\nor type one (at least 12 characters).`, '');
+  if (typed === null) return;
+  if (typed && typed.length < 12) { showToast('Use at least 12 characters, or leave it empty to generate one.', 'error'); return; }
+  const sendEmail = confirm(`Email the new login details to ${email || 'this person'}?\n\nOK = email them  ·  Cancel = don't email (you share it yourself)`);
+  try {
+    const r = await fetch('https://api.stemnestacademy.co.uk/api/users/' + userId + '/set-password', {
+      method: 'PUT',
+      headers: { 'Authorization': 'Bearer ' + localStorage.getItem('sn_access_token'), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: typed || undefined, sendEmail }),
+    });
+    const d = await r.json();
+    if (!r.ok || !d.success) throw new Error(d.error || 'Could not set the password');
+    document.getElementById('credPwOverlay')?.remove();
+    const ov = document.createElement('div');
+    ov.id = 'credPwOverlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(10,20,50,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+    const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    ov.innerHTML = `<div style="background:#fff;border-radius:18px;padding:24px;max-width:440px;width:100%;font-family:Nunito,sans-serif;">
+      <div style="font-family:'Fredoka One',cursive;font-size:20px;margin-bottom:6px;">✅ New password set</div>
+      <div style="font-size:13px;font-weight:700;color:var(--mid);margin-bottom:12px;">${esc(d.name)} has been signed out of every device.${d.emailedTo ? ' The details were emailed to ' + esc(d.emailedTo) + '.' : ' Share these details with them privately.'}</div>
+      <div style="background:#f0f4ff;border-left:4px solid #1a56db;border-radius:10px;padding:14px 16px;font-family:monospace;font-size:15px;line-height:1.8;">
+        Login: <strong>${esc(d.loginId)}</strong><br>Password: <strong id="credNewPw">${esc(d.password)}</strong></div>
+      <div style="display:flex;gap:10px;margin-top:14px;">
+        <button onclick="navigator.clipboard.writeText(document.getElementById('credNewPw').textContent).then(()=>showToast('📋 Copied'))" style="flex:1;background:#1a56db;color:#fff;border:none;border-radius:10px;padding:10px;font-weight:900;cursor:pointer;">📋 Copy password</button>
+        <button onclick="document.getElementById('credPwOverlay').remove()" style="flex:1;background:var(--bg);border:1.5px solid #e8eaf0;border-radius:10px;padding:10px;font-weight:900;cursor:pointer;">Done</button>
+      </div></div>`;
+    document.body.appendChild(ov);
+  } catch (e) { showToast('⚠️ ' + e.message, 'error'); }
+}
+
+async function credDeactivate(userId, name) {
+  if (!confirm(`Deactivate ${name}?\n\nThey will no longer be able to log in. Nothing is deleted, and the account can be reactivated later.`)) return;
+  try {
+    const r = await fetch('https://api.stemnestacademy.co.uk/api/users/' + userId, {
+      method: 'DELETE', headers: { 'Authorization': 'Bearer ' + localStorage.getItem('sn_access_token') },
+    });
+    const d = await r.json();
+    if (!r.ok || !d.success) throw new Error(d.error || 'Could not deactivate');
+    showToast(`⛔ ${name} deactivated.`);
+    renderCredentialsChart();
+  } catch (e) { showToast('⚠️ ' + e.message, 'error'); }
+}
+
 async function renderCredentialsChart() {
   const el = document.getElementById('credentialsChart');
   if (!el) return;
@@ -879,7 +926,14 @@ function _renderCredTab() {
               'style="background:#fde8e8;color:#c53030;border:1.5px solid #fca5a5;border-radius:8px;padding:7px 14px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:12px;cursor:pointer;">🗑️ Delete</button>' +
             '<button onclick="credEditName(\'' + u.id + '\',\'' + (u.name || '').replace(/'/g,'') + '\')" ' +
               'style="background:var(--bg);color:var(--dark);border:1.5px solid #e8eaf0;border-radius:8px;padding:7px 14px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:12px;cursor:pointer;">✏️ Edit Name</button>'
-            : '') +
+            : (u.role !== 'super_admin' ?
+              '<button onclick="credSetPassword(\'' + u.id + '\',\'' + (u.name || '').replace(/'/g,'') + '\',\'' + (u.email || '').replace(/'/g,'') + '\')" ' +
+                'style="background:#fff7ed;color:#c2410c;border:1.5px solid #fdba74;border-radius:8px;padding:7px 14px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:12px;cursor:pointer;">🔒 Set password</button>' +
+              (u.is_active === false
+                ? '<span style="font-size:11px;font-weight:900;color:#c53030;align-self:center;">Deactivated</span>'
+                : '<button onclick="credDeactivate(\'' + u.id + '\',\'' + (u.name || '').replace(/'/g,'') + '\')" ' +
+                  'style="background:#fde8e8;color:#c53030;border:1.5px solid #fca5a5;border-radius:8px;padding:7px 14px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:12px;cursor:pointer;">⛔ Deactivate</button>')
+              : '')) +
         '</div>' +
       '</td>' +
     '</tr>';
