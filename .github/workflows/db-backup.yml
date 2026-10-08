@@ -1,0 +1,66 @@
+name: Weekly database backup
+
+# Every Sunday 02:00 UTC (and on demand): dumps the database on the API
+# server, encrypts it with the BACKUP_PASSPHRASE secret (AES-256), keeps the
+# last 8 weekly copies on the server in ~/db-backups, and — if the secret
+# BACKUP_S3_BUCKET is set and the AWS CLI is on the server — uploads the
+# encrypted copy to that private S3 bucket. Nothing readable leaves the server.
+#
+# Restore:  gpg -d backup.sql.gz.gpg | gunzip | psql "<connection string>"
+on:
+  schedule:
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    name: Back up the database
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump, encrypt, keep
+        uses: appleboy/ssh-action@v1.2.5
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+          BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: BACKUP_PASSPHRASE,BACKUP_S3_BUCKET
+          command_timeout: 30m
+          script: |
+            set -e
+            [ -n "$BACKUP_PASSPHRASE" ] || { echo "Add the BACKUP_PASSPHRASE secret first"; exit 1; }
+            command -v pg_dump >/dev/null || { echo "pg_dump is not installed on the server (sudo apt-get install -y postgresql-client-17)"; exit 1; }
+            command -v gpg >/dev/null || sudo apt-get install -y gnupg >/dev/null
+            cd /home/ubuntu/stemnest-academy/backend
+            mkdir -p /home/ubuntu/db-backups && chmod 700 /home/ubuntu/db-backups
+            OUT="/home/ubuntu/db-backups/stemnest-$(date -u +%Y%m%d-%H%M).sql.gz.gpg"
+            # Try the current password, then the "next" one (password rotation)
+            URLS=$(node -e "
+              require('dotenv').config();
+              const { parse } = require('pg-connection-string');
+              const p = parse(process.env.DATABASE_URL || '');
+              const pw = [p.password, process.env.DB_PASSWORD_NEXT].filter(Boolean);
+              for (const w of pw) console.log('postgresql://' + encodeURIComponent(p.user) + ':' + encodeURIComponent(w) + '@' + p.host + ':' + (p.port || 5432) + '/' + (p.database || 'postgres') + '?sslmode=require');
+            ")
+            ok=0
+            for U in $URLS; do
+              if pg_dump --no-owner --no-privileges --schema=public "$U" 2>/tmp/pgdump.err | gzip -9 \
+                  | gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" --symmetric --cipher-algo AES256 -o "$OUT" \
+                 && [ -z "$(grep -i 'error\|fatal' /tmp/pgdump.err)" ]; then ok=1; break; fi
+              echo "connection attempt failed: $(head -c 200 /tmp/pgdump.err | sed -E 's#://[^@]*@#://***@#g')"
+            done
+            [ "$ok" = "1" ] || { rm -f "$OUT"; echo "Backup failed"; exit 1; }
+            chmod 600 "$OUT"
+            echo "backup saved: $(basename "$OUT") ($(du -h "$OUT" | cut -f1))"
+            ls -1t /home/ubuntu/db-backups/*.gpg | tail -n +9 | xargs -r rm -f
+            echo "copies kept on the server: $(ls -1 /home/ubuntu/db-backups/*.gpg | wc -l)"
+            if [ -n "$BACKUP_S3_BUCKET" ] && command -v aws >/dev/null; then
+              aws s3 cp "$OUT" "s3://$BACKUP_S3_BUCKET/db-backups/$(basename "$OUT")" --only-show-errors && echo "uploaded to s3://$BACKUP_S3_BUCKET/db-backups/"
+            else
+              echo "off-server copy skipped (set BACKUP_S3_BUCKET and install the AWS CLI on the server to enable)"
+            fi

@@ -20,6 +20,7 @@ const rescheduleSvc = require('../services/rescheduleService');
 const pauseSvc = require('../services/pauseService');
 const learningSvc = require('../services/learningService');
 const classOps = require('../services/classOpsService');
+const tracksSvc = require('../services/studentTracks');
 const promoSvc = require('../services/promoterService');
 const logger   = require('../utils/logger');
 
@@ -416,6 +417,9 @@ router.get('/', requireAuth, async (req, res, next) => {
       where += ` AND b.sales_id = $${params.length}`;
     }
     if (status) { params.push(status); where += ` AND b.status = $${params.length}`; }
+    /* Old cancelled classes are not resent on every dashboard refresh (saves
+       database traffic); ask for them with ?status=cancelled or includeCancelled=1 */
+    else if (req.query.includeCancelled !== '1') where += ` AND NOT (b.status = 'cancelled' AND b.date < CURRENT_DATE - 30)`;
     if (subject) { params.push(subject); where += ` AND b.subject = $${params.length}`; }
     if (from && req.user.role !== 'tutor') { params.push(from); where += ` AND b.date >= $${params.length}::date`; }
     if (to) { params.push(to); where += ` AND b.date <= $${params.length}::date`; }
@@ -431,8 +435,16 @@ router.get('/', requireAuth, async (req, res, next) => {
               pl.lesson_number AS lesson_number,
               pl.id     AS pathway_lesson_id_joined,
               sp.credits            AS student_credits,
-              sp.credits_suspended  AS student_credits_suspended
+              sp.credits_suspended  AS student_credits_suspended,
+              COALESCE(pw_e.name, pw_l.name, pw_b.name) AS pathway_name
        FROM bookings b
+       LEFT JOIN enrolments en_b ON en_b.id = b.enrolment_id
+       LEFT JOIN pathways pw_e ON pw_e.id = en_b.pathway_id
+       LEFT JOIN pathway_lessons pl_p ON pl_p.id = b.pathway_lesson_id
+       LEFT JOIN pathway_grades pg_p ON pg_p.id = pl_p.grade_id
+       LEFT JOIN pathways pw_l ON pw_l.id = pg_p.pathway_id
+       LEFT JOIN batches bt_p ON bt_p.id = b.batch_id
+       LEFT JOIN pathways pw_b ON pw_b.id = bt_p.pathway_id
        LEFT JOIN users u_s  ON u_s.id  = b.student_id
        LEFT JOIN users u_t  ON u_t.id  = b.tutor_id
        LEFT JOIN users u_sp ON u_sp.id = b.sales_id
@@ -588,6 +600,17 @@ router.post('/bulk-schedule', requireAuth, requireRole('admin','super_admin','po
           [gradeNum, enrolment.id]
         );
         enrolment.lessons_completed = 0;
+      }
+    }
+
+    /* One schedule per pathway: a pathway that still has upcoming classes is changed with Reschedule */
+    if (enrolment) {
+      const upcoming = await client.query(
+        `SELECT COUNT(*)::int AS n FROM bookings WHERE enrolment_id = $1 AND status = 'scheduled' AND date >= CURRENT_DATE`,
+        [enrolment.id]
+      );
+      if (upcoming.rows[0].n > 0) {
+        throw Object.assign(new Error(`${student.name} already has ${upcoming.rows[0].n} upcoming ${pathwayName} classes. Use Reschedule or Change Tutor for this pathway instead.`), { status: 409 });
       }
     }
 
@@ -974,22 +997,31 @@ router.put('/reschedule-student', requireAuth, requireRole('admin','super_admin'
       classLink,      // optional — keep existing if not provided
       schedule,       // [{ weekday: 1, time: '11:30' }, ...]
       tutorId,        // keep existing if not provided
+      track,          // which pathway (see services/studentTracks) — required when the student has several
     } = req.body;
 
     if (!studentId)   return res.status(400).json({ success: false, error: 'studentId required' });
     if (!startDate)   return res.status(400).json({ success: false, error: 'startDate required' });
     if (!Array.isArray(schedule) || !schedule.length) return res.status(400).json({ success: false, error: 'schedule required' });
 
-    /* Get existing future bookings for this student, ordered by date */
+    /* Only the chosen pathway's classes — a student can take several pathways */
+    let trackKey;
+    try { trackKey = await tracksSvc.resolveTrack(pool, studentId, track); }
+    catch (e) { if (e.status) return res.status(e.status).json({ success: false, error: e.message, needsTrack: e.needsTrack, tracks: e.tracks }); throw e; }
+    const tf = trackKey ? tracksSvc.trackFilter(trackKey, 3) : { sql: 'TRUE', params: [] };
+
+    /* Get existing future bookings for this pathway, ordered by date */
     const existing = await pool.query(`
       SELECT id, date, time, tutor_id, class_link, lesson_name, pathway_lesson_id,
              lesson_number_in_grade, notes, enrolment_id, subject, grade
-      FROM bookings
+      FROM bookings b
       WHERE student_id = $1
         AND status = 'scheduled'
         AND date >= $2::date
+        AND b.batch_id IS NULL AND b.is_demo = FALSE
+        AND ${tf.sql}
       ORDER BY date ASC, time ASC
-    `, [studentId, startDate]);
+    `, [studentId, startDate, ...tf.params]);
 
     if (!existing.rows.length) {
       return res.status(404).json({ success: false, error: 'No future scheduled bookings found for this student' });
@@ -1033,11 +1065,11 @@ router.put('/reschedule-student', requireAuth, requireRole('admin','super_admin'
       slotStarts[0].next = nextOccurrence;
     }
 
-    /* Cancel old bookings */
-    await pool.query(`
-      UPDATE bookings SET status = 'cancelled'
-      WHERE student_id = $1 AND status = 'scheduled' AND date >= $2::date
-    `, [studentId, startDate]);
+    /* Cancel the old bookings of this pathway only */
+    await pool.query(
+      `UPDATE bookings SET status = 'cancelled' WHERE id = ANY($1::uuid[])`,
+      [existing.rows.map(r => r.id)]
+    );
 
     /* Create new bookings preserving lesson sequence */
     const createdIds = [];
@@ -1088,7 +1120,7 @@ router.put('/reschedule-student', requireAuth, requireRole('admin','super_admin'
       );
     }
 
-    logger.info(`[RESCHEDULE] Student ${studentId}: cancelled ${totalToReschedule}, created ${createdIds.length}`);
+    logger.info(`[RESCHEDULE] Student ${studentId}${trackKey ? ' track ' + trackKey : ''}: cancelled ${totalToReschedule}, created ${createdIds.length}`);
     res.json({ success: true, cancelled: totalToReschedule, created: createdIds.length });
 
   } catch (err) { next(err); }
@@ -1097,7 +1129,7 @@ router.put('/reschedule-student', requireAuth, requireRole('admin','super_admin'
 
 router.put('/change-tutor', requireAuth, requireRole('admin','super_admin','postsales'), async (req, res, next) => {
   try {
-    const { studentId, newTutorId, startDate } = req.body;
+    const { studentId, newTutorId, startDate, track } = req.body;
 
     if (!studentId)  return res.status(400).json({ success: false, error: 'studentId required' });
     if (!newTutorId) return res.status(400).json({ success: false, error: 'newTutorId required' });
@@ -1109,11 +1141,17 @@ router.put('/change-tutor', requireAuth, requireRole('admin','super_admin','post
     if (!tutorRes.rows.length) return res.status(404).json({ success: false, error: 'New tutor not found or no longer active' });
     const newTutorName = tutorRes.rows[0].name;
 
-    /* Get affected bookings */
+    /* Only the chosen pathway's classes — the student's other pathways keep their tutors */
+    let trackKey;
+    try { trackKey = await tracksSvc.resolveTrack(pool, studentId, track); }
+    catch (e) { if (e.status) return res.status(e.status).json({ success: false, error: e.message, needsTrack: e.needsTrack, tracks: e.tracks }); throw e; }
+    const tf = trackKey ? tracksSvc.trackFilter(trackKey, 3) : { sql: 'TRUE', params: [] };
+
     const affected = await pool.query(`
-      SELECT id, notes, enrolment_id FROM bookings
+      SELECT id, notes, enrolment_id FROM bookings b
       WHERE student_id = $1 AND status = 'scheduled' AND date >= $2::date
-    `, [studentId, effectiveDate]);
+        AND b.batch_id IS NULL AND b.is_demo = FALSE AND ${tf.sql}
+    `, [studentId, effectiveDate, ...tf.params]);
 
     if (!affected.rows.length) {
       return res.status(404).json({ success: false, error: 'No future bookings found for this student' });
@@ -1131,6 +1169,7 @@ router.put('/change-tutor', requireAuth, requireRole('admin','super_admin','post
     }
 
     const enrolIds = [...new Set(affected.rows.map(r => r.enrolment_id).filter(Boolean))];
+    if (trackKey && trackKey.startsWith('e:') && !enrolIds.includes(trackKey.slice(2))) enrolIds.push(trackKey.slice(2));
     if (enrolIds.length) {
       await pool.query('UPDATE enrolments SET tutor_id = $1, updated_at = NOW() WHERE id = ANY($2::uuid[])', [newTutorId, enrolIds]);
     }
@@ -1342,7 +1381,9 @@ async function chargeStudentForClass(studentId, booking, bookingNotes) {
 
   /* ── Track lesson completion ── */
   try {
-    /* Find the student's active enrolment for this pathway */
+    /* The enrolment (pathway) this class belongs to — a student can take
+       several pathways. In order: the class's own enrolment, the pathway of
+       the lesson taught, the batch's pathway, then the student's latest. */
     const enrolResult = await pool.query(
       `SELECT e.id, e.pathway_id, e.current_grade, e.lessons_completed,
               pg.total_lessons
@@ -1350,8 +1391,13 @@ async function chargeStudentForClass(studentId, booking, bookingNotes) {
        LEFT JOIN pathway_grades pg ON pg.pathway_id = e.pathway_id
                                   AND pg.grade_number = e.current_grade
        WHERE e.student_id = $1 AND e.status = 'active'
-       ORDER BY e.created_at DESC LIMIT 1`,
-      [studentId]
+       ORDER BY (e.id = $2::uuid) DESC,
+                (e.pathway_id = (SELECT g.pathway_id FROM pathway_lessons l JOIN pathway_grades g ON g.id = l.grade_id
+                                 WHERE l.id = $3::uuid)) DESC NULLS LAST,
+                (e.pathway_id = (SELECT pathway_id FROM batches WHERE id = $4::uuid)) DESC NULLS LAST,
+                e.created_at DESC
+       LIMIT 1`,
+      [studentId, booking.enrolment_id || null, booking.pathway_lesson_id || null, booking.batch_id || null]
     );
     const enrolment = enrolResult.rows[0];
 

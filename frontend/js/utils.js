@@ -3,6 +3,35 @@
    Shared helpers used across every page.
 ═══════════════════════════════════════════════════════ */
 
+/* ── Background refresh limits (keeps database traffic low) ──
+   Dashboards reload their data on a timer. Loops of 20 s or more:
+   • pause while the tab is hidden or minimised, and run once when it
+     becomes visible again;
+   • run at most every 2 minutes (chat's 20 s check is left as it is).
+   Short timers (animations, countdowns) are not affected. */
+(function () {
+  if (window.__snIntervalPatched) return;
+  window.__snIntervalPatched = true;
+  var nativeSetInterval = window.setInterval.bind(window);
+  var MIN_DATA_LOOP = 20000, FLOOR = 120000;
+  var missed = [];
+  window.setInterval = function (fn, ms) {
+    var args = Array.prototype.slice.call(arguments, 2);
+    if (typeof fn !== 'function' || !(ms >= MIN_DATA_LOOP)) return nativeSetInterval.apply(window, arguments);
+    var wait = ms >= 30000 && ms < FLOOR ? FLOOR : ms;
+    var run = function () { try { fn.apply(window, args); } catch (e) { console.error(e); } };
+    return nativeSetInterval(function () {
+      if (document.hidden) { if (missed.indexOf(run) === -1) missed.push(run); return; }
+      run();
+    }, wait);
+  };
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden || !missed.length) return;
+    var due = missed; missed = [];
+    due.forEach(function (r) { r(); });
+  });
+})();
+
 /**
  * Navigate to another page.
  * Automatically resolves paths whether called from root or /pages/.

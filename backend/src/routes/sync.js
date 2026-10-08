@@ -361,7 +361,21 @@ router.get('/dashboard/:role', requireAuth, async (req, res, next) => {
             e.status                                                        AS "enrolmentStatus",
             u_t.name                                                        AS "tutorName",
             (SELECT pm.amount   FROM payments pm WHERE pm.student_id = u.id ORDER BY pm.created_at DESC LIMIT 1) AS "amountPaid",
-            (SELECT pm.currency FROM payments pm WHERE pm.student_id = u.id ORDER BY pm.created_at DESC LIMIT 1) AS "amountCurrency"
+            (SELECT pm.currency FROM payments pm WHERE pm.student_id = u.id ORDER BY pm.created_at DESC LIMIT 1) AS "amountCurrency",
+            /* Every pathway the student takes (a student can take several) */
+            (SELECT COALESCE(json_agg(json_build_object(
+                      'enrolmentId', en2.id, 'pathwayId', en2.pathway_id, 'pathwayName', pw2.name,
+                      'grade', en2.current_grade, 'lessonsCompleted', en2.lessons_completed,
+                      'status', en2.status, 'tutorName', t2.name) ORDER BY en2.created_at), '[]'::json)
+             FROM enrolments en2
+             LEFT JOIN pathways pw2 ON pw2.id = en2.pathway_id
+             LEFT JOIN users t2 ON t2.id = en2.tutor_id
+             WHERE en2.student_id = u.id AND en2.status IN ('active','paused')) AS "pathways",
+            /* Groups of upcoming 1-on-1 classes not linked to a pathway yet */
+            (SELECT COUNT(DISTINCT COALESCE(bx.tutor_id::text, '') || '|' || COALESCE(bx.class_link, ''))::int
+             FROM bookings bx
+             WHERE bx.student_id = u.id AND bx.enrolment_id IS NULL AND bx.batch_id IS NULL AND bx.is_demo = FALSE
+               AND bx.status = 'scheduled' AND bx.date >= CURRENT_DATE) AS "unlinkedTracks"
           FROM users u
           LEFT JOIN student_profiles sp ON sp.user_id  = u.id
           /* One row per student: their most recent live enrolment */
@@ -534,10 +548,19 @@ router.get('/dashboard/:role', requireAuth, async (req, res, next) => {
                            pl.task1_description, pl.task2_description,
                            pl.debrief, pl.what_comes_next,
                            pl.lesson_number AS pathway_lesson_number,
-                           pl.session_type
+                           pl.session_type,
+                           /* Which pathway the class belongs to (a student can take several) */
+                           COALESCE(pw_e.name, pw_l.name, pw_b.name) AS pathway_name,
+                           COALESCE(pw_e.emoji, pw_l.emoji, pw_b.emoji) AS pathway_emoji
                     FROM bookings b
                     LEFT JOIN users u_t ON u_t.id = b.tutor_id
                     LEFT JOIN pathway_lessons pl ON pl.id = b.pathway_lesson_id
+                    LEFT JOIN enrolments en_b ON en_b.id = b.enrolment_id
+                    LEFT JOIN pathways pw_e ON pw_e.id = en_b.pathway_id
+                    LEFT JOIN pathway_grades pg_l ON pg_l.id = pl.grade_id
+                    LEFT JOIN pathways pw_l ON pw_l.id = pg_l.pathway_id
+                    LEFT JOIN batches bt_b ON bt_b.id = b.batch_id
+                    LEFT JOIN pathways pw_b ON pw_b.id = bt_b.pathway_id
                     WHERE (b.student_id = $1
                        OR b.batch_id IN (
                          SELECT bm.batch_id FROM batch_members bm
@@ -575,8 +598,10 @@ router.get('/dashboard/:role', requireAuth, async (req, res, next) => {
                            p.name AS pathway_name, p.emoji AS pathway_emoji,
                            pg.grade_number AS current_grade_number,
                            pg.name AS current_grade_name,
-                           pg.total_lessons
+                           pg.total_lessons,
+                           u_te.name AS tutor_name
                     FROM enrolments e
+                    LEFT JOIN users u_te ON u_te.id = e.tutor_id
                     LEFT JOIN pathways p ON p.id = e.pathway_id
                     LEFT JOIN pathway_grades pg ON pg.pathway_id = e.pathway_id
                                                 AND pg.grade_number = e.current_grade

@@ -84,6 +84,7 @@ async function _loadStudentFromAPI() {
     if (!res.ok) return;
     const data = await res.json();
     if (data.success) {
+      window._lastStudentAPIData = data;   /* shared with student-pathway.js (no second download) */
       window.STUDENT_DATA.payments = data.payments || [];
       window.STUDENT_DATA.profile = data.students?.[0] || null;
       
@@ -119,7 +120,8 @@ async function _loadStudentFromAPI() {
           startsAt:        local ? local.instant : null,
           endsAt:          local ? new Date(local.instant.getTime() + durationMin * 60000) : null,
           tutor:           b.tutor_name || 'Tutor',
-          subject:         b.subject || '',
+          subject:         b.pathway_name || b.subject || '',
+          pathway:         b.pathway_name || '',
           duration:        durationMin + ' mins',
           status:          b.status || 'scheduled',
           classLink:       b.class_link || '',
@@ -655,11 +657,11 @@ function renderUpcomingPreview() {
           </div>
           <div class="jc-title">${next.title || next.subject || 'Class'}</div>
           <div class="jc-meta">
-            <span>👩‍🏫 Tutor: ${next.tutor || '—'}</span>
+            <span>👩‍🏫 Tutor: ${next.tutor || '—'}</span>${next.pathway ? `<span>📚 ${next.pathway}</span>` : ''}
             <span>🕐 ${next.time || '—'}</span>
             <span>📅 ${next.date || '—'}</span>
           </div>
-          ${next.subject ? `<div class="jc-desc">Subject: <strong>${next.subject}</strong></div>` : ''}
+          ${next.subject && !next.pathway ? `<div class="jc-desc">Subject: <strong>${next.subject}</strong></div>` : ''}
         </div>
         <div class="jc-right">
           ${isPaused
@@ -791,7 +793,7 @@ function renderLessons(tab) {
             '<div class="lesson-title" style="font-size:15px;font-weight:900;">' + (l.lessonTitle || l.title) + '</div>' +
             (lessonLabel ? '<div style="font-size:11px;font-weight:800;color:var(--blue);margin-top:2px;">' + lessonLabel + '</div>' : '') +
             '<div class="lesson-meta" style="margin-top:4px;">🕐 ' + l.time + ' &nbsp;·&nbsp; 📅 ' + l.date + '</div>' +
-            '<div class="lesson-meta">👩‍🏫 ' + l.tutor + ' &nbsp;·&nbsp; ⏱ ' + l.duration + '</div>' +
+            '<div class="lesson-meta">' + (l.pathway ? '📚 ' + l.pathway + ' &nbsp;·&nbsp; ' : '') + '👩‍🏫 ' + l.tutor + ' &nbsp;·&nbsp; ⏱ ' + l.duration + '</div>' +
           '</div>' +
         '</div>' +
         '<div class="lesson-card-right">' +

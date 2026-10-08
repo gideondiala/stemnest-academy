@@ -270,7 +270,12 @@ function renderPaidStudents() {
     const creditBadge = (s.credits || 0) <= 0
       ? `<span style="color:#c53030;background:#fed7d7;padding:2px 8px;border-radius:50px;font-size:11px;">${s.credits || 0}</span>`
       : `<span style="color:#065f46;background:#d4f8e8;padding:2px 8px;border-radius:50px;font-size:11px;">${s.credits || 0}</span>`;
-    const pathway = s.pathwayName || '—';
+    /* Every pathway the student takes, each with its tutor */
+    const pws = Array.isArray(s.pathways) ? s.pathways : [];
+    const pathway = (pws.length
+      ? pws.map(p => `<span title="${_escH(p.tutorName || 'No tutor')}" style="display:inline-block;background:var(--blue-light);color:var(--blue);border-radius:50px;padding:2px 8px;margin:1px 2px 1px 0;font-size:11px;white-space:nowrap;">${_escH(p.pathwayName || 'Pathway')}${p.tutorName ? ' · ' + _escH(p.tutorName.split(' ')[0]) : ''}${p.status === 'paused' ? ' ⏸' : ''}</span>`).join('')
+      : _escH(s.pathwayName || '—'))
+      + (s.unlinkedTracks ? `<span title="Classes not linked to a pathway — open 🧭 Pathways" style="display:inline-block;background:#fff7ed;color:#c2410c;border-radius:50px;padding:2px 8px;font-size:11px;white-space:nowrap;">⚠ ${s.unlinkedTracks} unlinked</span>` : '');
     const grade   = s.gradeNumber ? `Grade ${s.gradeNumber}` : (s.grade || '—');
 
     return `<tr>
@@ -289,6 +294,10 @@ function renderPaidStudents() {
           <button onclick="openPOSScheduleModal('${s.studentId}','${(s.studentName||'').replace(/'/g,'')}','${s.email||''}')"
             style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;white-space:nowrap;">
             📅 Schedule
+          </button>
+          <button title="Pathways — tutors, schedules, add a pathway" onclick="openPathwaysPanel('${s.studentId}','${(s.studentName||'').replace(/'/g,'')}','${s.email||''}')"
+            style="background:#0e9f6e;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;">
+            🧭
           </button>
           <button onclick="openPauseModal('${s.studentId}','${(s.studentName||'').replace(/'/g,'')}')"
             style="background:#f59e0b;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;">
@@ -1287,13 +1296,16 @@ async function confirmRescheduleStudent() {
     const res  = await fetch(`${API}/api/bookings/reschedule-student`, {
       method: 'PUT',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studentId: _rsStudentId, startDate, classLink, schedule }),
+      body: JSON.stringify({ studentId: _rsStudentId, startDate, classLink, schedule, track: window._snTrack || undefined }),
     });
     const data = await res.json();
     if (data.success) {
       showToast(`✅ ${_rsStudentName}'s schedule updated. ${data.created || ''} classes recreated.`);
       closeRescheduleStudentModal();
       await loadDashboard();
+    } else if (data.needsTrack && typeof snShowTrackPicker === 'function') {
+      snShowTrackPicker('rs', data.tracks);
+      showToast('Choose which pathway to reschedule.', 'warning');
     } else {
       showToast('Error: ' + (data.error || 'Unknown'), 'error');
     }
@@ -1351,13 +1363,16 @@ async function confirmChangeTutor() {
     const res  = await fetch(`${API}/api/bookings/change-tutor`, {
       method: 'PUT',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studentId: _ctStudentId, newTutorId, startDate }),
+      body: JSON.stringify({ studentId: _ctStudentId, newTutorId, startDate, track: window._snTrack || undefined }),
     });
     const data = await res.json();
     if (data.success) {
       showToast(`✅ ${_ctStudentName}'s tutor changed. ${data.updated || ''} classes updated.`);
       closeChangeTutorModal();
       await loadDashboard();
+    } else if (data.needsTrack && typeof snShowTrackPicker === 'function') {
+      snShowTrackPicker('ct', data.tracks);
+      showToast('Choose which pathway gets the new tutor.', 'warning');
     } else {
       showToast('Error: ' + (data.error || 'Unknown'), 'error');
     }

@@ -15,103 +15,116 @@ window.STUDENT_PATHWAY = {
 const _origLoadStudent = window._loadStudentFromAPI;
 window._loadStudentFromAPI = async function() {
   await _origLoadStudent();
-  const data = window._lastStudentAPIData;
-  if (data && data.enrolments) {
-    window.STUDENT_PATHWAY.enrolments = data.enrolments;
-    window.STUDENT_PATHWAY.activeEnrolment = data.enrolments[0] || null;
-    _renderPathwayProgress();
-    _injectPathwayBanner();
-  }
+  _applyPathwayData(window._lastStudentAPIData);
 };
 
-/* Store raw API data for pathway use */
-const _origFetch = window.fetch;
-// We patch _loadStudentFromAPI differently — intercept the data after it loads
+/* A student can take several pathways at once — one card each */
+function _currentEnrolments(list) {
+  const seen = new Set();
+  return (list || [])
+    .filter(e => e.pathway_name && (e.status === 'active' || e.status === 'paused'))
+    .filter(e => { if (seen.has(e.pathway_id)) return false; seen.add(e.pathway_id); return true; })
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+}
+
+function _applyPathwayData(data) {
+  if (!data) return;
+  if (data.bookings) window._pathwayBookings = data.bookings;
+  if (!data.enrolments) return;
+  window.STUDENT_PATHWAY.enrolments = _currentEnrolments(data.enrolments);
+  window.STUDENT_PATHWAY.activeEnrolment = window.STUDENT_PATHWAY.enrolments[0] || null;
+  _renderPathwayProgress();
+  _injectPathwayBanner();
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-  /* After student data loads, check for pathway enrolments */
+  /* Uses the data the dashboard already loaded — fetches only if it is not there */
   setTimeout(_checkPathwayData, 2000);
 });
 
 async function _checkPathwayData() {
   try {
+    if (window._lastStudentAPIData) { _applyPathwayData(window._lastStudentAPIData); return; }
     const token = localStorage.getItem('sn_access_token');
     if (!token) return;
     const res = await fetch('https://api.stemnestacademy.co.uk/api/sync/dashboard/student', {
       headers: { 'Authorization': 'Bearer ' + token }
     });
     if (!res.ok) return;
-    const data = await res.json();
-    if (data.enrolments && data.enrolments.length) {
-      window.STUDENT_PATHWAY.enrolments = data.enrolments;
-      window.STUDENT_PATHWAY.activeEnrolment = data.enrolments[0];
-      _renderPathwayProgress();
-      _injectPathwayBanner();
-    }
-    /* Also update LESSONS with pathway lesson data */
-    if (data.bookings) {
-      window._pathwayBookings = data.bookings;
-    }
+    _applyPathwayData(await res.json());
   } catch(e) { /* silent */ }
 }
 
-/* ── Inject pathway banner on overview tab ── */
+function _pwEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+/* Next upcoming class of a pathway (from the dashboard's class list) */
+function _nextClassFor(pathwayName) {
+  const now = Date.now();
+  const list = (typeof LESSONS !== 'undefined' ? LESSONS : [])
+    .filter(l => l.status === 'scheduled' && l.pathway === pathwayName && l.endsAt && l.endsAt.getTime() > now);
+  return list[0] || null;
+}
+
+/* ── Pathway cards on the overview tab ── */
 function _injectPathwayBanner() {
-  const enr = window.STUDENT_PATHWAY.activeEnrolment;
-  if (!enr || !enr.pathway_name) return;
+  const list = window.STUDENT_PATHWAY.enrolments || [];
   const existing = document.getElementById('pathwayProgressBanner');
   if (existing) existing.remove();
-
+  if (!list.length) return;
   const overview = document.getElementById('tab-overview');
   if (!overview) return;
 
-  const gradeNum  = enr.current_grade || 1;
-  const unitNum   = enr.current_unit  || 1;
-  const completed = enr.lessons_completed || 0;
-  const total     = 72;
-  const pct       = Math.round((completed / total) * 100);
+  const many = list.length > 1;
+  const cards = list.map(enr => {
+    const total     = enr.total_lessons || 72;
+    const completed = enr.lessons_completed || 0;
+    const pct       = Math.min(100, Math.round((completed / total) * 100));
+    const next      = _nextClassFor(enr.pathway_name);
+    return `
+      <div style="background:linear-gradient(135deg,#1a56db,#0e9f6e);border-radius:20px;padding:22px 24px;color:#fff;${many ? 'flex:1;min-width:260px;' : ''}">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+          <div>
+            <div style="font-size:12px;font-weight:800;opacity:.8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">${many ? 'Pathway' : 'Your Career Pathway'}</div>
+            <div style="font-family:'Fredoka One',cursive;font-size:21px;">${_pwEsc(enr.pathway_emoji || '🚀')} ${_pwEsc(enr.pathway_name)}${enr.status === 'paused' ? ' <span style="font-size:12px;background:rgba(255,255,255,.25);border-radius:50px;padding:2px 10px;">paused</span>' : ''}</div>
+            <div style="font-size:13px;opacity:.92;margin-top:4px;">Grade ${enr.current_grade || 1} &nbsp;·&nbsp; ${completed} / ${total} lessons${enr.tutor_name ? ' &nbsp;·&nbsp; 👩‍🏫 ' + _pwEsc(enr.tutor_name) : ''}</div>
+            ${next ? `<div style="font-size:12px;opacity:.9;margin-top:4px;">Next class: ${_pwEsc(next.date)} · ${_pwEsc(next.time)}</div>` : ''}
+          </div>
+          <div style="text-align:right;">
+            <div style="font-family:'Fredoka One',cursive;font-size:30px;">${pct}%</div>
+            <div style="font-size:12px;opacity:.8;">Grade progress</div>
+          </div>
+        </div>
+        <div style="background:rgba(255,255,255,.25);border-radius:50px;height:8px;margin-top:14px;overflow:hidden;">
+          <div style="background:#fff;height:100%;width:${pct}%;border-radius:50px;transition:width .5s;"></div>
+        </div>
+      </div>`;
+  }).join('');
 
   const banner = document.createElement('div');
   banner.id = 'pathwayProgressBanner';
   banner.style.cssText = 'margin-bottom:24px;';
-  banner.innerHTML = `
-    <div style="background:linear-gradient(135deg,#1a56db,#0e9f6e);border-radius:20px;padding:24px 28px;color:#fff;">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
-        <div>
-          <div style="font-size:13px;font-weight:800;opacity:.8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Your Career Pathway</div>
-          <div style="font-family:'Fredoka One',cursive;font-size:22px;">${enr.pathway_emoji || '🚀'} ${enr.pathway_name}</div>
-          <div style="font-size:14px;opacity:.9;margin-top:4px;">Grade ${gradeNum} of 12 &nbsp;·&nbsp; Unit ${unitNum} of 8 &nbsp;·&nbsp; ${completed} / ${total} lessons</div>
-        </div>
-        <div style="text-align:right;">
-          <div style="font-family:'Fredoka One',cursive;font-size:32px;">${pct}%</div>
-          <div style="font-size:12px;opacity:.8;">Grade Progress</div>
-        </div>
-      </div>
-      <div style="background:rgba(255,255,255,.25);border-radius:50px;height:8px;margin-top:16px;overflow:hidden;">
-        <div style="background:#fff;height:100%;width:${pct}%;border-radius:50px;transition:width .5s;"></div>
-      </div>
-    </div>`;
-
-  /* Insert before the first child of overview */
+  banner.innerHTML = (many ? `<div style="font-family:'Fredoka One',cursive;font-size:18px;color:var(--dark);margin-bottom:10px;">🧭 My Pathways</div>` : '') +
+    `<div style="display:flex;gap:14px;flex-wrap:wrap;">${cards}</div>`;
   overview.insertBefore(banner, overview.firstChild);
 }
 
-/* ── Render pathway progress in the progress bars section ── */
+/* ── One progress bar per pathway ── */
 function _renderPathwayProgress() {
-  const enr = window.STUDENT_PATHWAY.activeEnrolment;
-  if (!enr || !enr.pathway_name) return;
-  /* Override COURSES array to show pathway progress */
-  const gradeNum  = enr.current_grade || 1;
-  const completed = enr.lessons_completed || 0;
-  const total     = 72;
-  COURSES = [{
-    id:       enr.pathway_id || 'pathway',
-    name:     `${enr.pathway_emoji || '🚀'} ${enr.pathway_name} — Grade ${gradeNum}`,
-    tutor:    'Assigned Tutor',
-    progress: Math.round((completed / total) * 100),
-    total,
-    done:     completed,
-    color:    'blue',
-  }];
+  const list = window.STUDENT_PATHWAY.enrolments || [];
+  if (!list.length) return;
+  COURSES = list.map(enr => {
+    const total = enr.total_lessons || 72;
+    const done  = enr.lessons_completed || 0;
+    return {
+      id:       enr.pathway_id || enr.id,
+      name:     `${enr.pathway_emoji || '🚀'} ${enr.pathway_name} — Grade ${enr.current_grade || 1}`,
+      tutor:    enr.tutor_name || 'Assigned Tutor',
+      progress: Math.min(100, Math.round((done / total) * 100)),
+      total,
+      done,
+      color:    'blue',
+    };
+  });
   renderProgressBars();
 }
 

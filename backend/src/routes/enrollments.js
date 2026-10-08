@@ -403,10 +403,12 @@ router.get('/board', requireAuth, requireRole('admin','super_admin','postsales')
          FROM users u
          LEFT JOIN student_profiles sp ON sp.user_id = u.id
          LEFT JOIN LATERAL (
-           SELECT p.name AS pathway_name, en.current_grade FROM enrolments en
+           /* All the student's pathways, e.g. "Data Science + AI & Automation" */
+           SELECT string_agg(p.name, ' + ' ORDER BY en.created_at) AS pathway_name,
+                  (array_agg(en.current_grade ORDER BY en.created_at DESC))[1] AS current_grade
+           FROM enrolments en
            LEFT JOIN pathways p ON p.id = en.pathway_id
            WHERE en.student_id = u.id AND en.status IN ('active','paused')
-           ORDER BY en.created_at DESC LIMIT 1
          ) e ON TRUE
          LEFT JOIN LATERAL (
            SELECT to_char(MIN(b.date + b.time), 'YYYY-MM-DD') AS next_date,
@@ -449,6 +451,85 @@ router.get('/board', requireAuth, requireRole('admin','super_admin','postsales')
       },
     });
   } catch (err) { next(err); }
+});
+
+/* ══════════════════════════════════════════════
+   A student's pathways (tracks)
+   GET  /students/:studentId/tracks       — each pathway with tutor, link and class counts,
+                                            plus classes not yet linked to a pathway
+   POST /students/:studentId/link-track   — link unlinked classes to a pathway
+══════════════════════════════════════════════ */
+const tracksSvc = require('../services/studentTracks');
+
+router.get('/students/:studentId/tracks', requireAuth, requireRole('admin', 'super_admin', 'postsales'), async (req, res, next) => {
+  try {
+    if (!tracksSvc.UUID_RE.test(req.params.studentId)) return res.status(400).json({ success: false, error: 'Invalid student' });
+    res.json({ success: true, tracks: await tracksSvc.studentTracks(pool, req.params.studentId) });
+  } catch (err) { next(err); }
+});
+
+router.post('/students/:studentId/link-track', requireAuth, requireRole('admin', 'super_admin', 'postsales'), async (req, res, next) => {
+  const studentId = req.params.studentId;
+  const { track, pathwayId } = req.body || {};
+  const gradeNumber = req.body && req.body.gradeNumber ? parseInt(req.body.gradeNumber, 10) : null;
+  const lessonsCompleted = req.body && req.body.lessonsCompleted !== undefined && req.body.lessonsCompleted !== ''
+    ? Math.max(0, parseInt(req.body.lessonsCompleted, 10) || 0) : null;
+  if (!tracksSvc.UUID_RE.test(studentId)) return res.status(400).json({ success: false, error: 'Invalid student' });
+  if (!String(track || '').startsWith('t:')) return res.status(400).json({ success: false, error: 'Choose classes that are not linked to a pathway yet' });
+  if (!tracksSvc.UUID_RE.test(String(pathwayId || ''))) return res.status(400).json({ success: false, error: 'Choose the pathway' });
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const pw = await client.query('SELECT id, name FROM pathways WHERE id = $1', [pathwayId]);
+    if (!pw.rows.length) throw Object.assign(new Error('Pathway not found'), { status: 404 });
+    const tf = tracksSvc.trackFilter(track, 2);
+    const classes = await client.query(
+      `SELECT b.id, b.tutor_id, b.class_link, b.status, b.date FROM bookings b
+       WHERE b.student_id = $1 AND ${tf.sql} ORDER BY b.date DESC FOR UPDATE`,
+      [studentId, ...tf.params]
+    );
+    if (!classes.rows.length) throw Object.assign(new Error('No classes found for that selection'), { status: 404 });
+    const latest = classes.rows[0];
+    const done = classes.rows.filter(c => c.status === 'completed' || c.status === 'partially_completed').length;
+
+    let enr = (await client.query(
+      `SELECT id FROM enrolments WHERE student_id = $1 AND pathway_id = $2 AND status IN ('active', 'paused')
+       ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,
+      [studentId, pathwayId]
+    )).rows[0];
+    if (!enr) {
+      const paused = (await client.query('SELECT class_paused FROM student_profiles WHERE user_id = $1', [studentId])).rows[0];
+      enr = (await client.query(
+        `INSERT INTO enrolments (student_id, pathway_id, tutor_id, class_link, current_grade, lessons_completed, total_lessons, status, start_date)
+         VALUES ($1, $2, $3, $4, $5, $6, 0, $7, (SELECT MIN(date) FROM bookings WHERE id = ANY($8::uuid[])))
+         RETURNING id`,
+        [studentId, pathwayId, latest.tutor_id, latest.class_link || null, gradeNumber || 1,
+         lessonsCompleted !== null ? lessonsCompleted : done,
+         paused && paused.class_paused ? 'paused' : 'active', classes.rows.map(c => c.id)]
+      )).rows[0];
+    } else if (gradeNumber || lessonsCompleted !== null) {
+      await client.query(
+        `UPDATE enrolments SET current_grade = COALESCE($2, current_grade),
+                lessons_completed = COALESCE($3, lessons_completed), updated_at = NOW()
+         WHERE id = $1`,
+        [enr.id, gradeNumber, lessonsCompleted]
+      );
+    }
+    const upd = await client.query(
+      `UPDATE bookings SET enrolment_id = $1 WHERE id = ANY($2::uuid[])`,
+      [enr.id, classes.rows.map(c => c.id)]
+    );
+    await client.query('COMMIT');
+    logger.info(`[TRACKS] ${req.user.email} linked ${upd.rowCount} classes of student ${studentId} to ${pw.rows[0].name} (enrolment ${enr.id})`);
+    res.json({ success: true, enrolmentId: enr.id, linked: upd.rowCount, pathwayName: pw.rows[0].name });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    if (err.status) return res.status(err.status).json({ success: false, error: err.message });
+    next(err);
+  } finally {
+    client.release();
+  }
 });
 
 module.exports = router;

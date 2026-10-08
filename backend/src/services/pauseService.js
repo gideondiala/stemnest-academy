@@ -96,11 +96,13 @@ async function pauseStudent(client, studentId, { reason, byUserId = null, kind =
   if (stu.rows[0].class_paused) throw httpError(400, 'Student is already paused');
   const name = stu.rows[0].name;
 
-  const enrol = (await client.query(
+  /* Every pathway the student is taking is paused together (one shared credit balance) */
+  const enrols = (await client.query(
     `SELECT id, lessons_completed FROM enrolments
-     WHERE student_id = $1 AND status = 'active' ORDER BY created_at DESC LIMIT 1`,
+     WHERE student_id = $1 AND status = 'active' ORDER BY created_at DESC`,
     [studentId]
-  )).rows[0];
+  )).rows;
+  const enrol = enrols[0];
 
   const pausedAt = new Date().toISOString();
   const cancelled = await client.query(
@@ -112,12 +114,12 @@ async function pauseStudent(client, studentId, { reason, byUserId = null, kind =
     [studentId, pausedAt, todayWAT()]
   );
 
-  if (enrol) {
+  for (const e of enrols) {
     await client.query(
       `UPDATE enrolments SET status = 'paused', paused_at = NOW(), paused_reason = $2, paused_by = $3,
               last_lesson_at_pause = $4, updated_at = NOW()
        WHERE id = $1`,
-      [enrol.id, reason, byUserId, enrol.lessons_completed || 0]
+      [e.id, reason, byUserId, e.lessons_completed || 0]
     );
   }
   await client.query(
@@ -174,6 +176,13 @@ async function resumeStudent(client, studentId, { startDate, keepSchedule = true
   const rows = await pausedClasses(client, studentId);
   let slots = [];
   let mode;
+
+  /* Several pathways (different tutors / class links) can only come back on
+     their own schedules — one new schedule would merge them */
+  const tracks = new Set(rows.map(r => (r.tutor_id || '') + '|' + (r.class_link || '')));
+  if (!keepSchedule && tracks.size > 1) {
+    throw httpError(400, `${student.name} takes more than one pathway. Resume with the same schedule, then reschedule each pathway from Paid Students.`);
+  }
 
   if (rows.length && keepSchedule) {
     mode = 'restored';
@@ -249,14 +258,18 @@ async function resumeStudent(client, studentId, { startDate, keepSchedule = true
     }
   }
 
-  if (enrol) {
+  if (enrol && tutor) {
     await client.query(
-      `UPDATE enrolments SET status = 'active', resumed_at = NOW(), updated_at = NOW()
-              ${tutor ? ', tutor_id = $2' : ''}
-       WHERE id = $1`,
-      tutor ? [enrol.id, tutor.id] : [enrol.id]
+      `UPDATE enrolments SET status = 'active', resumed_at = NOW(), updated_at = NOW(), tutor_id = $2 WHERE id = $1`,
+      [enrol.id, tutor.id]
     );
   }
+  /* Every paused pathway is active again */
+  await client.query(
+    `UPDATE enrolments SET status = 'active', resumed_at = NOW(), updated_at = NOW()
+     WHERE student_id = $1 AND status = 'paused'`,
+    [studentId]
+  );
   await client.query(
     `UPDATE student_profiles SET class_paused = FALSE, paused_at = NULL, paused_reason = NULL,
             paused_by = NULL, pause_kind = NULL

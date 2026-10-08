@@ -265,6 +265,7 @@ async function _loadTutorFromAPI() {
           slidesLink:      b.lesson_slides   || b.slides_link || '',
           pathwayLessonId: b.pathway_lesson_id || b.pathway_lesson_id_joined || null,
           courseName:      b.course_name || '',
+          pathwayName:     b.pathway_name || '',
           bookedAt:        b.booked_at || b.created_at,
           scheduledAt:     b.scheduled_at,
           creditsSuspended: b.student_credits_suspended === true || b.student_credits_suspended === 'true',
@@ -914,7 +915,7 @@ function showBookingPopup(bookingId) {
     // PAID popup: topic, date, time, student phone, join, end, reschedule, close
     // If lessonName equals studentName (no pathway linked), fall back to courseName/subject
     const lessonTitle = (b.lessonName && b.lessonName !== b.studentName) ? b.lessonName : null;
-    const topic = lessonTitle || b.courseName || b.subject || '—';
+    const topic = lessonTitle || b.pathwayName || b.courseName || b.subject || '—';
     popup.innerHTML = `
       <div style="background:var(--white);border-radius:20px;padding:28px 32px;max-width:440px;width:100%;box-shadow:0 16px 60px rgba(0,0,0,.25);">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
@@ -927,6 +928,7 @@ function showBookingPopup(bookingId) {
           <div style="font-weight:900;font-size:16px;color:var(--dark);margin-bottom:4px;">${b.studentName || '—'}</div>
           <div style="font-size:13px;color:var(--mid);font-weight:700;line-height:2;">
             📖 <strong>${topic}</strong>${b.lessonNumber ? ' · Lesson ' + b.lessonNumber + (b.totalLessons ? ' of ' + b.totalLessons : '') : ''}<br>
+            ${b.pathwayName && lessonTitle ? `🧭 Pathway: <strong>${b.pathwayName}</strong><br>` : ''}
             🎓 Grade: <strong>${b.grade || '—'}</strong><br>
             📅 <strong>${b.date || '—'}</strong> at <strong>${timeDisplay}</strong><br>
             ⏱ Duration: <strong>${b.duration || '60 mins'}</strong>
