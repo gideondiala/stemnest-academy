@@ -110,7 +110,7 @@ async function pauseStudent(client, studentId, { reason, byUserId = null, kind =
      SET status = 'cancelled',
          notes = COALESCE(notes, '{}'::jsonb) || jsonb_build_object('cancelledByPause', $2::text)
      WHERE student_id = $1 AND status = 'scheduled' AND is_demo = FALSE AND date >= $3::date
-     RETURNING id`,
+     RETURNING id, tutor_id`,
     [studentId, pausedAt, todayWAT()]
   );
 
@@ -135,6 +135,8 @@ async function pauseStudent(client, studentId, { reason, byUserId = null, kind =
     studentName: name,
     bookingsCancelled: cancelled.rows.length,
     lessonsPausedAt: enrol ? (enrol.lessons_completed || 0) : null,
+    /* per tutor: how many of their classes came off the calendar (for notifyTutors) */
+    tutorCounts: cancelled.rows.reduce((m, r) => { if (r.tutor_id) m[r.tutor_id] = (m[r.tutor_id] || 0) + 1; return m; }, {}),
   };
 }
 
@@ -288,7 +290,45 @@ async function resumeStudent(client, studentId, { startDate, keepSchedule = true
     classes: slots.length,
     bookingsCreated: slots.length,
     firstClass: slots[0] ? { date: slots[0].d, time: slots[0].t } : null,
+    tutorFirst: slots.reduce((m, x) => {
+      if (x.tutor_id && !m[x.tutor_id]) m[x.tutor_id] = { date: x.d, time: x.t, count: 0 };
+      if (x.tutor_id) m[x.tutor_id].count++;
+      return m;
+    }, {}),
   };
+}
+
+/**
+ * Tell each tutor their classes with this student were paused / are back.
+ * Call after the transaction commits. Never throws.
+ */
+async function notifyTutors(kind, out, reason) {
+  const tn = require('./tutorNotify');
+  try {
+    if (kind === 'pause') {
+      const why = /credit/i.test(reason || '') ? 'Waiting for the parent to top up.' : (reason ? 'Reason: ' + reason : '');
+      for (const [tid, n] of Object.entries(out.tutorCounts || {})) {
+        await tn.notifyTutor({
+          tutorId: tid,
+          title: `Classes paused — ${out.studentName}`,
+          body: `${n} upcoming class${n === 1 ? '' : 'es'} removed from your calendar. ${why}`.trim(),
+          lines: [`Student: ${out.studentName}`, `Classes removed: ${n}`, why, 'You will be told when they come back.'].filter(Boolean),
+        });
+      }
+    } else {
+      for (const [tid, f] of Object.entries(out.tutorFirst || {})) {
+        const t = (await pool.query('SELECT id, name, email FROM users WHERE id = $1', [tid])).rows[0];
+        if (!t) continue;
+        const when = await tn.whenFor(t, f.date, f.time);
+        await tn.notifyTutor({
+          tutorId: tid,
+          title: `Classes back on — ${out.studentName}`,
+          body: `${f.count} class${f.count === 1 ? '' : 'es'} back on your calendar · first ${when}`,
+          lines: [`Student: ${out.studentName}`, `Classes added: ${f.count}`, `First class: ${when}`],
+        });
+      }
+    }
+  } catch (e) { logger.warn('[TUTOR NOTIFY] pause/resume: ' + e.message); }
 }
 
 async function _inTx(fn) {
@@ -323,7 +363,10 @@ async function autoPauseForCredits(studentId) {
         kind: 'credits',
       });
       logger.info(`[CREDITS] Auto-paused ${r.studentName} (${studentId}) at ${prof.credits} credits: ${r.bookingsCancelled} classes on hold`);
-      return { paused: true, bookingsCancelled: r.bookingsCancelled, studentName: r.studentName };
+      return { paused: true, bookingsCancelled: r.bookingsCancelled, studentName: r.studentName, _r: r };
+    }).then(out => {
+      if (out._r) { const r = out._r; delete out._r; notifyTutors('pause', r, 'credits').catch(() => {}); }
+      return out;
     });
   } catch (e) {
     logger.warn(`[CREDITS] Auto-pause failed for ${studentId}: ${e.message}`);
@@ -347,8 +390,9 @@ async function autoResumeAfterTopUp(studentId) {
       if (prof.credits < 1) return { resumed: false, reason: 'balance still below 1 credit' };
       const r = await resumeStudent(client, studentId, { startDate: addDays(todayWAT(), 1), keepSchedule: true });
       logger.info(`[CREDITS] Auto-resumed ${r.studentName} (${studentId}) after top-up: ${r.classes} classes back`);
-      return { resumed: true, classes: r.classes, firstClass: r.firstClass, studentName: r.studentName };
+      return { resumed: true, classes: r.classes, firstClass: r.firstClass, studentName: r.studentName, _r: r };
     });
+    if (out._r) { notifyTutors('resume', out._r).catch(() => {}); delete out._r; }
     if (out.resumed) _emailResumed(studentId, out).catch(() => {});
     return out;
   } catch (e) {
@@ -402,4 +446,5 @@ module.exports = {
   pausedClasses, findClash,
   pauseStudent, resumeStudent,
   autoPauseForCredits, autoResumeAfterTopUp,
+  notifyTutors,
 };

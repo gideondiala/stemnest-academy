@@ -294,7 +294,7 @@ async function _recipients(booking) {
  * a failed email must not undo or fail a completed reschedule.
  *   moves — [{ id, from:{d,t}, to:{d,t} }], moves[0] is the rescheduled lesson
  */
-async function notifyReschedule({ bookingId, moves, reason, actorName }) {
+async function notifyReschedule({ bookingId, moves, reason, actorName, actorId }) {
   try {
     const booking = await loadBooking(pool, bookingId);
     if (!booking || !moves || !moves.length) return;
@@ -303,6 +303,13 @@ async function notifyReschedule({ bookingId, moves, reason, actorName }) {
     const emailSvc   = require('./emailService');
     const main       = moves[0];
     const later      = moves.slice(1);
+    /* Tutors teach many students — name the student (or batch), not the lesson */
+    let bNotes = {};
+    try { bNotes = typeof booking.notes === 'string' ? JSON.parse(booking.notes || '{}') : (booking.notes || {}); } catch {}
+    const who = await require('./tutorNotify').classLabel(pool, {
+      studentId: booking.student_id, batchId: booking.batch_id,
+      fallback: booking.student_name || bNotes.studentName || 'your student',
+    });
 
     for (const r of recipients) {
       try {
@@ -315,7 +322,7 @@ async function notifyReschedule({ bookingId, moves, reason, actorName }) {
           to:            r.email,
           recipientName: r.name,
           audience:      r.audience,
-          studentName:   r.studentName || booking.lesson_name || 'Student',
+          studentName:   r.audience === 'tutor' ? who : (r.studentName || booking.lesson_name || 'Student'),
           subject:       booking.subject,
           lessonName:    booking.lesson_name,
           oldWhen:       fmt(main.from),
@@ -326,6 +333,11 @@ async function notifyReschedule({ bookingId, moves, reason, actorName }) {
           finalWhen:     later.length > 5 ? fmt(later[later.length - 1].to) : null,
           classLink:     booking.class_link,
         });
+        if (r.audience === 'tutor' && r.userId !== actorId) {   /* not for the tutor's own move */
+          await require('./notificationService').saveNotification(r.userId, 'schedule_change',
+            `Class moved — ${who}: ${fmt(main.from)} → ${fmt(main.to)}`,
+            (reason ? 'Reason: ' + reason + '. ' : '') + (later.length ? later.length + ' later class' + (later.length === 1 ? '' : 'es') + ' also moved one slot.' : ''));
+        }
       } catch (e) {
         logger.warn(`[RESCHEDULE EMAIL] Failed for ${r.email}: ${e.message}`);
       }

@@ -328,7 +328,7 @@ async function sendClassRescheduledEmail({ to, recipientName, audience, studentN
     ${classLink ? `<a href="${classLink}" class="btn">🔗 Class Link →</a>` : ''}
     <a href="${process.env.APP_URL || 'https://stemnestacademy.co.uk'}/pages/${isTutor ? 'tutor' : 'student'}-dashboard.html" class="btn" style="background:#0e9f6e;">View Dashboard →</a>
   `);
-  return sendEmail({ to, subject: `📅 Class rescheduled — ${studentName} · now ${newWhen}`, html, template: isTutor ? 'class_rescheduled_tutor' : 'class_rescheduled_parent' });
+  return sendEmail({ to, subject: `📅 Class moved — ${studentName}: ${oldWhen} → ${newWhen}`, html, template: isTutor ? 'class_rescheduled_tutor' : 'class_rescheduled_parent' });
 }
 
 async function sendPaymentLinkEmail({ to, studentName, course, amount, currency, paymentUrl }) {

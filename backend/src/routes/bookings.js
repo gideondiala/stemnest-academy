@@ -1123,6 +1123,15 @@ router.put('/reschedule-student', requireAuth, requireRole('admin','super_admin'
     logger.info(`[RESCHEDULE] Student ${studentId}${trackKey ? ' track ' + trackKey : ''}: cancelled ${totalToReschedule}, created ${createdIds.length}`);
     res.json({ success: true, cancelled: totalToReschedule, created: createdIds.length });
 
+    /* Tell the tutor(s) — after the reply, never blocks the change */
+    require('../services/tutorNotify').notifyNewSchedule({
+      studentName: student.name || 'Student',
+      oldTutorIds: existing.rows.map(r => r.tutor_id),
+      newTutorId:  resolvedTutorId,
+      schedule, first: newDates[0], count: newDates.length,
+      enrolmentId: existing.rows[0].enrolment_id,
+    });
+
   } catch (err) { next(err); }
 });
 
@@ -1148,9 +1157,10 @@ router.put('/change-tutor', requireAuth, requireRole('admin','super_admin','post
     const tf = trackKey ? tracksSvc.trackFilter(trackKey, 3) : { sql: 'TRUE', params: [] };
 
     const affected = await pool.query(`
-      SELECT id, notes, enrolment_id FROM bookings b
+      SELECT id, notes, enrolment_id, tutor_id, date::text AS date, time::text AS time FROM bookings b
       WHERE student_id = $1 AND status = 'scheduled' AND date >= $2::date
         AND b.batch_id IS NULL AND b.is_demo = FALSE AND ${tf.sql}
+      ORDER BY date, time
     `, [studentId, effectiveDate, ...tf.params]);
 
     if (!affected.rows.length) {
@@ -1176,6 +1186,15 @@ router.put('/change-tutor', requireAuth, requireRole('admin','super_admin','post
 
     logger.info(`[CHANGE-TUTOR] Student ${studentId}: ${affected.rows.length} bookings → tutor ${newTutorId} (${newTutorName})`);
     res.json({ success: true, updated: affected.rows.length, newTutorName });
+
+    const stu = (await pool.query('SELECT name FROM users WHERE id = $1', [studentId])).rows[0];
+    require('../services/tutorNotify').notifyTutorChange({
+      studentName: stu ? stu.name : 'Student',
+      oldTutorIds: affected.rows.map(r => r.tutor_id),
+      newTutorId, fromDate: effectiveDate,
+      classes: affected.rows.map(r => ({ date: r.date, time: r.time })),
+      enrolmentId: enrolIds[0],
+    });
 
   } catch (err) { next(err); }
 });
@@ -2157,6 +2176,7 @@ router.put('/:id/move', requireAuth, requireRole('admin','super_admin','tutor','
     moves,
     reason,
     actorName: req.user.name ? `${req.user.name} (${req.user.role})` : req.user.role,
+    actorId: req.user.id,
   });
 
   res.json({

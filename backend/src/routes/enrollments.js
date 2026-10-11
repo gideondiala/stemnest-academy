@@ -235,13 +235,14 @@ router.put('/referrals/:id', requireAuth, requireRole('presales','postsales','ad
    ══════════════════════════════════════════════ */
 
 /** Run fn(client) in a transaction; a thrown {status, message} becomes that HTTP error. */
-async function _withTx(res, next, fn) {
+async function _withTx(res, next, fn, after) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const body = await fn(client);
     await client.query('COMMIT');
     res.json(body);
+    if (after) setImmediate(() => after(body));
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
     if (err.status) return res.status(err.status).json({ success: false, error: err.message, ...(err.extra || {}) });
@@ -265,7 +266,7 @@ router.put('/students/:studentId/pause', requireAuth, requireRole('admin','super
     const out = await pauseSvc.pauseStudent(client, studentId, { reason, byUserId: req.user.id, kind: 'manual' });
     logger.info(`[PAUSE] ${out.studentName} (${studentId}) paused by ${req.user.email}. ${out.bookingsCancelled} classes cancelled. Reason: ${reason}`);
     return out;
-  });
+  }, out => pauseSvc.notifyTutors('pause', out, reason));
 });
 
 /* ══════════════════════════════════════════════
@@ -290,7 +291,7 @@ router.put('/students/:studentId/resume', requireAuth, requireRole('admin','supe
     const out = await pauseSvc.resumeStudent(client, studentId, { startDate, keepSchedule, tutorId, schedule, classLink });
     logger.info(`[RESUME] ${out.studentName} (${studentId}) resumed by ${req.user.email}: ${out.classes} classes ${out.mode} from ${out.firstClass && out.firstClass.date}`);
     return out;
-  });
+  }, out => pauseSvc.notifyTutors('resume', out));
 });
 
 /* ══════════════════════════════════════════════

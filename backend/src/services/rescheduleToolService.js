@@ -520,6 +520,11 @@ async function _notify(plan, input, reason) {
     const ttz = await resolveUserTimeZone(t.id, t.email);
     const leaving = tid !== plan.tutor.id;
     const tf = formatForTimeZone(plan.firstClass.date, plan.firstClass.time, ttz);
+    await require('./notificationService').saveNotification(t.id, 'schedule_change',
+      leaving ? `${plan.student.name} has moved to ${plan.tutor.name}` : `New schedule for ${plan.student.name}`,
+      leaving ? 'Their old slots on your calendar are now free.'
+              : `${_patternText(plan.pattern, ttz)} · first class ${tf ? tf.full : plan.firstClass.date}. Reason: ${reason}`
+    ).catch(() => {});
     await emailSvc.sendEmail({
       to: t.email,
       subject: leaving ? `📅 ${plan.student.name} has moved to another teacher` : `📅 New schedule for ${plan.student.name}`,

@@ -364,6 +364,53 @@
       }).join('');
   }
 
+  /* ══════════════ SCHEDULE CHANGES (Overview) ══════════════
+     Classes moved, rescheduled, handed over, paused or resumed by
+     Post-Sales / Admin — shown until the tutor taps "Got it". */
+  async function refreshChanges() {
+    try {
+      var d = await apiCall('/api/users/me/notifications');
+      if (!d) return;
+      state.changes = (d.notifications || []).filter(function (n) { return n.type === 'schedule_change' && !n.is_read; });
+      renderChanges();
+    } catch (e) {}
+  }
+  function renderChanges() {
+    var host = document.getElementById('tab-overview');
+    if (!host) return;
+    var box = document.getElementById('scheduleChangesBox');
+    var list = state.changes || [];
+    if (!list.length) { if (box) box.remove(); return; }
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'scheduleChangesBox';
+      var after = document.getElementById('unendedBanner');
+      host.insertBefore(box, after ? after.nextSibling : host.firstChild);
+    }
+    box.style.cssText = 'background:#eff6ff;border:2px solid #93c5fd;border-radius:16px;padding:16px 18px;margin-bottom:20px;font-family:Nunito,sans-serif;';
+    box.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">' +
+        '<div style="font-weight:900;font-size:15px;color:#1e3a8a;">📅 ' + list.length + ' schedule change' + (list.length === 1 ? '' : 's') + '</div>' +
+        (list.length > 1 ? '<button onclick="SNClassOps.ackChange(\'all\')" style="background:none;border:1.5px solid #1a56db;color:#1a56db;border-radius:50px;padding:5px 14px;font-family:Nunito,sans-serif;font-weight:800;font-size:12px;cursor:pointer;">Got it, all</button>' : '') +
+      '</div>' +
+      list.map(function (n) {
+        var when = n.created_at ? new Date(n.created_at).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '';
+        return '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;background:#fff;border-radius:12px;padding:10px 12px;margin-bottom:6px;">' +
+          '<div style="flex:1;min-width:200px;"><div style="font-size:13px;font-weight:900;color:#1a202c;">' + esc(n.title) + '</div>' +
+            (n.body ? '<div style="font-size:12px;font-weight:700;color:#4a5568;margin-top:2px;">' + esc(n.body) + '</div>' : '') +
+            '<div style="font-size:11px;color:#94a3b8;font-weight:700;margin-top:3px;">' + esc(when) + '</div></div>' +
+          '<button onclick="SNClassOps.ackChange(\'' + n.id + '\')" style="background:#1a56db;color:#fff;border:none;border-radius:50px;padding:7px 16px;font-family:Nunito,sans-serif;font-weight:900;font-size:12px;cursor:pointer;">Got it</button></div>';
+      }).join('');
+  }
+  async function ackChange(id) {
+    var ids = id === 'all' ? (state.changes || []).map(function (n) { return n.id; }) : [id];
+    state.changes = (state.changes || []).filter(function (n) { return ids.indexOf(n.id) < 0; });
+    renderChanges();
+    for (var i = 0; i < ids.length; i++) {
+      try { await apiCall('/api/users/me/notifications/' + ids[i] + '/read', { method: 'PUT' }); } catch (e) {}
+    }
+  }
+
   /* ══════════════ MY PAYMENTS TAB ══════════════ */
   function ensurePaymentsTab() {
     if (document.getElementById('tab-payments')) return;
@@ -484,14 +531,16 @@
     }
   }
 
-  window.SNClassOps = { refreshPay: refreshPay, refreshUnended: refreshUnended, downloadPaySheet: downloadPaySheet };
+  window.SNClassOps = { refreshPay: refreshPay, refreshUnended: refreshUnended, downloadPaySheet: downloadPaySheet, refreshChanges: refreshChanges, ackChange: ackChange };
 
   function start() {
     ensurePaymentsTab();
     refreshPay();
     refreshLate();
     refreshUnended();
+    refreshChanges();
     setInterval(refreshUnended, 5 * 60 * 1000);
+    setInterval(refreshChanges, 5 * 60 * 1000);
     if (location.hash === '#payments') setTimeout(function () { showDashTab('payments'); }, 1200);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(start, 300); });
