@@ -316,6 +316,50 @@ const STATEMENTS = [
   `ALTER TABLE payments ADD COLUMN IF NOT EXISTS kind      VARCHAR(20)`,
   `CREATE INDEX IF NOT EXISTS idx_payments_reference ON payments(reference)`,
   `CREATE INDEX IF NOT EXISTS idx_payments_student   ON payments(student_id, created_at)`,
+
+  /* ── Student reports (unit + grade) — see services/reportService.js ──
+     RLS on with no policies: only the API's own connection can read them */
+  `CREATE TABLE IF NOT EXISTS student_class_joins (
+     booking_id UUID NOT NULL,
+     student_id UUID NOT NULL,
+     joined_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+     mins_after_start INTEGER,
+     PRIMARY KEY (booking_id, student_id)
+   )`,
+  `ALTER TABLE student_class_joins ENABLE ROW LEVEL SECURITY`,
+  `CREATE TABLE IF NOT EXISTS study_time (
+     student_id UUID NOT NULL,
+     day        DATE NOT NULL,
+     source     VARCHAR(20) NOT NULL,
+     seconds    INTEGER NOT NULL DEFAULT 0,
+     PRIMARY KEY (student_id, day, source)
+   )`,
+  `ALTER TABLE study_time ENABLE ROW LEVEL SECURITY`,
+  `CREATE TABLE IF NOT EXISTS student_reports (
+     id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     student_id     UUID NOT NULL,
+     enrolment_id   UUID,
+     pathway_id     UUID NOT NULL,
+     grade_number   INTEGER NOT NULL,
+     unit_number    INTEGER NOT NULL DEFAULT 0,
+     kind           VARCHAR(10) NOT NULL,
+     tutor_id       UUID,
+     status         VARCHAR(20) NOT NULL DEFAULT 'awaiting_tutor',
+     period_start   DATE,
+     period_end     DATE,
+     ratings        JSONB,
+     remarks        TEXT,
+     recommendation TEXT,
+     created_at     TIMESTAMPTZ DEFAULT NOW(),
+     publish_due_at TIMESTAMPTZ,
+     reminder_sent_at TIMESTAMPTZ,
+     published_at   TIMESTAMPTZ,
+     published_by   VARCHAR(10),
+     UNIQUE (student_id, pathway_id, grade_number, kind, unit_number)
+   )`,
+  `ALTER TABLE student_reports ENABLE ROW LEVEL SECURITY`,
+  `CREATE INDEX IF NOT EXISTS idx_student_reports_tutor   ON student_reports(tutor_id, status)`,
+  `CREATE INDEX IF NOT EXISTS idx_student_reports_student ON student_reports(student_id, status)`,
 ];
 
 async function ensureSchema() {

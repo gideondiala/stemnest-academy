@@ -214,7 +214,13 @@ async function handleLogin() {
         }
         if (user.role === 'sales')   localStorage.setItem('sn_logged_in_sales',   user.staffId || user.id);
         if (user.role === 'student') localStorage.setItem('sn_logged_in_student', user.email);
-        setTimeout(() => navigateAfterLogin(dest), 700);
+        /* Back to a report link from an email (same-site report pages only) */
+        const back = new URLSearchParams(window.location.search).get('redirect') || '';
+        if (/^\/pages\/report(\.html)?\?id=[0-9a-f-]{36}$/i.test(back)) {
+          setTimeout(() => { window.location.href = back; }, 700);
+        } else {
+          setTimeout(() => navigateAfterLogin(dest), 700);
+        }
       } else {
         throw new Error('Unknown role: ' + user.role);
       }

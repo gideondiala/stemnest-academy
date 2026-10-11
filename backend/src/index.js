@@ -152,6 +152,7 @@ app.use('/api/pathways',      pathwayRoutes);
 app.use('/api/quizzes',       quizRoutes);
 app.use('/api/certificates',  certificateRoutes);
 app.use('/api/batches',       batchRoutes);
+app.use('/api/reports',       require('./routes/reports'));
 
 /* ══════════════════════════════════════════════
    404 + GLOBAL ERROR HANDLER
@@ -176,6 +177,7 @@ const server = app.listen(PORT, () => {
       startBookingExtensionJob();
       require('./services/classOpsService').startUnendedClassJob();
       require("./services/learningService").startDueReminderJob();
+      require('./services/reportService').startReportJob();
       chatRoutes.startChatReminderJob();
     });
 });

@@ -1444,6 +1444,10 @@ async function chargeStudentForClass(studentId, booking, bookingNotes) {
 
       logger.info(`[PROGRESS] Student ${studentId} lesson ${newLessonsCompleted}/${totalLessons}`);
 
+      /* Unit / grade report when this lesson finished one (never throws) */
+      await require('../services/reportService').onLessonCompleted(studentId, booking, enrolment,
+        { gradeFinished: newLessonsCompleted >= totalLessons });
+
       /* Auto-award certificate when grade is fully completed */
       if (newLessonsCompleted >= totalLessons) {
         try {

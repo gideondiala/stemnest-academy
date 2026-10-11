@@ -667,7 +667,7 @@ function renderUpcomingPreview() {
           ${isPaused
             ? `<button class="join-class-btn" disabled style="opacity:.6;cursor:not-allowed;">⏸️ On Break</button>
                <div class="jc-note">Contact us to resume your schedule</div>`
-            : `<button class="join-class-btn" onclick="joinClass('${next.classLink || ''}')"
+            : `<button class="join-class-btn" onclick="joinClass('${next.classLink || ''}', '${next.id || ''}')"
                 ${isSuspended ? 'disabled style="opacity:.5;cursor:not-allowed;"' : ''}>
                 🚀 ${isSuspended ? 'Classes Paused' : isLive ? 'Join Class Now' : 'Join Class'}
                </button>
@@ -695,9 +695,9 @@ function buildSessionItem(l, isNext) {
   } else if (isSuspended) {
     badgeHtml = `<span style="background:#f5f3ff;color:#7c3aed;font-size:11px;font-weight:900;padding:4px 10px;border-radius:50px;">🔒 Paused</span>`;
   } else if (isLive) {
-    badgeHtml = `<span class="sess-badge sb-live">🔴 Live Now</span><button class="join-btn" onclick="joinClass('${l.classLink || ''}')">Join →</button>`;
+    badgeHtml = `<span class="sess-badge sb-live">🔴 Live Now</span><button class="join-btn" onclick="joinClass('${l.classLink || ''}', '${l.id || ''}')">Join →</button>`;
   } else if (isNext) {
-    badgeHtml = `<span class="sess-badge sb-upcoming">Next</span><button class="join-btn" onclick="joinClass('${l.classLink || ''}')">Join →</button>`;
+    badgeHtml = `<span class="sess-badge sb-upcoming">Next</span><button class="join-btn" onclick="joinClass('${l.classLink || ''}', '${l.id || ''}')">Join →</button>`;
   } else {
     badgeHtml = `<span class="sess-badge sb-upcoming">Upcoming</span>`;
   }
@@ -718,7 +718,7 @@ function buildSessionItem(l, isNext) {
     </div>`;
 }
 
-function joinClass(classLink) {
+function joinClass(classLink, bookingId) {
   if (window._studentClassPaused) {
     showToast('⏸️ Your classes are currently on a break. Contact us to resume.', 'error');
     return;
@@ -730,6 +730,10 @@ function joinClass(classLink) {
   if (!classLink) {
     showToast('Your class link has not been added yet. Please contact us and we will send it right away.', 'error');
     return;
+  }
+  /* Record the join time for the student's report (early / on time / late) — fire and forget */
+  if (bookingId && typeof apiCall === 'function') {
+    try { apiCall('/api/reports/joined/' + encodeURIComponent(bookingId), { method: 'POST' }).catch(function () {}); } catch (e) {}
   }
   /* Open immediately — a delayed window.open is blocked as a pop-up (notably Safari on iPhone/iPad) */
   const win = window.open(classLink, '_blank');
@@ -798,7 +802,7 @@ function renderLessons(tab) {
         '</div>' +
         '<div class="lesson-card-right">' +
           ((isLive || isNext) && !isSuspended && !isPaused
-            ? '<button class="join-btn" onclick="event.stopPropagation();joinClass(\'' + (l.classLink || '') + '\')">🚀 ' + (isLive ? 'Join Now' : 'Join') + '</button>'
+            ? '<button class="join-btn" onclick="event.stopPropagation();joinClass(\'' + (l.classLink || '') + '\', \'' + (l.id || '') + '\')">🚀 ' + (isLive ? 'Join Now' : 'Join') + '</button>'
             : isSuspended
               ? '<span style="background:#f5f3ff;color:#7c3aed;font-size:11px;font-weight:900;padding:3px 8px;border-radius:50px;">🔒 Paused</span>'
               : '<span class="sess-badge sb-upcoming">Upcoming</span>') +
