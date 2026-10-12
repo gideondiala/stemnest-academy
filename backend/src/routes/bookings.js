@@ -1400,6 +1400,25 @@ async function chargeStudentForClass(studentId, booking, bookingNotes) {
 
   /* ── Track lesson completion ── */
   try {
+    /* Batch class: progress belongs to the batch's pathway. A member without an
+       enrolment for it gets one, so progress, reports and certificates work */
+    if (booking.batch_id) {
+      const bt = (await pool.query(
+        `SELECT pathway_id, grade_number, tutor_id, class_link FROM batches WHERE id = $1`, [booking.batch_id])).rows[0];
+      if (bt && bt.pathway_id && bt.grade_number) {
+        const has = await pool.query(
+          `SELECT 1 FROM enrolments WHERE student_id = $1 AND pathway_id = $2 AND status IN ('active', 'paused') LIMIT 1`,
+          [studentId, bt.pathway_id]);
+        if (!has.rows.length) {
+          await pool.query(
+            `INSERT INTO enrolments (student_id, pathway_id, tutor_id, class_link, current_grade, lessons_completed, total_lessons, status, start_date)
+             VALUES ($1, $2, $3, $4, $5, $6, 0, 'active', $7)`,
+            [studentId, bt.pathway_id, bt.tutor_id, bt.class_link || null, bt.grade_number,
+             Math.max(0, (Number(booking.lesson_number_in_grade) || 1) - 1), booking.date]);
+          logger.info(`[PROGRESS] Batch student ${studentId}: enrolment created for the batch's pathway (grade ${bt.grade_number})`);
+        }
+      }
+    }
     /* The enrolment (pathway) this class belongs to — a student can take
        several pathways. In order: the class's own enrolment, the pathway of
        the lesson taught, the batch's pathway, then the student's latest. */

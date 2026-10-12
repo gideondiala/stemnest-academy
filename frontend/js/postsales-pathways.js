@@ -103,7 +103,14 @@
     try {
       var d = await api('/api/enrollments/students/' + panel.studentId + '/tracks');
       panel.tracks = d.tracks.filter(function (t) { return t.linked || t.upcoming > 0 || t.completed > 0; });
-      el.innerHTML = panel.tracks.length ? panel.tracks.map(card).join('') :
+      /* Batch classes follow the batch's pathway — nothing to link per student */
+      var batches = (d.batches || []).map(function (b) {
+        return '<div style="border:1.5px solid #c7d7fe;background:#f5f8ff;border-radius:14px;padding:14px;margin-bottom:10px;">' +
+          '<div style="font-weight:900;font-size:15px;">👥 ' + esc(b.batch_ref || 'Batch') + ' — ' + esc(b.pathway_name || 'pathway not set') + (b.grade_number ? ' <span style="color:var(--light);font-size:12px;">Grade ' + b.grade_number + '</span>' : '') + '</div>' +
+          '<div style="font-size:12px;font-weight:700;color:var(--mid);margin-top:6px;">👩‍🏫 ' + esc(b.tutor_name || '—') + ' · ' + b.upcoming + ' upcoming · lessons follow the batch automatically' +
+            (b.pathway_name && b.grade_number ? '' : ' — <span style="color:#c2410c;">set the pathway and grade for this batch in Batches</span>') + '</div></div>';
+      }).join('');
+      el.innerHTML = (batches + panel.tracks.map(card).join('')) ||
         '<div style="padding:18px;text-align:center;color:var(--light);font-weight:800;border:1.5px dashed #e8eaf0;border-radius:14px;">No pathways yet — use ➕ Add a pathway.</div>';
     } catch (e) { el.innerHTML = '<div style="color:#c53030;font-weight:800;">' + esc(e.message) + '</div>'; }
   }

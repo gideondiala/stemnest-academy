@@ -465,7 +465,14 @@ const tracksSvc = require('../services/studentTracks');
 router.get('/students/:studentId/tracks', requireAuth, requireRole('admin', 'super_admin', 'postsales'), async (req, res, next) => {
   try {
     if (!tracksSvc.UUID_RE.test(req.params.studentId)) return res.status(400).json({ success: false, error: 'Invalid student' });
-    res.json({ success: true, tracks: await tracksSvc.studentTracks(pool, req.params.studentId) });
+    const batches = (await pool.query(
+      `SELECT bt.batch_ref, p.name AS pathway_name, bt.grade_number, t.name AS tutor_name,
+              (SELECT COUNT(*)::int FROM bookings b WHERE b.batch_id = bt.id AND b.status = 'scheduled' AND b.date >= CURRENT_DATE) AS upcoming
+       FROM batch_members bm JOIN batches bt ON bt.id = bm.batch_id
+       LEFT JOIN pathways p ON p.id = bt.pathway_id LEFT JOIN users t ON t.id = bt.tutor_id
+       WHERE bm.student_id = $1 AND COALESCE(bm.status, 'active') = 'active'
+       ORDER BY bt.batch_ref`, [req.params.studentId])).rows;
+    res.json({ success: true, tracks: await tracksSvc.studentTracks(pool, req.params.studentId), batches });
   } catch (err) { next(err); }
 });
 
