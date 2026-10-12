@@ -1,0 +1,64 @@
+name: Deploy Learning Hub (learn.stemnestacademy.co.uk)
+
+# Builds the static Learning Hub from learn/ (repo articles + posts published
+# in Admin → Blog) and publishes it to the Cloudflare Pages project
+# "stemnest-learn". Runs on every push that touches learn/, every hour (to pick
+# up new Admin posts), or by hand. Skips publishing when nothing changed.
+on:
+  push:
+    branches: [main]
+    paths: ['learn/**', '.github/workflows/learn.yml']
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-learn
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build the site
+        working-directory: learn
+        run: |
+          npm ci --no-audit --no-fund
+          node build.js
+
+      - name: Anything new?
+        id: diff
+        run: |
+          NEW=$(cat learn/dist/build-hash.txt)
+          LIVE=$(curl -fsS --max-time 15 https://stemnest-learn.pages.dev/build-hash.txt 2>/dev/null || true)
+          echo "new=$NEW live=$LIVE"
+          if [ "$NEW" = "$LIVE" ] && [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"; echo "No changes — not publishing."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create the Pages project (first run only)
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@4.14.4 pages project create stemnest-learn --production-branch=main || echo "project already exists"
+
+      - name: Publish to Cloudflare Pages
+        if: steps.diff.outputs.changed == 'true'
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy learn/dist --project-name=stemnest-learn --branch=main

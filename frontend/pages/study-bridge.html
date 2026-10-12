@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<title>Study time</title>
+</head>
+<body>
+<script>
+/* Hidden helper for learn.stemnestacademy.co.uk: the Learning Hub posts
+   "another minute of active reading" here, and if a student is logged in on
+   this site, the time is saved to their study-time report (source: blog). */
+(function () {
+  var API = 'https://api.stemnestacademy.co.uk/api/reports/study';
+  window.addEventListener('message', function (e) {
+    if (e.origin !== 'https://learn.stemnestacademy.co.uk') return;
+    var d = e.data || {};
+    if (d.type !== 'sn-study') return;
+    var seconds = Math.max(0, Math.min(120, Math.round(Number(d.seconds) || 0)));
+    if (seconds < 15) return;
+    var user = null, token = null;
+    try { user = JSON.parse(localStorage.getItem('sn_api_user') || 'null'); token = localStorage.getItem('sn_access_token'); } catch (err) { return; }
+    if (!user || user.role !== 'student' || !token) return;
+    fetch(API, {
+      method: 'POST', keepalive: true,
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ source: 'blog', seconds: seconds }),
+    }).catch(function () {});
+  });
+})();
+</script>
+</body>
+</html>
