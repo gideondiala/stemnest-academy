@@ -129,7 +129,7 @@
       '<div style="font-size:12px;font-weight:700;color:var(--mid);margin:6px 0 10px;">' + meta + (t.classLink ? ' · ' + esc(t.classLink) : '') + '</div>' +
       '<div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:end;">' +
         '<div><div style="font-size:11px;font-weight:900;color:var(--mid);margin-bottom:4px;">Pathway</div><select id="snLinkPw' + i + '" style="width:100%;padding:9px;border:2px solid #e8eaf0;border-radius:10px;font-family:Nunito,sans-serif;font-weight:700;"><option value="">— Pathway —</option>' + opts + '</select></div>' +
-        '<div><div style="font-size:11px;font-weight:900;color:var(--mid);margin-bottom:4px;">Grade</div><input id="snLinkGr' + i + '" type="number" min="1" max="12" placeholder="e.g. 4" style="width:100%;box-sizing:border-box;padding:9px;border:2px solid #e8eaf0;border-radius:10px;font-family:Nunito,sans-serif;font-weight:700;"></div>' +
+        '<div><div style="font-size:11px;font-weight:900;color:var(--mid);margin-bottom:4px;">Grade *</div><input id="snLinkGr' + i + '" type="number" min="1" max="12" placeholder="e.g. 4" style="width:100%;box-sizing:border-box;padding:9px;border:2px solid #e8eaf0;border-radius:10px;font-family:Nunito,sans-serif;font-weight:700;"></div>' +
         '<div><div style="font-size:11px;font-weight:900;color:var(--mid);margin-bottom:4px;">Lessons done</div><input id="snLinkDone' + i + '" type="number" min="0" placeholder="' + t.completed + '" style="width:100%;box-sizing:border-box;padding:9px;border:2px solid #e8eaf0;border-radius:10px;font-family:Nunito,sans-serif;font-weight:700;"></div>' +
         '<button onclick="snLinkTrack(' + i + ')" style="background:#0e9f6e;color:#fff;border:none;border-radius:10px;padding:10px 14px;font-weight:900;cursor:pointer;font-family:Nunito,sans-serif;">🔗 Link</button>' +
       '</div></div>';
@@ -148,11 +148,12 @@
     var grade = document.getElementById('snLinkGr' + i).value;
     var done = document.getElementById('snLinkDone' + i).value;
     if (!pathwayId) { showToast('Choose the pathway these classes belong to.', 'warning'); return; }
+    if (!(parseInt(grade, 10) >= 1)) { showToast('Enter the grade the student is in (e.g. 4).', 'warning'); return; }
     try {
       var d = await api('/api/enrollments/students/' + panel.studentId + '/link-track', {
         method: 'POST', body: JSON.stringify({ track: t.key, pathwayId: pathwayId, gradeNumber: grade || undefined, lessonsCompleted: done === '' ? undefined : done }),
       });
-      showToast('🔗 ' + d.linked + ' classes linked to ' + d.pathwayName + '.');
+      showToast('🔗 ' + d.linked + ' classes linked to ' + d.pathwayName + (d.lessonsLinked ? ' — ' + d.lessonsLinked + ' upcoming classes given their lessons.' : '.'));
       await loadTracks();
       if (typeof loadDashboard === 'function') loadDashboard();
     } catch (e) { showToast('⚠️ ' + e.message, 'error'); }
