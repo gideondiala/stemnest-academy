@@ -1707,6 +1707,15 @@ router.post('/:id/report', requireAuth, requireRole('tutor'), async (req, res, n
       return res.status(409).json({ success: false, error: 'This class was cancelled.' });
     }
 
+    /* A paid class with no lesson gets the next lesson of its pathway, so the
+       student gets the project, quiz and unit report for it */
+    if (!booking.is_demo && !booking.pathway_lesson_id && (booking.enrolment_id || booking.batch_id)) {
+      await require('../services/lessonLinker').fillForBooking(booking);
+      const fresh = (await pool.query(
+        'SELECT pathway_lesson_id, lesson_number_in_grade, lesson_name FROM bookings WHERE id = $1', [booking.id])).rows[0];
+      if (fresh) Object.assign(booking, fresh);
+    }
+
     /* bookingNotes is used by post-class emails below */
     let bookingNotes = {};
     try { bookingNotes = typeof booking.notes === 'string' ? JSON.parse(booking.notes || '{}') : { ...(booking.notes || {}) }; } catch (e) {}

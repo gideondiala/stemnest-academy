@@ -178,6 +178,7 @@ const server = app.listen(PORT, () => {
       require('./services/classOpsService').startUnendedClassJob();
       require("./services/learningService").startDueReminderJob();
       require('./services/reportService').startReportJob();
+      require('./services/lessonLinker').startLessonLinkJob();
       chatRoutes.startChatReminderJob();
     });
 });

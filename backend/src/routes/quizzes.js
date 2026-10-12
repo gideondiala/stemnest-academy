@@ -16,6 +16,43 @@ const pool    = require('../config/db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const learning = require('../services/learningService');
 const logger  = require('../utils/logger');
+const crypto  = require('crypto');
+
+/* ── Shuffling: every attempt shows the questions, and each question's
+   options, in a different order. The order comes from the student, the
+   quiz and the attempt number, so it is the same when the page is
+   reloaded and the server can map answers back without storing it. ── */
+function _rng(seed) {
+  let h = crypto.createHash('sha256').update(seed).digest().readUInt32LE(0);
+  return () => {            /* mulberry32 */
+    h = (h + 0x6D2B79F5) | 0;
+    let t = Math.imul(h ^ (h >>> 15), 1 | h);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function _shuffled(n, rnd) {
+  const a = Array.from({ length: n }, (_, i) => i);
+  for (let i = n - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+/** order[d] = original question shown at position d; opts[d][k] = original option shown as option k */
+function quizLayout(quiz, studentId, attemptNo) {
+  const qs = quiz.questions || [];
+  const rnd = _rng(`${studentId}:${quiz.id}:${attemptNo}`);
+  const order = _shuffled(qs.length, rnd);
+  const opts = order.map(oi => _shuffled((qs[oi].options || []).length, rnd));
+  return { order, opts };
+}
+async function _nextAttemptNo(quizId, studentId) {
+  const r = await pool.query(`SELECT attempts_used FROM quiz_assignments WHERE quiz_id = $1 AND student_id = $2`, [quizId, studentId]);
+  return (r.rows[0] ? Number(r.rows[0].attempts_used) || 0 : 0) + 1;
+}
+async function _studentQuestions(quiz, studentId) {
+  const qs = quiz.questions || [];
+  const { order, opts } = quizLayout(quiz, studentId, await _nextAttemptNo(quiz.id, studentId));
+  return order.map((oi, d) => ({ idx: d, q: qs[oi].q, options: opts[d].map(k => qs[oi].options[k]) }));
+}
 
 const router = express.Router();
 
@@ -172,13 +209,10 @@ router.get('/unit/:pathwayId/:grade/:unit', requireAuth, async (req, res, next) 
       existingAttempt = att.rows[0] || null;
     }
 
-    /* Strip correct answers from questions before sending to student */
-    const questionsForStudent = (quiz.questions || []).map((q, idx) => ({
-      idx,
-      q:       q.q,
-      options: q.options,
-      /* Do NOT include q.answer */
-    }));
+    /* No correct answers; students get this attempt's shuffled order */
+    const questionsForStudent = req.user.role === 'student'
+      ? await _studentQuestions(quiz, req.user.id)
+      : (quiz.questions || []).map((q, idx) => ({ idx, q: q.q, options: q.options }));
 
     res.json({
       success: true,
@@ -219,7 +253,9 @@ router.get('/:id', requireAuth, async (req, res, next) => {
     /* Admin sees full questions including answers; students do not */
     const questions = isAdmin
       ? quiz.questions
-      : (quiz.questions || []).map((q, idx) => ({ idx, q: q.q, options: q.options }));
+      : req.user.role === 'student'
+        ? await _studentQuestions(quiz, req.user.id)
+        : (quiz.questions || []).map((q, idx) => ({ idx, q: q.q, options: q.options }));
 
     res.json({ success: true, quiz: { ...quiz, questions } });
   } catch (err) { next(err); }
@@ -260,9 +296,14 @@ router.post('/:id/attempt', requireAuth, requireRole('student'), async (req, res
       return res.status(403).json({ success: false, error: `You have used all ${learning.QUIZ_ATTEMPTS} attempts for this quiz` });
     }
 
+    /* answers[] follow this attempt's shuffled order — map them back to the originals */
+    const { order, opts } = quizLayout(quiz, req.user.id, asg.attempts_used + 1);
+    const original = new Array(questions.length).fill(null);   // original question → original option
+    order.forEach((oi, d) => { const k = answers[d]; if (Number.isInteger(k) && opts[d][k] != null) original[oi] = opts[d][k]; });
+
     /* Grade it */
     let correct = 0;
-    questions.forEach((q, i) => { if (answers[i] === q.answer) correct++; });
+    questions.forEach((q, i) => { if (original[i] === q.answer) correct++; });
     const total      = questions.length;
     const percentage = total > 0 ? Math.round((correct / total) * 100 * 100) / 100 : 0;
     const passScore  = quiz.pass_score || learning.DEFAULT_PASS;
@@ -290,7 +331,7 @@ router.post('/:id/attempt', requireAuth, requireRole('student'), async (req, res
        DO UPDATE SET answers = EXCLUDED.answers, score = EXCLUDED.score, total = EXCLUDED.total,
                      percentage = EXCLUDED.percentage, passed = EXCLUDED.passed, submitted_at = NOW()
        RETURNING id, submitted_at`,
-      [quiz.id, req.user.id, JSON.stringify(answers), correct, total, percentage, percentage >= passScore]
+      [quiz.id, req.user.id, JSON.stringify(original), correct, total, percentage, percentage >= passScore]
     );
     await client.query('COMMIT');
 
@@ -298,12 +339,15 @@ router.post('/:id/attempt', requireAuth, requireRole('student'), async (req, res
     /* After every attempt the student sees the right answer and the explanation
        for each question, so they can learn from mistakes before trying again */
     const reveal = true;
-    const breakdown = questions.map((q, i) => ({
-      idx: i, q: q.q, options: q.options, selected: answers[i],
-      isRight: answers[i] === q.answer,
-      correct: q.answer,
-      explanation: q.explanation ? String(q.explanation) : null,
-    }));
+    const breakdown = order.map((oi, d) => {
+      const q = questions[oi];
+      return {
+        idx: d, q: q.q, options: opts[d].map(k => q.options[k]), selected: answers[d],
+        isRight: original[oi] === q.answer,
+        correct: opts[d].indexOf(q.answer),
+        explanation: q.explanation ? String(q.explanation) : null,
+      };
+    });
 
     logger.info(`[QUIZ] ${req.user.email} attempt ${attemptNo}/${learning.QUIZ_ATTEMPTS}: ${correct}/${total} (${percentage}%)${late ? ' late' : ''} on quiz ${quiz.id}`);
     res.json({
