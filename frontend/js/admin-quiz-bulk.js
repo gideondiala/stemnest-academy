@@ -20,7 +20,8 @@
     [/webweave|web/i, 'Website Development'],
   ];
   var STOP = ('unit the a an of and in to for with grade edition appforge dataville mindspire questopia webweave nova novas ' +
-              'part intro introduction band').split(' ');
+              'part intro introduction band app development mobile data science game web website design advanced project ' +
+              'programming system building real world').split(' ');
   /* The last unit of every grade is a capstone ("NOVA's Second Restoration") */
   var SAME = { restoration: 'capstone', final: 'capstone' };
 
