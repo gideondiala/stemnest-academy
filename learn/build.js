@@ -457,7 +457,14 @@ ${posts.slice(0, 30).map(p => `<item><title>${esc(p.title)}</title><link>${SITE.
 </channel>
 </rss>
 `);
-  write('_headers', `/*
+  /* The pages.dev addresses must not compete with the real domain in search results */
+  write('_headers', `https://stemnest-learn.pages.dev/*
+  X-Robots-Tag: noindex
+
+https://:version.stemnest-learn.pages.dev/*
+  X-Robots-Tag: noindex
+
+/*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
