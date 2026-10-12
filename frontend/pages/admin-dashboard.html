@@ -458,25 +458,47 @@
         <button class="btn btn-outline" style="font-size:13px;" onclick="showAdminTab('quizzes')">← Back to Quizzes</button>
       </div>
 
+      <!-- Bulk upload: whole quiz files, matched to curriculum units -->
+      <div style="background:var(--white);border-radius:16px;padding:22px 24px;border:1.5px solid #c7d7fe;box-shadow:0 4px 20px rgba(0,0,0,.05);margin-bottom:26px;">
+        <div style="font-weight:900;font-size:16px;margin-bottom:4px;">📦 Bulk upload quiz files</div>
+        <div style="font-size:13px;color:#4a5568;line-height:1.6;margin-bottom:12px;">Choose one or more quiz files (e.g. <code>quizzes_g2_appforge.json</code>). Each unit is matched to its pathway, grade and unit automatically, and checked against the curriculum unit title. Units that match are ticked; units whose titles do not match are flagged so quizzes for a different course are not uploaded by mistake. Students who already finished a unit get its quiz straight away.</div>
+        <input type="file" id="bulkQuizFiles" accept=".json,application/json" multiple onchange="snBulkQuizFiles(this)" style="font-family:Nunito,sans-serif;font-size:13px;">
+        <div id="bulkQuizResult"></div>
+      </div>
+
       <div style="max-width:640px;">
         <!-- Instructions -->
         <div style="background:#fff3e0;border-radius:14px;padding:20px 22px;margin-bottom:24px;border-left:4px solid #e65100;">
           <div style="font-weight:900;color:#e65100;font-size:15px;margin-bottom:10px;">📋 How to generate a quiz with AI</div>
           <p style="font-size:13px;color:#4a5568;line-height:1.7;margin-bottom:8px;">Give this prompt to ChatGPT or Claude:</p>
-          <div style="background:#1a202c;color:#68d391;border-radius:10px;padding:14px 16px;font-family:monospace;font-size:12px;line-height:1.7;white-space:pre-wrap;">"Generate 40 multiple-choice quiz questions for a unit on [TOPIC] in a technology course for children aged 10–17. Return the result as a valid JSON object in this exact format:
+          <div style="background:#1a202c;color:#68d391;border-radius:10px;padding:14px 16px;font-family:monospace;font-size:12px;line-height:1.7;white-space:pre-wrap;">You are writing an end-of-unit quiz for StemNest Academy, an online coding and AI school for children.
 
+Pathway: [e.g. AI &amp; Automation]
+Grade: [e.g. Grade 4]  (students are about [age] years old)
+Unit: [e.g. Unit 1: The Real ML Pipeline]
+
+Below are all the lessons of this unit. Write [20] multiple-choice questions that check what students learned in THESE lessons only.
+
+Rules:
+- Each question has exactly 4 options and only one correct answer.
+- Use simple, child-friendly language suited to the age above. No trick questions.
+- Mix recall (&quot;What is...&quot;) and understanding (&quot;What would happen if...&quot;, &quot;Which example shows...&quot;).
+- Wrong options must be believable but clearly wrong to a student who learned the lesson.
+- Do not use &quot;All of the above&quot; or &quot;None of the above&quot;.
+- Add a one-sentence explanation of why the answer is right.
+
+Reply with ONLY valid JSON, no other text, in exactly this format:
 {
-  &quot;unit&quot;: &quot;Unit 1 — Introduction to HTML&quot;,
+  &quot;unit&quot;: &quot;Unit 1: The Real ML Pipeline&quot;,
   &quot;questions&quot;: [
-    {
-      &quot;q&quot;: &quot;Question text here?&quot;,
-      &quot;options&quot;: [&quot;Option A&quot;, &quot;Option B&quot;, &quot;Option C&quot;, &quot;Option D&quot;],
-      &quot;answer&quot;: 0
-    }
+    { &quot;q&quot;: &quot;Question text?&quot;, &quot;options&quot;: [&quot;first&quot;, &quot;second&quot;, &quot;third&quot;, &quot;fourth&quot;], &quot;answer&quot;: 0, &quot;explanation&quot;: &quot;Why this answer is correct.&quot; }
   ]
 }
+&quot;answer&quot; is the position of the correct option: 0 = first, 1 = second, 2 = third, 3 = fourth.
 
-The &quot;answer&quot; field is the index (0-3) of the correct option. Generate all 40 questions."</div>
+LESSONS:
+[paste the unit&#x27;s lessons here]</div>
+          <p style="font-size:12px;color:#718096;margin-top:10px;"><strong>Always paste the unit's real lessons</strong> — quizzes written without them will not match what students were taught. Students see the options as A–D, in a new random order on every attempt.</p>
           <p style="font-size:12px;color:#718096;margin-top:10px;">Save the JSON output as a <strong>.json</strong> file, then upload it below.</p>
         </div>
 
@@ -887,6 +909,7 @@ Answer: A</code>
 <script src="../js/mail-system.js"></script>
 <script src="../js/admin-pathways.js?v=202610061500"></script>
 <script src="../js/admin-quizzes.js"></script>
+<script src="../js/admin-quiz-bulk.js?v=202610122200"></script>
 <script>
 // Wire bulk email tab into admin showAdminTab
 document.addEventListener('DOMContentLoaded', () => {

@@ -13,6 +13,7 @@ const pool   = require('../config/db');
 const logger = require('../utils/logger');
 
 const DUE_DAYS = 7;
+const CATCHUP_DUE_DAYS = 14;   // work for lessons finished earlier: more time, as several may arrive at once
 const REMIND_BEFORE_HOURS = 48;
 const QUIZ_ATTEMPTS = 3;
 const DEFAULT_PASS = 60;
@@ -47,7 +48,8 @@ async function assignAfterClass(studentId, booking) {
     if (brief) {
       const r = await pool.query(
         `INSERT INTO projects (student_id, tutor_id, title, brief, due_date, due_at, kind, booking_id, lesson_id, status)
-         VALUES ($1, $2, $3, $4, $5::date, $6, 'lesson', $7, $8, 'pending')
+         SELECT $1, $2, $3, $4, $5::date, $6, 'lesson', $7, $8, 'pending'
+         WHERE NOT EXISTS (SELECT 1 FROM projects x WHERE x.student_id = $1 AND x.lesson_id = $8)
          ON CONFLICT (student_id, booking_id) WHERE booking_id IS NOT NULL DO NOTHING
          RETURNING id`,
         [studentId, booking.tutor_id, `Lesson ${l.lesson_number}: ${l.title}`.slice(0, 250), brief,
@@ -187,13 +189,96 @@ async function runDueReminders() {
   }
 }
 
+/* ══════════════ Catch-up for lessons finished earlier ══════════════
+   A student gets the project of every lesson they have finished (that has
+   homework) and the quiz of every unit they have finished (once a quiz
+   exists), even if they finished it before projects/quizzes were added.
+   Finished lessons = lessons 1..N of their current grade (N = the
+   enrolment's lessons done, as set by Post-Sales) plus every completed
+   class linked to a lesson that they attended. Paused students are
+   skipped until they resume. Safe to run any number of times. */
+async function catchUp({ studentId = null, quizId = null } = {}) {
+  const out = { projects: 0, quizzes: 0, students: 0 };
+  try {
+    const DONE = `
+      WITH done AS (
+        SELECT e.student_id, pl.id AS lesson_id, e.tutor_id, NULL::uuid AS booking_id
+        FROM enrolments e
+        JOIN pathway_grades pg ON pg.pathway_id = e.pathway_id AND pg.grade_number = e.current_grade
+        JOIN pathway_lessons pl ON pl.grade_id = pg.id AND pl.is_active = TRUE AND pl.lesson_number <= COALESCE(e.lessons_completed, 0)
+        WHERE e.status = 'active'
+        UNION ALL
+        SELECT COALESCE(b.student_id, ct.student_id), b.pathway_lesson_id, b.tutor_id, b.id
+        FROM bookings b
+        LEFT JOIN credit_transactions ct ON b.student_id IS NULL AND ct.booking_id = b.id
+                                        AND ct.type = 'class_deduction' AND ct.amount < 0
+        WHERE b.status IN ('completed', 'partially_completed') AND b.is_demo = FALSE AND b.pathway_lesson_id IS NOT NULL
+      ), d AS (
+        SELECT DISTINCT ON (done.student_id, done.lesson_id) done.*
+        FROM done
+        JOIN users u ON u.id = done.student_id AND u.role = 'student' AND u.is_active = TRUE
+        LEFT JOIN student_profiles sp ON sp.user_id = done.student_id
+        WHERE COALESCE(sp.class_paused, FALSE) = FALSE AND ($1::uuid IS NULL OR done.student_id = $1)
+        ORDER BY done.student_id, done.lesson_id, done.booking_id NULLS LAST
+      )`;
+    const due = new Date(Date.now() + CATCHUP_DUE_DAYS * 86400000);
+    const per = {};
+    const bump = (rows, k) => rows.forEach(r => { (per[r.student_id] = per[r.student_id] || { projects: 0, quizzes: 0 })[k]++; });
+
+    if (!quizId) {
+      const pr = (await pool.query(DONE + `
+        INSERT INTO projects (student_id, tutor_id, title, brief, due_date, due_at, kind, booking_id, lesson_id, status)
+        SELECT d.student_id, d.tutor_id, LEFT('Lesson ' || pl.lesson_number || ': ' || pl.title, 250),
+               concat_ws(E'\n\n', NULLIF(btrim(pl.homework1), ''), NULLIF(btrim(pl.homework2), '')),
+               ($2::text::timestamptz AT TIME ZONE 'Africa/Lagos')::date, $2::text::timestamptz, 'lesson', d.booking_id, d.lesson_id, 'pending'
+        FROM d JOIN pathway_lessons pl ON pl.id = d.lesson_id
+        WHERE (COALESCE(btrim(pl.homework1), '') <> '' OR COALESCE(btrim(pl.homework2), '') <> '')
+          AND NOT EXISTS (SELECT 1 FROM projects x WHERE x.student_id = d.student_id AND x.lesson_id = d.lesson_id)
+        ON CONFLICT DO NOTHING
+        RETURNING student_id`, [studentId, due.toISOString()])).rows;
+      out.projects = pr.length; bump(pr, 'projects');
+    }
+
+    const qz = (await pool.query(DONE + `
+      INSERT INTO quiz_assignments (student_id, quiz_id, booking_id, due_at)
+      SELECT DISTINCT ON (d.student_id, uq.id) d.student_id, uq.id, d.booking_id, $2::text::timestamptz
+      FROM d
+      JOIN pathway_lessons pl ON pl.id = d.lesson_id
+      JOIN pathway_units pu ON pu.id = pl.unit_id
+      JOIN pathway_grades pg ON pg.id = pl.grade_id
+      JOIN unit_quizzes uq ON uq.pathway_id = pg.pathway_id AND uq.grade_number = pg.grade_number AND uq.unit_number = pu.unit_number
+      WHERE pl.lesson_number = (SELECT MAX(x.lesson_number) FROM pathway_lessons x WHERE x.unit_id = pl.unit_id AND x.is_active = TRUE)
+        AND ($3::uuid IS NULL OR uq.id = $3)
+      ORDER BY d.student_id, uq.id
+      ON CONFLICT (student_id, quiz_id) DO NOTHING
+      RETURNING student_id`, [studentId, due.toISOString(), quizId])).rows;
+    out.quizzes = qz.length; bump(qz, 'quizzes');
+
+    for (const [sid, c] of Object.entries(per)) {
+      const bits = [];
+      if (c.projects) bits.push(c.projects + ' assignment' + (c.projects === 1 ? '' : 's'));
+      if (c.quizzes) bits.push(c.quizzes + ' unit quiz' + (c.quizzes === 1 ? '' : 'zes'));
+      _notify(sid, c.quizzes && !c.projects ? 'quiz_assigned' : 'project_assigned', '📚 Work from lessons you finished earlier',
+        `${bits.join(' and ')} added — due ${_fmt(due)}. Find them on the Projects and Quizzes tabs.`);
+    }
+    out.students = Object.keys(per).length;
+    if (out.projects || out.quizzes) logger.info(`[LEARNING] Catch-up: ${out.projects} project(s), ${out.quizzes} quiz(zes) for ${out.students} student(s)`);
+  } catch (e) {
+    logger.warn('[LEARNING] Catch-up failed: ' + e.message);
+  }
+  return out;
+}
+
 function startDueReminderJob() {
   setTimeout(runDueReminders, 60 * 1000);
   setInterval(runDueReminders, 60 * 60 * 1000);
+  /* Catch-up for lessons finished earlier: shortly after start, then every 6 hours */
+  setTimeout(() => catchUp(), 3 * 60 * 1000);
+  setInterval(() => catchUp(), 6 * 60 * 60 * 1000);
   logger.info('[LEARNING] Due-date reminder job started (hourly)');
 }
 
 module.exports = {
-  DUE_DAYS, QUIZ_ATTEMPTS, DEFAULT_PASS, penalised,
-  assignAfterClass, leaderboard, runDueReminders, startDueReminderJob,
+  DUE_DAYS, CATCHUP_DUE_DAYS, QUIZ_ATTEMPTS, DEFAULT_PASS, penalised,
+  assignAfterClass, catchUp, leaderboard, runDueReminders, startDueReminderJob,
 };

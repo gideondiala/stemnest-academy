@@ -104,35 +104,10 @@ router.post('/upload', requireAuth, requireRole('admin','super_admin'), async (r
        pass_score || learning.DEFAULT_PASS, req.user.id]
     );
 
-    /* Students who finished this unit in the last 14 days get the new quiz too */
-    let backfilled = 0;
-    try {
-      const bf = await pool.query(
-        `WITH last_lesson AS (
-           SELECT pl.id FROM pathway_lessons pl
-           JOIN pathway_units pu ON pu.id = pl.unit_id
-           JOIN pathway_grades pg ON pg.id = pl.grade_id
-           WHERE pg.pathway_id = $1 AND pg.grade_number = $2 AND pu.unit_number = $3 AND pl.is_active = TRUE
-           ORDER BY pl.lesson_number DESC LIMIT 1
-         ), finished AS (
-           SELECT b.student_id AS sid, b.id AS bid FROM bookings b
-           WHERE b.pathway_lesson_id = (SELECT id FROM last_lesson) AND b.student_id IS NOT NULL
-             AND b.status IN ('completed','partially_completed') AND b.date >= CURRENT_DATE - 14
-           UNION
-           SELECT (a.v)::uuid, b.id FROM bookings b, jsonb_array_elements_text(COALESCE(b.notes->'attendees', '[]'::jsonb)) AS a(v)
-           WHERE b.pathway_lesson_id = (SELECT id FROM last_lesson) AND b.batch_id IS NOT NULL
-             AND b.status IN ('completed','partially_completed') AND b.date >= CURRENT_DATE - 14
-         )
-         INSERT INTO quiz_assignments (student_id, quiz_id, booking_id, due_at)
-         SELECT sid, $4, bid, NOW() + make_interval(days => $5) FROM finished
-         ON CONFLICT (student_id, quiz_id) DO NOTHING
-         RETURNING id`,
-        [pathway_id, grade_number, unit_number, result.rows[0].id, learning.DUE_DAYS]
-      );
-      backfilled = bf.rows.length;
-    } catch (e) { logger.warn('[QUIZ] Backfill failed: ' + e.message); }
+    /* Everyone who has finished this unit — whenever that was — gets the quiz */
+    const backfilled = (await learning.catchUp({ quizId: result.rows[0].id })).quizzes;
 
-    logger.info(`[QUIZ] Uploaded ${questions.length} questions for pathway=${pathway_id} grade=${grade_number} unit=${unit_number} by ${req.user.email}; assigned to ${backfilled} recent finisher(s)`);
+    logger.info(`[QUIZ] Uploaded ${questions.length} questions for pathway=${pathway_id} grade=${grade_number} unit=${unit_number} by ${req.user.email}; assigned to ${backfilled} student(s) who finished the unit`);
     res.json({ success: true, quiz: result.rows[0], assignedTo: backfilled });
   } catch (err) { next(err); }
 });
@@ -173,6 +148,26 @@ router.get('/my-attempts', requireAuth, async (req, res, next) => {
       [req.user.id]
     );
     res.json({ success: true, attempts: result.rows });
+  } catch (err) { next(err); }
+});
+
+/* ══════════════════════════════════════════════════════
+   GET /api/quizzes/units-map  (admin)
+   Every curriculum unit with its title and whether it has a quiz —
+   used by the bulk upload to match quiz files to units.
+══════════════════════════════════════════════════════ */
+router.get('/units-map', requireAuth, requireRole('admin','super_admin'), async (req, res, next) => {
+  try {
+    const r = await pool.query(
+      `SELECT p.id AS "pathwayId", p.name AS pathway, pg.grade_number AS grade, pu.unit_number AS unit, pu.name,
+              (uq.id IS NOT NULL) AS "hasQuiz", uq.total_questions AS "quizQuestions"
+       FROM pathway_units pu
+       JOIN pathway_grades pg ON pg.id = pu.grade_id
+       JOIN pathways p ON p.id = pg.pathway_id
+       LEFT JOIN unit_quizzes uq ON uq.pathway_id = p.id AND uq.grade_number = pg.grade_number AND uq.unit_number = pu.unit_number
+       WHERE pu.is_active IS NOT FALSE
+       ORDER BY p.name, pg.grade_number, pu.unit_number`);
+    res.json({ success: true, units: r.rows });
   } catch (err) { next(err); }
 });
 

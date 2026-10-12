@@ -532,7 +532,9 @@ router.post('/students/:studentId/link-track', requireAuth, requireRole('admin',
     logger.info(`[TRACKS] ${req.user.email} linked ${upd.rowCount} classes of student ${studentId} to ${pw.rows[0].name} (enrolment ${enr.id})`);
     /* Give the upcoming classes their lessons straight away */
     const lessonsLinked = await require('../services/lessonLinker').fillSeries({ enrolmentId: enr.id });
-    res.json({ success: true, enrolmentId: enr.id, linked: upd.rowCount, lessonsLinked, pathwayName: pw.rows[0].name });
+    /* Projects (and unit quizzes) for the lessons they had already done */
+    const caught = await require('../services/learningService').catchUp({ studentId });
+    res.json({ success: true, enrolmentId: enr.id, linked: upd.rowCount, lessonsLinked, catchUp: caught, pathwayName: pw.rows[0].name });
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
     if (err.status) return res.status(err.status).json({ success: false, error: err.message });
