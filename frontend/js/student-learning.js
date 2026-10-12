@@ -230,6 +230,39 @@ async function openQuiz(quizId) {
   }
 }
 
+/* After each attempt: every wrong answer with the right one and why, then the ones they got right */
+function _slReview(r) {
+  var L = ['A', 'B', 'C', 'D'];
+  var opt = function (b, i) { return i == null || !b.options || b.options[i] == null ? '—' : L[i] + '. ' + _slEsc(b.options[i]); };
+  var all = (r.breakdown || []).map(function (b, i) { b.n = i + 1; return b; });
+  var wrong = all.filter(function (b) { return !b.isRight; }), right = all.filter(function (b) { return b.isRight; });
+  var h = '<div style="text-align:left;margin:18px 0 14px;">';
+  if (wrong.length) {
+    h += '<div style="font-weight:900;font-size:15px;color:#c53030;margin-bottom:4px;">📝 Review ' + wrong.length + ' question' + (wrong.length === 1 ? '' : 's') + ' you got wrong</div>' +
+      '<div style="font-size:12px;font-weight:700;color:var(--mid);margin-bottom:10px;">' + (r.attemptsLeft && !r.passed ? 'Read each explanation before your next attempt.' : 'Read each explanation to learn from your mistakes.') + '</div>' +
+      '<div style="display:flex;flex-direction:column;gap:10px;max-height:380px;overflow-y:auto;padding-right:4px;">' +
+      wrong.map(function (b) {
+        return '<div style="background:#fff5f5;border-radius:12px;padding:12px 14px;font-size:13px;border-left:4px solid #c53030;">' +
+          '<div style="font-weight:800;margin-bottom:6px;color:var(--dark);">' + b.n + '. ' + _slEsc(b.q) + '</div>' +
+          '<div style="font-weight:700;color:#c53030;">❌ Your answer: ' + opt(b, b.selected) + '</div>' +
+          (b.correct != null ? '<div style="font-weight:800;color:#065f46;margin-top:2px;">✅ Correct answer: ' + opt(b, b.correct) + '</div>' : '') +
+          (b.explanation ? '<div style="background:#fff;border-radius:8px;padding:8px 10px;margin-top:8px;font-weight:600;color:var(--dark);line-height:1.5;">💡 ' + _slEsc(b.explanation) + '</div>' : '') +
+          '</div>';
+      }).join('') + '</div>';
+  } else {
+    h += '<div style="font-weight:900;font-size:15px;color:#065f46;">🌟 You got every question right!</div>';
+  }
+  if (right.length && wrong.length) {
+    h += '<details style="margin-top:12px;"><summary style="cursor:pointer;font-weight:800;color:var(--blue);font-size:13px;">✅ See the ' + right.length + ' question' + (right.length === 1 ? '' : 's') + ' you got right</summary>' +
+      '<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto;">' +
+      right.map(function (b) {
+        return '<div style="background:#f0fdf4;border-radius:10px;padding:8px 12px;font-size:13px;border-left:3px solid #0e9f6e;">' +
+          '<div style="font-weight:800;">' + b.n + '. ' + _slEsc(b.q) + '</div><div style="font-weight:700;color:#065f46;">' + opt(b, b.selected) + '</div></div>';
+      }).join('') + '</div></details>';
+  }
+  return h + '</div>';
+}
+
 async function submitQuiz() {
   var unanswered = quizAnswers.filter(function (a) { return a === null; }).length;
   if (unanswered > 0) { showToast(unanswered + ' question' + (unanswered > 1 ? 's' : '') + ' still unanswered.', 'error'); return; }
@@ -254,14 +287,7 @@ async function submitQuiz() {
         '<div style="font-size:13px;color:var(--mid);font-weight:800;margin-top:6px;">' + (r.late ? '⚠️ Late — this attempt earns ' + r.points + ' points · ' : '') + 'Best: ' + r.bestPoints + ' points</div>' +
       '</div>' +
       '<div style="font-size:13px;font-weight:800;color:var(--mid);">Attempt ' + r.attempt + ' of ' + SL_ATTEMPTS + (r.attemptsLeft ? ' · ' + r.attemptsLeft + ' left — your best score counts' : '') + '</div>' +
-      '<details style="text-align:left;margin:16px 0;"><summary style="cursor:pointer;font-weight:800;color:var(--blue);font-size:14px;">📋 See your answers</summary>' +
-      '<div style="margin-top:10px;display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;">' +
-      (r.breakdown || []).map(function (b, i) {
-        var tail = b.isRight ? '✅ Correct' : ('❌ Your answer: ' + _slEsc(b.options[b.selected] || '—') + (r.answersRevealed && b.correct != null ? ' · Correct: ' + _slEsc(b.options[b.correct]) : ''));
-        return '<div style="background:' + (b.isRight ? '#f0fdf4' : '#fff5f5') + ';border-radius:10px;padding:10px 14px;font-size:13px;border-left:3px solid ' + (b.isRight ? '#0e9f6e' : '#c53030') + ';">' +
-          '<div style="font-weight:800;margin-bottom:4px;">' + (i + 1) + '. ' + _slEsc(b.q) + '</div><div style="font-weight:700;color:' + (b.isRight ? '#065f46' : '#c53030') + ';">' + tail + '</div></div>';
-      }).join('') + '</div>' +
-      (!r.answersRevealed ? '<div style="font-size:12px;color:var(--light);font-weight:700;margin-top:8px;">Correct answers are shown once you pass or use all ' + SL_ATTEMPTS + ' attempts.</div>' : '') + '</details>' +
+      _slReview(r) +
       '<div style="display:flex;gap:10px;justify-content:center;"><button class="btn btn-outline" onclick="closeQuizModal()">Close</button>' +
       (!r.passed && r.attemptsLeft ? '<button class="btn btn-primary" onclick="openQuiz(\'' + activeQuizId + '\')">🔄 Try again</button>' : '') + '</div></div>';
 

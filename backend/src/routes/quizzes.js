@@ -295,12 +295,14 @@ router.post('/:id/attempt', requireAuth, requireRole('student'), async (req, res
     await client.query('COMMIT');
 
     const attemptsLeft = learning.QUIZ_ATTEMPTS - attemptNo;
-    /* Correct answers are only revealed once the student passes or has no attempts left */
-    const reveal = percentage >= passScore || attemptsLeft === 0;
+    /* After every attempt the student sees the right answer and the explanation
+       for each question, so they can learn from mistakes before trying again */
+    const reveal = true;
     const breakdown = questions.map((q, i) => ({
       idx: i, q: q.q, options: q.options, selected: answers[i],
       isRight: answers[i] === q.answer,
-      ...(reveal ? { correct: q.answer } : {}),
+      correct: q.answer,
+      explanation: q.explanation ? String(q.explanation) : null,
     }));
 
     logger.info(`[QUIZ] ${req.user.email} attempt ${attemptNo}/${learning.QUIZ_ATTEMPTS}: ${correct}/${total} (${percentage}%)${late ? ' late' : ''} on quiz ${quiz.id}`);

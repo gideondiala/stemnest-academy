@@ -1267,7 +1267,7 @@ function _renderQuestion() {
     <div style="margin-bottom:8px;">
       <div style="font-size:12px;font-weight:900;color:var(--light);text-transform:uppercase;letter-spacing:.5px;">Question ${currentQuestion + 1} of ${total}</div>
     </div>
-    <div style="font-size:17px;font-weight:800;color:var(--dark);line-height:1.6;margin-bottom:24px;min-height:60px;">${q.q}</div>
+    <div style="font-size:17px;font-weight:800;color:var(--dark);line-height:1.6;margin-bottom:24px;min-height:60px;">${_qEsc(q.q)}</div>
     <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:28px;">
       ${(q.options || []).map((opt, i) => {
         const selected = quizAnswers[currentQuestion] === i;
@@ -1283,7 +1283,7 @@ function _renderQuestion() {
           <span style="width:28px;height:28px;border-radius:8px;background:${selected ? 'var(--blue)' : 'var(--bg)'};
                        color:${selected ? '#fff' : 'var(--mid)'};font-weight:900;font-size:13px;
                        display:flex;align-items:center;justify-content:center;flex-shrink:0;">${letters[i]}</span>
-          ${opt}
+          ${_qEsc(opt)}
         </button>`;
       }).join('')}
     </div>
@@ -1295,6 +1295,9 @@ function _renderQuestion() {
         : `<button class="btn btn-primary" onclick="submitQuiz()" style="background:var(--green);">Submit Quiz ✦</button>`}
     </div>`;
 }
+
+/* Quiz text can contain code such as <div> — always show it as text */
+function _qEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
 function selectAnswer(optIdx) {
   quizAnswers[currentQuestion] = optIdx;
