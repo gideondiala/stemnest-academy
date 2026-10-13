@@ -72,7 +72,8 @@ const extraOrigins = allowedOrigins.flatMap(o => [
   o.replace('https://www.', 'https://'),
   o.replace('https://', 'https://www.'),
 ]);
-const allAllowedOrigins = [...new Set(extraOrigins)];
+/* The Learning Hub (learn.stemnestacademy.co.uk) reads and posts blog comments */
+const allAllowedOrigins = [...new Set([...extraOrigins, 'https://learn.stemnestacademy.co.uk'])];
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -153,6 +154,7 @@ app.use('/api/quizzes',       quizRoutes);
 app.use('/api/certificates',  certificateRoutes);
 app.use('/api/batches',       batchRoutes);
 app.use('/api/reports',       require('./routes/reports'));
+app.use('/api/blog-comments', require('./routes/blogComments'));
 
 /* ══════════════════════════════════════════════
    404 + GLOBAL ERROR HANDLER

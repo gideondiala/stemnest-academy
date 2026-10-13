@@ -53,6 +53,8 @@ function publishTime(v) {
 }
 const NOW = process.env.PUBLISH_ALL ? new Date('2999-01-01') : new Date();
 const niceDate = d => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Africa/Lagos' });
+/* Cut text at a word boundary for meta descriptions */
+const shortText = (t, n) => { t = String(t); if (t.length <= n) return t; const c = t.slice(0, n - 1); return c.slice(0, c.lastIndexOf(' ')).replace(/[,;:.]$/, '') + '…'; };
 /* YYYY-MM-DD in Nigeria time (sitemap) */
 const watDay = d => new Date(new Date(d).getTime() + 3600e3).toISOString().slice(0, 10);
 const words = html => String(html).replace(/<pre[\s\S]*?<\/pre>/g, ' ').replace(/<[^>]+>/g, ' ').split(/\s+/).filter(Boolean).length;
@@ -468,7 +470,7 @@ ${related.length ? `<section class="wrap related"><h2>Keep learning</h2><div cla
     const list = posts.filter(p => p.author.slug === a.slug);
     if (!list.length) continue;
     write(`author/${a.slug}/index.html`, page({
-      title: `${a.name}${a.role ? ', ' + a.role : ''}`, description: (a.bio || `Articles by ${a.name}`).slice(0, 158), canonical: `${SITE.url}/author/${a.slug}/`,
+      title: `${a.name}${a.role ? ', ' + a.role : ''}`, description: shortText(a.bio || `Articles by ${a.name}`, 158), canonical: `${SITE.url}/author/${a.slug}/`,
       body: `<section class="hero hero-small"><div class="wrap author-hero">${authorAvatar(a, 88)}<div>
         <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Learning Hub</a> › Authors</nav>
         <h1>${esc(a.name)}</h1>${a.role ? `<p class="hero-sub">${esc(a.role)}</p>` : ''}</div></div></section>

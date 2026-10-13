@@ -360,6 +360,25 @@ const STATEMENTS = [
   `ALTER TABLE student_reports ENABLE ROW LEVEL SECURITY`,
   `CREATE INDEX IF NOT EXISTS idx_student_reports_tutor   ON student_reports(tutor_id, status)`,
   `CREATE INDEX IF NOT EXISTS idx_student_reports_student ON student_reports(student_id, status)`,
+
+  /* ── Learning Hub comments: held until a moderator approves; staff replies are marked ── */
+  `CREATE TABLE IF NOT EXISTS blog_comments (
+     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     post_slug   VARCHAR(160) NOT NULL,
+     parent_id   UUID REFERENCES blog_comments(id) ON DELETE CASCADE,
+     name        VARCHAR(60) NOT NULL,
+     body        TEXT NOT NULL,
+     status      VARCHAR(12) NOT NULL DEFAULT 'pending',
+     is_staff    BOOLEAN NOT NULL DEFAULT FALSE,
+     staff_id    UUID,
+     ip_hash     VARCHAR(64),
+     created_at  TIMESTAMPTZ DEFAULT NOW(),
+     moderated_at TIMESTAMPTZ,
+     moderated_by UUID
+   )`,
+  `ALTER TABLE blog_comments ENABLE ROW LEVEL SECURITY`,
+  `CREATE INDEX IF NOT EXISTS idx_blog_comments_post ON blog_comments(post_slug, status, created_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_blog_comments_status ON blog_comments(status, created_at)`,
 ];
 
 async function ensureSchema() {
