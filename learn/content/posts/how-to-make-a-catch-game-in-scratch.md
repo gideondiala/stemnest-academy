@@ -1,12 +1,12 @@
 ---
 title: How to Make a Catch Game in Scratch (Step-by-Step for Kids)
-description: Build a complete "catch the falling apples" game in Scratch 3 — moving player, falling objects, a score, lives and game over — with every block explained.
+description: Build a complete "catch the falling apples" game in Scratch 3 with a moving player, falling objects, a score, lives and game over. Every block is explained.
 date: 2026-10-13
 category: Learn by Doing
 tags: [scratch, games, beginner, kids coding]
 emoji: 🍎
 level: Beginner
-age: 7–12
+age: 7 to 12
 ---
 
 A catch game is one of the best first games to build in Scratch. It is short enough to finish in one sitting, but it uses the big ideas every game needs: **movement, loops, conditions, variables and random numbers**.
@@ -34,7 +34,7 @@ Writing the rules first is what real game designers do. It turns "make a game" i
 3. Click **Choose a Sprite** and add **Bowl**. This is your player.
 4. Add a second sprite: **Apple**.
 
-Make both sprites a sensible size. Select a sprite and change **Size** in the sprite panel — around `80` for the bowl and `60` for the apple works well.
+Make both sprites a sensible size. Select a sprite and change **Size** in the sprite panel. Around `80` for the bowl and `60` for the apple works well.
 
 ## Step 2: Make the bowl move
 
@@ -172,11 +172,11 @@ Small touches like these are what make players say "one more go!".
 
 You used the core building blocks of every video game:
 
-- **Events** — `when green flag clicked` starts everything.
-- **Loops** — `forever` keeps the game running.
-- **Conditions** — `if … then` decides what happens.
-- **Variables** — `score`, `lives` and `speed` remember important numbers.
-- **Randomness** — `pick random` keeps the game surprising.
+- **Events**: `when green flag clicked` starts everything.
+- **Loops**: `forever` keeps the game running.
+- **Conditions**: `if … then` decides what happens.
+- **Variables**: `score`, `lives` and `speed` remember important numbers.
+- **Randomness**: `pick random` keeps the game surprising.
 
 These ideas are exactly the same in "real" programming languages such as Python and JavaScript. Once you understand them in Scratch, you are ready for more. Next, try our guide to [making a maze game in Scratch](/how-to-make-a-maze-game-in-scratch/), or read [Scratch vs Python: which should you learn first?](/scratch-vs-python-which-first/)
 

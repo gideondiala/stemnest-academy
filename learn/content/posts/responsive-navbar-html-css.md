@@ -1,6 +1,6 @@
 ---
 title: How to Build a Responsive Navbar with HTML and CSS (Hamburger Menu Included)
-description: Build a clean, accessible navigation bar that turns into a hamburger menu on phones — full HTML, CSS and a tiny bit of JavaScript, explained line by line.
+description: Build a clean, accessible navigation bar that turns into a hamburger menu on phones. Full HTML, CSS and a tiny bit of JavaScript, explained line by line.
 date: 2026-10-13
 category: Learn by Doing
 tags: [html, css, javascript, web development, beginner]
@@ -15,7 +15,7 @@ In this tutorial you will build exactly that, from an empty file, and understand
 
 - **HTML** for the structure (what is on the page),
 - **CSS** for the look and the layout (Flexbox and a media query),
-- **JavaScript** — just five lines — to open and close the menu.
+- **JavaScript**, just five lines of it, to open and close the menu.
 
 > **What you need:** a text editor (VS Code is free, or use an online editor such as CodePen) and a web browser. New to these languages? Read [HTML vs CSS vs JavaScript explained](/html-css-javascript-explained/) first.
 
@@ -77,7 +77,7 @@ Create a folder called `navbar`, and inside it a file called `index.html`:
 - The menu button is a real `<button>` with three empty `<span>` bars that we will style into the ☰ icon. It comes *after* the `<nav>` so that, on phones, it sits at the far right of the bar.
 - `aria-label`, `aria-expanded` and `aria-controls` tell screen-reader users what the button is and whether the menu is open.
 
-Open `index.html` in your browser. It looks plain — that is fine. HTML is about meaning; CSS will make it look good.
+Open `index.html` in your browser. It looks plain, and that is fine. HTML is about meaning; CSS will make it look good.
 
 ## Step 2: Basic styles
 
@@ -176,13 +176,13 @@ Add this to `style.css`:
 - `align-items: center` lines everything up vertically.
 - `.nav-links` is also a flex container, so the links sit side by side with a `gap` between them.
 - `list-style: none` removes the bullet points.
-- The menu button is hidden for now with `display: none` — we only want it on small screens.
+- The menu button is hidden for now with `display: none`, because we only want it on small screens.
 
 Refresh the browser. You now have a proper desktop navbar.
 
 ## Step 4: Make it responsive with a media query
 
-A **media query** applies CSS only when a condition is true — here, when the screen is 700 pixels wide or less.
+A **media query** applies CSS only when a condition is true. Here, the condition is a screen 700 pixels wide or less.
 
 ```css
 @media (max-width: 700px) {
@@ -321,7 +321,7 @@ Ready to put your navbar on a real website? Follow our [complete guide to buildi
 
 ## Frequently asked questions
 
-**Can I make a hamburger menu without JavaScript?** Yes — a common trick uses a hidden checkbox and the `:checked` selector. It works, but a real button with JavaScript is better for accessibility, so we recommend the approach in this guide.
+**Can I make a hamburger menu without JavaScript?** Yes. A common trick uses a hidden checkbox and the `:checked` selector. It works, but a real button with JavaScript is better for accessibility, so we recommend the approach in this guide.
 
 **Why 700px?** It is a sensible point where five links no longer fit comfortably. Choose whatever width suits your own links.
 

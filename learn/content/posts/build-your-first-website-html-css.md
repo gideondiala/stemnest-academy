@@ -1,6 +1,6 @@
 ---
 title: Build Your First Website from Scratch with HTML and CSS (Complete Beginner's Guide)
-description: A step-by-step project for beginners — plan, code, style and publish a real personal website with HTML and CSS, including a responsive layout, a project gallery and free hosting.
+description: Build a real website from scratch with HTML and CSS. A beginner's step-by-step guide to planning, coding, styling and publishing it free.
 date: 2026-10-13
 category: Learn by Doing
 tags: [html, css, web development, beginner, project]
@@ -20,7 +20,7 @@ We will build a personal site called **"My Coding Journey"** with:
 - a contact section and a footer,
 - a layout that works on phones, tablets and laptops.
 
-You will only use **HTML** and **CSS** — the two languages every website is built on. No downloads are needed apart from a free code editor.
+You will only use **HTML** and **CSS**, the two languages every website is built on. No downloads are needed apart from a free code editor.
 
 > **Before you start:** if you are not sure what HTML and CSS do, read [HTML vs CSS vs JavaScript explained](/html-css-javascript-explained/) (5 minutes).
 
@@ -54,12 +54,12 @@ my-website/
 
 Professional developers plan before they code. Grab paper and sketch boxes for each section, top to bottom:
 
-1. **Header** — your name or logo, and links to the sections.
-2. **Hero** — a big welcome message and a button.
-3. **About** — a few sentences about you (no private details!).
-4. **Projects** — three to six cards, each with a title and short description.
-5. **Contact** — how people can reach you (a parent's or school email, or a link to your coding profile).
-6. **Footer** — a copyright line.
+1. **Header**: your name or logo, and links to the sections.
+2. **Hero**: a big welcome message and a button.
+3. **About**: a few sentences about you (no private details!).
+4. **Projects**: three to six cards, each with a title and short description.
+5. **Contact**: how people can reach you (a parent's or school email, or a link to your coding profile).
+6. **Footer**: a copyright line.
 
 > **Stay safe online:** never put your home address, school name, phone number, full date of birth or photos of yourself on a public website. Use a nickname or first name only, and ask a parent before publishing.
 
@@ -145,7 +145,7 @@ Now add the sections inside `<body>`:
 </footer>
 ```
 
-Save the file and double-click `index.html` to open it in your browser. You will see all your content in plain black text, one block under another. That is exactly right — HTML gives the page its **structure and meaning**. Now we make it beautiful.
+Save the file and double-click `index.html` to open it in your browser. You will see all your content in plain black text, one block under another. That is exactly right. HTML gives the page its **structure and meaning**. Now we make it beautiful.
 
 **A few things to notice:**
 
@@ -282,7 +282,7 @@ Want a hamburger menu for phones? Our [responsive navbar tutorial](/responsive-n
 ```
 
 - `linear-gradient` blends two colours for an eye-catching background.
-- `clamp(32px, 6vw, 56px)` makes the heading grow with the screen width but never smaller than 32px or bigger than 56px — responsive text in one line.
+- `clamp(32px, 6vw, 56px)` makes the heading grow with the screen width but never smaller than 32px or bigger than 56px. That's responsive text in a single line.
 - `max-width` plus `margin: 0 auto` keeps the paragraph a comfortable reading width and centres it.
 
 ### 4.4 Sections and the project grid
@@ -338,7 +338,7 @@ This one line is the magic of **CSS Grid**:
 grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 ```
 
-It means: *"make as many columns as fit, each at least 240px wide, and share any spare space equally."* On a laptop you get three columns, on a tablet two, and on a phone one — **without writing a single media query**.
+It means: *"make as many columns as fit, each at least 240px wide, and share any spare space equally."* On a laptop you get three columns, on a tablet two, and on a phone one. You don't need a single media query.
 
 ### 4.5 Contact and footer
 
@@ -372,11 +372,11 @@ Check that:
 
 ## Part 6: Make it yours
 
-Now the fun part — personalise it:
+Now for the fun part. Make it your own:
 
 - **Change the theme:** edit the colours in `:root`. Try `--primary: #059669;` for green.
 - **Add your real projects:** a link to your Scratch game, a screenshot of your maze, a drawing you made.
-- **Add an image:** save it in the `images` folder and use `<img src="images/game.png" alt="My maze game">`. Always write `alt` text describing the image — it is read aloud to blind users and shown if the image fails to load.
+- **Add an image:** save it in the `images` folder and use `<img src="images/game.png" alt="My maze game">`. Always write `alt` text describing the image. It is read aloud to blind users and shown if the image fails to load.
 - **Add a second page:** create `games.html`, copy the header and footer into it, and link to it from the navigation.
 
 ## Part 7: Publish your website for free
@@ -392,7 +392,7 @@ A website on your computer can only be seen by you. To share it, it needs to be 
 5. Under **Build and deployment**, choose **Deploy from a branch**, select the **main** branch and the **/ (root)** folder, and click **Save**.
 6. Wait a minute or two, then refresh. GitHub shows your site's address, which looks like `https://your-username.github.io/my-website/`.
 
-Share the link — your website is live!
+Share the link. Your website is live!
 
 ## Common problems and fixes
 
@@ -414,7 +414,7 @@ Share the link — your website is live!
 
 ## Where to go next
 
-- Add interactivity with **JavaScript** — for example, a "dark mode" button or a mini quiz.
+- Add interactivity with **JavaScript**, for example a "dark mode" button or a mini quiz.
 - Turn your header into a [mobile hamburger menu](/responsive-navbar-html-css/).
 - Learn more about how the three web languages work together in [HTML vs CSS vs JavaScript](/html-css-javascript-explained/).
 
@@ -424,6 +424,6 @@ Share the link — your website is live!
 
 **Do I need to pay for a domain name?** No. Free hosts give you a free address. You can buy a custom name (like `alexcodes.com`) later if you want one.
 
-**Is HTML a programming language?** Strictly, HTML is a *markup* language: it describes content rather than giving step-by-step instructions. That does not make it less important — every website depends on it.
+**Is HTML a programming language?** Strictly, HTML is a *markup* language: it describes content rather than giving step-by-step instructions. That does not make it less important. Every website depends on it.
 
 **What age can children start building websites?** Many children start HTML and CSS around 10 or 11, once they are comfortable typing. Younger learners often start with block-based coding like Scratch.

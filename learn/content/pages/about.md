@@ -10,9 +10,9 @@ Our students asked for a place to keep practising between classes. Parents asked
 
 ## What you will find here
 
-**🛠️ Learn by Doing** — step-by-step tutorials you can follow on your own computer: build a game in Scratch, a navigation bar with HTML and CSS, your first full website, a Python game, or your own AI model. Every tutorial lists what you need, explains *why* each step works, and ends with challenges to try next.
+**🛠️ Learn by Doing**: step-by-step tutorials you can follow on your own computer. Build a game in Scratch, a navigation bar with HTML and CSS, your first full website, a Python game, or your own AI model. Every tutorial lists what you need, explains *why* each step works, and ends with challenges to try next.
 
-**💡 Tech Explained** — clear explanations and honest comparisons: Scratch or Python first, what HTML, CSS and JavaScript each do, what machine learning really is, and how to think about coding and AI in 2026.
+**💡 Tech Explained**: clear explanations and honest comparisons, such as Scratch or Python first, what HTML, CSS and JavaScript each do, what machine learning really is, and how to think about coding and AI in 2026.
 
 ## Who it is for
 
@@ -29,7 +29,7 @@ Each guide shows a suggested age range and level, but curious learners of any ag
 - We keep language simple, avoid jargon (or explain it when it matters), and never ask young readers to sign up for paid tools.
 - When tools change, we update the guide and show the "Updated" date at the top.
 
-Spotted a mistake or have an idea for a guide? Please [tell us](/contact/) — we read every message.
+Spotted a mistake or have an idea for a guide? Please [tell us](/contact/). We read every message.
 
 ## Learn live with a tutor
 

@@ -1,6 +1,6 @@
 ---
 title: "HTML vs CSS vs JavaScript: What Each One Does (Explained Simply)"
-description: Every website is built with HTML, CSS and JavaScript. Learn what each language does, how they work together, and which to learn first — with simple examples and a mini project.
+description: What is the difference between HTML, CSS and JavaScript? A simple explanation of what each does, how they work together and which to learn first.
 date: 2026-10-13
 category: Tech Explained
 tags: [html, css, javascript, web development, beginner]
@@ -9,7 +9,7 @@ level: Beginner
 age: 10+
 ---
 
-Open any website — a game, a news site, your school's homepage — and it is built from the same three languages: **HTML, CSS and JavaScript**. Each one has a different job. Once you understand those jobs, building websites suddenly makes much more sense.
+Open any website (a game, a news site, your school's homepage) and it is built from the same three languages: **HTML, CSS and JavaScript**. Each one has a different job. Once you understand those jobs, building websites suddenly makes much more sense.
 
 ## The house analogy
 
@@ -39,7 +39,7 @@ A house needs walls before you can paint them, and paint before the lights make 
 - `<img>` shows an image, and `alt` describes it for people who can't see it.
 - `<button>` makes a button.
 
-On its own, HTML looks plain — black text on a white page. That is fine: HTML's job is **meaning**, not looks. Search engines and screen readers rely on good HTML to understand a page.
+On its own, HTML looks plain: black text on a white page. That is fine: HTML's job is **meaning**, not looks. Search engines and screen readers rely on good HTML to understand a page.
 
 ## CSS: the style
 
@@ -68,7 +68,7 @@ button {
 
 A CSS **rule** has a **selector** (which elements to style, such as `h1`) and **declarations** in curly brackets (what to change, such as `color: #4338ca;`).
 
-CSS also handles **layout** — putting things side by side, building grids, and making pages work on phones as well as laptops. Tools like Flexbox and Grid make this much easier than it used to be (see them in action in our [first website guide](/build-your-first-website-html-css/)).
+CSS also handles **layout**, which means putting things side by side, building grids, and making pages work on phones as well as laptops. Tools like Flexbox and Grid make this much easier than it used to be (see them in action in our [first website guide](/build-your-first-website-html-css/)).
 
 ## JavaScript: the behaviour
 
@@ -92,7 +92,7 @@ button.addEventListener('click', () => {
 - `addEventListener('click', …)` says: *when this button is clicked, run this code*.
 - `Math.random()` picks a random joke from the list.
 
-JavaScript is a full programming language with variables, loops, conditions and functions — the same ideas you may know from Scratch or Python.
+JavaScript is a full programming language with variables, loops, conditions and functions. These are the same ideas you may know from Scratch or Python.
 
 ## How they work together
 
@@ -141,7 +141,7 @@ In real projects, CSS and JavaScript usually live in separate files (`style.css`
 
 ## Is HTML a programming language?
 
-Strictly speaking, **HTML and CSS are not programming languages** — HTML is a *markup* language (it labels content) and CSS is a *style sheet* language (it describes appearance). Neither has the loops, variables and decisions of a programming language. **JavaScript is a programming language.**
+Strictly speaking, **HTML and CSS are not programming languages**: HTML is a *markup* language (it labels content) and CSS is a *style sheet* language (it describes appearance). Neither has the loops, variables and decisions of a programming language. **JavaScript is a programming language.**
 
 That doesn't make HTML and CSS less important. Every single website needs them, and doing them well takes real skill.
 
@@ -175,7 +175,7 @@ When you're ready for a bigger project, follow our step-by-step guides to [build
 
 **Do I need to install anything?** No. You can write HTML, CSS and JavaScript in any text editor and open the file in your browser. A free editor like VS Code makes it easier.
 
-**How long does it take to learn HTML and CSS?** The basics take a few weeks of regular practice. Becoming really confident with layouts takes longer — and building real projects is the fastest way to get there.
+**How long does it take to learn HTML and CSS?** The basics take a few weeks of regular practice. Becoming really confident with layouts takes longer, and building real projects is the fastest way to get there.
 
 **Is JavaScript the same as Java?** No! Despite the similar names, they are completely different languages.
 

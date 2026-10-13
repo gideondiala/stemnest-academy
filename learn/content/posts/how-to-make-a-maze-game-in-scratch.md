@@ -1,19 +1,19 @@
 ---
 title: How to Make a Maze Game in Scratch (with Levels)
-description: Draw your own maze, stop the player walking through walls with colour detection, add a goal, a timer and multiple levels — a complete Scratch 3 tutorial for beginners.
+description: Make a maze game in Scratch with walls, a goal, a timer and multiple levels. A complete step-by-step Scratch 3 tutorial for beginners.
 date: 2026-10-13
 category: Learn by Doing
 tags: [scratch, games, beginner, kids coding]
 emoji: 🧩
 level: Beginner
-age: 8–13
+age: 8 to 13
 ---
 
-Maze games are a brilliant second Scratch project. You get to **design your own level**, and you learn a powerful trick game programmers use all the time: **collision detection** — knowing when the player bumps into something.
+Maze games are a brilliant second Scratch project. You get to **design your own level**, and you learn a powerful trick game programmers use all the time, called **collision detection**: knowing when the player bumps into something.
 
 In this guide you will draw a maze, move a character through it with the arrow keys, stop it walking through walls, finish the level by reaching a goal, and then add a timer and more levels.
 
-> **What you need:** the free Scratch editor at [scratch.mit.edu](https://scratch.mit.edu) (click **Create**). If you have never used Scratch, try our [catch game tutorial](/how-to-make-a-catch-game-in-scratch/) first — it is a gentle start.
+> **What you need:** the free Scratch editor at [scratch.mit.edu](https://scratch.mit.edu) (click **Create**). If you have never used Scratch, try our [catch game tutorial](/how-to-make-a-catch-game-in-scratch/) first. It is a gentle start.
 
 ## The plan
 
@@ -33,7 +33,7 @@ In this guide you will draw a maze, move a character through it with the arrow k
 
 ## Step 2: Add and shrink the player
 
-1. Click **Choose a Sprite** and pick a small character — *Ball*, *Beetle* or the cat all work.
+1. Click **Choose a Sprite** and pick a small character. *Ball*, *Beetle* or the cat all work.
 2. Set its **Size** so it fits easily through your paths (try `25` to `35`).
 3. Drag it to the start of the maze. In the sprite panel, note its **x** and **y** numbers.
 
@@ -92,7 +92,7 @@ Do the same for the other three directions, always undoing with the opposite num
 
 ## Step 5: Add the goal
 
-1. Add a sprite to be the goal — *Star*, *Gift* or a flag you paint yourself.
+1. Add a sprite to be the goal, such as *Star*, *Gift* or a flag you paint yourself.
 2. Place it at the end of the maze.
 3. Add this script to the **player**, inside the `forever` loop, after the four arrow checks:
 
@@ -103,7 +103,7 @@ if <touching (Star)?> then
 end
 ```
 
-Play your maze from start to finish. Congratulations — it is a real game!
+Play your maze from start to finish. Congratulations, you have made a real game!
 
 ## Step 6: Add a timer
 
@@ -150,7 +150,7 @@ end
 5. Paint a `You Win` backdrop.
 6. Move the player back to the start for each level: on the player, add `when I receive (next level)` → `go to x: (-210) y: (0)`. If the start or goal is in a different place on Level 2, move the Star in its own `when backdrop switches to (Level 2)` script.
 
-`join [Level ] (level)` builds the backdrop name from the level number, so the same code works for 2, 3, 10 or 100 levels — you only need to paint them.
+`join [Level ] (level)` builds the backdrop name from the level number, so the same code works for 2, 3, 10 or 100 levels. You only need to paint them.
 
 ## Common problems
 

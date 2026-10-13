@@ -1,6 +1,6 @@
 ---
 title: "Python for Kids: Build a Number Guessing Game (Step by Step)"
-description: Write your first real Python program — a number guessing game with hints, a guess counter, input checking and a "play again" option. Every line explained for beginners.
+description: Write your first Python game: a number guessing game with hints, a guess counter and play again. Every line explained for kids and beginners.
 date: 2026-10-13
 category: Learn by Doing
 tags: [python, games, beginner, kids coding]
@@ -9,7 +9,7 @@ level: Beginner
 age: 10+
 ---
 
-"I'm thinking of a number between 1 and 100…" — the guessing game is the perfect first Python project. In about 25 lines of code you will use the most important ideas in programming: **variables, input, conditions, loops and random numbers**.
+"I'm thinking of a number between 1 and 100…" The guessing game is the perfect first Python project. In about 25 lines of code you will use the most important ideas in programming: **variables, input, conditions, loops and random numbers**.
 
 By the end, your game will:
 
@@ -48,7 +48,7 @@ print("I'm thinking of a number between 1 and 100.")
 ```
 
 - `import random` loads Python's random-number tools.
-- `random.randint(1, 100)` picks a whole number from 1 to 100 — and both 1 and 100 can be chosen.
+- `random.randint(1, 100)` picks a whole number from 1 to 100. Both 1 and 100 can be chosen.
 - `secret = …` stores that number in a **variable** called `secret`. A variable is a named box that holds a value.
 
 ## Step 3: Ask for a guess
@@ -73,9 +73,9 @@ else:
 
 Python checks each condition in order:
 
-- `if` — is the guess smaller? Then say "Too low!"
-- `elif` (short for *else if*) — otherwise, is it bigger?
-- `else` — if it is neither smaller nor bigger, it must be correct.
+- `if`: is the guess smaller? Then say "Too low!"
+- `elif` (short for *else if*): otherwise, is it bigger?
+- `else`: if it is neither smaller nor bigger, it must be correct.
 
 **Indentation matters in Python.** The four spaces before each `print` show that it belongs to the line above. Thonny and other editors add them for you after a colon (`:`).
 
@@ -128,7 +128,7 @@ while True:
         print("Please type a whole number.")
 ```
 
-- `while True` loops forever — until we `break` out of it.
+- `while True` loops forever, until we `break` out of it.
 - If `int(text)` works, `break` leaves the loop with a valid number.
 - If it fails, Python jumps to `except ValueError` and asks again instead of crashing.
 
@@ -188,9 +188,9 @@ while True:
 **New ideas in this version:**
 
 - **Functions** (`def get_guess():` and `def play():`) package code into named, reusable chunks. `return` sends a value back to wherever the function was called.
-- The text in triple quotes under `def get_guess()` is a **docstring** — a note explaining what the function does.
+- The text in triple quotes under `def get_guess()` is a **docstring**: a note explaining what the function does.
 - `continue` jumps straight back to the top of the loop.
-- `1 <= number <= 100` checks that the number is in range — Python lets you write it just like in maths.
+- `1 <= number <= 100` checks that the number is in range. Python lets you write it just like in maths.
 - `tries += 1` is a shortcut for `tries = tries + 1`.
 - `best = None` means "no best score yet". After each game we keep the smallest number of tries.
 - `.strip().lower()` removes spaces and makes the answer lowercase, so `Y`, `y` and ` y ` all count as yes.
@@ -200,8 +200,8 @@ while True:
 
 Is there a best strategy? Yes! Always guess the **middle** of the numbers that are still possible:
 
-- Start with **50**. "Too high" means the number is 1–49, so guess **25**.
-- "Too low" means 26–49, so guess **37**, and so on.
+- Start with **50**. "Too high" means the number is 1 to 49, so guess **25**.
+- "Too low" means 26 to 49, so guess **37**, and so on.
 
 Each guess cuts the possibilities in half, so you will **always** find the number in **7 guesses or fewer** (because 2 × 2 × 2 × 2 × 2 × 2 × 2 = 128, which is more than 100). This strategy is called **binary search**, and computers use it to find things in huge lists incredibly fast.
 
@@ -210,7 +210,7 @@ Each guess cuts the possibilities in half, so you will **always** find the numbe
 | Error message | What it means | Fix |
 |---|---|---|
 | `IndentationError` | The spaces at the start of a line are wrong | Line code up exactly as shown; use 4 spaces |
-| `NameError: name 'radom' is not defined` | A spelling mistake | Check spelling — it's `random` |
+| `NameError: name 'radom' is not defined` | A spelling mistake | Check the spelling: it's `random` |
 | `SyntaxError` near `if` or `while` | A missing colon | Lines starting `if`, `elif`, `else`, `while` and `def` end with `:` |
 | `ValueError: invalid literal for int()` | Text was turned into a number | Use the `try`/`except` version from Step 6 |
 
@@ -231,7 +231,7 @@ Each guess cuts the possibilities in half, so you will **always** find the numbe
 - Handling errors with `try` and `except`.
 - A real computer science idea: **binary search**.
 
-If you have used Scratch before, you might notice these are the same ideas as Scratch's `forever`, `if` and variable blocks — just written as text. Our guide to [Scratch vs Python](/scratch-vs-python-which-first/) explains how the two connect.
+If you have used Scratch before, you might notice these are the same ideas as Scratch's `forever`, `if` and variable blocks, just written as text. Our guide to [Scratch vs Python](/scratch-vs-python-which-first/) explains how the two connect.
 
 ## Frequently asked questions
 
@@ -239,4 +239,4 @@ If you have used Scratch before, you might notice these are the same ideas as Sc
 
 **Is Python free?** Yes. Python and editors such as Thonny and VS Code are completely free.
 
-**Why does my game pick the same number every time I test it?** It doesn't — `random.randint` picks a new number each run. If you set `secret = 42` while testing, remember to change it back!
+**Why does my game pick the same number every time I test it?** It doesn't. `random.randint` picks a new number each run. If you set `secret = 42` while testing, remember to change it back!

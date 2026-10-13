@@ -1,6 +1,6 @@
 ---
 title: Contact us
-description: Get in touch with the StemNest Learning Hub team — suggest a tutorial, report a mistake, or ask about live coding classes.
+description: Get in touch with the StemNest Learning Hub team to suggest a tutorial, report a mistake, or ask about live coding classes.
 updated: 2026-10-13
 ---
 
@@ -14,10 +14,10 @@ We usually reply within one or two working days.
 
 ## What to write to us about
 
-- **Ideas for new guides** — tell us what you are trying to build or understand.
-- **Mistakes or broken steps** — please include the guide's title and the step number.
-- **Live classes** — questions about StemNest Academy classes, prices and timetables.
-- **Schools and partnerships** — using our guides in a classroom or coding club.
+- **Ideas for new guides**: tell us what you are trying to build or understand.
+- **Mistakes or broken steps**: please include the guide's title and the step number.
+- **Live classes**: questions about StemNest Academy classes, prices and timetables.
+- **Schools and partnerships**: using our guides in a classroom or coding club.
 
 ## Try a live class
 

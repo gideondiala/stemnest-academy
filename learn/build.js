@@ -1,10 +1,10 @@
 /**
- * Static site generator for learn.stemnestacademy.co.uk — the StemNest
+ * Static site generator for learn.stemnestacademy.co.uk, the StemNest
  * Student Learning Hub.
  *
  * Content comes from two places:
- *   1. content/posts/*.md   — articles kept in the repo (front matter + Markdown)
- *   2. the StemNest API     — posts published in Admin → Blog (HTML body),
+ *   1. content/posts/*.md   articles kept in the repo (front matter + Markdown)
+ *   2. the StemNest API     posts published in Admin → Blog (HTML body),
  *                             fetched at build time (skipped if unreachable)
  *
  * Output (dist/): one folder per article (pretty URLs), category pages,
@@ -23,7 +23,7 @@ const hljs = require('highlight.js');
 const SITE = {
   url: 'https://learn.stemnestacademy.co.uk',
   name: 'StemNest Learning Hub',
-  tagline: 'Coding, AI and tech skills for young learners — step by step.',
+  tagline: 'Coding, AI and tech skills for young learners, step by step.',
   mainUrl: 'https://stemnestacademy.co.uk',
   trialUrl: 'https://stemnestacademy.co.uk/pages/free-trial',
   api: process.env.LEARN_API || 'https://api.stemnestacademy.co.uk/api/blogs',
@@ -85,7 +85,7 @@ function renderMarkdown(md) {
       code(code, lang) {
         const language = lang && hljs.getLanguage(lang) ? lang : null;
         const html = language ? hljs.highlight(code, { language }).value : esc(code);
-        const label = { html: 'HTML', css: 'CSS', js: 'JavaScript', javascript: 'JavaScript', python: 'Python', scratch: 'Scratch blocks', text: 'Text', bash: 'Terminal' }[lang] || (lang || 'Code');
+        const label = { html: 'HTML', css: 'CSS', js: 'JavaScript', javascript: 'JavaScript', python: 'Python', scratch: 'Scratch blocks', text: 'Text', bash: 'Terminal', lua: 'Lua' }[lang] || (lang || 'Code');
         return `<div class="code"><div class="code-bar"><span>${esc(label)}</span><button type="button" class="copy" aria-label="Copy code">Copy</button></div><pre><code class="hljs${language ? ' language-' + language : ''}">${html}</code></pre></div>\n`;
       },
       link(href, title, text) {
@@ -170,7 +170,7 @@ async function loadApiPosts() {
       };
     });
   } catch (e) {
-    console.warn('! Admin posts not loaded (' + e.message + ') — building repo articles only');
+    console.warn('! Admin posts not loaded (' + e.message + '), building repo articles only');
     return [];
   }
 }
@@ -368,7 +368,7 @@ ${related.length ? `<section class="wrap related"><h2>Keep learning</h2><div cla
   <div class="wrap">
     <p class="eyebrow">StemNest Academy</p>
     <h1>Student Learning Hub</h1>
-    <p class="hero-sub">A place where our students and young coders learn beyond the classroom — free, step-by-step guides to coding, games, websites and AI.</p>
+    <p class="hero-sub">A place where our students and young coders learn beyond the classroom. Free, step-by-step guides to coding, games, websites and AI.</p>
     ${searchBox()}
     <div class="hero-cats">${Object.entries(CATEGORIES).map(([k, c]) => `<a class="chip chip-${k}" href="/category/${k}/">${c.emoji} ${esc(c.name)}</a>`).join('')}</div>
   </div>
@@ -402,7 +402,7 @@ ${related.length ? `<section class="wrap related"><h2>Keep learning</h2><div cla
   ${sidebar(posts, k)}
 </div>`;
     write(`category/${k}/index.html`, page({
-      title: `${c.name} — coding and tech guides`, description: c.blurb, canonical: `${SITE.url}/category/${k}/`, body,
+      title: `${c.name}: coding and tech guides`, description: c.blurb, canonical: `${SITE.url}/category/${k}/`, body,
       jsonld: [{ '@context': 'https://schema.org', '@type': 'CollectionPage', name: c.name, url: `${SITE.url}/category/${k}/`, isPartOf: { '@type': 'WebSite', name: SITE.name, url: SITE.url + '/' } }],
     }));
   }
@@ -480,7 +480,7 @@ https://:version.stemnest-learn.pages.dev/*
   /* Static assets */
   for (const f of fs.readdirSync(path.join(ROOT, 'static'))) fs.copyFileSync(path.join(ROOT, 'static', f), path.join(OUT, f));
 
-  /* Fingerprint of the whole site — the deploy skips publishing when it matches the live one */
+  /* Fingerprint of the whole site: the deploy skips publishing when it matches the live one */
   const h = require('crypto').createHash('sha256');
   (function walk(d) {
     for (const f of fs.readdirSync(d).sort()) {

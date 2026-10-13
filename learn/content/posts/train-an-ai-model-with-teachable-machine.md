@@ -1,6 +1,6 @@
 ---
 title: "Train Your First AI Model with Teachable Machine (No Coding Needed)"
-description: Teach a computer to recognise rock, paper and scissors using your webcam and Google's free Teachable Machine — and learn how machine learning really works along the way.
+description: Train your first AI model with Google's free Teachable Machine. Teach a computer to recognise rock, paper, scissors with no coding needed.
 date: 2026-10-13
 category: Learn by Doing
 tags: [ai, machine learning, teachable machine, beginner, kids coding]
@@ -9,7 +9,7 @@ level: Beginner
 age: 8+
 ---
 
-Can you teach a computer to see? In this activity you will train a real **machine learning model** that recognises hand shapes for *rock, paper, scissors* — in about 20 minutes, with no coding at all.
+Can you teach a computer to see? In this activity you will train a real **machine learning model** that recognises hand shapes for *rock, paper, scissors* in about 20 minutes, with no coding at all.
 
 You will use **Teachable Machine**, a free tool from Google that runs in your web browser. More importantly, you will discover *how* AI learns, and why it sometimes gets things wrong.
 
@@ -19,7 +19,7 @@ You will use **Teachable Machine**, a free tool from Google that runs in your we
 
 Normal programs follow rules a person writes: *"if the score is 10, show 'You win'."* But try writing rules for "this is a picture of a hand making scissors". What exactly makes scissors look like scissors? It's surprisingly hard to put into words.
 
-**Machine learning** flips the idea around. Instead of writing rules, we give the computer lots of **examples** with **labels** (*this is rock, this is paper…*) and it finds the patterns itself. The result is called a **model**. Once trained, the model can make a guess — a **prediction** — about examples it has never seen.
+**Machine learning** flips the idea around. Instead of writing rules, we give the computer lots of **examples** with **labels** (*this is rock, this is paper…*) and it finds the patterns itself. The result is called a **model**. Once trained, the model can make a guess, a **prediction**: about examples it has never seen.
 
 You will do exactly that in three stages: **collect examples → train → test**.
 
@@ -35,7 +35,7 @@ You will see a row of boxes on the left called **classes**. A class is one categ
 1. Click the pencil icon next to **Class 1** and rename it `Rock`.
 2. Rename **Class 2** to `Paper`.
 3. Click **Add a class** and name it `Scissors`.
-4. Add one more class called `Nothing`. This teaches the model what it looks like when *no* hand shape is shown — otherwise it is forced to choose rock, paper or scissors even when you are just sitting there.
+4. Add one more class called `Nothing`. This teaches the model what it looks like when *no* hand shape is shown. Otherwise it is forced to choose rock, paper or scissors even when you are just sitting there.
 
 ## Step 3: Collect training examples
 
@@ -44,7 +44,7 @@ For each class:
 1. Click **Webcam** and allow the browser to use your camera.
 2. Make the hand shape in front of the camera.
 3. Press and **hold** the **Hold to Record** button. It captures many pictures per second.
-4. While recording, **move your hand around**: closer, further away, a little left and right, slightly turned. Aim for **150–300 images** per class.
+4. While recording, **move your hand around**: closer, further away, a little left and right, slightly turned. Aim for **150 to 300 images** per class.
 
 For the **Nothing** class, record your face and background with no hand showing.
 
@@ -60,12 +60,12 @@ During training, the computer looks at every picture over and over and adjusts a
 
 When training finishes, the **Preview** panel turns on your webcam. Make each hand shape and watch the bars:
 
-- The bars show the model's **confidence** for each class — how sure it is, from 0% to 100%.
+- The bars show the model's **confidence** for each class: how sure it is, from 0% to 100%.
 - Try all three shapes. Then try something tricky: a half-open hand, two hands, a different background, or a friend's hand.
 
 ## Step 6: Investigate the mistakes
 
-Your model will probably make some mistakes. That is not a failure — it is where the real learning happens. Try these experiments:
+Your model will probably make some mistakes. That is not a failure. It is where the real learning happens. Try these experiments:
 
 | Experiment | What you might notice | Why |
 |---|---|---|
@@ -74,14 +74,14 @@ Your model will probably make some mistakes. That is not a failure — it is whe
 | Hold your hand much closer | Mistakes increase | Few training pictures were taken that close |
 | Remove the "Nothing" class and retrain | It always picks something, even with no hand | It has no way to say "none of these" |
 
-**How to fix it:** add more varied examples (different light, distances, backgrounds, and other people's hands — with their permission) and train again. This loop of *test → find weaknesses → improve the data → retrain* is exactly what AI engineers do every day.
+**How to fix it:** add more varied examples (different light, distances, backgrounds, and other people's hands, with their permission) and train again. This loop of *test → find weaknesses → improve the data → retrain* is exactly what AI engineers do every day.
 
 ## Step 7: Make a game with your model
 
 Want to go further? Teachable Machine can **export** your model:
 
 - Click **Export Model** to see the options. You can upload it to get a shareable link, or download it to use in your own code (for example, in a JavaScript website).
-- Some free tools for young coders, such as PictoBlox and ML for Kids, let you use AI models inside Scratch-style block coding — so you could build a game where the computer plays rock, paper, scissors against your webcam hand.
+- Some free tools for young coders, such as PictoBlox and ML for Kids, let you use AI models inside Scratch-style block coding, so you could build a game where the computer plays rock, paper, scissors against your webcam hand.
 
 ## Think about it: AI and fairness
 
@@ -115,6 +115,6 @@ To understand the ideas behind this activity in more depth, read [What is machin
 
 **Can I train it on sounds or poses?** Yes. Teachable Machine also offers **Audio Projects** (for example, recognising claps and whistles) and **Pose Projects** (recognising body positions).
 
-**Does this count as "real" AI?** Yes. Under the hood it uses a neural network — the same family of technology used in many professional image-recognition systems, just on a smaller scale.
+**Does this count as "real" AI?** Yes. Under the hood it uses a neural network, the same family of technology used in many professional image-recognition systems, just on a smaller scale.
 
 **What age is this activity suitable for?** Children from about 8 can do it with an adult nearby; older children and teenagers can explore the export options and build projects with their models.

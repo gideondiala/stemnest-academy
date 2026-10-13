@@ -23,7 +23,7 @@ You can opt out of Google Analytics with the [Google Analytics opt-out browser a
 
 ### Study time for StemNest students
 
-Students of StemNest Academy receive progress reports that include time spent on our learning resources. If you are logged in to a **student** account on stemnestacademy.co.uk in the same browser, each minute of active reading on the Learning Hub is added to that student's study-time total. We record only the number of minutes, the day, and that the time was spent on the Learning Hub — not which pages were read. Nothing is recorded for visitors who are not logged-in students.
+Students of StemNest Academy receive progress reports that include time spent on our learning resources. If you are logged in to a **student** account on stemnestacademy.co.uk in the same browser, each minute of active reading on the Learning Hub is added to that student's study-time total. We record only the number of minutes, the day, and that the time was spent on the Learning Hub, not which pages were read. Nothing is recorded for visitors who are not logged-in students.
 
 ### Messages you send us
 
@@ -47,4 +47,4 @@ We will update this page if the way we use information changes, and change the "
 
 ## Contact
 
-StemNest Academy — **[{{email}}](mailto:{{email}})**
+StemNest Academy: **[{{email}}](mailto:{{email}})**
