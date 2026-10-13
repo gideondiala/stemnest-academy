@@ -1,0 +1,42 @@
+name: Set Anthropic key
+
+# Run by hand after adding the repository secret ANTHROPIC_API_KEY.
+# Writes it into the server's backend/.env (used by the EdTech news drafts,
+# backend/src/services/newsDrafts.js) and restarts the API. The value is never printed.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  set-key:
+    name: Write Anthropic key to the server
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write key and restart the API
+        uses: appleboy/ssh-action@v1.2.5
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: ANTHROPIC_API_KEY
+          script: |
+            set -e
+            cd /home/ubuntu/stemnest-academy/backend
+            [ -n "$ANTHROPIC_API_KEY" ] || { echo "ANTHROPIC_API_KEY secret is missing"; exit 1; }
+            cp .env "/home/ubuntu/env-before-anthropic-$(date +%Y%m%d-%H%M%S)"
+            grep -v '^ANTHROPIC_API_KEY=' .env > .env.new || true
+            printf 'ANTHROPIC_API_KEY=%s\n' "$ANTHROPIC_API_KEY" >> .env.new
+            mv .env.new .env
+            echo "key starts with: $(printf '%s' "$ANTHROPIC_API_KEY" | cut -c1-7)…  (${#ANTHROPIC_API_KEY} chars)"
+            pm2 reload stemnest-api --update-env
+            sleep 8
+            node -e "require('dotenv').config(); console.log('server sees Anthropic key:', !!process.env.ANTHROPIC_API_KEY)"
+            curl -s -o /dev/null -w "API health: %{http_code}\n" http://localhost:3000/api/health

@@ -155,6 +155,7 @@ app.use('/api/certificates',  certificateRoutes);
 app.use('/api/batches',       batchRoutes);
 app.use('/api/reports',       require('./routes/reports'));
 app.use('/api/blog-comments', require('./routes/blogComments'));
+app.use('/api/blog-news',     require('./routes/blogNews'));
 
 /* ══════════════════════════════════════════════
    404 + GLOBAL ERROR HANDLER
@@ -181,6 +182,7 @@ const server = app.listen(PORT, () => {
       require("./services/learningService").startDueReminderJob();
       require('./services/reportService').startReportJob();
       require('./services/lessonLinker').startLessonLinkJob();
+      require('./services/newsDrafts').startNewsJob();
       chatRoutes.startChatReminderJob();
     });
 });

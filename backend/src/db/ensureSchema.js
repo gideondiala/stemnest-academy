@@ -379,6 +379,15 @@ const STATEMENTS = [
   `ALTER TABLE blog_comments ENABLE ROW LEVEL SECURITY`,
   `CREATE INDEX IF NOT EXISTS idx_blog_comments_post ON blog_comments(post_slug, status, created_at)`,
   `CREATE INDEX IF NOT EXISTS idx_blog_comments_status ON blog_comments(status, created_at)`,
+
+  /* ── EdTech news drafts: stories already considered (services/newsDrafts.js) ── */
+  `CREATE TABLE IF NOT EXISTS news_seen (
+     url     TEXT PRIMARY KEY,
+     title   TEXT,
+     source  VARCHAR(80),
+     seen_at TIMESTAMPTZ DEFAULT NOW()
+   )`,
+  `ALTER TABLE news_seen ENABLE ROW LEVEL SECURITY`,
 ];
 
 async function ensureSchema() {
