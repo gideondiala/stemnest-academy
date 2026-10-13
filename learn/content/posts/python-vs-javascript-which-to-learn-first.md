@@ -1,7 +1,7 @@
 ---
 title: "Python vs JavaScript: Which Should You Learn First?"
 description: Python or JavaScript first? A plain-English comparison of how they look, what they're used for and how hard they are, to help you choose.
-date: 2026-10-14
+date: 2026-10-13
 category: Tech Explained
 tags: [python, javascript, comparison, beginner, careers]
 emoji: 🥊

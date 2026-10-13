@@ -43,6 +43,28 @@
     document.addEventListener('click', function (e) { if (!e.target.closest('.search')) box.hidden = true; });
   }
 
+  /* ── Cookie consent (Google Consent Mode) ──
+     Analytics cookies stay off until the visitor accepts. The choice is
+     remembered; "Cookie settings" in the footer reopens the banner. */
+  function setConsent(v) {
+    try { localStorage.setItem('sn_consent', v); } catch (e) {}
+    if (typeof gtag === 'function') gtag('consent', 'update', { analytics_storage: v });
+    var b = document.getElementById('consent'); if (b) b.remove();
+  }
+  function showConsent() {
+    if (document.getElementById('consent')) return;
+    var b = document.createElement('div');
+    b.id = 'consent'; b.className = 'consent'; b.setAttribute('role', 'dialog'); b.setAttribute('aria-label', 'Cookie choices');
+    b.innerHTML = '<p>We use cookies to count visits and see which guides help most. Is that OK? <a href="/privacy/">Privacy policy</a></p>' +
+      '<div class="actions"><button type="button" class="reject">No thanks</button><button type="button" class="accept">Accept</button></div>';
+    b.querySelector('.accept').onclick = function () { setConsent('granted'); };
+    b.querySelector('.reject').onclick = function () { setConsent('denied'); };
+    document.body.appendChild(b);
+  }
+  var stored = null; try { stored = localStorage.getItem('sn_consent'); } catch (e) {}
+  if (!stored) showConsent();
+  var cs = document.getElementById('cookie-settings'); if (cs) cs.onclick = showConsent;
+
   /* ── Copy buttons on code blocks ── */
   document.querySelectorAll('.code .copy').forEach(function (btn) {
     btn.addEventListener('click', function () {

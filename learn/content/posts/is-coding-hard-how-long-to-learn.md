@@ -1,7 +1,7 @@
 ---
 title: "Is Coding Hard to Learn? How Long It Really Takes (Honest Answers)"
 description: Is coding hard? How long does it take to learn? Honest answers for kids, teens and parents, with realistic timelines and tips to learn faster.
-date: 2026-10-14
+date: 2026-10-13
 category: Tech Explained
 tags: [coding, beginner, parents, careers, motivation]
 emoji: ⏳

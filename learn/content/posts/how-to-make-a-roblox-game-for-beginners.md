@@ -1,7 +1,7 @@
 ---
 title: "How to Make a Roblox Game: A Beginner's Guide to Roblox Studio and Lua"
 description: Make your first Roblox obby in Roblox Studio: platforms, kill bricks, spinning bars, coins and checkpoints with simple Lua scripts. A beginner guide.
-date: 2026-10-14
+date: 2026-10-13
 category: Learn by Doing
 tags: [roblox, lua, games, beginner, kids coding]
 emoji: 🧱

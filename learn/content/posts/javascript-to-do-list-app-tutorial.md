@@ -1,7 +1,7 @@
 ---
 title: "Build a To-Do List App with JavaScript (Beginner Project, Step by Step)"
 description: Build a to-do list app with HTML, CSS and JavaScript. Add, tick off, delete and save tasks, with every line explained. A great first JS project.
-date: 2026-10-14
+date: 2026-10-13
 category: Learn by Doing
 tags: [javascript, html, css, web development, project, beginner]
 emoji: ✅

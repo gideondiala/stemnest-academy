@@ -1,7 +1,7 @@
 ---
 title: "How to Debug Your Code: 12 Simple Tips for Beginners"
 description: Code not working? 12 simple debugging tips for beginners, from reading error messages to rubber duck debugging, with Python, JavaScript and Scratch examples.
-date: 2026-10-14
+date: 2026-10-13
 category: Learn by Doing
 tags: [debugging, python, javascript, scratch, beginner]
 emoji: 🐞

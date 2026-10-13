@@ -1,7 +1,7 @@
 ---
 title: "How Do AI Chatbots Work? A Simple Explanation for Kids and Parents"
 description: How do AI chatbots actually work? A simple explanation for kids and parents of language models, why they make mistakes, and how to use them safely.
-date: 2026-10-14
+date: 2026-10-13
 category: Tech Explained
 tags: [ai, chatbots, parents, machine learning, safety]
 emoji: 💬

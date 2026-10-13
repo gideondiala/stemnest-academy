@@ -33,14 +33,28 @@ const SITE = {
 const CATEGORIES = {
   'learn-by-doing': { name: 'Learn by Doing', emoji: '🛠️', blurb: 'Step-by-step tutorials: build games, websites, apps and AI projects yourself.', colors: ['#1a56db', '#3b82f6'] },
   'tech-explained': { name: 'Tech Explained', emoji: '💡', blurb: 'Clear answers and honest comparisons to help students and parents choose well.', colors: ['#7c3aed', '#a78bfa'] },
+  'parents-corner': { name: "Parents' Corner", emoji: '👨‍👩‍👧', blurb: 'Practical, plain-English guides for parents supporting a young coder at home.', colors: ['#0e9f6e', '#34d399'] },
+  'study-tips': { name: 'Study Tips', emoji: '✏️', blurb: 'Simple study habits and revision tricks that help students learn more in less time.', colors: ['#ea580c', '#fbbf24'] },
+  'edtech-news': { name: 'EdTech News', emoji: '📰', blurb: 'What is changing in education and technology, and what it means for students and parents.', colors: ['#334155', '#64748b'] },
 };
+/* Admin → Blog uses short keys for some categories */
+const CATEGORY_ALIASES = { news: 'edtech-news', tips: 'study-tips', parents: 'parents-corner' };
 const ROOT = __dirname, OUT = path.join(ROOT, 'dist');
 
 /* ── helpers ── */
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const slugify = s => String(s).toLowerCase().replace(/<[^>]+>/g, '').replace(/&[a-z]+;/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
 const isoDate = d => new Date(d).toISOString();
-const niceDate = d => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+/* Front matter dates are Nigeria time (UTC+1). "2026-10-17" means 00:00, "2026-10-17 09:00" means 9am. */
+function publishTime(v) {
+  const m = String(v || '').trim().match(/^(\d{4}-\d{2}-\d{2})(?:[ T](\d{1,2}):(\d{2}))?$/);
+  if (!m) return new Date(v);
+  return new Date(`${m[1]}T${String(m[2] || '00').padStart(2, '0')}:${m[3] || '00'}:00+01:00`);
+}
+const NOW = process.env.PUBLISH_ALL ? new Date('2999-01-01') : new Date();
+const niceDate = d => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Africa/Lagos' });
+/* YYYY-MM-DD in Nigeria time (sitemap) */
+const watDay = d => new Date(new Date(d).getTime() + 3600e3).toISOString().slice(0, 10);
 const words = html => String(html).replace(/<pre[\s\S]*?<\/pre>/g, ' ').replace(/<[^>]+>/g, ' ').split(/\s+/).filter(Boolean).length;
 function write(rel, content) {
   const f = path.join(OUT, rel);
@@ -50,7 +64,17 @@ function write(rel, content) {
 function categoryKey(c) {
   const k = slugify(c || '');
   if (CATEGORIES[k]) return k;
+  if (CATEGORY_ALIASES[k]) return CATEGORY_ALIASES[k];
   return /how|build|make|tutorial|learn/i.test(c || '') ? 'learn-by-doing' : 'tech-explained';
+}
+
+/* Authors: content/authors.json. Posts name one with "author: <slug>"; Admin posts match by name. */
+const AUTHORS = JSON.parse(fs.readFileSync(path.join(ROOT, 'content', 'authors.json'), 'utf8'));
+const DEFAULT_AUTHOR = AUTHORS[0].slug;
+function findAuthor(v) {
+  const k = slugify(v || '');
+  return AUTHORS.find(a => a.slug === k || slugify(a.name) === k) ||
+    (v ? { slug: null, name: String(v), role: '', bio: '' } : AUTHORS.find(a => a.slug === DEFAULT_AUTHOR));
 }
 
 /* Minimal front matter: key: value, and lists as [a, b, c] */
@@ -136,6 +160,7 @@ function cover(post, big) {
 }
 
 /* ── load content ── */
+const SCHEDULED = [];
 function loadRepoPosts() {
   const dir = path.join(ROOT, 'content', 'posts');
   return fs.readdirSync(dir).filter(f => f.endsWith('.md')).map(f => {
@@ -144,11 +169,13 @@ function loadRepoPosts() {
     const slug = data.slug || f.replace(/\.md$/, '');
     if (!data.title || !data.description || !data.date) throw new Error(`${f}: title, description and date are required`);
     if (data.draft === 'true') return null;
+    const date = publishTime(data.date);
+    if (date > NOW) { SCHEDULED.push({ slug, title: data.title, date }); return null; }
     return {
       slug, title: data.title, description: data.description, html, toc,
       category: categoryKey(data.category), tags: data.tags || [], emoji: data.emoji,
-      level: data.level, age: data.age, author: data.author || 'StemNest Academy Team',
-      date: data.date, updated: data.updated || data.date, source: 'repo',
+      level: data.level, age: data.age, author: findAuthor(data.author || DEFAULT_AUTHOR),
+      date: date.toISOString(), updated: data.updated ? publishTime(data.updated).toISOString() : date.toISOString(), source: 'repo',
     };
   }).filter(Boolean);
 }
@@ -159,13 +186,15 @@ async function loadApiPosts() {
     const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 15000);
     const r = await fetch(SITE.api, { signal: ctl.signal }); clearTimeout(t);
     const d = await r.json();
-    return (d.posts || []).filter(p => p.is_published && p.slug && p.title && p.content).map(p => {
+    return (d.posts || []).filter(p => p.is_published && p.slug && p.title && p.content)
+      .filter(p => { const t = new Date(p.published_at || p.created_at); if (t > NOW) { SCHEDULED.push({ slug: p.slug, title: p.title, date: t }); return false; } return true; })
+      .map(p => {
       const { html, toc } = cleanAdminHtml(p.content);
       return {
         slug: slugify(p.slug), title: p.title, description: p.excerpt || String(p.content).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 155),
         html, toc, category: categoryKey(p.category), tags: p.tags || [], emoji: null,
         image: /^https:\/\//.test(p.cover_image || '') ? p.cover_image : null,
-        author: p.author_name || 'StemNest Academy Team',
+        author: findAuthor(p.author_name || DEFAULT_AUTHOR),
         date: p.published_at || p.created_at, updated: p.updated_at || p.published_at || p.created_at, source: 'admin',
       };
     });
@@ -204,8 +233,13 @@ ${published ? `<meta property="article:published_time" content="${isoDate(publis
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css?v=${BUILD_ID}">
 ${jsonld.map(j => `<script type="application/ld+json">${JSON.stringify(j).replace(/</g, '\\u003c')}</script>`).join('\n')}
+<script>
+window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}
+var snConsent=null;try{snConsent=localStorage.getItem('sn_consent');}catch(e){}
+gtag('consent','default',{analytics_storage:snConsent==='granted'?'granted':'denied',ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',wait_for_update:500});
+gtag('js',new Date());gtag('config','${SITE.ga}');
+</script>
 <script async src="https://www.googletagmanager.com/gtag/js?id=${SITE.ga}"></script>
-<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${SITE.ga}');</script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -213,12 +247,13 @@ ${jsonld.map(j => `<script type="application/ld+json">${JSON.stringify(j).replac
   <div class="wrap header-row">
     <a class="brand" href="/" aria-label="${esc(SITE.name)} home"><img src="/logo.png" alt="StemNest Academy" width="150" height="50"><span>Learning Hub</span></a>
     <nav aria-label="Main">
-      <a href="/category/learn-by-doing/">Learn by Doing</a>
-      <a href="/category/tech-explained/">Tech Explained</a>
       <a class="hide-sm" href="/about/">About</a>
       <a class="nav-cta" href="${SITE.trialUrl}">Free trial<span class="hide-sm"> class</span></a>
     </nav>
   </div>
+  <nav class="cat-bar" aria-label="Categories"><div class="wrap cat-row">
+    ${Object.entries(CATEGORIES).map(([k, c]) => `<a href="/category/${k}/">${c.emoji} ${esc(c.name)}</a>`).join('')}
+  </div></nav>
 </header>
 <main id="main">
 ${body}
@@ -231,8 +266,7 @@ ${body}
     </div>
     <div>
       <h2>Explore</h2>
-      <a href="/category/learn-by-doing/">Learn by Doing</a>
-      <a href="/category/tech-explained/">Tech Explained</a>
+      ${Object.entries(CATEGORIES).map(([k, c]) => `<a href="/category/${k}/">${esc(c.name)}</a>`).join('')}
       <a href="/rss.xml">RSS feed</a>
     </div>
     <div>
@@ -240,6 +274,7 @@ ${body}
       <a href="/about/">About the Learning Hub</a>
       <a href="/contact/">Contact</a>
       <a href="/privacy/">Privacy policy</a>
+      <button type="button" class="link-btn" id="cookie-settings">Cookie settings</button>
       <a href="${SITE.mainUrl}">stemnestacademy.co.uk</a>
     </div>
   </div>
@@ -264,6 +299,25 @@ function card(p) {
     <div class="meta">${esc(niceDate(p.date))} · ${p.minutes} min read${p.level ? ' · ' + esc(p.level) : ''}</div>
   </div>
 </article>`;
+}
+
+function authorLink(a) {
+  return a.slug ? `<a href="/author/${a.slug}/">${esc(a.name)}</a>` : esc(a.name);
+}
+function authorAvatar(a, size) {
+  return a.photo
+    ? `<img class="avatar" src="${esc(a.photo)}" alt="${esc(a.name)}" width="${size}" height="${size}" loading="lazy">`
+    : `<span class="avatar avatar-text" style="width:${size}px;height:${size}px;font-size:${Math.round(size / 2.6)}px">${esc(a.name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase())}</span>`;
+}
+function authorBox(a) {
+  if (!a.bio) return '';
+  return `<aside class="author-box">${authorAvatar(a, 64)}<div><div class="author-label">About the author</div>
+    <div class="author-name">${authorLink(a)}${a.role ? ` <span>${esc(a.role)}</span>` : ''}</div><p>${esc(a.bio)}</p></div></aside>`;
+}
+function authorLd(a) {
+  return a.slug === DEFAULT_AUTHOR || !a.slug
+    ? { '@type': 'Organization', name: 'StemNest Academy', url: SITE.mainUrl }
+    : { '@type': 'Person', name: a.name, jobTitle: a.role || undefined, url: `${SITE.url}/author/${a.slug}/`, worksFor: { '@type': 'Organization', name: 'StemNest Academy' } };
 }
 
 function sidebar(posts, current) {
@@ -329,13 +383,15 @@ const BUILD_ID = require('crypto').createHash('sha1')
       <a class="chip chip-${p.category}" href="/category/${p.category}/">${c.emoji} ${esc(c.name)}</a>
       <h1>${esc(p.title)}</h1>
       <p class="lede">${esc(p.description)}</p>
-      <div class="meta">By ${esc(p.author)} · <time datetime="${isoDate(p.date)}">${esc(niceDate(p.date))}</time>${p.updated && p.updated !== p.date ? ` · Updated <time datetime="${isoDate(p.updated)}">${esc(niceDate(p.updated))}</time>` : ''} · ${p.minutes} min read${p.level ? ` · ${esc(p.level)}` : ''}${p.age ? ` · Ages ${esc(p.age)}` : ''}</div>
+      <div class="meta">By ${authorLink(p.author)} · <time datetime="${isoDate(p.date)}">${esc(niceDate(p.date))}</time>${p.updated && p.updated !== p.date ? ` · Updated <time datetime="${isoDate(p.updated)}">${esc(niceDate(p.updated))}</time>` : ''} · ${p.minutes} min read${p.level ? ` · ${esc(p.level)}` : ''}${p.age ? ` · Ages ${esc(p.age)}` : ''}</div>
     </header>
     <div class="post-cover">${cover(p, true)}</div>
     ${toc.length >= 3 ? `<details class="toc-mobile"><summary>In this guide</summary><ol>${toc.map(t => `<li><a href="#${t.id}">${esc(t.text)}</a></li>`).join('')}</ol></details>` : ''}
     <div class="prose">
 ${p.html}
     </div>
+    ${authorBox(p.author)}
+    <section class="comments" id="comments" data-slug="${esc(p.slug)}" aria-labelledby="comments-title"></section>
     ${trialBox().replace('trial-box', 'trial-box trial-wide')}
     ${p.tags.length ? `<div class="tags">${p.tags.map(t => `<span class="tag">#${esc(t)}</span>`).join('')}</div>` : ''}
     <div class="share">Share: <a target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(p.title + ' ' + url)}">WhatsApp</a> · <a target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}">Facebook</a> · <a target="_blank" rel="noopener" href="https://x.com/intent/post?url=${encodeURIComponent(url)}&text=${encodeURIComponent(p.title)}">X</a> · <a target="_blank" rel="noopener" href="https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}">LinkedIn</a></div>
@@ -351,7 +407,7 @@ ${related.length ? `<section class="wrap related"><h2>Keep learning</h2><div cla
       jsonld: [
         { '@context': 'https://schema.org', '@type': 'BlogPosting', headline: p.title, description: p.description,
           datePublished: isoDate(p.date), dateModified: isoDate(p.updated || p.date), inLanguage: 'en-GB',
-          author: { '@type': 'Organization', name: p.author === 'StemNest Academy Team' ? 'StemNest Academy' : p.author, url: SITE.mainUrl },
+          author: authorLd(p.author),
           publisher: ORG, mainEntityOfPage: { '@type': 'WebPage', '@id': url }, image: SITE.url + '/og-default.png',
           articleSection: c.name, keywords: p.tags.join(', '), wordCount: words(p.html) },
         { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
@@ -398,12 +454,27 @@ ${related.length ? `<section class="wrap related"><h2>Keep learning</h2><div cla
   </div>
 </section>
 <div class="wrap with-side">
-  <section>${list.length ? `<div class="grid">${list.map(card).join('')}</div>` : '<p>New guides are on the way.</p>'}</section>
+  <section>${list.length ? `<div class="grid">${list.map(card).join('')}</div>` : '<p class="empty">New articles are on the way. Check back soon!</p>'}</section>
   ${sidebar(posts, k)}
 </div>`;
     write(`category/${k}/index.html`, page({
-      title: `${c.name}: coding and tech guides`, description: c.blurb, canonical: `${SITE.url}/category/${k}/`, body,
+      title: `${c.name}: coding and tech guides`, description: c.blurb, canonical: `${SITE.url}/category/${k}/`, body, noindex: !list.length,
       jsonld: [{ '@context': 'https://schema.org', '@type': 'CollectionPage', name: c.name, url: `${SITE.url}/category/${k}/`, isPartOf: { '@type': 'WebSite', name: SITE.name, url: SITE.url + '/' } }],
+    }));
+  }
+
+  /* Author pages */
+  for (const a of AUTHORS) {
+    const list = posts.filter(p => p.author.slug === a.slug);
+    if (!list.length) continue;
+    write(`author/${a.slug}/index.html`, page({
+      title: `${a.name}${a.role ? ', ' + a.role : ''}`, description: (a.bio || `Articles by ${a.name}`).slice(0, 158), canonical: `${SITE.url}/author/${a.slug}/`,
+      body: `<section class="hero hero-small"><div class="wrap author-hero">${authorAvatar(a, 88)}<div>
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Learning Hub</a> › Authors</nav>
+        <h1>${esc(a.name)}</h1>${a.role ? `<p class="hero-sub">${esc(a.role)}</p>` : ''}</div></div></section>
+        <div class="wrap with-side"><section>${a.bio ? `<p class="author-bio">${esc(a.bio)}</p>` : ''}
+        <h2 class="section-title">Articles by ${esc(a.name)} (${list.length})</h2><div class="grid">${list.map(card).join('')}</div></section>${sidebar(posts)}</div>`,
+      jsonld: [{ '@context': 'https://schema.org', '@type': 'ProfilePage', mainEntity: authorLd(a) }],
     }));
   }
 
@@ -435,13 +506,14 @@ ${related.length ? `<section class="wrap related"><h2>Keep learning</h2><div cla
   const newest = posts.length ? posts.reduce((m, p) => new Date(p.updated) > new Date(m) ? p.updated : m, posts[0].updated) : new Date();
   const urls = [
     { loc: SITE.url + '/', lastmod: newest },
-    ...Object.keys(CATEGORIES).map(k => ({ loc: `${SITE.url}/category/${k}/`, lastmod: newest })),
+    ...Object.keys(CATEGORIES).filter(k => posts.some(p => p.category === k)).map(k => ({ loc: `${SITE.url}/category/${k}/`, lastmod: newest })),
+    ...AUTHORS.filter(a => posts.some(p => p.author.slug === a.slug)).map(a => ({ loc: `${SITE.url}/author/${a.slug}/`, lastmod: newest })),
     ...posts.map(p => ({ loc: `${SITE.url}/${p.slug}/`, lastmod: p.updated })),
     ...staticPages.map(s => ({ loc: `${SITE.url}/${s.slug}/`, lastmod: s.updated })),
   ];
   write('sitemap.xml', `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls.map(u => `  <url><loc>${esc(u.loc)}</loc>${u.lastmod ? `<lastmod>${isoDate(u.lastmod).slice(0, 10)}</lastmod>` : ''}</url>`).join('\n')}
+${urls.map(u => `  <url><loc>${esc(u.loc)}</loc>${u.lastmod ? `<lastmod>${watDay(u.lastmod)}</lastmod>` : ''}</url>`).join('\n')}
 </urlset>
 `);
   write('robots.txt', `User-agent: *\nAllow: /\n\nSitemap: ${SITE.url}/sitemap.xml\n`);
@@ -490,5 +562,9 @@ https://:version.stemnest-learn.pages.dev/*
   })(OUT);
   write('build-hash.txt', h.digest('hex'));
 
+  if (SCHEDULED.length) {
+    console.log('Scheduled (not published yet):');
+    SCHEDULED.sort((a, b) => a.date - b.date).forEach(x => console.log(`  ${x.date.toISOString().slice(0, 16).replace('T', ' ')} UTC  ${x.slug}`));
+  }
   console.log(`Built ${posts.length} articles (${repo.length} from the repo, ${posts.length - repo.length} from Admin), ${staticPages.length} pages → dist/`);
 })().catch(e => { console.error('BUILD FAILED:', e.message); process.exit(1); });

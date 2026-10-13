@@ -19,7 +19,7 @@ This policy explains how **learn.stemnestacademy.co.uk** (the "Learning Hub") ha
 
 We use Google Analytics, which sets cookies and collects information such as the pages you visit, how long you stay, the type of device and browser you use, and your approximate location (country or city, based on a shortened IP address). This helps us understand which guides are helpful and what to write next. Google's use of this data is described in [Google's Privacy Policy](https://policies.google.com/privacy) and [How Google uses information from sites that use its services](https://policies.google.com/technologies/partner-sites).
 
-You can opt out of Google Analytics with the [Google Analytics opt-out browser add-on](https://tools.google.com/dlpage/gaoptout), or by blocking cookies in your browser settings.
+**Analytics cookies are only used if you click Accept** on the cookie banner. If you choose "No thanks", Google Analytics runs in a cookieless mode that does not identify you. You can change your choice at any time with **Cookie settings** at the bottom of every page. You can also opt out with the [Google Analytics opt-out browser add-on](https://tools.google.com/dlpage/gaoptout), or by blocking cookies in your browser settings.
 
 ### Study time for StemNest students
 

@@ -1,7 +1,7 @@
 ---
 title: "What Is an Algorithm? Explained for Kids with Everyday Examples"
 description: What is an algorithm? A simple explanation for kids with everyday examples, plus sorting and searching activities and how computers use them.
-date: 2026-10-14
+date: 2026-10-13
 category: Tech Explained
 tags: [algorithms, computational thinking, beginner, parents]
 emoji: 🧭

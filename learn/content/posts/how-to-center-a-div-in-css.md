@@ -1,7 +1,7 @@
 ---
 title: "How to Center a Div in CSS: 6 Easy Ways That Actually Work"
 description: How to center a div in CSS: six methods that work, from Flexbox and Grid to margin auto, with copy-and-paste code and when to use each one.
-date: 2026-10-14
+date: 2026-10-13
 category: Learn by Doing
 tags: [css, html, web development, beginner, layout]
 emoji: 🎯

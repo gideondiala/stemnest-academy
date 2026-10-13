@@ -1,8 +1,8 @@
 ---
 title: "How to Teach Kids to Code at Home: A Practical Guide for Parents"
 description: You don't need to code to help your child learn. A practical guide for parents: benefits, the best age to start, free tools and a weekly routine.
-date: 2026-10-14
-category: Tech Explained
+date: 2026-10-13
+category: Parents' Corner
 tags: [parents, coding, kids coding, guide, beginner]
 emoji: 👨‍👩‍👧
 level: For parents

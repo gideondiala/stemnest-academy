@@ -1,8 +1,8 @@
 ---
 title: "The Best Programming Languages for Kids in 2026 (By Age and Interest)"
 description: Scratch, Python, JavaScript or Lua? A parent's guide to the best programming languages for kids, by age and interest, and how to choose the right one.
-date: 2026-10-14
-category: Tech Explained
+date: 2026-10-13
+category: Parents' Corner
 tags: [parents, coding, comparison, python, scratch, javascript]
 emoji: 🗺️
 level: For parents

@@ -2,7 +2,7 @@
 title: "Coding or AI: What Should Kids Learn in 2026? A Parent's Guide"
 description: AI can write code, so should kids still learn to program? An honest guide for parents on coding, AI skills and an age-by-age plan for 2026.
 date: 2026-10-13
-category: Tech Explained
+category: Parents' Corner
 tags: [ai, coding, parents, careers, guide]
 emoji: 🧠
 level: For parents

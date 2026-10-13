@@ -1,7 +1,7 @@
 ---
 title: "What Is Data Science? Explained for Kids (with a Fun Mini Project)"
 description: What is data science? A simple explanation for kids and parents of what data scientists do, real examples, and a fun mini project to try.
-date: 2026-10-14
+date: 2026-10-13
 category: Tech Explained
 tags: [data science, python, careers, beginner, parents]
 emoji: 📈

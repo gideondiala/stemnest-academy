@@ -1,8 +1,8 @@
 ---
 title: "The Best Free Coding Websites and Apps for Kids (By Age)"
 description: The best free coding websites and apps for kids, by age: ScratchJr, Scratch, Code.org, Python, App Inventor and more, with tips on where to start.
-date: 2026-10-14
-category: Tech Explained
+date: 2026-10-13
+category: Parents' Corner
 tags: [parents, free resources, coding, kids coding, comparison]
 emoji: 🆓
 level: For parents

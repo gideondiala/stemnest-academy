@@ -1,7 +1,7 @@
 ---
 title: "How to Make Your First Phone App for Free with MIT App Inventor"
 description: Make your first phone app for free with MIT App Inventor. Build a talking app and a tap game step by step, then test it on your own phone.
-date: 2026-10-14
+date: 2026-10-13
 category: Learn by Doing
 tags: [apps, app inventor, beginner, kids coding, mobile]
 emoji: 📱
