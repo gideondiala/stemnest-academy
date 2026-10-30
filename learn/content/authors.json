@@ -5,5 +5,55 @@
     "role": "Tutors and curriculum team",
     "bio": "Our guides are written by the StemNest Academy tutors and curriculum team, who teach coding, game development, web development, data science and AI to children and teenagers in live online classes. Every tutorial is built from projects we teach and test in class.",
     "photo": null
+  },
+  {
+    "slug": "adorable-nwabugo",
+    "name": "Adorable Nwabugo",
+    "role": "Coding Tutor",
+    "bio": "Adorable is a StemNest Academy tutor with 7 years of teaching experience. Subjects taught include Scratch, Code.org, Web development, MIT App Inventor, Thunkable, Machine Learning for Kids, PictoBlox and Python.",
+    "photo": "/adorable-nwabugo.jpg",
+    "subjects": [
+      "Scratch",
+      "Code.org",
+      "Web development",
+      "MIT App Inventor",
+      "Thunkable",
+      "Machine Learning for Kids",
+      "PictoBlox",
+      "Python"
+    ]
+  },
+  {
+    "slug": "mannasseh-jackson",
+    "name": "Mannasseh Jackson",
+    "role": "Coding Tutor",
+    "bio": "Mannasseh is a StemNest Academy tutor with 8 years of teaching experience. Subjects taught include Scratch, Code.org, Web development, MIT App Inventor, Thunkable, Machine Learning for Kids and Data science and analytics.",
+    "photo": null,
+    "subjects": [
+      "Scratch",
+      "Code.org",
+      "Web development",
+      "MIT App Inventor",
+      "Thunkable",
+      "Machine Learning for Kids",
+      "Data science and analytics"
+    ]
+  },
+  {
+    "slug": "patricia-oigbochie",
+    "name": "Patricia Oigbochie",
+    "role": "Coding Tutor",
+    "bio": "Patricia is a StemNest Academy tutor with 6 years of teaching experience. Subjects taught include Scratch, Code.org, Web development, MIT App Inventor, Thunkable, Machine Learning for Kids, PictoBlox and UI/UX design.",
+    "photo": null,
+    "subjects": [
+      "Scratch",
+      "Code.org",
+      "Web development",
+      "MIT App Inventor",
+      "Thunkable",
+      "Machine Learning for Kids",
+      "PictoBlox",
+      "UI/UX design"
+    ]
   }
 ]

@@ -1,4 +1,5 @@
 ---
+author: adorable-nwabugo
 title: "How to Make a Platformer Game in Scratch (Gravity, Jumping and Levels)"
 description: Build a platformer in Scratch with real gravity, jumping, solid walls, lava and levels. A step-by-step Scratch 3 tutorial with every block explained.
 date: 2026-10-13

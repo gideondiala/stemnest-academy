@@ -1,4 +1,5 @@
 ---
+author: adorable-nwabugo
 title: "25 Easy Scratch Project Ideas for Beginners (From First Steps to Real Games)"
 description: 25 easy Scratch project ideas for kids and beginners, from talking pets to platformers, grouped by difficulty with the key blocks for each.
 date: 2026-10-13

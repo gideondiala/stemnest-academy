@@ -1,4 +1,5 @@
 ---
+author: adorable-nwabugo
 title: "CSS Flexbox Tutorial for Beginners: Learn It in One Afternoon"
 description: Learn CSS Flexbox in one afternoon: justify-content, align-items, gap, wrap and flex-grow explained simply, plus three real layouts to build.
 date: 2026-10-13

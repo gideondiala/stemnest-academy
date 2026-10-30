@@ -1,4 +1,5 @@
 ---
+author: adorable-nwabugo
 title: "How to Make Flappy Bird in Scratch (Step-by-Step Tutorial)"
 description: Make Flappy Bird in Scratch step by step: gravity, flapping, endless pipes with clones, scoring and a high score. An easy tutorial for kids.
 date: 2026-10-13

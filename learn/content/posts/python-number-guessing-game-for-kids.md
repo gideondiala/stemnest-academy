@@ -1,4 +1,5 @@
 ---
+author: adorable-nwabugo
 title: "Python for Kids: Build a Number Guessing Game (Step by Step)"
 description: Write your first Python game: a number guessing game with hints, a guess counter and play again. Every line explained for kids and beginners.
 date: 2026-10-13

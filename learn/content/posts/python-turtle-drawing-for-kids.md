@@ -1,4 +1,5 @@
 ---
+author: adorable-nwabugo
 title: "Python Turtle for Kids: Draw Shapes, Stars and Spirals with Code"
 description: Learn Python by drawing with turtle graphics: squares, stars, spirals and a mini drawing game. A step-by-step guide for kids with full code.
 date: 2026-10-13

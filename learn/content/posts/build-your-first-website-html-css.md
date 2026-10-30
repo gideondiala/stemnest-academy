@@ -1,4 +1,5 @@
 ---
+author: adorable-nwabugo
 title: Build Your First Website from Scratch with HTML and CSS (Complete Beginner's Guide)
 description: Build a real website from scratch with HTML and CSS. A beginner's step-by-step guide to planning, coding, styling and publishing it free.
 date: 2026-10-13

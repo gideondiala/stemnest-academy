@@ -319,7 +319,7 @@ function authorBox(a) {
 function authorLd(a) {
   return a.slug === DEFAULT_AUTHOR || !a.slug
     ? { '@type': 'Organization', name: 'StemNest Academy', url: SITE.mainUrl }
-    : { '@type': 'Person', name: a.name, jobTitle: a.role || undefined, url: `${SITE.url}/author/${a.slug}/`, worksFor: { '@type': 'Organization', name: 'StemNest Academy' } };
+    : { '@type': 'Person', name: a.name, jobTitle: a.role || undefined, url: `${SITE.url}/author/${a.slug}/`, image: a.photo ? SITE.url + a.photo : undefined, knowsAbout: a.subjects, worksFor: { '@type': 'Organization', name: 'StemNest Academy' } };
 }
 
 function sidebar(posts, current) {
@@ -385,7 +385,7 @@ const BUILD_ID = require('crypto').createHash('sha1')
       <a class="chip chip-${p.category}" href="/category/${p.category}/">${c.emoji} ${esc(c.name)}</a>
       <h1>${esc(p.title)}</h1>
       <p class="lede">${esc(p.description)}</p>
-      <div class="meta">By ${authorLink(p.author)} · <time datetime="${isoDate(p.date)}">${esc(niceDate(p.date))}</time>${p.updated && p.updated !== p.date ? ` · Updated <time datetime="${isoDate(p.updated)}">${esc(niceDate(p.updated))}</time>` : ''} · ${p.minutes} min read${p.level ? ` · ${esc(p.level)}` : ''}${p.age ? ` · Ages ${esc(p.age)}` : ''}</div>
+      <div class="meta">${p.author.photo ? authorAvatar(p.author, 28) + ' ' : ''}By ${authorLink(p.author)} · <time datetime="${isoDate(p.date)}">${esc(niceDate(p.date))}</time>${p.updated && p.updated !== p.date ? ` · Updated <time datetime="${isoDate(p.updated)}">${esc(niceDate(p.updated))}</time>` : ''} · ${p.minutes} min read${p.level ? ` · ${esc(p.level)}` : ''}${p.age ? ` · Ages ${esc(p.age)}` : ''}</div>
     </header>
     <div class="post-cover">${cover(p, true)}</div>
     ${toc.length >= 3 ? `<details class="toc-mobile"><summary>In this guide</summary><ol>${toc.map(t => `<li><a href="#${t.id}">${esc(t.text)}</a></li>`).join('')}</ol></details>` : ''}

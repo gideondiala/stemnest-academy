@@ -192,6 +192,7 @@ img.cover { object-fit: cover; background: var(--blue-soft); }
 /* Authors */
 .avatar { border-radius: 50%; object-fit: cover; flex: none; }
 .avatar-text { display: inline-flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #1a56db, #7c3aed); color: #fff; font-weight: 900; }
+.meta .avatar { vertical-align: middle; margin-right: 4px; }
 .author-box { display: flex; gap: 16px; align-items: flex-start; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; margin: 34px 0 10px; }
 .author-label { font-size: 12px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .author-name { font-weight: 900; font-size: 18px; margin: 2px 0 6px; }

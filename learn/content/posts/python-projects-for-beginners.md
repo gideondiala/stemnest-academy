@@ -1,4 +1,5 @@
 ---
+author: adorable-nwabugo
 title: "10 Fun Python Projects for Beginners and Kids (With Full Code)"
 description: 10 fun Python projects for beginners and kids, from a dice roller and quiz to a password generator and Hangman, each with full working code.
 date: 2026-10-13
