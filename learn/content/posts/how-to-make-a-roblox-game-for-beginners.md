@@ -2,7 +2,8 @@
 title: "How to Make a Roblox Game: A Beginner's Guide to Roblox Studio and Lua"
 description: Make your first Roblox obby in Roblox Studio: platforms, kill bricks, spinning bars, coins and checkpoints with simple Lua scripts. A beginner guide.
 date: 2026-10-13
-category: Learn by Doing
+updated: 2026-10-30
+category: Roblox and Minecraft
 tags: [roblox, lua, games, beginner, kids coding]
 emoji: 🧱
 level: Beginner
@@ -177,6 +178,8 @@ When you're happy with it:
 1. **File → Publish to Roblox.** Give it a name and description.
 2. By default, new games are private while you work on them. You can choose who can play in **Game Settings**.
 
+You can build and test your game without making it public. Roblox tightened its publishing rules in 2026, so sharing a game with other people now takes extra steps. The rules depend on who you want to reach. For example, your account needs to be age-checked, and reaching players under 16 has further requirements, such as passing a review. Under 13s need a parent's account linked to their own. Check Roblox's [publishing guide](https://create.roblox.com/docs/production/publishing/publish-games-and-places) for the latest rules.
+
 Before making a game public, talk it through with a parent. Think about the name and description, and never include personal information in your game.
 
 ## Debugging tips
@@ -199,5 +202,7 @@ The caveat is that Roblox scripting teaches Roblox's way of doing things, and ma
 **What programming language does Roblox use?** Roblox uses **Luau**, a version of the Lua language developed by Roblox. Beginners usually just call it Lua.
 
 **What age can kids start making Roblox games?** Many children start around 10, once they're comfortable using a mouse and keyboard and reading instructions. Younger children can build without scripts and add code with help.
+
+**Can I share my Roblox game with friends?** Yes, but Roblox now has rules on who can publish games and who can see them. A parent can help you check what your account can do. Keeping your game private while you learn is always fine.
 
 **Can you make money from Roblox games?** Some developers earn money through Roblox's systems, but most games don't, and there are age requirements and rules for earning. Focus on learning and making something fun first.

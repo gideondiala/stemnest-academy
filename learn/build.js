@@ -31,6 +31,7 @@ const SITE = {
   ga: 'G-WB62B0P5KG',
 };
 const CATEGORIES = {
+  'roblox-and-minecraft': { name: 'Roblox and Minecraft', emoji: '🎮', blurb: 'Make, code and stay safe in the games kids love: scripting, commands, redstone and honest guides for parents.', colors: ['#16a34a', '#65a30d'] },
   'learn-by-doing': { name: 'Learn by Doing', emoji: '🛠️', blurb: 'Step-by-step tutorials: build games, websites, apps and AI projects yourself.', colors: ['#1a56db', '#3b82f6'] },
   'tech-explained': { name: 'Tech Explained', emoji: '💡', blurb: 'Clear answers and honest comparisons to help students and parents choose well.', colors: ['#7c3aed', '#a78bfa'] },
   'parents-corner': { name: "Parents' Corner", emoji: '👨‍👩‍👧', blurb: 'Practical, plain-English guides for parents supporting a young coder at home.', colors: ['#0e9f6e', '#34d399'] },
@@ -80,7 +81,8 @@ function findAuthor(v) {
 }
 
 /* Challenges: content/challenges.json. Each step is one published article with a mission. */
-const CHALLENGES = JSON.parse(fs.readFileSync(path.join(ROOT, 'content', 'challenges.json'), 'utf8'));
+const ALL_CHALLENGES = JSON.parse(fs.readFileSync(path.join(ROOT, 'content', 'challenges.json'), 'utf8'));
+let CHALLENGES = [];   /* set at build time: a challenge appears once all its articles are published */
 
 /* Minimal front matter: key: value, and lists as [a, b, c] */
 function parseFrontMatter(src) {
@@ -341,9 +343,10 @@ function sidebar(posts, current) {
 const CTA_DEFAULT = { emoji: '🚀', title: 'New to StemNest?', text: 'Book a free trial class and learn coding and AI live with our friendly tutors.' };
 /* Checked in order: the first match decides what an article's booking box says */
 const CTAS = [
+  { tags: ['parent guide'], emoji: '👨‍👩‍👧', title: 'Want to turn gaming into coding?', text: 'See how your child gets on with an expert tutor in a free one-on-one class.' },
   { category: 'parents-corner', emoji: '👨‍👩‍👧', title: 'Curious how your child would get on?', text: 'Book a free one-on-one class with an expert tutor and see for yourself.' },
   { category: 'study-tips', emoji: '🎯', title: 'Want one-on-one support?', text: 'An expert tutor can work with you at your own pace. Your first class is free.' },
-  { tags: ['roblox'], emoji: '🎮', title: 'Want to build bigger games?', text: 'Keep going with an expert tutor in a free one-on-one class.' },
+  { tags: ['roblox', 'minecraft'], emoji: '🎮', title: 'Love games? Learn to make them', text: 'Learn real coding with an expert tutor in a free one-on-one class.' },
   { tags: ['scratch'], emoji: '🐱', title: 'Stuck on your Scratch project?', text: 'Build your next one with an expert tutor in a free one-on-one class.' },
   { tags: ['python'], emoji: '🐍', title: 'Want a Python tutor by your side?', text: 'Get unstuck faster with an expert tutor in a free one-on-one class.' },
   { tags: ['html', 'css', 'javascript', 'web development'], emoji: '💻', title: 'Want to build real websites?', text: 'Learn with an expert tutor in a free one-on-one class.' },
@@ -362,6 +365,8 @@ function trialBox(cta = CTA_DEFAULT, extraClass = '') {
     <a class="btn" href="${SITE.trialUrl}">Book a free trial class</a>
   </section>`;
 }
+
+const GAME_NOTICE = 'StemNest Academy is independent. We are not connected to, or endorsed by, Roblox Corporation, Mojang Studios or Microsoft. Roblox and Minecraft are trademarks of their owners.';
 
 /* The challenge step an article belongs to, if any */
 function challengeStep(slug) {
@@ -423,6 +428,13 @@ const BUILD_ID = require('crypto').createHash('sha1')
     .map(p => ({ ...p, minutes: Math.max(1, Math.round(words(p.html) / 200)) }))
     .sort((a, b) => new Date(b.date) - new Date(a.date));
 
+  const live = new Set(posts.map(p => p.slug));
+  if (SCHEDULED.length) {
+    const waiting = new RegExp(`<a href="/(${SCHEDULED.map(x => x.slug).join('|')})/"[^>]*>([\\s\\S]*?)</a>`, 'g');
+    for (const p of posts) p.html = p.html.replace(waiting, '$2');
+  }
+  CHALLENGES = ALL_CHALLENGES.filter(ch => ch.steps.every(s => live.has(s.post)));
+
   /* Articles */
   for (const p of posts) {
     const c = CATEGORIES[p.category];
@@ -450,6 +462,7 @@ const BUILD_ID = require('crypto').createHash('sha1')
     <div class="prose">
 ${p.html}
     </div>
+    ${p.category === 'roblox-and-minecraft' ? `<p class="notice">${esc(GAME_NOTICE)}</p>` : ''}
     ${inChallenge ? challengeMission(inChallenge) : ''}
     ${trialBox(cta, 'trial-wide')}
     ${authorBox(p.author)}
@@ -518,7 +531,7 @@ ${related.length ? `<section class="wrap related"><h2>Keep learning</h2><div cla
   </div>
 </section>
 <div class="wrap with-side">
-  <section>${list.length ? `<div class="grid">${list.map(card).join('')}</div>` : '<p class="empty">New articles are on the way. Check back soon!</p>'}</section>
+  <section>${list.length ? `<div class="grid">${list.map(card).join('')}</div>` : '<p class="empty">New articles are on the way. Check back soon!</p>'}${k === 'roblox-and-minecraft' ? `<p class="notice">${esc(GAME_NOTICE)}</p>` : ''}</section>
   ${sidebar(posts, k)}
 </div>`;
     write(`category/${k}/index.html`, page({
@@ -529,9 +542,8 @@ ${related.length ? `<section class="wrap related"><h2>Keep learning</h2><div cla
 
   /* Challenges */
   const bySlug = Object.fromEntries(posts.map(p => [p.slug, p]));
-  for (const ch of CHALLENGES) for (const s of ch.steps) if (!bySlug[s.post]) throw new Error(`${ch.slug}: "${s.post}" is not a published article`);
   write('challenges/index.html', page({
-    title: 'Coding Challenges for Kids and Teens', description: 'Free coding challenges for ages 7 and up. Pick Scratch, Python or web development, work through the steps and save your progress as you go.',
+    title: 'Coding Challenges for Kids and Teens', description: 'Free coding challenges for ages 7 and up. Pick the right challenge for your age, work through the steps and save your progress as you go.',
     canonical: `${SITE.url}/challenges/`,
     body: `<section class="hero hero-small"><div class="wrap">
       <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Learning Hub</a> › Challenges</nav>

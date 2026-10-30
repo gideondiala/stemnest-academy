@@ -89,6 +89,7 @@ a { color: var(--blue); }
 .card p { margin: 0; color: var(--ink-2); font-size: 15px; flex: 1; }
 .meta { color: var(--muted); font-size: 14px; font-weight: 700; }
 .chip { display: inline-block; align-self: flex-start; padding: 4px 12px; border-radius: 50px; font-size: 13px; font-weight: 800; text-decoration: none; }
+.chip-roblox-and-minecraft { background: #dcfce7; color: #166534; }
 .chip-learn-by-doing { background: var(--blue-soft); color: var(--blue-ink); }
 .chip-tech-explained { background: var(--purple-soft); color: var(--purple); }
 .chip-parents-corner { background: #dcfce7; color: #166534; }
@@ -278,3 +279,4 @@ img.cover { object-fit: cover; background: var(--blue-soft); }
 .ch-tick[aria-pressed="true"] { border-color: var(--green); color: var(--green); }
 .ch-note { color: var(--muted); font-size: 14px; margin: 18px 0; }
 @media (max-width: 520px) { .continue { flex-direction: column; align-items: flex-start; } }
+.notice { color: var(--muted); font-size: 13px; margin: 18px 0; }

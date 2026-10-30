@@ -7,10 +7,26 @@
     "description": "A free Scratch challenge for kids aged 7 to 12. Build a talking pet, a catch game, a maze and a platformer, one step at a time.",
     "intro": "Start with a talking pet and finish with your very own platformer game. No experience needed, just a free Scratch account or the Scratch app.",
     "steps": [
-      { "post": "scratch-project-ideas-for-beginners", "name": "Make a talking pet", "mission": "Build project 1, the Talking pet. When you click your sprite, it should say something and play a sound." },
-      { "post": "how-to-make-a-catch-game-in-scratch", "name": "Build a catch game", "mission": "Follow the guide up to Step 6, so your game has a score, lives and a game over." },
-      { "post": "how-to-make-a-maze-game-in-scratch", "name": "Build a maze game", "mission": "Draw a maze with walls and a goal, then add a timer so you can race against your best time." },
-      { "post": "how-to-make-a-platformer-game-in-scratch", "name": "Boss level: build a platformer", "mission": "This one is harder, so take your time and ask a grown-up or a friend to test it. Your player should jump, land on platforms and reach the goal flag." }
+      {
+        "post": "scratch-project-ideas-for-beginners",
+        "name": "Make a talking pet",
+        "mission": "Build project 1, the Talking pet. When you click your sprite, it should say something and play a sound."
+      },
+      {
+        "post": "how-to-make-a-catch-game-in-scratch",
+        "name": "Build a catch game",
+        "mission": "Follow the guide up to Step 6, so your game has a score, lives and a game over."
+      },
+      {
+        "post": "how-to-make-a-maze-game-in-scratch",
+        "name": "Build a maze game",
+        "mission": "Draw a maze with walls and a goal, then add a timer so you can race against your best time."
+      },
+      {
+        "post": "how-to-make-a-platformer-game-in-scratch",
+        "name": "Boss level: build a platformer",
+        "mission": "This one is harder, so take your time and ask a grown-up or a friend to test it. Your player should jump, land on platforms and reach the goal flag."
+      }
     ]
   },
   {
@@ -21,10 +37,26 @@
     "description": "A free Python challenge for beginners aged 10 and up. Draw with code, build a guessing game, fix bugs and make your own small projects.",
     "intro": "Write your first real code by drawing with Python, then build games and learn to fix your own mistakes. Ready for Python after Scratch? This is the place to start.",
     "steps": [
-      { "post": "python-turtle-drawing-for-kids", "name": "Draw with code", "mission": "Draw a square using a loop, then make the colourful spiral." },
-      { "post": "python-number-guessing-game-for-kids", "name": "Build a guessing game", "mission": "Finish the complete game from Step 7, and make sure a wrong answer like the word \"banana\" does not crash it." },
-      { "post": "how-to-debug-code-tips-for-beginners", "name": "Become a bug hunter", "mission": "Break your guessing game on purpose, then use the tips in this guide to find the problem and fix it." },
-      { "post": "python-projects-for-beginners", "name": "Boss level: two more projects", "mission": "Build the dice roller, then rock, paper, scissors, without looking at the code more than you need to." }
+      {
+        "post": "python-turtle-drawing-for-kids",
+        "name": "Draw with code",
+        "mission": "Draw a square using a loop, then make the colourful spiral."
+      },
+      {
+        "post": "python-number-guessing-game-for-kids",
+        "name": "Build a guessing game",
+        "mission": "Finish the complete game from Step 7, and make sure a wrong answer like the word \"banana\" does not crash it."
+      },
+      {
+        "post": "how-to-debug-code-tips-for-beginners",
+        "name": "Become a bug hunter",
+        "mission": "Break your guessing game on purpose, then use the tips in this guide to find the problem and fix it."
+      },
+      {
+        "post": "python-projects-for-beginners",
+        "name": "Boss level: two more projects",
+        "mission": "Build the dice roller, then rock, paper, scissors, without looking at the code more than you need to."
+      }
     ]
   },
   {
@@ -35,11 +67,71 @@
     "description": "A free web development challenge for ages 11 and up. Learn HTML, CSS and JavaScript by building a website, a navbar and a to-do app.",
     "intro": "Go from not knowing what HTML is to building a working app in your browser. All you need is a computer and a free code editor.",
     "steps": [
-      { "post": "html-css-javascript-explained", "name": "Learn the three languages", "mission": "Read the guide, then explain to someone in one sentence each what HTML, CSS and JavaScript do." },
-      { "post": "build-your-first-website-html-css", "name": "Build your first website", "mission": "Build your page up to Part 6, and check it on a small screen as well as a big one." },
-      { "post": "css-flexbox-tutorial-for-beginners", "name": "Control your layout", "mission": "Make the practice page and try Steps 1 to 5 until the boxes go where you want them." },
-      { "post": "responsive-navbar-html-css", "name": "Add a navbar", "mission": "Build the navbar and make sure the menu button works on a small screen." },
-      { "post": "javascript-to-do-list-app-tutorial", "name": "Boss level: a to-do app", "mission": "Build the app up to Step 7, so your tasks are still there after you refresh the page." }
+      {
+        "post": "html-css-javascript-explained",
+        "name": "Learn the three languages",
+        "mission": "Read the guide, then explain to someone in one sentence each what HTML, CSS and JavaScript do."
+      },
+      {
+        "post": "build-your-first-website-html-css",
+        "name": "Build your first website",
+        "mission": "Build your page up to Part 6, and check it on a small screen as well as a big one."
+      },
+      {
+        "post": "css-flexbox-tutorial-for-beginners",
+        "name": "Control your layout",
+        "mission": "Make the practice page and try Steps 1 to 5 until the boxes go where you want them."
+      },
+      {
+        "post": "responsive-navbar-html-css",
+        "name": "Add a navbar",
+        "mission": "Build the navbar and make sure the menu button works on a small screen."
+      },
+      {
+        "post": "javascript-to-do-list-app-tutorial",
+        "name": "Boss level: a to-do app",
+        "mission": "Build the app up to Step 7, so your tasks are still there after you refresh the page."
+      }
+    ]
+  },
+  {
+    "slug": "roblox-creator",
+    "title": "Roblox Creator Challenge",
+    "emoji": "🧱",
+    "age": "10 and up",
+    "description": "A free Roblox coding challenge for ages 10 and up. Build an obby in Roblox Studio, then learn Lua scripting with small, fun projects.",
+    "intro": "Stop just playing and start making. Build your own obstacle course, then learn real Lua scripting. You need a Windows PC or Mac, and a parent to help you set up.",
+    "steps": [
+      {
+        "post": "how-to-make-a-roblox-game-for-beginners",
+        "name": "Build your first obby",
+        "mission": "Build a course with at least five platforms and a lava kill brick, then test it from start to finish."
+      },
+      {
+        "post": "roblox-scripting-for-beginners",
+        "name": "Boss level: learn to script",
+        "mission": "Build the speed pad and the door, then change the numbers until they feel right in your game."
+      }
+    ]
+  },
+  {
+    "slug": "minecraft-logic",
+    "title": "Minecraft Logic Challenge",
+    "emoji": "⛏️",
+    "age": "8 and up",
+    "description": "A free Minecraft challenge for ages 8 and up. Learn commands, then build logic gates with redstone, the same logic that runs real computers.",
+    "intro": "Use the game you already love to think like a coder. Give Minecraft exact instructions, then build the logic gates found inside every computer.",
+    "steps": [
+      {
+        "post": "minecraft-commands-for-beginners",
+        "name": "Command the world",
+        "mission": "In a new test world, try all eight commands, then use them to build a small house."
+      },
+      {
+        "post": "minecraft-redstone-for-beginners",
+        "name": "Boss level: build an AND gate",
+        "mission": "Build the AND gate, then test all four lever combinations and check them against the truth table."
+      }
     ]
   }
 ]

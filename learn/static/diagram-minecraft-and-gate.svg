@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 452" width="560" height="452" role="img" aria-label="A Minecraft AND gate seen from above" font-family="Nunito, system-ui, Segoe UI, sans-serif">
+<rect width="560" height="452" rx="18" fill="#f6f8fc"/>
+<text x="280" y="36" text-anchor="middle" font-size="21" font-weight="800" fill="#172033">Seen from above</text>
+<rect x="28" y="66" width="84" height="84" fill="#fff" stroke="#172033" stroke-width="3"/>
+<text x="70" y="114" text-anchor="middle" font-size="17" font-weight="800" fill="#172033">Lever</text>
+<rect x="196" y="66" width="84" height="84" fill="#fff" stroke="#172033" stroke-width="3"/>
+<text x="238" y="114" text-anchor="middle" font-size="17" font-weight="800" fill="#172033">Lever</text>
+<rect x="28" y="150" width="84" height="84" fill="#cbd5e1" stroke="#172033" stroke-width="3"/>
+<text x="70" y="198" text-anchor="middle" font-size="17" font-weight="800" fill="#dc2626">Torch</text>
+<rect x="112" y="150" width="84" height="84" fill="#cbd5e1" stroke="#172033" stroke-width="3"/>
+<text x="154" y="198" text-anchor="middle" font-size="17" font-weight="800" fill="#dc2626">Dust</text>
+<rect x="196" y="150" width="84" height="84" fill="#cbd5e1" stroke="#172033" stroke-width="3"/>
+<text x="238" y="198" text-anchor="middle" font-size="17" font-weight="800" fill="#dc2626">Torch</text>
+<rect x="112" y="234" width="84" height="84" fill="#fff" stroke="#172033" stroke-width="3"/>
+<text x="154" y="282" text-anchor="middle" font-size="17" font-weight="800" fill="#dc2626">Torch</text>
+<rect x="112" y="318" width="84" height="84" fill="#fde047" stroke="#172033" stroke-width="3"/>
+<text x="154" y="366" text-anchor="middle" font-size="17" font-weight="800" fill="#172033">Lamp</text>
+<text x="306" y="106" font-size="18" fill="#172033">Back: a lever on</text>
+<text x="306" y="130" font-size="18" fill="#172033">each outer block</text>
+<text x="306" y="192" font-size="18" fill="#172033">Three stone blocks,</text>
+<text x="306" y="216" font-size="18" fill="#172033">with these on top</text>
+<text x="306" y="276" font-size="18" fill="#172033">Torch on the front</text>
+<text x="306" y="300" font-size="18" fill="#172033">of the middle block</text>
+<text x="306" y="366" font-size="18" fill="#172033">Front: the lamp</text>
+<text x="280" y="432" text-anchor="middle" font-size="17" fill="#475569">The lamp lights only when both levers are on</text>
+</svg>
