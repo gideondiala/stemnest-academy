@@ -2,6 +2,7 @@
 title: "How Does the Internet Work? Explained Simply for Kids"
 description: What happens when you open a website? A simple explanation for kids of how the internet works: packets, IP addresses, servers, DNS and undersea cables.
 date: 2026-10-26 09:00
+updated: 2026-10-30
 category: Tech Explained
 tags: [internet, networks, beginner, computer science]
 emoji: 🌍
@@ -86,6 +87,8 @@ Here's the whole journey when you open a website:
 4. **Routers** across the internet pass the packets towards the website's **server**.
 5. The server sends back the website's files, also as packets.
 6. Your browser reassembles the packets and shows you the page.
+
+![Your device asks DNS for the IP address, then your request goes through your home router and routers across the internet to a server, and the website files travel back the same way](/diagram-internet-journey.svg)
 
 All of that usually happens in less time than it takes to blink.
 

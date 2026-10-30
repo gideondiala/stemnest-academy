@@ -2,6 +2,7 @@
 title: "What Is Machine Learning? Explained for Kids (and Parents)"
 description: What is machine learning? A clear, jargon-free explanation for kids and parents of how computers learn from examples and why AI makes mistakes.
 date: 2026-10-13
+updated: 2026-10-30
 category: Tech Explained
 tags: [ai, machine learning, parents, beginner]
 emoji: 📊
@@ -43,6 +44,8 @@ During **training**, the computer studies the examples again and again, adjustin
 ### 3. Test and use the model
 
 Next, we check the model on examples it has **never seen before**. This is important: a model that only does well on its training examples might just have memorised them, like a student who memorises answers without understanding. If it does well on new examples, we can start using it to make **predictions**.
+
+![The three steps of machine learning: collect data, train the model, then test and use the model](/diagram-machine-learning-steps.svg)
 
 ## Where you already meet machine learning
 

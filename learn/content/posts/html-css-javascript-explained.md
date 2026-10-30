@@ -2,6 +2,7 @@
 title: "HTML vs CSS vs JavaScript: What Each One Does (Explained Simply)"
 description: What is the difference between HTML, CSS and JavaScript? A simple explanation of what each does, how they work together and which to learn first.
 date: 2026-10-13
+updated: 2026-10-30
 category: Tech Explained
 tags: [html, css, javascript, web development, beginner]
 emoji: 🏗️
@@ -20,6 +21,8 @@ Think of a website as a house:
 | **HTML** | Structure and content | The walls, rooms, doors and furniture |
 | **CSS** | Style and layout | The paint, wallpaper, lighting and where furniture goes |
 | **JavaScript** | Behaviour and interactivity | The electricity: lights that switch on, a doorbell that rings |
+
+![A website is like a house: HTML is the walls and rooms, CSS is the paint and lighting, and JavaScript is the electricity](/diagram-html-css-js-house.svg)
 
 A house needs walls before you can paint them, and paint before the lights make it feel like home. Websites are the same: **HTML first, then CSS, then JavaScript**.
 

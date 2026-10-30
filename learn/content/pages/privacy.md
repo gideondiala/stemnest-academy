@@ -1,7 +1,7 @@
 ---
 title: Privacy policy
 description: How the StemNest Learning Hub (learn.stemnestacademy.co.uk) uses cookies, analytics and data, and the choices you have.
-updated: 2026-10-13
+updated: 2026-10-30
 ---
 
 This policy explains how **learn.stemnestacademy.co.uk** (the "Learning Hub") handles information. The Learning Hub is run by StemNest Academy. For our classes and student accounts, our main [privacy policy]({{main}}/pages/legal/privacy-policy) also applies.
@@ -10,6 +10,7 @@ This policy explains how **learn.stemnestacademy.co.uk** (the "Learning Hub") ha
 
 - You can read every guide **without an account** and without giving us any personal details.
 - We use **Google Analytics** to count visits and see which guides are useful.
+- If you start a **challenge**, your progress is saved only in your own browser.
 - If a **StemNest student is logged in** on stemnestacademy.co.uk, the time they spend reading guides is added to their own progress report.
 - In future we may show **advertising from Google** on this site; if we do, this page will be updated first.
 
@@ -24,6 +25,10 @@ We use Google Analytics, which sets cookies and collects information such as the
 ### Study time for StemNest students
 
 Students of StemNest Academy receive progress reports that include time spent on our learning resources. If you are logged in to a **student** account on stemnestacademy.co.uk in the same browser, each minute of active reading on the Learning Hub is added to that student's study-time total. We record only the number of minutes, the day, and that the time was spent on the Learning Hub, not which pages were read. Nothing is recorded for visitors who are not logged-in students.
+
+### Challenge progress
+
+If you start a challenge, your progress is saved in your own browser, on your device. This includes which steps you have finished and the last section you reached in a challenge article. It is not sent to us, we cannot see it, and it is not linked to your name. Nothing is saved until you press **Start the challenge** or mark a step as finished. You can remove it at any time with **Clear my progress** on the challenge page, or by clearing your browser data.
 
 ### Messages you send us
 

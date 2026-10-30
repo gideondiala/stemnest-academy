@@ -2,6 +2,7 @@
 title: "What Is an Algorithm? Explained for Kids with Everyday Examples"
 description: What is an algorithm? A simple explanation for kids with everyday examples, plus sorting and searching activities and how computers use them.
 date: 2026-10-13
+updated: 2026-10-30
 category: Tech Explained
 tags: [algorithms, computational thinking, beginner, parents]
 emoji: 🧭
@@ -70,6 +71,8 @@ Doing something again and again. In code, this is a **loop**.
 
 > **Repeat** 10 times: do a star jump.
 > **Keep** stirring **until** the sauce is thick.
+
+![The three building blocks of an algorithm: sequence, such as toast then butter; selection, such as taking an umbrella if it is raining; and repetition, such as ten star jumps](/diagram-algorithm-blocks.svg)
 
 Put those three ideas together and you can describe almost anything. Here's an algorithm for crossing the road using all three:
 

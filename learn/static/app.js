@@ -153,6 +153,101 @@
     });
   });
 
+  /* ── Challenges ──
+     Saved only in this browser, and only after the reader starts a challenge
+     or marks a step as finished. Nothing here is ever sent to us. */
+  var CH_KEY = 'sn_challenges';
+  function chLoad() { try { return JSON.parse(localStorage.getItem(CH_KEY)) || {}; } catch (e) { return {}; } }
+  function chSave(d) { try { localStorage.setItem(CH_KEY, JSON.stringify(d)); return true; } catch (e) { return false; } }
+  function chCanSave() { try { localStorage.setItem(CH_KEY + '_t', '1'); localStorage.removeItem(CH_KEY + '_t'); return true; } catch (e) { return false; } }
+  function chStart(d, id, title, total) {
+    if (!d[id]) d[id] = { title: title, total: total, done: [] };
+    d[id].at = Date.now();
+    return d[id];
+  }
+
+  /* Challenge page: progress bar, start button and a tick for each step */
+  var chPage = document.querySelector('.ch-page');
+  if (chPage && chCanSave()) {
+    var chId = chPage.dataset.challenge, chTotal = Number(chPage.dataset.total);
+    var chStartBtn = chPage.querySelector('.ch-start'), chResetBtn = chPage.querySelector('.ch-reset');
+    var chBar = chPage.querySelector('.ch-bar'), chText = chPage.querySelector('.ch-progress-text');
+    var chSteps = Array.prototype.slice.call(chPage.querySelectorAll('.ch-step'));
+    var chDraw = function () {
+      var st = chLoad()[chId], started = !!st, done = started ? st.done : [];
+      chStartBtn.hidden = started; chBar.hidden = !started; chResetBtn.hidden = !started;
+      chBar.firstElementChild.style.width = Math.round(done.length / chTotal * 100) + '%';
+      chText.textContent = !started ? '' : done.length >= chTotal
+        ? 'You finished the whole challenge. Amazing work! 🎉' : done.length + ' of ' + chTotal + ' steps finished';
+      var marked = false;
+      chSteps.forEach(function (li) {
+        var isDone = done.indexOf(li.dataset.post) >= 0, tick = li.querySelector('.ch-tick');
+        tick.hidden = !started;
+        tick.textContent = isDone ? 'Finished ✓' : 'Mark as finished';
+        tick.setAttribute('aria-pressed', isDone ? 'true' : 'false');
+        li.classList.toggle('done', isDone);
+        li.classList.toggle('now', started && !isDone && !marked);
+        if (!isDone) marked = true;
+      });
+    };
+    chStartBtn.onclick = function () { var d = chLoad(); chStart(d, chId, chPage.dataset.title, chTotal); chSave(d); chDraw(); };
+    chResetBtn.onclick = function () { var d = chLoad(); delete d[chId]; chSave(d); chDraw(); };
+    chSteps.forEach(function (li) {
+      li.querySelector('.ch-tick').onclick = function () {
+        var d = chLoad(), st = chStart(d, chId, chPage.dataset.title, chTotal), i = st.done.indexOf(li.dataset.post);
+        if (i >= 0) st.done.splice(i, 1); else st.done.push(li.dataset.post);
+        chSave(d); chDraw();
+      };
+    });
+    chDraw();
+  }
+
+  /* Article in a challenge: the finish button, and remembering the section reached */
+  var chBox = document.querySelector('.ch-mission');
+  if (chBox && chCanSave()) {
+    var cId = chBox.dataset.challenge, cPost = chBox.dataset.post, cFin = chBox.querySelector('.ch-finish');
+    var cDraw = function () {
+      var st = chLoad()[cId], isDone = !!st && st.done.indexOf(cPost) >= 0;
+      cFin.hidden = false; cFin.disabled = isDone; cFin.textContent = isDone ? 'Finished ✓' : 'I finished this step';
+    };
+    cFin.onclick = function () {
+      var d = chLoad(), st = chStart(d, cId, chBox.dataset.title, Number(chBox.dataset.total));
+      if (st.done.indexOf(cPost) < 0) st.done.push(cPost);
+      delete st.place; chSave(d); cDraw();
+    };
+    cDraw();
+    var cHeads = Array.prototype.slice.call(document.querySelectorAll('.prose h2[id]')), cWait = false, cLast = null;
+    var cMark = function () {
+      cWait = false;
+      var d = chLoad(), st = d[cId], cur = null;
+      if (!st || st.done.indexOf(cPost) >= 0) return;   /* only for a challenge the reader started */
+      cHeads.forEach(function (h) { if (h.getBoundingClientRect().top < window.innerHeight * 0.4) cur = h; });
+      if (!cur || cur.id === cLast) return;
+      cLast = cur.id;
+      st.place = { url: location.pathname + '#' + cur.id, section: cur.textContent, article: document.querySelector('h1').textContent };
+      st.at = Date.now(); chSave(d);
+    };
+    window.addEventListener('scroll', function () { if (!cWait) { cWait = true; setTimeout(cMark, 800); } }, { passive: true });
+  }
+
+  /* Home and Challenges: carry on from where the reader stopped */
+  var cont = document.getElementById('continue');
+  if (cont) {
+    var all = chLoad(), best = null;
+    Object.keys(all).forEach(function (id) {
+      var s = all[id];
+      if (s.done && s.done.length < s.total && (!best || (s.at || 0) > (best.at || 0))) { best = s; best.id = id; }
+    });
+    if (best) {
+      var where = best.place
+        ? 'You stopped at <strong>' + esc(best.place.section) + '</strong> in ' + esc(best.place.article) + '.'
+        : 'You have finished ' + best.done.length + ' of ' + best.total + ' steps.';
+      cont.innerHTML = '<div><div class="author-label">Welcome back</div><h2>Carry on with your ' + esc(best.title) + '</h2><p>' + where + '</p></div>' +
+        '<a class="btn" href="' + esc(best.place ? best.place.url : '/challenges/' + best.id + '/') + '">Continue</a>';
+      cont.hidden = false;
+    }
+  }
+
   /* ── Study time ──
      A StemNest student who is logged in on stemnestacademy.co.uk gets their
      reading time here added to their progress report. A small hidden page

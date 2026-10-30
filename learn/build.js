@@ -79,6 +79,9 @@ function findAuthor(v) {
     (v ? { slug: null, name: String(v), role: '', bio: '' } : AUTHORS.find(a => a.slug === DEFAULT_AUTHOR));
 }
 
+/* Challenges: content/challenges.json. Each step is one published article with a mission. */
+const CHALLENGES = JSON.parse(fs.readFileSync(path.join(ROOT, 'content', 'challenges.json'), 'utf8'));
+
 /* Minimal front matter: key: value, and lists as [a, b, c] */
 function parseFrontMatter(src) {
   const m = src.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
@@ -254,6 +257,7 @@ gtag('js',new Date());gtag('config','${SITE.ga}');
     </nav>
   </div>
   <nav class="cat-bar" aria-label="Categories"><div class="wrap cat-row">
+    <a href="/challenges/">🏆 Challenges</a>
     ${Object.entries(CATEGORIES).map(([k, c]) => `<a href="/category/${k}/">${c.emoji} ${esc(c.name)}</a>`).join('')}
   </div></nav>
 </header>
@@ -268,6 +272,7 @@ ${body}
     </div>
     <div>
       <h2>Explore</h2>
+      <a href="/challenges/">Challenges</a>
       ${Object.entries(CATEGORIES).map(([k, c]) => `<a href="/category/${k}/">${esc(c.name)}</a>`).join('')}
       <a href="/rss.xml">RSS feed</a>
     </div>
@@ -333,13 +338,64 @@ function sidebar(posts, current) {
 </aside>`;
 }
 
-function trialBox() {
-  return `<section class="trial-box">
-    <div class="trial-emoji">🚀</div>
-    <h2>New to StemNest?</h2>
-    <p>Book a free trial class and learn coding and AI live with our friendly tutors.</p>
-    <a class="btn" href="${SITE.trialUrl}">Book a free trial</a>
+const CTA_DEFAULT = { emoji: '🚀', title: 'New to StemNest?', text: 'Book a free trial class and learn coding and AI live with our friendly tutors.' };
+/* Checked in order: the first match decides what an article's booking box says */
+const CTAS = [
+  { category: 'parents-corner', emoji: '👨‍👩‍👧', title: 'Curious how your child would get on?', text: 'Book a free one-on-one class with an expert tutor and see for yourself.' },
+  { category: 'study-tips', emoji: '🎯', title: 'Want one-on-one support?', text: 'An expert tutor can work with you at your own pace. Your first class is free.' },
+  { tags: ['roblox'], emoji: '🎮', title: 'Want to build bigger games?', text: 'Keep going with an expert tutor in a free one-on-one class.' },
+  { tags: ['scratch'], emoji: '🐱', title: 'Stuck on your Scratch project?', text: 'Build your next one with an expert tutor in a free one-on-one class.' },
+  { tags: ['python'], emoji: '🐍', title: 'Want a Python tutor by your side?', text: 'Get unstuck faster with an expert tutor in a free one-on-one class.' },
+  { tags: ['html', 'css', 'javascript', 'web development'], emoji: '💻', title: 'Want to build real websites?', text: 'Learn with an expert tutor in a free one-on-one class.' },
+  { tags: ['apps', 'app inventor'], emoji: '📱', title: 'Got an app idea?', text: 'Build it with an expert tutor in a free one-on-one class.' },
+  { tags: ['ai', 'machine learning', 'data science'], emoji: '🤖', title: 'Curious about AI?', text: 'Explore it with an expert tutor in a free one-on-one class.' },
+];
+function ctaFor(p) {
+  return CTAS.find(c => c.category === p.category || (c.tags || []).some(t => p.tags.includes(t))) ||
+    { emoji: '🚀', title: 'Want a one-on-one lesson with an expert tutor?', text: 'Your first class is free.' };
+}
+function trialBox(cta = CTA_DEFAULT, extraClass = '') {
+  return `<section class="trial-box${extraClass ? ' ' + extraClass : ''}">
+    <div class="trial-emoji">${cta.emoji}</div>
+    <h2>${esc(cta.title)}</h2>
+    <p>${esc(cta.text)}</p>
+    <a class="btn" href="${SITE.trialUrl}">Book a free trial class</a>
   </section>`;
+}
+
+/* The challenge step an article belongs to, if any */
+function challengeStep(slug) {
+  for (const ch of CHALLENGES) {
+    const i = ch.steps.findIndex(s => s.post === slug);
+    if (i >= 0) return { ch, i, step: ch.steps[i], next: ch.steps[i + 1] };
+  }
+  return null;
+}
+function challengeStrip(s) {
+  return `<a class="ch-strip" href="/challenges/${s.ch.slug}/" data-challenge="${s.ch.slug}">${s.ch.emoji} Step ${s.i + 1} of ${s.ch.steps.length} in the ${esc(s.ch.title)}</a>`;
+}
+function challengeMission(s) {
+  const nextHref = s.next ? `/${s.next.post}/` : `/challenges/${s.ch.slug}/`;
+  return `<section class="ch-mission" data-challenge="${s.ch.slug}" data-title="${esc(s.ch.title)}" data-post="${s.step.post}" data-total="${s.ch.steps.length}">
+    <div class="author-label">${s.ch.emoji} Your mission, step ${s.i + 1} of ${s.ch.steps.length}</div>
+    <h2>${esc(s.step.name)}</h2>
+    <p>${esc(s.step.mission)}</p>
+    <div class="ch-actions"><button type="button" class="btn ch-finish" hidden>I finished this step</button>
+    <a class="ch-next" href="${nextHref}">${s.next ? esc('Next: ' + s.next.name) : 'Back to the challenge'}</a></div>
+  </section>`;
+}
+function continueBox() {
+  return '<div id="continue" class="continue" hidden></div>';
+}
+function challengeCard(ch) {
+  return `<article class="card ch-card" data-challenge="${ch.slug}">
+    <div class="card-body">
+      <div class="ch-emoji">${ch.emoji}</div>
+      <h3><a href="/challenges/${ch.slug}/">${esc(ch.title)}</a></h3>
+      <p>${esc(ch.intro)}</p>
+      <div class="meta">Ages ${esc(ch.age)} · ${ch.steps.length} steps</div>
+    </div>
+  </article>`;
 }
 
 function searchBox() {
@@ -375,6 +431,7 @@ const BUILD_ID = require('crypto').createHash('sha1')
       .map(x => ({ x, score: (x.category === p.category ? 2 : 0) + x.tags.filter(t => p.tags.includes(t)).length * 3 }))
       .sort((a, b) => b.score - a.score || new Date(b.x.date) - new Date(a.x.date)).slice(0, 3).map(r => r.x);
     const toc = p.toc.filter(t => t.level === 2);
+    const cta = ctaFor(p), inChallenge = challengeStep(p.slug);
     const body = `
 <div class="wrap">
   <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Learning Hub</a> › <a href="/category/${p.category}/">${esc(c.name)}</a></nav>
@@ -383,6 +440,7 @@ const BUILD_ID = require('crypto').createHash('sha1')
   <div class="post-main">
     <header class="post-head">
       <a class="chip chip-${p.category}" href="/category/${p.category}/">${c.emoji} ${esc(c.name)}</a>
+      ${inChallenge ? challengeStrip(inChallenge) : ''}
       <h1>${esc(p.title)}</h1>
       <p class="lede">${esc(p.description)}</p>
       <div class="meta">${p.author.photo ? authorAvatar(p.author, 28) + ' ' : ''}By ${authorLink(p.author)} · <time datetime="${isoDate(p.date)}">${esc(niceDate(p.date))}</time>${p.updated && p.updated !== p.date ? ` · Updated <time datetime="${isoDate(p.updated)}">${esc(niceDate(p.updated))}</time>` : ''} · ${p.minutes} min read${p.level ? ` · ${esc(p.level)}` : ''}${p.age ? ` · Ages ${esc(p.age)}` : ''}</div>
@@ -392,15 +450,16 @@ const BUILD_ID = require('crypto').createHash('sha1')
     <div class="prose">
 ${p.html}
     </div>
+    ${inChallenge ? challengeMission(inChallenge) : ''}
+    ${trialBox(cta, 'trial-wide')}
     ${authorBox(p.author)}
     <section class="comments" id="comments" data-slug="${esc(p.slug)}" aria-labelledby="comments-title"></section>
-    ${trialBox().replace('trial-box', 'trial-box trial-wide')}
     ${p.tags.length ? `<div class="tags">${p.tags.map(t => `<span class="tag">#${esc(t)}</span>`).join('')}</div>` : ''}
     <div class="share">Share: <a target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(p.title + ' ' + url)}">WhatsApp</a> · <a target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}">Facebook</a> · <a target="_blank" rel="noopener" href="https://x.com/intent/post?url=${encodeURIComponent(url)}&text=${encodeURIComponent(p.title)}">X</a> · <a target="_blank" rel="noopener" href="https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}">LinkedIn</a></div>
   </div>
   <aside class="post-side">
     ${toc.length >= 3 ? `<nav class="toc" aria-label="In this guide"><h2>In this guide</h2><ol>${toc.map(t => `<li><a href="#${t.id}">${esc(t.text)}</a></li>`).join('')}</ol></nav>` : ''}
-    ${trialBox()}
+    ${trialBox(cta)}
   </aside>
 </article>
 ${related.length ? `<section class="wrap related"><h2>Keep learning</h2><div class="grid">${related.map(card).join('')}</div></section>` : ''}`;
@@ -431,8 +490,11 @@ ${related.length ? `<section class="wrap related"><h2>Keep learning</h2><div cla
     <div class="hero-cats">${Object.entries(CATEGORIES).map(([k, c]) => `<a class="chip chip-${k}" href="/category/${k}/">${c.emoji} ${esc(c.name)}</a>`).join('')}</div>
   </div>
 </section>
+<div class="wrap">${continueBox()}</div>
 <div class="wrap with-side">
   <section aria-labelledby="latest">
+    <h2 class="section-title"><a class="title-link" href="/challenges/">🏆 Take a challenge</a></h2>
+    <div class="grid">${CHALLENGES.map(challengeCard).join('')}</div>
     <h2 id="latest" class="section-title">Latest guides</h2>
     <div class="grid">${posts.map(card).join('')}</div>
   </section>
@@ -462,6 +524,46 @@ ${related.length ? `<section class="wrap related"><h2>Keep learning</h2><div cla
     write(`category/${k}/index.html`, page({
       title: `${c.name}: coding and tech guides`, description: c.blurb, canonical: `${SITE.url}/category/${k}/`, body, noindex: !list.length,
       jsonld: [{ '@context': 'https://schema.org', '@type': 'CollectionPage', name: c.name, url: `${SITE.url}/category/${k}/`, isPartOf: { '@type': 'WebSite', name: SITE.name, url: SITE.url + '/' } }],
+    }));
+  }
+
+  /* Challenges */
+  const bySlug = Object.fromEntries(posts.map(p => [p.slug, p]));
+  for (const ch of CHALLENGES) for (const s of ch.steps) if (!bySlug[s.post]) throw new Error(`${ch.slug}: "${s.post}" is not a published article`);
+  write('challenges/index.html', page({
+    title: 'Coding Challenges for Kids and Teens', description: 'Free coding challenges for ages 7 and up. Pick Scratch, Python or web development, work through the steps and save your progress as you go.',
+    canonical: `${SITE.url}/challenges/`,
+    body: `<section class="hero hero-small"><div class="wrap">
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Learning Hub</a> › Challenges</nav>
+      <h1>🏆 Coding challenges</h1><p class="hero-sub">Pick a challenge for your age, finish each mission, and come back any time to carry on.</p></div></section>
+      <div class="wrap">${continueBox()}</div>
+      <div class="wrap with-side"><section><div class="grid">${CHALLENGES.map(challengeCard).join('')}</div></section>${sidebar(posts)}</div>`,
+    jsonld: [{ '@context': 'https://schema.org', '@type': 'CollectionPage', name: 'Coding challenges', url: `${SITE.url}/challenges/`, isPartOf: { '@type': 'WebSite', name: SITE.name, url: SITE.url + '/' } }],
+  }));
+  for (const ch of CHALLENGES) {
+    const url = `${SITE.url}/challenges/${ch.slug}/`;
+    write(`challenges/${ch.slug}/index.html`, page({
+      title: `${ch.title} (Ages ${ch.age})`, description: ch.description, canonical: url,
+      body: `<section class="hero hero-small"><div class="wrap">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Learning Hub</a> › <a href="/challenges/">Challenges</a></nav>
+        <h1>${ch.emoji} ${esc(ch.title)}</h1><p class="hero-sub">${esc(ch.intro)}</p>
+        <div class="meta ch-meta">Ages ${esc(ch.age)} · ${ch.steps.length} steps · Free</div></div></section>
+        <div class="wrap with-side"><section class="ch-page" data-challenge="${ch.slug}" data-title="${esc(ch.title)}" data-total="${ch.steps.length}">
+          <div class="ch-bar-wrap"><div class="ch-progress-text" aria-live="polite"></div><div class="ch-bar" hidden><span></span></div>
+          <button type="button" class="btn ch-start" hidden>Start the challenge</button></div>
+          <ol class="ch-steps">${ch.steps.map((s, i) => {
+            const p = bySlug[s.post];
+            return `<li class="ch-step" data-post="${s.post}"><div class="ch-num" aria-hidden="true">${i + 1}</div><div>
+              <h2><a href="/${s.post}/">${esc(s.name)}</a></h2>
+              <p>${esc(s.mission)}</p>
+              <div class="meta">${esc(p.title)} · ${p.minutes} min read${p.level ? ' · ' + esc(p.level) : ''}</div>
+              <button type="button" class="ch-tick" hidden aria-pressed="false">Mark as finished</button></div></li>`;
+          }).join('')}</ol>
+          <p class="ch-note">No sign-up needed. Your progress is saved only in this browser, on this device. We never see it. <button type="button" class="link-btn ch-reset" hidden>Clear my progress</button></p>
+          ${trialBox({ emoji: ch.emoji, title: 'Want a tutor to help you finish?', text: 'Work through it with an expert tutor in a free one-on-one class.' }, 'trial-wide')}
+        </section>${sidebar(posts)}</div>`,
+      jsonld: [{ '@context': 'https://schema.org', '@type': 'ItemList', name: ch.title, itemListOrder: 'https://schema.org/ItemListOrderAscending', numberOfItems: ch.steps.length,
+        itemListElement: ch.steps.map((s, i) => ({ '@type': 'ListItem', position: i + 1, name: s.name, url: `${SITE.url}/${s.post}/` })) }],
     }));
   }
 
@@ -508,6 +610,8 @@ ${related.length ? `<section class="wrap related"><h2>Keep learning</h2><div cla
   const newest = posts.length ? posts.reduce((m, p) => new Date(p.updated) > new Date(m) ? p.updated : m, posts[0].updated) : new Date();
   const urls = [
     { loc: SITE.url + '/', lastmod: newest },
+    { loc: `${SITE.url}/challenges/`, lastmod: newest },
+    ...CHALLENGES.map(ch => ({ loc: `${SITE.url}/challenges/${ch.slug}/`, lastmod: newest })),
     ...Object.keys(CATEGORIES).filter(k => posts.some(p => p.category === k)).map(k => ({ loc: `${SITE.url}/category/${k}/`, lastmod: newest })),
     ...AUTHORS.filter(a => posts.some(p => p.author.slug === a.slug)).map(a => ({ loc: `${SITE.url}/author/${a.slug}/`, lastmod: newest })),
     ...posts.map(p => ({ loc: `${SITE.url}/${p.slug}/`, lastmod: p.updated })),

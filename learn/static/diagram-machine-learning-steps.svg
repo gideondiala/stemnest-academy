@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 450" width="560" height="450" role="img" aria-label="The three steps of machine learning: collect data, train the model, test and use it" font-family="Nunito, system-ui, Segoe UI, sans-serif">
+<defs><marker id="a" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto"><path d="M0 0L9 4L0 8z" fill="#475569"/></marker></defs>
+<rect width="560" height="450" rx="18" fill="#f6f8fc"/>
+<rect x="20" y="20" width="520" height="104" rx="13" fill="#1a56db"/>
+<text x="42" y="58" font-size="23" font-weight="800" fill="#ffffff">1. Collect data</text>
+<text x="42" y="88" font-size="18" fill="#ffffff">Examples to learn from, such as photos</text>
+<text x="42" y="111" font-size="18" fill="#ffffff">labelled cat or dog</text>
+<rect x="20" y="170" width="520" height="104" rx="13" fill="#7c3aed"/>
+<text x="42" y="208" font-size="23" font-weight="800" fill="#ffffff">2. Train the model</text>
+<text x="42" y="238" font-size="18" fill="#ffffff">The computer studies the examples again and</text>
+<text x="42" y="261" font-size="18" fill="#ffffff">again, adjusting a tiny bit each time</text>
+<rect x="20" y="320" width="520" height="104" rx="13" fill="#0e9f6e"/>
+<text x="42" y="358" font-size="23" font-weight="800" fill="#ffffff">3. Test and use the model</text>
+<text x="42" y="388" font-size="18" fill="#ffffff">Check it on examples it has never seen, then</text>
+<text x="42" y="411" font-size="18" fill="#ffffff">use it to make predictions</text>
+<path d="M280 128V164" fill="none" stroke="#475569" stroke-width="3" marker-end="url(#a)"/>
+<path d="M280 278V314" fill="none" stroke="#475569" stroke-width="3" marker-end="url(#a)"/>
+</svg>

@@ -53,6 +53,8 @@ Each column can be either 0 (off) or 1 (on). To find the value of a binary numbe
 
 8 + 2 + 1 = **11**. So binary `1011` is the number 11.
 
+![In binary, 1011 means one 8, one 2 and one 1, which adds up to 11](/diagram-binary-place-values.svg)
+
 ## Counting from 0 to 10 in binary
 
 | Decimal | Binary |
