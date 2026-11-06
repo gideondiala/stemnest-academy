@@ -97,6 +97,7 @@
       <a class="sidebar-link"        data-tab="add-sales"   onclick="showAdminTab('add-sales')">   <span class="sl-icon">➕</span> Add Sales Person</a>
       <div class="sidebar-section-label">Reports</div>
       <a class="sidebar-link"        data-tab="class-reports" onclick="showAdminTab('class-reports')"><span class="sl-icon">📊</span> Class Reports</a>
+      <a class="sidebar-link"        data-tab="finance"       onclick="showAdminTab('finance')"><span class="sl-icon">💰</span> Finance · Tutor Pay</a>
       <div class="sidebar-section-label">Blog</div>
       <a class="sidebar-link"        data-tab="blog-posts"    onclick="showAdminTab('blog-posts')">  <span class="sl-icon">✍️</span> All Posts <span class="sl-badge" id="blogBadge">0</span></a>
       <a class="sidebar-link"        data-tab="blog-new"      onclick="showAdminTab('blog-new')">    <span class="sl-icon">➕</span> New Post</a>
@@ -614,6 +615,9 @@ Answer: A</code>
       </div>
     </div>
 
+    <!-- ── TAB: FINANCE (js/finance.js) ── -->
+    <div id="tab-finance" style="display:none;"></div>
+
     <!-- ── TAB: CLASS REPORTS ── -->
     <div id="tab-class-reports" style="display:none;">
       <div class="dash-section-header">
@@ -911,6 +915,7 @@ Answer: A</code>
 <script src="../js/admin-pathways.js?v=202610061500"></script>
 <script src="../js/admin-quizzes.js"></script>
 <script src="../js/admin-quiz-bulk.js?v=202610130900"></script>
+<script src="../js/finance.js?v=202611061600"></script>
 <script>
 // Wire bulk email tab into admin showAdminTab
 document.addEventListener('DOMContentLoaded', () => {

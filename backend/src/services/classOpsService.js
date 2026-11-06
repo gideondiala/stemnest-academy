@@ -164,6 +164,69 @@ async function payMonthDetail(tutorId, month) {
 }
 
 /* ════════════════════════════════════════════
+   FINANCE (Admin / HR): every tutor's pay for a month
+════════════════════════════════════════════ */
+/**
+ * One row per tutor for the month: active tutors (₦0 when they had no
+ * classes, so nobody is missed) plus anyone paid that month. Class pay is
+ * the same figure the tutor sees in My Payments; late-join penalties for the
+ * month are shown beside it, and net pay is class pay less penalties.
+ */
+async function paySummary(month) {
+  const r = await pool.query(
+    `WITH pay AS (
+       SELECT l.tutor_id,
+              COALESCE(SUM(l.amount), 0)::float AS total,
+              COUNT(*)::int AS classes,
+              COUNT(*) FILTER (WHERE l.type = 'demo')::int AS demos,
+              COUNT(*) FILTER (WHERE l.type <> 'demo')::int AS paid,
+              COALESCE(SUM(l.students_count) FILTER (WHERE l.type <> 'demo'), 0)::int AS students
+       FROM tutor_earnings_log l
+       WHERE l.currency = 'NGN' AND ${MONTH_SQL} = $1
+       GROUP BY l.tutor_id
+     ), late AS (
+       SELECT lj.tutor_id, COUNT(*)::int AS late_joins,
+              COALESCE(SUM(lj.penalty) FILTER (WHERE lj.pardoned = FALSE), 0)::float AS penalties
+       FROM late_joins lj
+       WHERE to_char(COALESCE(lj.class_start, lj.join_time) AT TIME ZONE 'Africa/Lagos', 'YYYY-MM') = $1
+       GROUP BY lj.tutor_id
+     )
+     SELECT u.id AS "tutorId", u.name AS "tutorName", u.staff_id AS "staffId", u.email, u.phone, u.is_active AS "isActive",
+            COALESCE(p.classes, 0) AS classes, COALESCE(p.demos, 0) AS demos, COALESCE(p.paid, 0) AS paid,
+            COALESCE(p.students, 0) AS students, COALESCE(p.total, 0)::float AS "classPay",
+            COALESCE(lt.late_joins, 0) AS "lateJoins", COALESCE(lt.penalties, 0)::float AS penalties,
+            (COALESCE(p.total, 0) - COALESCE(lt.penalties, 0))::float AS "netPay"
+     FROM users u
+     LEFT JOIN pay p   ON p.tutor_id = u.id
+     LEFT JOIN late lt ON lt.tutor_id = u.id
+     WHERE u.role = 'tutor' AND (u.is_active = TRUE OR p.tutor_id IS NOT NULL OR lt.tutor_id IS NOT NULL)
+     ORDER BY COALESCE(p.total, 0) DESC, u.name`,
+    [month]
+  );
+  return r.rows;
+}
+
+/** Every paid class of every tutor in the month, for the payout workbook. */
+async function payDetailAll(month) {
+  const r = await pool.query(
+    `SELECT l.tutor_id AS "tutorId", l.booking_id AS "bookingId", l.type, l.outcome, l.amount::float AS amount,
+            COALESCE(l.students_count, 1) AS "studentsCount", l.student_names AS "studentNames",
+            to_char(COALESCE(l.class_date, b.date), 'YYYY-MM-DD') AS "classDate",
+            to_char(COALESCE(l.class_time, b.time), 'HH24:MI') AS "classTime",
+            COALESCE(l.subject, b.subject) AS subject,
+            b.batch_id IS NOT NULL AS "isBatch", bt.batch_ref AS "batchRef",
+            to_char(l.created_at AT TIME ZONE 'Africa/Lagos', 'YYYY-MM-DD HH24:MI') AS "endedAt"
+     FROM tutor_earnings_log l
+     LEFT JOIN bookings b ON b.id = l.booking_id
+     LEFT JOIN batches bt ON bt.id = b.batch_id
+     WHERE l.currency = 'NGN' AND ${MONTH_SQL} = $1
+     ORDER BY l.tutor_id, "classDate", "classTime"`,
+    [month]
+  );
+  return r.rows;
+}
+
+/* ════════════════════════════════════════════
    INCOMPLETE CLASSES
 ════════════════════════════════════════════ */
 /**
@@ -191,6 +254,21 @@ async function applyIncomplete(booking, { reason, actorLabel, markedBy } = {}) {
   );
 
   let movedTo = null;
+  /* A paused student's missed lesson goes on hold with their other classes
+     instead of taking the next slot (it comes back, in order, on resume) */
+  const pausedStudent = booking.student_id && !booking.batch_id && !booking.is_demo
+    ? (await pool.query(`SELECT paused_at FROM student_profiles WHERE user_id = $1 AND class_paused = TRUE`, [booking.student_id])).rows[0]
+    : null;
+  if (pausedStudent) {
+    await pool.query(
+      `UPDATE bookings SET status = 'cancelled', completed_at = NULL, tutor_joined_at = NULL, unended_warned_at = NULL,
+              notes = COALESCE(notes, '{}'::jsonb) || jsonb_build_object('cancelledByPause', $2::text, 'heldAfterPause', NOW()::text)
+       WHERE id = $1`,
+      [booking.id, pausedStudent.paused_at ? new Date(pausedStudent.paused_at).toISOString() : new Date().toISOString()]
+    );
+    logger.info(`[INCOMPLETE] Booking ${booking.id}: student is paused, so the lesson is on hold until they resume`);
+    return { movedTo: null, onHold: true };
+  }
   if ((booking.student_id || booking.batch_id) && !booking.is_demo) {
     const client = await pool.connect();
     try {
@@ -397,6 +475,6 @@ function startUnendedClassJob() {
 
 module.exports = {
   LATE_AFTER_MINS, PARDONED_PER_MONTH, LATE_PENALTY, FOLLOW_UP_FROM, CLASS_START_SQL,
-  getPayRates, setPayRates, payFor, recordEarning, payMonths, payMonthDetail,
+  getPayRates, setPayRates, payFor, recordEarning, payMonths, payMonthDetail, paySummary, payDetailAll,
   applyIncomplete, recordTutorJoin, lateJoins, unendedClasses, sendUnendedWarnings, startUnendedClassJob,
 };

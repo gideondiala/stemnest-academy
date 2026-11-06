@@ -388,6 +388,18 @@ const STATEMENTS = [
      seen_at TIMESTAMPTZ DEFAULT NOW()
    )`,
   `ALTER TABLE news_seen ENABLE ROW LEVEL SECURITY`,
+
+  /* ── Pause details kept for resume: tutor, days and times, pathway and
+     lessons of each course at the moment of the pause (services/pauseService.js) ── */
+  `ALTER TABLE student_profiles ADD COLUMN IF NOT EXISTS pause_snapshot JSONB`,
+
+  /* ── One-off data repairs, each applied once (db/dataFixes.js) ── */
+  `CREATE TABLE IF NOT EXISTS data_fixes (
+     id         TEXT PRIMARY KEY,
+     applied_at TIMESTAMPTZ DEFAULT NOW(),
+     result     JSONB
+   )`,
+  `ALTER TABLE data_fixes ENABLE ROW LEVEL SECURITY`,
 ];
 
 async function ensureSchema() {

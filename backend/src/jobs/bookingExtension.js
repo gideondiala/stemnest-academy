@@ -222,17 +222,34 @@ async function runBookingExtensionCheck() {
 }
 
 /**
- * Start the booking extension job.
- * Runs immediately on startup, then every 24 hours.
+ * The daily calendar check: paused students' classes stay on hold (first,
+ * so nothing below extends them), group batches keep their grade booked,
+ * and 1-on-1 students keep MINIMUM_WEEKS_AHEAD of classes. Never throws.
+ */
+async function runDailyCalendarCheck() {
+  try {
+    const held = await require('../services/pauseService').holdStrayClasses();
+    if (held.held) logger.info(`[PAUSE] ${held.held} class(es) of ${held.students} paused student(s) put on hold`);
+  } catch (e) { logger.error('[PAUSE] Hold check error:', e.message); }
+  try {
+    const n = await require('../routes/batches').topUpBatches();
+    if (n) logger.info(`[BATCH-TOPUP] ${n} batch(es) topped up`);
+  } catch (e) { logger.error('[BATCH-TOPUP] Job error:', e.message); }
+  await runBookingExtensionCheck();
+}
+
+/**
+ * Start the daily calendar check.
+ * Runs a minute after startup, then every 24 hours.
  */
 function startBookingExtensionJob() {
   logger.info('[BOOKING-EXT] Job registered — runs daily');
 
   // Run after a 1-minute delay on startup (give server time to fully boot)
   setTimeout(() => {
-    runBookingExtensionCheck();
-    setInterval(runBookingExtensionCheck, INTERVAL_MS);
+    runDailyCalendarCheck();
+    setInterval(runDailyCalendarCheck, INTERVAL_MS);
   }, 60 * 1000);
 }
 
-module.exports = { startBookingExtensionJob, runBookingExtensionCheck };
+module.exports = { startBookingExtensionJob, runBookingExtensionCheck, runDailyCalendarCheck };

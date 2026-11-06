@@ -72,6 +72,8 @@
       <a class="sidebar-link"        data-tab="interviews"   onclick="showHRTab('interviews')"> <span class="sl-icon">📅</span> Interviews</a>
       <a class="sidebar-link"        data-tab="training"     onclick="showHRTab('training')">   <span class="sl-icon">🎓</span> Training</a>
       <a class="sidebar-link"        data-tab="adverts"      onclick="showHRTab('adverts')">    <span class="sl-icon">📣</span> Job Adverts</a>
+      <div class="sidebar-section-label">Payroll</div>
+      <a class="sidebar-link"        data-tab="finance"      onclick="showHRTab('finance')">    <span class="sl-icon">💰</span> Finance · Tutor Pay</a>
     </div>
     <div class="sidebar-bottom">
       <button class="logout-btn" onclick="window.location.href='login.html'">🚪 Log Out</button>
@@ -138,6 +140,9 @@
       <div id="trainingList"></div>
     </div>
 
+    <!-- FINANCE (js/finance.js) -->
+    <div id="tab-finance" style="display:none;"></div>
+
     <!-- JOB ADVERTS -->
     <div id="tab-adverts" style="display:none;">
       <div class="dash-section-header"><div class="dash-section-title">📣 Job Adverts</div></div>
@@ -180,5 +185,6 @@
 </div>
 <script src="../js/utils.js?v=202610081200"></script>
 <script src="../js/hr-dashboard.js"></script>
+<script src="../js/finance.js?v=202611061600"></script>
 </body>
 </html>

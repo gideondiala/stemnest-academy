@@ -56,6 +56,18 @@
   }
   window.refreshTutorPay = refreshPay;
 
+  /* This month's pay starts hidden on every page load; the eye button shows
+     or hides it everywhere it appears. Not remembered, so it is hidden again
+     next time the dashboard opens. */
+  window.togglePayVisibility = function () {
+    var shown = document.documentElement.classList.toggle('pay-shown');
+    document.querySelectorAll('.pay-toggle').forEach(function (b) {
+      b.textContent = shown ? '🙈 Hide' : '👁️ Show';
+      b.setAttribute('aria-pressed', shown ? 'true' : 'false');
+      b.setAttribute('aria-label', shown ? "Hide this month's pay" : "Show this month's pay");
+    });
+  };
+
   /* Pay and credits are settled by the server now; retire the browser-side copies */
   window._addEarnings = function () { refreshPay(); };
   window._deductStudentCredit = function () {};

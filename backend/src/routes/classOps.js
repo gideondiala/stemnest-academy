@@ -9,6 +9,8 @@
  * PUT  /pay-rates            — set pay rates (admin / super admin)
  * GET  /my-pay               — tutor's pay: this month + previous months
  * GET  /my-pay/:month        — every paid class in a month (for the Excel pay sheet)
+ * GET  /pay-summary          — every tutor's pay for a month (?month=YYYY-MM) — admin / HR
+ * GET  /pay-summary/:month/classes — every tutor's paid classes in a month (payout workbook) — admin / HR
  */
 
 const express = require('express');
@@ -141,6 +143,31 @@ router.get('/my-pay/:month', requireAuth, requireRole('tutor', 'admin', 'super_a
       tutor: t.rows[0] ? { name: t.rows[0].name, staffId: t.rows[0].staff_id } : null,
       classes, total: classes.reduce((a, c) => a + c.amount, 0),
     });
+  } catch (err) { next(err); }
+});
+
+/* ── Finance: all tutors' pay (Admin and HR payout reports) ── */
+const FINANCE_ROLES = ['admin', 'super_admin', 'hr'];
+
+router.get('/pay-summary', requireAuth, requireRole(...FINANCE_ROLES), async (req, res, next) => {
+  try {
+    const month = req.query.month || currentMonthWAT();
+    if (!MONTH_RE.test(month)) return res.status(400).json({ success: false, error: 'Month must be YYYY-MM' });
+    const tutors = await ops.paySummary(month);
+    const sum = k => tutors.reduce((a, t) => a + Number(t[k] || 0), 0);
+    res.json({
+      success: true, month, currency: 'NGN', currentMonth: currentMonthWAT(), tutors,
+      totals: { classes: sum('classes'), demos: sum('demos'), paid: sum('paid'), students: sum('students'),
+                classPay: sum('classPay'), lateJoins: sum('lateJoins'), penalties: sum('penalties'), netPay: sum('netPay') },
+      rates: await ops.getPayRates(),
+    });
+  } catch (err) { next(err); }
+});
+
+router.get('/pay-summary/:month/classes', requireAuth, requireRole(...FINANCE_ROLES), async (req, res, next) => {
+  try {
+    if (!MONTH_RE.test(req.params.month)) return res.status(400).json({ success: false, error: 'Month must be YYYY-MM' });
+    res.json({ success: true, month: req.params.month, currency: 'NGN', classes: await ops.payDetailAll(req.params.month) });
   } catch (err) { next(err); }
 });
 

@@ -253,9 +253,24 @@ async function _withTx(res, next, fn, after) {
 }
 
 /* ══════════════════════════════════════════════
+   GET /api/enrollments/students/:studentId/pause-preview
+   What a pause would take off the calendar, before confirming: classes not
+   ended whose time has passed (the tutor should end any that were taught),
+   upcoming classes, and the course details that will be kept.
+   ══════════════════════════════════════════════ */
+router.get('/students/:studentId/pause-preview', requireAuth, requireRole('admin','super_admin','postsales'), async (req, res, next) => {
+  try { res.json(await pauseSvc.previewPause(pool, req.params.studentId)); }
+  catch (err) {
+    if (err.status) return res.status(err.status).json({ success: false, error: err.message });
+    next(err);
+  }
+});
+
+/* ══════════════════════════════════════════════
    PUT /api/enrollments/students/:studentId/pause   { reason }
-   Cancels the student's future 1-on-1 classes (tagged so resume can bring
-   back exactly those lessons) and records the pause. Credits are untouched.
+   Puts every 1-on-1 class not yet ended on hold (tagged so resume can bring
+   back exactly those lessons), saves each course's teacher, schedule and
+   lessons, and records the pause. Credits are untouched.
    ══════════════════════════════════════════════ */
 router.put('/students/:studentId/pause', requireAuth, requireRole('admin','super_admin','postsales'), (req, res, next) => {
   const { studentId } = req.params;
@@ -271,13 +286,17 @@ router.put('/students/:studentId/pause', requireAuth, requireRole('admin','super
 
 /* ══════════════════════════════════════════════
    PUT /api/enrollments/students/:studentId/resume
-   Body: { startDate, keepSchedule = true, tutorId?, schedule?, classLink? }
-   See pauseService.resumeStudent.
+   Body: { startDate, courses?: { [courseKey]: { tutorId?, schedule?, classLink? } },
+           keepSchedule = true, tutorId?, schedule?, classLink? }
+   Each course in `courses` comes back with that teacher, days and times or
+   link; the others come back as they were. See pauseService.resumeStudent.
    ══════════════════════════════════════════════ */
 router.put('/students/:studentId/resume', requireAuth, requireRole('admin','super_admin','postsales'), (req, res, next) => {
   const { studentId } = req.params;
   const { startDate, tutorId, classLink } = req.body || {};
   const keepSchedule = req.body && req.body.keepSchedule !== false;
+  const courses = req.body && req.body.courses && typeof req.body.courses === 'object' && !Array.isArray(req.body.courses)
+    ? req.body.courses : null;
 
   let schedule = null;
   if (!keepSchedule || Array.isArray(req.body.schedule)) {
@@ -288,7 +307,7 @@ router.put('/students/:studentId/resume', requireAuth, requireRole('admin','supe
   }
 
   _withTx(res, next, async (client) => {
-    const out = await pauseSvc.resumeStudent(client, studentId, { startDate, keepSchedule, tutorId, schedule, classLink });
+    const out = await pauseSvc.resumeStudent(client, studentId, { startDate, keepSchedule, tutorId, schedule, classLink, courses });
     logger.info(`[RESUME] ${out.studentName} (${studentId}) resumed by ${req.user.email}: ${out.classes} classes ${out.mode} from ${out.firstClass && out.firstClass.date}`);
     return out;
   }, out => pauseSvc.notifyTutors('resume', out));
@@ -336,6 +355,11 @@ router.get('/students/paused', requireAuth, requireRole('admin','super_admin','p
       ORDER BY u.id, (e.status = 'paused') DESC
     `);
     result.rows.sort((a, b) => new Date(b.pausedAt || 0) - new Date(a.pausedAt || 0));
+    /* Saved details of each course: teacher, days and times, pathway, lessons taught and next */
+    for (const s of result.rows) {
+      try { s.courses = await pauseSvc.pausedCourses(pool, s.studentId); }
+      catch (e) { s.courses = []; logger.warn(`[PAUSE] Could not read courses for ${s.studentId}: ${e.message}`); }
+    }
     res.json({ success: true, students: result.rows });
   } catch (err) { next(err); }
 });

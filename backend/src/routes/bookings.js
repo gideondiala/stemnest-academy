@@ -2144,6 +2144,11 @@ router.put('/:id/move', requireAuth, requireRole('admin','super_admin','tutor','
       await client.query('ROLLBACK');
       return res.status(400).json({ success: false, error: 'Only scheduled bookings can be moved' });
     }
+    /* A paused student's classes stay on hold: moving one would put it back on the calendar */
+    if (booking.student_id && !booking.batch_id && await pauseSvc.isPaused(client, booking.student_id)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ success: false, error: 'This student is paused, so their classes are on hold. End the class if it was taught, or resume the student from Pause & Resume.' });
+    }
 
     if (mode === 'next') {
       ({ moves } = await rescheduleSvc.shiftSeriesForward(client, booking, { reason, actorLabel: req.user.role }));

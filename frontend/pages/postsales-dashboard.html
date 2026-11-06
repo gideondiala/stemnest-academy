@@ -443,7 +443,7 @@
 <script src="../js/api-sync.js"></script>
 <script src="../js/wa.js"></script>
 <script src="../js/utils.js?v=202610081200"></script>
-<script src="../js/postsales-dashboard.js?v=202610081200"></script>
+<script src="../js/postsales-dashboard.js?v=202611061600"></script>
 <script src="../js/postsales-pathways.js?v=202610121600"></script>
 <script src="../js/reschedule-tool.js?v=202610021200"></script>
 
@@ -658,8 +658,11 @@
       <!-- Warning banner -->
       <div style="background:#fff8e1;border:1.5px solid #f59e0b;border-radius:14px;padding:16px 18px;margin-bottom:22px;font-size:13px;font-weight:700;color:#92400e;line-height:1.7;">
         ⚠️ You are pausing classes for <strong><span id="pauseStudentName"></span></strong>.<br>
-        All future scheduled sessions will be cancelled. Their dashboard stays active, completed lessons stay accessible, and <strong>credits are fully preserved</strong>.
+        Every class that has not been ended comes off the calendar and is kept on hold, in lesson order, with its teacher, days and times. Their dashboard stays active, completed lessons stay accessible, and <strong>credits are fully preserved</strong>.
       </div>
+
+      <!-- What the pause will take off the calendar (filled from /pause-preview) -->
+      <div id="pausePreview" style="margin-bottom:22px;"></div>
 
       <!-- Reason field -->
       <div style="margin-bottom:22px;">
@@ -702,21 +705,19 @@
       <input type="date" id="resume-start-date" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
     </div>
 
-    <label id="resume-keep-label" style="display:flex;align-items:flex-start;gap:10px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:12px;padding:12px 14px;margin-bottom:16px;cursor:pointer;">
-      <input type="checkbox" id="resume-keep-schedule" checked onchange="toggleResumeFields()" style="width:18px;height:18px;margin-top:2px;">
-      <span style="font-size:13px;font-weight:800;color:#065f46;line-height:1.5;">
-        Keep the same days, times, teacher and class link as before the pause
-        <span id="resume-keep-hint" style="display:block;font-weight:700;color:#047857;font-size:12px;"></span>
-      </span>
-    </label>
+    <!-- One card per course on hold: keep it as it was, or change teacher / days and times / link -->
+    <div id="resume-courses"></div>
 
+    <!-- Nothing on hold (batch-only student, or no classes when paused): optionally book new classes -->
     <div id="resume-custom-fields" style="display:none;">
+    <div style="background:#f8fafc;border:1.5px solid #e8eaf0;border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:12px;font-weight:700;color:var(--mid);line-height:1.6;">
+      Nothing is on hold for this student (for example, they only take a group batch). Resume just unpauses them. To book new 1-on-1 classes from their next lesson, choose a teacher and add the days below.
+    </div>
 
     <div style="margin-bottom:16px;">
-      <label style="display:block;font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Assign Tutor <span style="color:#c53030;">*</span></label>
-      <div id="resumeTutorHint" style="font-size:11px;color:var(--light);margin-bottom:6px;"></div>
+      <label style="display:block;font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Assign Tutor</label>
       <select id="resume-tutor-select" style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;background:#fff;">
-        <option value="">⏳ Loading tutors…</option>
+        <option value="">— No new classes —</option>
       </select>
     </div>
 
@@ -727,15 +728,14 @@
     </div>
 
     <div style="margin-bottom:20px;">
-      <label style="display:block;font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">New Schedule <span style="color:#c53030;">*</span></label>
+      <label style="display:block;font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Schedule</label>
       <div id="resume-schedule-rows"></div>
       <button type="button" onclick="addRSScheduleRow('resume-schedule-rows')" style="background:#f0f4ff;color:var(--blue);border:1.5px solid var(--blue);border-radius:10px;padding:8px 16px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;margin-top:4px;">+ Add Another Day</button>
     </div>
-
     </div>
 
     <div style="background:#dbeafe;border-radius:12px;padding:12px 16px;margin-bottom:20px;font-size:12px;font-weight:700;color:#1e40af;">
-      ℹ️ The lessons the pause took off the calendar are brought back in order, from where the student left off. If the selected time clashes with another student on that tutor, you will be shown an error and can choose a different time.
+      ℹ️ The lessons on hold come back in lesson order from the start date, beginning with any class that was never ended. Clashes with the teacher's other classes are checked first; if there is one, nothing changes and you can pick a different date or time.
     </div>
 
     <div style="display:flex;gap:12px;">
@@ -851,9 +851,16 @@
     </div>
     <div class="modal-body">
 
-      <div style="background:#fff3e0;border:1.5px solid #f59e0b;border-radius:12px;padding:14px 16px;margin-bottom:20px;font-size:13px;font-weight:700;color:#92400e;line-height:1.7;">
-        ⚠️ All future scheduled classes for this batch will be cancelled and recreated on the new schedule from the chosen start date.<br>
+      <div id="br-warning" style="background:#fff3e0;border:1.5px solid #f59e0b;border-radius:12px;padding:14px 16px;margin-bottom:20px;font-size:13px;font-weight:700;color:#92400e;line-height:1.7;">
+        ⚠️ All future scheduled classes for this batch will move onto the new schedule from the chosen start date, in lesson order.<br>
         Completed classes and lesson sequence are not affected. Clash detection runs before saving.
+      </div>
+
+      <div class="pm-field" id="br-from-wrap" style="display:none;">
+        <label style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">🔢 Start From Lesson</label>
+        <div style="font-size:12px;color:var(--light);font-weight:700;margin-bottom:8px;">Leave blank to continue from the lesson after the last one this batch had</div>
+        <input type="number" min="1" id="br-from-lesson" placeholder="e.g. 19"
+          style="width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:'Nunito',sans-serif;font-size:14px;outline:none;">
       </div>
 
       <div class="pm-field">

@@ -174,6 +174,9 @@ const server = app.listen(PORT, () => {
   /* Apply idempotent schema additions, then start background jobs */
   ensureSchema()
     .catch(e => logger.warn('[SCHEMA] ensureSchema failed: ' + e.message))
+    /* One-off data repairs run before the jobs, which build on the data they fix */
+    .then(() => require('./db/dataFixes').runDataFixes())
+    .catch(e => logger.warn('[DATA-FIX] ' + e.message))
     .then(() => {
       startReminderJob();
       startRetentionJob();

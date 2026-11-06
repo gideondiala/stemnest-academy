@@ -36,6 +36,7 @@ let   _rsStudentId    = null;
 let   _rsStudentName  = '';
 let   _pauseStudentId = null;
 let   _resumeStudentId = null;
+let   _pausedCache = [];
 let   _ctStudentId    = null;
 let   _ctStudentName  = '';
 
@@ -878,6 +879,7 @@ async function renderPauseResume() {
     const [activeData, pausedData] = await Promise.all([activeRes.json(), pausedRes.json()]);
     const activeStudents = activeData.students || [];
     const pausedStudents = pausedData.students || [];
+    _pausedCache = pausedStudents;
 
     setText('pauseBadge', pausedStudents.length);
 
@@ -912,9 +914,10 @@ async function renderPauseResume() {
             <div>
               <div style="font-weight:900;font-size:14px;color:var(--dark);">${s.studentName}</div>
               <div style="font-size:12px;color:var(--mid);font-weight:700;margin-top:2px;">${s.pathwayName||'No pathway'} · Grade ${s.currentGrade||'—'} · ${s.pausedClasses ? s.pausedClasses + ' lessons on hold' : 'paused'}${s.pausedAt ? ' since ' + fmtDateShort(s.pausedAt) : ''}</div>
-              <div style="font-size:11px;color:#c53030;margin-top:2px;">${s.pauseKind === 'credits' ? '<span style="background:#fed7d7;border-radius:50px;padding:1px 7px;font-weight:900;margin-right:4px;">Out of credits</span>' : ''}${s.pausedReason||'No reason given'}</div>
+              ${(s.courses || []).map(c => `<div style="margin-top:6px;padding:8px 10px;background:#fffaf5;border-radius:10px;">${_courseSummaryHtml(c)}</div>`).join('')}
+              <div style="font-size:11px;color:#c53030;margin-top:4px;">${s.pauseKind === 'credits' ? '<span style="background:#fed7d7;border-radius:50px;padding:1px 7px;font-weight:900;margin-right:4px;">Out of credits</span>' : ''}${s.pausedReason||'No reason given'}</div>
             </div>
-            <button onclick="openResumeModal('${s.studentId}','${(s.studentName||'').replace(/'/g,'')}','${s.classLink||''}','${s.lastTutorId||''}',${s.pausedClasses||0})"
+            <button onclick="openResumeModal('${s.studentId}')"
               style="background:var(--green);color:#fff;border:none;border-radius:10px;padding:9px 18px;font-family:'Nunito',sans-serif;font-weight:900;font-size:13px;cursor:pointer;flex-shrink:0;">
               ▶️ Resume
             </button>
@@ -926,12 +929,67 @@ async function renderPauseResume() {
   }
 }
 
+/* "Mon 16:00, Thu 16:00" from [{weekday, time}] */
+function _fmtCourseSchedule(schedule) {
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  return (schedule || []).map(s => `${days[s.weekday]} ${fmtTime(s.time)}`).join(', ') || 'no fixed days';
+}
+
+/* One course's saved details: teacher, days and times, pathway, lessons */
+function _courseSummaryHtml(c) {
+  const lessons = [
+    c.lessonsTaught != null ? `${c.lessonsTaught} lesson${c.lessonsTaught === 1 ? '' : 's'} taught` : '',
+    c.nextLesson ? `next: lesson ${c.nextLesson}${c.nextLessonName ? ' — ' + _escH(c.nextLessonName) : ''}` : '',
+    `${c.classes} class${c.classes === 1 ? '' : 'es'} on hold`,
+  ].filter(Boolean).join(' · ');
+  return `<div style="font-size:12px;font-weight:700;color:var(--dark);line-height:1.6;">
+      📚 ${_escH(c.pathwayName || 'Course')}${c.grade ? ' · Grade ' + c.grade : ''} · 👩‍🏫 ${_escH(c.tutorName || 'No teacher')}
+      <div style="color:var(--mid);">🗓️ ${_fmtCourseSchedule(c.schedule)} (WAT) · ${lessons}</div>
+    </div>`;
+}
+
 /* ─── PAUSE MODAL ─── */
-function openPauseModal(studentId, studentName) {
+async function openPauseModal(studentId, studentName) {
   _pauseStudentId = studentId;
   document.getElementById('pauseStudentName').textContent = studentName;
   if (document.getElementById('pauseReason')) document.getElementById('pauseReason').value = '';
+  const box = document.getElementById('pausePreview');
+  if (box) box.innerHTML = '<div style="font-size:13px;font-weight:700;color:var(--light);">⏳ Checking their classes…</div>';
+  const btn = document.getElementById('pauseConfirmBtn');
+  if (btn) btn.disabled = true;
   document.getElementById('pauseModalOverlay').classList.add('open');
+
+  try {
+    const res = await fetch(`${API}/api/enrollments/students/${studentId}/pause-preview`, {
+      headers: { 'Authorization': 'Bearer ' + localStorage.getItem('sn_access_token') },
+    });
+    const d = await res.json();
+    if (!d.success) throw new Error(d.error || 'Could not check their classes');
+    if (_pauseStudentId !== studentId || !box) return;
+    const overdue = d.overdue || [];
+    box.innerHTML = `
+      ${overdue.length ? `
+        <div style="background:#fff5f5;border:1.5px solid #fc8181;border-radius:14px;padding:14px 16px;margin-bottom:12px;">
+          <div style="font-size:13px;font-weight:900;color:#c53030;margin-bottom:6px;">⚠️ ${overdue.length} past class${overdue.length === 1 ? ' was' : 'es were'} never ended</div>
+          <div style="font-size:12px;font-weight:700;color:#742a2a;line-height:1.6;margin-bottom:8px;">
+            If any of these was taught, ask the teacher to end it <strong>before</strong> you pause, so they are paid and the lesson is recorded.
+            Classes not ended will be kept on hold and taught again when the student resumes.
+          </div>
+          ${overdue.map(o => `<div style="font-size:12px;font-weight:800;color:var(--dark);padding:3px 0;">
+              • ${fmtDateShort(o.date)} at ${fmtTime(o.time)} WAT — ${_escH(o.tutorName)}${o.lessonNumber ? ' · Lesson ' + o.lessonNumber : ''}</div>`).join('')}
+        </div>` : ''}
+      <div style="background:#f8fafc;border:1.5px solid #e8eaf0;border-radius:14px;padding:14px 16px;">
+        <div style="font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">
+          Saved for when they come back · ${d.upcoming} upcoming class${d.upcoming === 1 ? '' : 'es'}${overdue.length ? ` + ${overdue.length} not ended` : ''}
+        </div>
+        ${(d.courses || []).length ? d.courses.map(_courseSummaryHtml).join('<div style="height:8px;"></div>')
+          : '<div style="font-size:12px;font-weight:700;color:var(--light);">No 1-on-1 classes on the calendar. Group batch classes carry on without them.</div>'}
+      </div>`;
+  } catch (err) {
+    if (box) box.innerHTML = `<div style="font-size:13px;font-weight:700;color:#c53030;">⚠️ ${_escH(err.message)}. You can still pause.</div>`;
+  } finally {
+    if (btn && _pauseStudentId === studentId) btn.disabled = false;
+  }
 }
 
 function closePauseModal() {
@@ -954,7 +1012,7 @@ async function confirmPause() {
     });
     const data = await res.json();
     if (data.success) {
-      showToast(`✅ ${data.studentName}'s classes paused. ${data.bookingsCancelled} bookings cancelled.`);
+      showToast(`✅ ${data.studentName} paused. ${data.bookingsCancelled} class${data.bookingsCancelled === 1 ? '' : 'es'} on hold${data.overdueHeld ? ` (including ${data.overdueHeld} not ended)` : ''}, ready to come back in order.`, 'success', 7000);
       closePauseModal();
       await loadDashboard();
       renderPauseResume();
@@ -968,85 +1026,119 @@ async function confirmPause() {
   }
 }
 
-/* ─── RESUME MODAL ─── */
-function openResumeModal(studentId, studentName, classLink, lastTutorId, pausedClasses) {
+/* ─── RESUME MODAL ───
+   One card per course on hold. Each comes back as it was (saved teacher,
+   days, times and link) or with a new teacher / days and times / link. */
+let _resumeCourses = [];
+
+function openResumeModal(studentId) {
+  const s = (_pausedCache || []).find(x => x.studentId === studentId);
+  if (!s) { showToast('Could not find this student — refresh the page.', 'error'); return; }
   _resumeStudentId = studentId;
-  document.getElementById('resumeStudentName').textContent = studentName;
+  _resumeCourses = s.courses || [];
+  document.getElementById('resumeStudentName').textContent = s.studentName;
+  document.getElementById('resume-start-date').value = new Date(Date.now() + 3600e3).toISOString().split('T')[0];
 
-  const keep = document.getElementById('resume-keep-schedule');
-  if (keep) keep.checked = true;
-  const hint = document.getElementById('resume-keep-hint');
-  if (hint) hint.textContent = pausedClasses
-    ? `${pausedClasses} lessons are on hold and will be moved forward to start from the date above.`
-    : 'Their cancelled lessons will be moved forward to start from the date above.';
-  toggleResumeFields();
+  const tutorOptions = sel => `<option value="">— Select teacher —</option>` + _allTutors.map(t =>
+    `<option value="${t.id}"${t.id === sel ? ' selected' : ''}>${_escH(t.name)}${t.staff_id ? ' (' + _escH(t.staff_id) + ')' : ''}</option>`).join('');
 
-  const today = new Date().toISOString().split('T')[0];
-  document.getElementById('resume-start-date').value = today;
-  if (document.getElementById('resume-class-link')) document.getElementById('resume-class-link').value = classLink || '';
+  const wrap = document.getElementById('resume-courses');
+  wrap.innerHTML = _resumeCourses.map((c, i) => `
+    <div style="border:1.5px solid #86efac;background:#f0fdf4;border-radius:14px;padding:14px 16px;margin-bottom:14px;">
+      ${_courseSummaryHtml(c)}
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:13px;font-weight:800;color:#065f46;">
+        <label style="cursor:pointer;"><input type="radio" name="rc-mode-${i}" value="keep" checked onchange="toggleResumeCourse(${i})"> Keep as before</label>
+        <label style="cursor:pointer;"><input type="radio" name="rc-mode-${i}" value="change" onchange="toggleResumeCourse(${i})"> Change teacher, days or link</label>
+      </div>
+      <div id="rc-change-${i}" style="display:none;margin-top:12px;">
+        <label style="display:block;font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Teacher</label>
+        <select id="rc-tutor-${i}" style="width:100%;padding:10px 12px;border:2px solid #e8eaf0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:13px;outline:none;background:#fff;margin-bottom:12px;">${tutorOptions(c.tutorId)}</select>
+        <label style="display:block;font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Days and times (WAT)</label>
+        <div id="rc-sched-${i}"></div>
+        <button type="button" onclick="addRSScheduleRow('rc-sched-${i}')" style="background:#fff;color:var(--blue);border:1.5px solid var(--blue);border-radius:10px;padding:7px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;margin-bottom:12px;">+ Add Another Day</button>
+        <label style="display:block;font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Class link</label>
+        <input type="url" id="rc-link-${i}" value="${_escH(c.classLink || '')}" placeholder="https://meet.google.com/..." style="width:100%;padding:10px 12px;border:2px solid #e8eaf0;border-radius:10px;font-family:'Nunito',sans-serif;font-size:13px;outline:none;box-sizing:border-box;">
+      </div>
+    </div>`).join('');
 
-  // Populate tutors
-  const sel = document.getElementById('resume-tutor-select');
-  sel.innerHTML = `<option value="">— Select teacher —</option>`;
-  _allTutors.forEach(t => {
-    const opt = document.createElement('option');
-    opt.value = t.id;
-    opt.textContent = t.name + (t.staff_id ? ' (' + t.staff_id + ')' : '');
-    if (t.id === lastTutorId) opt.selected = true;
-    sel.appendChild(opt);
+  /* Each course's change form starts from its saved days and times */
+  _resumeCourses.forEach((c, i) => {
+    const sched = (c.schedule && c.schedule.length) ? c.schedule : [{ weekday: 1, time: '16:00' }];
+    sched.forEach(slot => {
+      addRSScheduleRow(`rc-sched-${i}`);
+      const row = document.getElementById(`rc-sched-${i}`).lastElementChild;
+      row.querySelector('select').value = String(slot.weekday);
+      row.querySelector('input[type="time"]').value = slot.time;
+    });
   });
 
-  // Reset schedule rows
-  _resumeRows = [];
-  const rowsEl = document.getElementById('resume-schedule-rows');
-  if (rowsEl) rowsEl.innerHTML = '';
-  addRSScheduleRow('resume-schedule-rows', _resumeRows);
+  /* Nothing on hold: optional fields to book new classes */
+  document.getElementById('resume-custom-fields').style.display = _resumeCourses.length ? 'none' : 'block';
+  document.getElementById('resume-tutor-select').innerHTML = `<option value="">— No new classes —</option>` + _allTutors.map(t =>
+    `<option value="${t.id}">${_escH(t.name)}${t.staff_id ? ' (' + _escH(t.staff_id) + ')' : ''}</option>`).join('');
+  document.getElementById('resume-class-link').value = s.classLink || '';
+  document.getElementById('resume-schedule-rows').innerHTML = '';
+  addRSScheduleRow('resume-schedule-rows');
 
   document.getElementById('resumeModalOverlay').classList.add('open');
+}
+
+function toggleResumeCourse(i) {
+  const change = document.querySelector(`input[name="rc-mode-${i}"][value="change"]`)?.checked;
+  const el = document.getElementById(`rc-change-${i}`);
+  if (el) el.style.display = change ? 'block' : 'none';
 }
 
 function closeResumeModal() {
   document.getElementById('resumeModalOverlay').classList.remove('open');
 }
 
-function toggleResumeFields() {
-  const keep = document.getElementById('resume-keep-schedule')?.checked !== false;
-  const el = document.getElementById('resume-custom-fields');
-  if (el) el.style.display = keep ? 'none' : 'block';
-}
-
 async function confirmResume() {
   const startDate = document.getElementById('resume-start-date').value;
-  const tutorId   = document.getElementById('resume-tutor-select').value;
-  const classLink = document.getElementById('resume-class-link')?.value || '';
-
-  const keepSchedule = document.getElementById('resume-keep-schedule')?.checked !== false;
-  const schedule = collectScheduleRows('resume-schedule-rows');
   if (!startDate) { showToast('Please select a start date.','warning'); return; }
-  if (!keepSchedule && !tutorId)   { showToast('Please select a teacher.','warning'); return; }
-  if (!keepSchedule && !schedule.length) { showToast('Please add at least one schedule day.','warning'); return; }
+
+  const body = { startDate };
+  if (_resumeCourses.length) {
+    const courses = {};
+    for (let i = 0; i < _resumeCourses.length; i++) {
+      if (!document.querySelector(`input[name="rc-mode-${i}"][value="change"]`)?.checked) continue;
+      const tutorId = document.getElementById(`rc-tutor-${i}`).value;
+      const schedule = collectScheduleRows(`rc-sched-${i}`);
+      const classLink = (document.getElementById(`rc-link-${i}`).value || '').trim();
+      const name = _resumeCourses[i].pathwayName || 'this course';
+      if (!tutorId)         { showToast(`Choose a teacher for ${name}.`, 'warning'); return; }
+      if (!schedule.length) { showToast(`Add at least one day and time for ${name}.`, 'warning'); return; }
+      courses[_resumeCourses[i].key] = { tutorId, schedule, classLink };
+    }
+    if (Object.keys(courses).length) body.courses = courses;
+  } else {
+    const tutorId = document.getElementById('resume-tutor-select').value;
+    const schedule = collectScheduleRows('resume-schedule-rows');
+    if (tutorId) {
+      if (!schedule.length) { showToast('Add at least one day and time for the new classes.', 'warning'); return; }
+      Object.assign(body, { keepSchedule: false, tutorId, schedule, classLink: document.getElementById('resume-class-link').value || '' });
+    }
+  }
 
   const btn = document.getElementById('resumeConfirmBtn');
   btn.disabled = true; btn.textContent = '⏳ Resuming…';
-
-  const token = localStorage.getItem('sn_access_token');
   try {
     const res  = await fetch(`${API}/api/enrollments/students/${_resumeStudentId}/resume`, {
       method: 'PUT',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify(keepSchedule
-        ? { startDate, keepSchedule: true, tutorId: tutorId || undefined }
-        : { startDate, keepSchedule: false, tutorId, schedule, classLink }),
+      headers: { 'Authorization': 'Bearer ' + localStorage.getItem('sn_access_token'), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
     });
     const data = await res.json();
     if (data.success) {
       const first = data.firstClass ? ` First class: ${fmtDateShort(data.firstClass.date)} at ${fmtTime(data.firstClass.time)} WAT.` : '';
-      showToast(`✅ ${data.studentName}'s classes resumed — ${data.classes} classes ${data.mode === 'created' ? 'created' : 'back on the calendar'}.${first}`, 'success', 8000);
+      const what = data.mode === 'none' ? 'unpaused (no 1-on-1 classes were on hold)'
+        : `${data.classes} class${data.classes === 1 ? '' : 'es'} ${data.mode === 'created' ? 'booked' : 'back on the calendar'}`;
+      showToast(`✅ ${data.studentName} resumed — ${what}.${first}`, 'success', 8000);
       closeResumeModal();
       await loadDashboard();
       renderPauseResume();
     } else {
-      showToast('Error: ' + (data.error || 'Unknown'), 'error');
+      showToast('Error: ' + (data.error || 'Unknown'), 'error', 9000);
     }
   } catch (err) {
     showToast('Error: ' + err.message, 'error');
@@ -1798,6 +1890,10 @@ async function loadBatches() {
             <div style="font-size:12px;color:var(--light);font-weight:700;margin-top:2px;">
               🗓️ ${formatBatchSchedule(b.schedule)} (WAT) · Next: ${nextDate} · ${b.remainingClasses || 0} classes left
             </div>
+            ${b.status === 'active' && !b.remainingClasses ? `<div style="margin-top:6px;background:#fff5f5;border:1.5px solid #fc8181;border-radius:10px;padding:6px 10px;font-size:12px;font-weight:800;color:#c53030;">
+              ⚠️ No classes booked, so nothing is on the teacher's calendar. ${b.unbookedLessons ? `Click 🔄 Reschedule to book the next ${b.unbookedLessons} lessons.` : 'The grade is finished: move the batch to its next grade with "Change starting lesson" in Details, then Reschedule.'}</div>` : ''}
+            ${b.status === 'active' && b.remainingClasses > 0 && b.remainingClasses <= 4 && !b.unbookedLessons ? `<div style="margin-top:6px;background:#fff8e1;border:1.5px solid #f59e0b;border-radius:10px;padding:6px 10px;font-size:12px;font-weight:800;color:#92400e;">
+              ⏳ Only ${b.remainingClasses} class${b.remainingClasses === 1 ? '' : 'es'} left in this grade. Plan the next grade before they run out.</div>` : ''}
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             ${btn('var(--blue)', '#fff', `openBatchDetail('${b.id}')`, '👁️ Details')}
@@ -1876,6 +1972,7 @@ async function openBatchDetail(batchId) {
         <strong>Class Link:</strong> ${b.class_link ? `<a href="${_bEsc(b.class_link)}" target="_blank" style="color:var(--blue);">🔗 Open</a>` : '—'}
         <button onclick="editBatchLink('${batchId}','${_bJs(b.class_link || '')}')" style="margin-left:8px;background:none;border:1.5px solid var(--blue);color:var(--blue);border-radius:8px;padding:2px 10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;">✏️ Edit link</button><br>
         <strong>Next lesson:</strong> ${(data.nextClasses || [])[0] && data.nextClasses[0].lessonNumber ? 'Lesson ' + data.nextClasses[0].lessonNumber : '—'}
+        <button onclick="openRecordBatchClass('${batchId}','${ref}',${((data.nextClasses || [])[0] || {}).lessonNumber ? ((data.nextClasses || [])[0].lessonNumber - 1) : 'null'})" style="margin-left:8px;background:none;border:1.5px solid var(--green);color:var(--green);border-radius:8px;padding:2px 10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;">📝 Record a class taken outside the calendar</button><br>
         <button onclick="openBatchStartLesson('${batchId}','${_bJs(b.pathway_id || '')}',${b.grade_number || 'null'},${((data.nextClasses || [])[0] || {}).lessonNumber || 1})" style="margin-left:8px;background:none;border:1.5px solid var(--blue);color:var(--blue);border-radius:8px;padding:2px 10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;cursor:pointer;">🔢 Change starting lesson</button>
       </div>
       <div style="font-family:'Fredoka One',cursive;font-size:15px;color:var(--dark);margin-bottom:12px;">👩‍🎓 Students (${active.length}/3)</div>
@@ -1889,6 +1986,52 @@ async function openBatchDetail(batchId) {
       ${past.length ? `<div style="font-family:'Fredoka One',cursive;font-size:14px;color:var(--mid);margin:18px 0 8px;">Previous students</div>${past.map(memberCard).join('')}` : ''}`;
   } catch (err) {
     body.innerHTML = `<div style="padding:24px;color:var(--orange);font-weight:700;">⚠️ ${_bEsc(err.message)}</div>`;
+  }
+}
+
+/** A class the teacher took outside the calendar: it is added so they can end it (attendance, credits and pay as usual). */
+function openRecordBatchClass(batchId, batchRef, lessonGuess) {
+  document.getElementById('rbcOverlay')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'rbcOverlay';
+  ov.className = 'modal-overlay open';
+  ov.style.zIndex = 10001;
+  const today = new Date(Date.now() + 3600e3).toISOString().split('T')[0];
+  const field = 'width:100%;padding:11px 14px;border:2px solid #e8eaf0;border-radius:12px;font-family:\'Nunito\',sans-serif;font-size:14px;outline:none;box-sizing:border-box;margin-bottom:14px;';
+  const label = 'display:block;font-size:12px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;';
+  ov.innerHTML = `<div class="modal" style="max-width:440px;">
+    <div class="modal-header"><div class="modal-title">📝 Record a class · ${_bEsc(batchRef)}</div>
+      <button class="modal-close" onclick="document.getElementById('rbcOverlay').remove()">✕</button></div>
+    <div class="modal-body">
+      <div style="background:#f0fdf4;border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:12px;font-weight:700;color:#065f46;line-height:1.6;">
+        For a class the teacher took that was not on the calendar. It is added for the batch's teacher, who then ends it from their dashboard in the usual way, so attendance, credits and pay are all recorded.</div>
+      <label style="${label}">Date of the class</label><input type="date" id="rbc-date" max="${today}" value="${today}" style="${field}">
+      <label style="${label}">Start time (WAT)</label><input type="time" id="rbc-time" style="${field}">
+      <label style="${label}">Lesson taught</label><input type="number" min="1" id="rbc-lesson" value="${lessonGuess > 0 ? lessonGuess : ''}" placeholder="e.g. 18" style="${field}">
+      <div style="display:flex;gap:12px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="document.getElementById('rbcOverlay').remove()">Cancel</button>
+        <button class="btn btn-primary" id="rbcBtn" style="flex:2;" onclick="confirmRecordBatchClass('${batchId}')">📝 Record class</button>
+      </div>
+    </div></div>`;
+  document.body.appendChild(ov);
+}
+
+async function confirmRecordBatchClass(batchId) {
+  const date = document.getElementById('rbc-date').value;
+  const time = document.getElementById('rbc-time').value;
+  const lessonNumber = parseInt(document.getElementById('rbc-lesson').value, 10);
+  if (!date || !time) { showToast('Enter the date and start time of the class.', 'warning'); return; }
+  if (!(lessonNumber >= 1)) { showToast('Enter the lesson number that was taught.', 'warning'); return; }
+  const btn = document.getElementById('rbcBtn');
+  btn.disabled = true; btn.textContent = '⏳ Saving…';
+  const data = await _batchApi('/' + batchId + '/record-class', 'POST', { date, time, lessonNumber });
+  if (data.success) {
+    showToast(`✅ Class recorded: ${fmtDateShort(data.date)} at ${fmtTime(data.time)} WAT, lesson ${data.lessonNumber}. ${data.tutorName || 'The teacher'} can now end it from their dashboard.`, 'success', 9000);
+    document.getElementById('rbcOverlay')?.remove();
+    openBatchDetail(batchId);
+  } else {
+    showToast('Error: ' + (data.error || 'Unknown'), 'error', 8000);
+    btn.disabled = false; btn.textContent = '📝 Record class';
   }
 }
 
@@ -2201,6 +2344,16 @@ let _batchRescheduleId = null;
 
 function openBatchRescheduleModal(batchId, batchRef) {
   _batchRescheduleId = batchId;
+  const cached = (_batchesCache || []).find(x => x.id === batchId) || {};
+  const empty = !cached.remainingClasses;
+  const fromWrap = document.getElementById('br-from-wrap');
+  if (fromWrap) fromWrap.style.display = empty ? 'block' : 'none';
+  const fromEl = document.getElementById('br-from-lesson');
+  if (fromEl) fromEl.value = '';
+  const warnEl = document.getElementById('br-warning');
+  if (warnEl) warnEl.innerHTML = empty
+    ? '📅 This batch has no classes booked. Its next lessons will be booked on the new schedule from the chosen date, to the end of the grade.'
+    : '⚠️ All future scheduled classes for this batch will move onto the new schedule from the chosen start date, in lesson order.<br>Completed classes and lesson sequence are not affected. Clash detection runs before saving.';
   const titleEl = document.getElementById('batchRescheduleTitle');
   if (titleEl) titleEl.textContent = `🔄 Reschedule Batch ${batchRef}`;
   const dateEl = document.getElementById('br-start-date');
@@ -2232,9 +2385,13 @@ async function confirmBatchReschedule() {
   try {
     const body = { startDate, schedule };
     if (classLink) body.classLink = classLink;
+    const fromLesson = parseInt(document.getElementById('br-from-lesson')?.value, 10);
+    if (fromLesson >= 1) body.fromLesson = fromLesson;
     const data = await _batchApi(`/${_batchRescheduleId}/reschedule`, 'PUT', body);
     if (data.success) {
-      showToast(`✅ ${data.moved} classes moved to the new schedule — first class ${fmtDateShort(data.firstClass?.d)} at ${fmtTime(data.firstClass?.t)} WAT.`);
+      showToast(data.created
+        ? `✅ ${data.created} classes booked (lessons ${data.fromLesson} to ${data.lastLesson}) — first class ${fmtDateShort(data.firstClass?.d)} at ${fmtTime(data.firstClass?.t)} WAT.`
+        : `✅ ${data.moved} classes moved to the new schedule — first class ${fmtDateShort(data.firstClass?.d)} at ${fmtTime(data.firstClass?.t)} WAT.`, 'success', 8000);
       closeBatchRescheduleModal();
       loadBatches();
     } else {

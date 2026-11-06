@@ -215,6 +215,67 @@ async function insertBatchBookings(client, { batch, tutorId, tutorName, classLin
   }
 }
 
+function _nowWAT() {
+  const d = new Date(Date.now() + 60 * 60000).toISOString();
+  return { d: d.slice(0, 10), t: d.slice(11, 16) };
+}
+/** Slots still to come (later today or after), dropping any whose time has passed. */
+function futureOnly(slots) {
+  const now = _nowWAT();
+  return slots.filter(s => s.d > now.d || (s.d === now.d && s.t > now.t));
+}
+
+/** Highest lesson number the batch has used: taught, booked, or on hold while paused. */
+async function lastLessonNumber(client, batchId) {
+  const r = await client.query(
+    `SELECT COALESCE(MAX(lesson_number_in_grade), 0)::int AS n FROM bookings
+     WHERE batch_id = $1 AND (status <> 'cancelled' OR notes->>'pausedBatch' = 'true')`,
+    [batchId]
+  );
+  return r.rows[0].n;
+}
+
+/**
+ * Book the batch's next lessons, from `fromLesson` to the end of its grade,
+ * on `schedule` from startDate (only slots still to come). Without a pathway
+ * there is no lesson list, so it books up to lesson 72 (a full grade).
+ *   strict: a clash stops everything (staff actions)
+ *   otherwise clashing slots are skipped and the next free slot is used (daily top-up)
+ * Returns { created, skipped, fromLesson, lastLesson, firstClass }.
+ */
+async function bookNextLessons(client, batch, { fromLesson, startDate, schedule, tutorId, tutorName, classLink, strict = true }) {
+  let lessons = await pathwayLessons(client, batch.pathway_id, batch.grade_number, fromLesson);
+  const hasPathway = !!(batch.pathway_id && batch.grade_number);
+  const count = hasPathway ? lessons.length : Math.max(0, 72 - fromLesson + 1);
+  if (!count) return { created: 0, skipped: 0, fromLesson, lastLesson: fromLesson - 1, firstClass: null };
+  const sched = normaliseSchedule(schedule);
+  const studentIds = await activeMemberIds(client, batch.id);
+
+  let dates;
+  let skipped = 0;
+  if (strict) {
+    dates = futureOnly(generateDates(startDate, sched, count + sched.length * 2)).slice(0, count);
+    const clash = await findClash(client, { tutorId, slots: dates, excludeBatchId: batch.id, studentIds });
+    if (clash) throw clashError(clash);
+  } else {
+    dates = [];
+    const candidates = futureOnly(generateDates(startDate, sched, count * 2 + 16));
+    for (const s of candidates) {
+      if (dates.length >= count) break;
+      const c = await findClash(client, { tutorId, slots: [s], excludeBatchId: batch.id, studentIds });
+      if (c) { skipped++; continue; }
+      dates.push(s);
+    }
+  }
+  if (!hasPathway) lessons = [];
+  await insertBatchBookings(client, { batch, tutorId, tutorName, classLink, dates, lessons: lessons.slice(0, dates.length), startNumber: fromLesson });
+  return {
+    created: dates.length, skipped, fromLesson,
+    lastLesson: fromLesson + dates.length - 1,
+    firstClass: dates[0] || null,
+  };
+}
+
 /** Remaining scheduled classes of a batch (lesson data in order), optionally locked. */
 async function futureClasses(client, batchId, fromDate, { lock = false } = {}) {
   const r = await client.query(
@@ -287,7 +348,13 @@ router.get('/', requireAuth, requireRole(...STAFF), async (req, res, next) => {
         (SELECT to_char(MIN(date), 'YYYY-MM-DD') FROM bookings
            WHERE batch_id = b.id AND status = 'scheduled' AND date >= CURRENT_DATE) AS "nextClassDate",
         (SELECT COUNT(*)::int FROM bookings
-           WHERE batch_id = b.id AND status = 'scheduled' AND date >= CURRENT_DATE) AS "remainingClasses"
+           WHERE batch_id = b.id AND status = 'scheduled' AND date >= CURRENT_DATE) AS "remainingClasses",
+        /* Lessons of the grade not booked yet (classes can still be added for these) */
+        (SELECT COUNT(*)::int FROM pathway_grades pg JOIN pathway_lessons pl ON pl.grade_id = pg.id AND pl.is_active = TRUE
+           WHERE pg.pathway_id = b.pathway_id AND pg.grade_number = b.grade_number AND pg.is_active = TRUE
+             AND pl.lesson_number > COALESCE((SELECT MAX(x.lesson_number_in_grade) FROM bookings x
+                   WHERE x.batch_id = b.id AND (x.status <> 'cancelled' OR x.notes->>'pausedBatch' = 'true')), 0)
+        ) AS "unbookedLessons"
       FROM batches b
       LEFT JOIN users u_t ON u_t.id = b.tutor_id
       LEFT JOIN pathways p ON p.id = b.pathway_id
@@ -486,12 +553,16 @@ router.put('/:id/status', requireAuth, requireRole(...STAFF), tx(async (client, 
 
 /* ══════════════════════════════════════════════
    PUT /api/batches/:id/reschedule
-   Body: { startDate, schedule: [{weekday,time}], classLink?, newTutorId? }
+   Body: { startDate, schedule: [{weekday,time}], classLink?, newTutorId?, fromLesson? }
    Moves the remaining classes (lesson order kept) onto the new schedule from
-   startDate. A paused batch is resumed onto the new schedule.
+   startDate. A paused batch is resumed onto the new schedule. A batch with
+   no classes left gets its next lessons booked (from `fromLesson`, or the
+   lesson after the last one it used) to the end of its grade.
 ══════════════════════════════════════════════ */
 router.put('/:id/reschedule', requireAuth, requireRole(...STAFF), tx(async (client, req) => {
   const { startDate, classLink, newTutorId } = req.body;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(startDate || ''))) throw new HttpError(400, 'A valid start date is required');
+  if (startDate < _todayWAT()) throw new HttpError(400, 'The start date cannot be in the past');
   const schedule = normaliseSchedule(req.body.schedule);
   const batch = await loadBatch(client, req.params.id, { lock: true });
   if (batch.status === 'closed') throw new HttpError(400, 'A closed batch cannot be rescheduled');
@@ -510,9 +581,27 @@ router.put('/:id/reschedule', requireAuth, requireRole(...STAFF), tx(async (clie
         `SELECT id FROM bookings WHERE batch_id = $1 AND status = 'cancelled' AND notes->>'pausedBatch' = 'true'
          ORDER BY date, time FOR UPDATE`, [batch.id])).rows
     : await futureClasses(client, batch.id, today, { lock: true });
-  if (!rows.length) throw new HttpError(400, 'This batch has no remaining classes to reschedule');
 
-  const dates = generateDates(startDate, schedule, rows.length);
+  if (!rows.length) {
+    /* Nothing left to move: book the next lessons on the new schedule */
+    const last = await lastLessonNumber(client, batch.id);
+    const fromLesson = parseInt(req.body.fromLesson, 10) >= 1 ? parseInt(req.body.fromLesson, 10) : last + 1;
+    const made = await bookNextLessons(client, batch, { fromLesson, startDate, schedule, tutorId, tutorName, classLink: link, strict: true });
+    if (!made.created) {
+      throw new HttpError(400, batch.pathway_id
+        ? `Grade ${batch.grade_number} has no lessons after lesson ${fromLesson - 1}. If the students are moving up a grade, set the pathway and grade with "Set starting lesson" first.`
+        : `This batch has already reached lesson ${fromLesson - 1} of 72. Give it a pathway and grade to book more classes.`);
+    }
+    await client.query(
+      `UPDATE batches SET schedule = $1, class_link = $2, tutor_id = $3, status = 'active', updated_at = NOW() WHERE id = $4`,
+      [JSON.stringify(schedule), link, tutorId, batch.id]
+    );
+    logger.info(`[BATCH] ${batch.batch_ref}: ${made.created} new classes (lessons ${made.fromLesson}–${made.lastLesson}) from ${startDate} by ${req.user.email}`);
+    return { success: true, batchRef: batch.batch_ref, moved: 0, created: made.created, fromLesson: made.fromLesson,
+             lastLesson: made.lastLesson, firstClass: made.firstClass, tutorName };
+  }
+
+  const dates = futureOnly(generateDates(startDate, schedule, rows.length + schedule.length * 2)).slice(0, rows.length);
   const clash = await findClash(client, { tutorId, slots: dates, excludeBatchId: batch.id, studentIds: await activeMemberIds(client, batch.id) });
   if (clash) throw clashError(clash);
 
@@ -535,6 +624,107 @@ router.put('/:id/reschedule', requireAuth, requireRole(...STAFF), tx(async (clie
   logger.info(`[BATCH] ${batch.batch_ref} rescheduled: ${rows.length} classes from ${startDate} by ${req.user.email}`);
   return { success: true, batchRef: batch.batch_ref, moved: rows.length, firstClass: dates[0], tutorName };
 }));
+
+/* ══════════════════════════════════════════════
+   POST /api/batches/:id/record-class — { date, time, lessonNumber }
+   A class the teacher took outside the calendar (for example after the
+   batch ran out of booked classes). It is added for the batch's teacher on
+   that date and time, so they can end it in the usual way: attendance,
+   credits and pay are then settled exactly as for any other class.
+══════════════════════════════════════════════ */
+router.post('/:id/record-class', requireAuth, requireRole(...STAFF), tx(async (client, req) => {
+  const out = await recordClass(client, req.params.id, req.body || {});
+  logger.info(`[BATCH] ${out.batchRef}: class on ${out.date} ${out.time} (lesson ${out.lessonNumber}) recorded by ${req.user.email}`);
+  return { _status: 201, ...out };
+}));
+
+async function recordClass(client, batchId, { date, time, lessonNumber }) {
+  const batch = await loadBatch(client, batchId, { lock: true });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ''))) throw new HttpError(400, 'Choose the date of the class');
+  const tm = String(time || '').match(/^(\d{1,2}):(\d{2})/);
+  if (!tm) throw new HttpError(400, 'Enter the time the class started');
+  const t = tm[1].padStart(2, '0') + ':' + tm[2];
+  const now = _nowWAT();
+  if (date > now.d || (date === now.d && t > now.t)) throw new HttpError(400, 'Only a class that has already taken place can be recorded. Book future classes with Reschedule.');
+  if (date < _addDays(now.d, -31)) throw new HttpError(400, 'Classes more than 31 days ago cannot be recorded here');
+  const n = parseInt(lessonNumber, 10);
+  if (!(n >= 1)) throw new HttpError(400, 'Enter the lesson number that was taught');
+  if (!batch.tutor_id) throw new HttpError(400, 'This batch has no teacher');
+
+  const dup = await client.query(
+    `SELECT 1 FROM bookings WHERE batch_id = $1 AND date = $2::date AND time = $3::time AND status <> 'cancelled' LIMIT 1`,
+    [batch.id, date, t]);
+  if (dup.rows.length) throw new HttpError(400, 'This batch already has a class at that date and time');
+  const clash = await findClash(client, { tutorId: batch.tutor_id, slots: [{ d: date, t }], excludeBatchId: batch.id, studentIds: [] });
+  if (clash && clash.tutor_clash) throw clashError(clash);
+
+  const lesson = (await pathwayLessons(client, batch.pathway_id, batch.grade_number, n)).find(l => l.lesson_number_in_grade === n) || null;
+  const tutorName = (await client.query('SELECT name FROM users WHERE id = $1', [batch.tutor_id])).rows[0]?.name || '';
+  const ins = await client.query(
+    `INSERT INTO bookings
+       (subject, grade, date, time, class_link, status, is_demo, tutor_id, student_id, batch_id, lesson_name, notes,
+        booked_at, scheduled_at, pathway_lesson_id, lesson_number_in_grade)
+     VALUES ('Coding', $1, $2::date, $3::time, $4, 'scheduled', FALSE, $5, NULL, $6, $7, $8, NOW(), NOW(), $9, $10)
+     RETURNING id`,
+    [batch.grade_number ? `Grade ${batch.grade_number}` : 'Group', date, t, batch.class_link || '', batch.tutor_id, batch.id,
+     lesson ? lesson.lesson_name : `Lesson ${n}`,
+     JSON.stringify({ batchRef: batch.batch_ref, tutorName, classLink: batch.class_link || '', isBatchClass: true, recordedAfter: true }),
+     lesson ? lesson.pathway_lesson_id : null, n]
+  );
+  return { success: true, bookingId: ins.rows[0].id, batchRef: batch.batch_ref, date, time: t, lessonNumber: n,
+           lessonName: lesson ? lesson.lesson_name : `Lesson ${n}`, tutorName };
+}
+
+/**
+ * Daily: an active batch with a pathway always has its grade booked. When
+ * lessons are added to the curriculum later, or a batch was created before
+ * its grade was complete, the missing lessons are booked after its last
+ * class on its weekly schedule. Slots that clash are skipped. Never throws.
+ */
+async function topUpBatches() {
+  const ids = (await pool.query(
+    `SELECT id FROM batches WHERE status = 'active' AND batch_ref IS NOT NULL AND tutor_id IS NOT NULL
+       AND pathway_id IS NOT NULL AND grade_number IS NOT NULL`)).rows.map(r => r.id);
+  const added = [];
+  for (const id of ids) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const batch = await loadBatch(client, id, { lock: true });
+      const last = await lastLessonNumber(client, batch.id);
+      const lastSlot = (await client.query(
+        `SELECT to_char(MAX(date),'YYYY-MM-DD') AS d FROM bookings WHERE batch_id = $1 AND status = 'scheduled'`, [batch.id])).rows[0].d;
+      const startDate = lastSlot && lastSlot >= _todayWAT() ? _addDays(lastSlot, 1) : _todayWAT();
+      const schedule = typeof batch.schedule === 'string' ? JSON.parse(batch.schedule) : batch.schedule;
+      if (!Array.isArray(schedule) || !schedule.length) { await client.query('ROLLBACK'); continue; }
+      const made = await bookNextLessons(client, batch, {
+        fromLesson: last + 1, startDate, schedule, tutorId: batch.tutor_id, tutorName: batch.tutor_name,
+        classLink: batch.class_link || '', strict: false,
+      });
+      await client.query('COMMIT');
+      if (made.created) {
+        added.push({ batch, made });
+        logger.info(`[BATCH-TOPUP] ${batch.batch_ref}: +${made.created} classes (lessons ${made.fromLesson}–${made.lastLesson})${made.skipped ? `, ${made.skipped} clashing slot(s) skipped` : ''}`);
+      }
+    } catch (e) {
+      await client.query('ROLLBACK').catch(() => {});
+      logger.warn(`[BATCH-TOPUP] ${id}: ${e.message}`);
+    } finally {
+      client.release();
+    }
+  }
+  for (const { batch, made } of added) {
+    try {
+      await require('../services/tutorNotify').notifyTutor({
+        tutorId: batch.tutor_id,
+        title: `Classes added — ${batch.batch_ref}`,
+        body: `${made.created} more class${made.created === 1 ? '' : 'es'} on your calendar (lessons ${made.fromLesson} to ${made.lastLesson})`,
+        lines: [`Batch: ${batch.batch_ref}`, `Lessons ${made.fromLesson} to ${made.lastLesson}`, `First new class: ${made.firstClass.d} at ${made.firstClass.t} WAT`],
+      });
+    } catch (e) { logger.warn('[BATCH-TOPUP] notify: ' + e.message); }
+  }
+  return added.length;
+}
 
 /* ══════════════════════════════════════════════
    POST /api/batches/:id/members — add a student { studentId }
@@ -687,4 +877,9 @@ router.delete('/:id', requireAuth, requireRole(...STAFF), tx(async (client, req)
 }));
 
 module.exports = router;
-module.exports._test = { normaliseSchedule, generateDates };
+module.exports.topUpBatches = topUpBatches;
+module.exports.recordClass = recordClass;
+module.exports.bookNextLessons = bookNextLessons;
+module.exports.lastLessonNumber = lastLessonNumber;
+module.exports.loadBatch = loadBatch;
+module.exports._test = { normaliseSchedule, generateDates, futureOnly };
