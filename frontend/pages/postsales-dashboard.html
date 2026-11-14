@@ -201,9 +201,15 @@
         <div class="dash-section-title">⚠️ Students Needing Top-Up</div>
         <span style="font-size:13px;font-weight:700;color:var(--light);">Students with 2 or fewer credits remaining</span>
       </div>
-      <div style="background:#fff3e0;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13px;font-weight:700;color:#e65100;">
-        💡 Generate a payment link for each student and paste it here. The student will see a "Top Up Credits" button linking directly to their payment page.
+      <div class="dash-section-header" style="margin-top:4px;">
+        <div class="dash-section-title" style="font-size:18px;">🔁 Renewals to confirm <span class="sl-badge" id="renewalsCount" style="position:static;display:inline-block;margin-left:6px;">0</span></div>
+        <span style="font-size:13px;font-weight:700;color:var(--light);">Prepared when a student reaches 3 credits</span>
       </div>
+      <div style="background:#eef4ff;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13px;font-weight:700;color:#1e40af;line-height:1.6;">
+        💡 Each renewal is filled in with the last package the parent paid for. Check the price, change it if needed, then <strong>Confirm &amp; send</strong>: the payment link is emailed to the parent and appears on the student's Top Up button. Nothing is sent until you confirm.
+      </div>
+      <div id="renewalsList" style="margin-bottom:28px;"></div>
+      <div class="dash-section-title" style="font-size:18px;margin-bottom:12px;">All students with 2 or fewer credits</div>
       <div id="topupStudentsList"></div>
     </div>
 
@@ -444,7 +450,7 @@
 <script src="../js/api-sync.js"></script>
 <script src="../js/wa.js"></script>
 <script src="../js/utils.js?v=202610081200"></script>
-<script src="../js/postsales-dashboard.js?v=202611061600"></script>
+<script src="../js/postsales-dashboard.js?v=202611141800"></script>
 <script src="../js/postsales-pathways.js?v=202610121600"></script>
 <script src="../js/reschedule-tool.js?v=202610021200"></script>
 

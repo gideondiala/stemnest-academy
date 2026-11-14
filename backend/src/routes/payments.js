@@ -7,6 +7,7 @@
  * POST /api/payments/manual-topup         — credits for a payment received outside the links, or a referral reward
  * GET  /api/payments/student-search       — find a student by ID, name, email or family
  * GET  /api/payments/credit-log/:id       — a student's credit activity
+ * GET  /api/payments/renewals            — renewals waiting for staff (also /:id/send, /:id/dismiss)
  * GET  /api/payments/my-top-up            — the latest open payment link for the logged-in student
  * GET  /api/payments/providers            — which payment providers are set up
  * POST /api/payments/enquiry              — course enrolment enquiry (public)
@@ -24,6 +25,7 @@ const { nextStudentId } = require('../utils/studentId');
 const promoSvc = require('../services/promoterService');
 const fincra  = require('../services/fincraService');
 const flutterwave = require('../services/flutterwaveService');
+const renewalSvc = require('../services/renewalService');
 
 const router = express.Router();
 
@@ -44,137 +46,205 @@ function parseNotes(n) {
    provider is chosen per link: Fincra (lower fees in
    Nigeria) or Flutterwave (more countries).
 ════════════════════════════════════════════════════ */
+/* An error with an HTTP status, for createPaymentLink callers */
+function linkError(status, message) { const e = new Error(message); e.status = status; return e; }
+
+/**
+ * Create a payment link with Fincra or Flutterwave, save it as a pending
+ * payment and (unless sendEmail is false) email it to the parent.
+ * Used by POST /create-link and by renewals approved in Post-Sales.
+ * Throws an error with .status 400/404/502 on bad input or provider failure.
+ */
+async function createPaymentLink(input, userId) {
+  const { studentId, courseId, amount, currency, credits, notes, bookingId } = input;
+  let { studentName, studentEmail } = input;
+  const provider = PROVIDERS.includes(String(input.provider || '').toLowerCase())
+    ? String(input.provider).toLowerCase() : 'fincra';
+  const sendEmail = input.sendEmail !== false;
+
+  if (studentId && !UUID_RE.test(studentId)) throw linkError(400, 'Invalid studentId');
+  /* For an existing student, fill in the payer from their profile */
+  let customerPhone = null;
+  if (studentId) {
+    const s = await pool.query(
+      `SELECT u.name, u.email, u.phone, sp.parent_email, sp.parent_name
+       FROM users u LEFT JOIN student_profiles sp ON sp.user_id = u.id
+       WHERE u.id = $1 AND u.role = 'student'`, [studentId]);
+    if (!s.rows.length) throw linkError(404, 'Student not found');
+    studentName  = studentName  || s.rows[0].name;
+    studentEmail = studentEmail || s.rows[0].parent_email || s.rows[0].email;
+    customerPhone = s.rows[0].phone || null;
+  }
+
+  if (!studentEmail || !amount) throw linkError(400, 'studentEmail and amount are required');
+
+  /* A link made by email for an existing student is tied to them, so their
+     dashboard's Top up button opens it (a new family has no account yet) */
+  let linkedStudentId = studentId || null;
+  if (!linkedStudentId) {
+    const m = await pool.query(
+      `SELECT u.id FROM users u LEFT JOIN student_profiles sp ON sp.user_id = u.id
+       WHERE u.role = 'student' AND u.is_active = TRUE
+         AND (LOWER(u.email) = LOWER($1) OR LOWER(COALESCE(sp.parent_email, '')) = LOWER($1))`,
+      [studentEmail]
+    );
+    if (m.rows.length === 1) linkedStudentId = m.rows[0].id;
+  }
+
+  if (isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) throw linkError(400, 'amount must be a positive number');
+
+  /* Resolve course name for display */
+  let courseName = 'StemNest Course';
+  if (courseId) {
+    const cRes = await pool.query('SELECT name FROM courses WHERE id = $1', [courseId]);
+    if (cRes.rows.length) courseName = cRes.rows[0].name;
+  }
+
+  /* Build a unique reference for this payment */
+  const reference = `SN-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2,5).toUpperCase()}`;
+  const usedCurrency = (currency || 'NGN').toUpperCase();
+  const description  = notes || `${courseName}${credits ? ' · ' + credits + ' classes' : ''}`;
+  const redirectUrl  = `${process.env.APP_URL || 'https://stemnestacademy.co.uk'}/pages/payment-success.html?ref=${reference}`;
+
+  /* Create the checkout link with the chosen provider */
+  let paymentUrl;
+  try {
+    const svc = provider === 'flutterwave' ? flutterwave : fincra;
+    const result = await svc.createCheckout({
+      amount:        parseFloat(amount),
+      currency:      usedCurrency,
+      customerName:  studentName || 'Parent',
+      customerEmail: studentEmail,
+      customerPhone,
+      reference,
+      description,
+      redirectUrl,
+    });
+    paymentUrl = result.checkoutUrl;
+  } catch (providerErr) {
+    logger.error(`[PAYMENT] ${provider} link creation failed:`, providerErr.message);
+    throw linkError(502, 'Could not generate payment link: ' + providerErr.message);
+  }
+
+  /* Save payment record to DB */
+  const dbResult = await pool.query(
+    `INSERT INTO payments
+       (student_id, sales_id, amount, currency, credits_purchased,
+        course_id, status, payment_link, notes, provider, reference, kind, created_at)
+     VALUES ($1,$2,$3,$4,$5,$6,'pending',$7,$8,$9,$10,'topup',NOW())
+     RETURNING id`,
+    [
+      linkedStudentId,
+      userId,
+      parseFloat(amount),
+      usedCurrency,
+      parseInt(credits) || 0,
+      courseId    || null,
+      paymentUrl,
+      JSON.stringify({ notes, bookingId, reference, studentName, studentEmail, renewalId: input.renewalId || undefined }),
+      provider,
+      reference,
+    ]
+  );
+
+  const paymentId = dbResult.rows[0].id;
+
+  /* Send the payment link to the parent via email */
+  let emailed = false;
+  if (sendEmail) {
+    try {
+      const emailSvc = require('../services/emailService');
+      await emailSvc.sendPaymentLinkEmail({
+        to:          studentEmail,
+        studentName: studentName || 'Student',
+        course:      courseName,
+        amount,
+        currency:    usedCurrency,
+        paymentUrl,
+      });
+      emailed = true;
+      logger.info(`[PAYMENT] Link emailed to ${studentEmail}`);
+    } catch (emailErr) {
+      logger.warn('[PAYMENT] Email send failed:', emailErr.message);
+      /* Non-fatal — the link is still returned to staff */
+    }
+  }
+
+  logger.info(`[PAYMENT LINK CREATED] ${provider} ref=${reference} amount=${usedCurrency} ${amount} student=${studentEmail}`);
+  return { paymentUrl, paymentId, reference, provider, emailed, studentEmail };
+}
+
 router.post('/create-link', requireAuth, requireRole('admin','super_admin','postsales','sales','presales'), async (req, res, next) => {
   try {
-    const {
-      studentId,
-      courseId,
-      amount,
-      currency,
-      credits,
-      notes,
-      bookingId,
-    } = req.body;
-    let { studentName, studentEmail } = req.body;
-    const provider = PROVIDERS.includes(String(req.body.provider || '').toLowerCase())
-      ? String(req.body.provider).toLowerCase() : 'fincra';
-    const sendEmail = req.body.sendEmail !== false;
+    const r = await createPaymentLink(req.body || {}, req.user.id);
+    res.json({ success: true, paymentUrl: r.paymentUrl, paymentId: r.paymentId, reference: r.reference, provider: r.provider });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ success: false, error: err.message });
+    next(err);
+  }
+});
 
-    if (studentId && !UUID_RE.test(studentId)) {
-      return res.status(400).json({ success: false, error: 'Invalid studentId' });
-    }
-    /* For an existing student, fill in the payer from their profile */
-    let customerPhone = null;
-    if (studentId) {
-      const s = await pool.query(
-        `SELECT u.name, u.email, u.phone, sp.parent_email, sp.parent_name
-         FROM users u LEFT JOIN student_profiles sp ON sp.user_id = u.id
-         WHERE u.id = $1 AND u.role = 'student'`, [studentId]);
-      if (!s.rows.length) return res.status(404).json({ success: false, error: 'Student not found' });
-      studentName  = studentName  || s.rows[0].name;
-      studentEmail = studentEmail || s.rows[0].parent_email || s.rows[0].email;
-      customerPhone = s.rows[0].phone || null;
-    }
+/* ════════════════════════════════════════════════════
+   Renewals waiting for staff (services/renewalService.js)
+   GET  /api/payments/renewals              — open renewals, pre-filled with the last package
+   POST /api/payments/renewals/:id/send     — staff confirm or change the price; the link is created and emailed
+   POST /api/payments/renewals/:id/dismiss  — not needed (staff handled it another way)
+════════════════════════════════════════════════════ */
+const RENEWAL_ROLES = ['admin','super_admin','postsales','sales'];
 
-    if (!studentEmail || !amount) {
-      return res.status(400).json({ success: false, error: 'studentEmail and amount are required' });
-    }
+router.get('/renewals', requireAuth, requireRole(...RENEWAL_ROLES), async (req, res, next) => {
+  try {
+    res.json({ success: true, renewals: await renewalSvc.listOpen() });
+  } catch (err) { next(err); }
+});
 
-    /* A link made by email for an existing student is tied to them, so their
-       dashboard's Top up button opens it (a new family has no account yet) */
-    let linkedStudentId = studentId || null;
-    if (!linkedStudentId) {
-      const m = await pool.query(
-        `SELECT u.id FROM users u LEFT JOIN student_profiles sp ON sp.user_id = u.id
-         WHERE u.role = 'student' AND u.is_active = TRUE
-           AND (LOWER(u.email) = LOWER($1) OR LOWER(COALESCE(sp.parent_email, '')) = LOWER($1))`,
-        [studentEmail]
-      );
-      if (m.rows.length === 1) linkedStudentId = m.rows[0].id;
-    }
+router.post('/renewals/:id/send', requireAuth, requireRole(...RENEWAL_ROLES), async (req, res, next) => {
+  if (!UUID_RE.test(req.params.id)) return res.status(400).json({ success: false, error: 'Invalid renewal' });
+  const b = req.body || {};
+  const amount   = parseFloat(b.amount);
+  const credits  = parseInt(b.credits, 10);
+  const currency = String(b.currency || '').toUpperCase();
+  const provider = String(b.provider || '').toLowerCase();
+  if (!(amount > 0))                                  return res.status(400).json({ success: false, error: 'Enter the price (a positive amount).' });
+  if (!(credits >= 1 && credits <= 500))              return res.status(400).json({ success: false, error: 'Enter the number of classes (1 to 500).' });
+  if (!/^[A-Z]{3}$/.test(currency))                   return res.status(400).json({ success: false, error: 'Choose a currency.' });
+  if (!PROVIDERS.includes(provider))                  return res.status(400).json({ success: false, error: 'Choose Fincra or Flutterwave.' });
 
-    if (isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
-      return res.status(400).json({ success: false, error: 'amount must be a positive number' });
-    }
+  /* Claim it, so two staff members cannot send the same renewal twice */
+  const claim = await pool.query(
+    `UPDATE renewal_drafts SET status = 'sending', updated_at = NOW()
+     WHERE id = $1 AND status = 'open' RETURNING *`, [req.params.id]).catch(next);
+  if (!claim) return;
+  if (!claim.rows.length) return res.status(409).json({ success: false, error: 'This renewal was already handled. Refresh the list.' });
+  const d = claim.rows[0];
+  try {
+    const r = await createPaymentLink({
+      studentId: d.student_id, amount, currency, credits, provider,
+      courseId: d.course_id || undefined, sendEmail: true, renewalId: d.id,
+    }, req.user.id);
+    await pool.query(
+      `UPDATE renewal_drafts SET status = 'sent', payment_id = $2, sent_amount = $3, sent_currency = $4,
+         sent_credits = $5, sent_provider = $6, decided_by = $7, decided_at = NOW(), updated_at = NOW()
+       WHERE id = $1`, [d.id, r.paymentId, amount, currency, credits, provider, req.user.id]);
+    const changed = d.suggested_amount != null && (Number(d.suggested_amount) !== amount || d.suggested_currency !== currency || Number(d.suggested_credits) !== credits);
+    logger.info(`[RENEWAL] Sent ${d.id}: ${currency} ${amount} for ${credits} classes${changed ? ' (price changed from the last package)' : ''} by ${req.user.id}`);
+    res.json({ success: true, paymentUrl: r.paymentUrl, paymentId: r.paymentId, emailed: r.emailed, sentTo: r.studentEmail });
+  } catch (err) {
+    await pool.query(`UPDATE renewal_drafts SET status = 'open', updated_at = NOW() WHERE id = $1 AND status = 'sending'`, [d.id]).catch(() => {});
+    if (err.status) return res.status(err.status).json({ success: false, error: err.message });
+    next(err);
+  }
+});
 
-    /* Resolve course name for display */
-    let courseName = 'StemNest Course';
-    if (courseId) {
-      const cRes = await pool.query('SELECT name FROM courses WHERE id = $1', [courseId]);
-      if (cRes.rows.length) courseName = cRes.rows[0].name;
-    }
-
-    /* Build a unique reference for this payment */
-    const reference = `SN-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2,5).toUpperCase()}`;
-    const usedCurrency = (currency || 'NGN').toUpperCase();
-    const description  = notes || `${courseName}${credits ? ' · ' + credits + ' classes' : ''}`;
-    const redirectUrl  = `${process.env.APP_URL || 'https://stemnestacademy.co.uk'}/pages/payment-success.html?ref=${reference}`;
-
-    /* Create the checkout link with the chosen provider */
-    let paymentUrl;
-    try {
-      const svc = provider === 'flutterwave' ? flutterwave : fincra;
-      const result = await svc.createCheckout({
-        amount:        parseFloat(amount),
-        currency:      usedCurrency,
-        customerName:  studentName || 'Parent',
-        customerEmail: studentEmail,
-        customerPhone,
-        reference,
-        description,
-        redirectUrl,
-      });
-      paymentUrl = result.checkoutUrl;
-    } catch (providerErr) {
-      logger.error(`[PAYMENT] ${provider} link creation failed:`, providerErr.message);
-      return res.status(502).json({ success: false, error: 'Could not generate payment link: ' + providerErr.message });
-    }
-
-    /* Save payment record to DB */
-    const dbResult = await pool.query(
-      `INSERT INTO payments
-         (student_id, sales_id, amount, currency, credits_purchased,
-          course_id, status, payment_link, notes, provider, reference, kind, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,'pending',$7,$8,$9,$10,'topup',NOW())
-       RETURNING id`,
-      [
-        linkedStudentId,
-        req.user.id,
-        parseFloat(amount),
-        usedCurrency,
-        parseInt(credits) || 0,
-        courseId    || null,
-        paymentUrl,
-        JSON.stringify({ notes, bookingId, reference, studentName, studentEmail }),
-        provider,
-        reference,
-      ]
-    );
-
-    const paymentId = dbResult.rows[0].id;
-
-    /* Send the payment link to the parent via email */
-    if (sendEmail) {
-      try {
-        const emailSvc = require('../services/emailService');
-        await emailSvc.sendPaymentLinkEmail({
-          to:          studentEmail,
-          studentName: studentName || 'Student',
-          course:      courseName,
-          amount,
-          currency:    usedCurrency,
-          paymentUrl,
-        });
-        logger.info(`[PAYMENT] Link emailed to ${studentEmail}`);
-      } catch (emailErr) {
-        logger.warn('[PAYMENT] Email send failed:', emailErr.message);
-        /* Non-fatal — the link is still returned to the LA */
-      }
-    }
-
-    logger.info(`[PAYMENT LINK CREATED] ${provider} ref=${reference} amount=${usedCurrency} ${amount} student=${studentEmail}`);
-    res.json({ success: true, paymentUrl, paymentId, reference, provider });
-
+router.post('/renewals/:id/dismiss', requireAuth, requireRole(...RENEWAL_ROLES), async (req, res, next) => {
+  try {
+    if (!UUID_RE.test(req.params.id)) return res.status(400).json({ success: false, error: 'Invalid renewal' });
+    const note = String((req.body && req.body.note) || '').trim().slice(0, 300) || null;
+    const r = await pool.query(
+      `UPDATE renewal_drafts SET status = 'dismissed', note = $2, decided_by = $3, decided_at = NOW(), updated_at = NOW()
+       WHERE id = $1 AND status = 'open' RETURNING id`, [req.params.id, note, req.user.id]);
+    if (!r.rows.length) return res.status(409).json({ success: false, error: 'This renewal was already handled. Refresh the list.' });
+    res.json({ success: true });
   } catch (err) { next(err); }
 });
 

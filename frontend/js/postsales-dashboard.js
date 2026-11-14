@@ -97,6 +97,7 @@ async function loadDashboard() {
 
     // render current tab
     renderCurrentTab();
+    if (_activeTab !== 'topup') loadRenewals();
 
   } catch (err) {
     console.error('[POS] loadDashboard error:', err);
@@ -135,7 +136,127 @@ function updateStats() {
   // Badges
   const lowCredit = students.filter(s => (s.credits || 0) <= 2 && !s.creditsSuspended);
   setText('posBadge',    students.length);
-  setText('topupBadge',  lowCredit.length);
+  setText('topupBadge',  _renewalsCache ? _renewalsCache.length : lowCredit.length);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RENEWALS TO CONFIRM (Needs Top-Up)
+   Prepared by the server when a student reaches 3 credits, filled in
+   with the last package the parent paid for. Staff confirm or change
+   the price; only then is the payment link created and emailed.
+═══════════════════════════════════════════════════════════════ */
+let _renewalsCache = null;
+let _renewalProviders = null;
+const _RN_SYMBOL = { NGN: '₦', GBP: '£', USD: '$', EUR: '€', CAD: 'C$' };
+
+async function _renewalApi(path, method = 'GET', body) {
+  const token = localStorage.getItem('sn_access_token');
+  const res = await fetch(`${API}/api/payments${path}`, {
+    method, headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  return res.json().catch(() => ({ success: false, error: 'Server error (' + res.status + ')' }));
+}
+
+async function loadRenewals() {
+  const data = await _renewalApi('/renewals').catch(e => ({ success: false, error: e.message }));
+  const el = document.getElementById('renewalsList');
+  if (!data.success) {
+    if (el) el.innerHTML = `<div style="color:#c53030;font-weight:800;font-size:13px;">Could not load renewals: ${_bEsc(data.error || 'unknown error')}</div>`;
+    return;
+  }
+  _renewalsCache = data.renewals || [];
+  setText('renewalsCount', _renewalsCache.length);
+  setText('topupBadge', _renewalsCache.length);
+  if (!_renewalProviders) {
+    const p = await _renewalApi('/providers').catch(() => null);
+    _renewalProviders = (p && p.providers) || [{ id: 'fincra', name: 'Fincra', ready: true }, { id: 'flutterwave', name: 'Flutterwave', ready: true }];
+  }
+  if (el) renderRenewals();
+}
+
+function renderRenewals() {
+  const el = document.getElementById('renewalsList');
+  const list = _renewalsCache || [];
+  if (!list.length) {
+    el.innerHTML = emptyState('✅', 'No renewals waiting', 'When a student reaches 3 credits, their renewal appears here for you to confirm.');
+    return;
+  }
+  const field = 'width:100%;padding:9px 12px;border:2px solid #e8eaf0;border-radius:10px;font-family:\'Nunito\',sans-serif;font-size:14px;font-weight:700;outline:none;box-sizing:border-box;';
+  const label = 'display:block;font-size:11px;font-weight:900;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;';
+  el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;">' + list.map(r => {
+    const cur = r.currency || 'NGN';
+    const currencies = [...new Set([cur, 'NGN'])];
+    const credColor = r.creditsNow <= 0 ? '#c53030' : '#e65100';
+    const last = r.hasLastPackage
+      ? `Last package: <strong>${_RN_SYMBOL[cur] || cur + ' '}${Number(r.amount).toLocaleString()} for ${r.credits} classes</strong>`
+      : '<span style="color:#c53030;">No previous payment on record: enter the price and number of classes.</span>';
+    return `<div id="rn-${r.id}" style="background:#fff;border:2px solid #e8eaf0;border-radius:16px;padding:16px 18px;">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">
+        <div>
+          <div style="font-weight:900;font-size:15px;color:var(--dark);">${_bEsc(r.studentName)} <span style="color:var(--light);font-size:12px;">${_bEsc(r.studentCode || '')}</span></div>
+          <div style="font-size:12px;font-weight:700;color:var(--mid);margin-top:2px;">Parent: ${_bEsc(r.parentName || '—')} · ${_bEsc(r.parentEmail || 'no email')}</div>
+          ${r.courseName ? `<div style="font-size:12px;font-weight:700;color:var(--mid);">Course: ${_bEsc(r.courseName)}</div>` : ''}
+        </div>
+        <div style="text-align:center;min-width:64px;">
+          <div style="font-family:'Fredoka One',cursive;font-size:24px;color:${credColor};line-height:1;">${r.creditsNow}</div>
+          <div style="font-size:10px;font-weight:900;color:var(--light);text-transform:uppercase;">credits left</div>
+          ${r.onHold ? '<div style="font-size:10px;font-weight:900;color:#c53030;">CLASSES ON HOLD</div>' : ''}
+        </div>
+      </div>
+      <div style="font-size:12px;font-weight:700;color:var(--mid);margin:10px 0 12px;">${last}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div><label style="${label}">Price</label><input type="number" min="1" step="any" id="rn-amount-${r.id}" value="${r.amount || ''}" placeholder="e.g. 60000" style="${field}"></div>
+        <div><label style="${label}">Classes</label><input type="number" min="1" max="500" id="rn-credits-${r.id}" value="${r.credits || ''}" placeholder="e.g. 8" style="${field}"></div>
+        <div><label style="${label}">Currency</label><select id="rn-currency-${r.id}" style="${field}">${currencies.map(c => `<option value="${c}"${c === cur ? ' selected' : ''}>${c}</option>`).join('')}</select></div>
+        <div><label style="${label}">Pay with</label><select id="rn-provider-${r.id}" style="${field}">${(_renewalProviders || []).map(p => `<option value="${p.id}"${p.id === r.provider ? ' selected' : ''}${p.ready === false ? ' disabled' : ''}>${_bEsc(p.name)}${p.ready === false ? ' (not set up)' : ''}</option>`).join('')}</select></div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:14px;">
+        <button onclick="dismissRenewal('${r.id}')" style="flex:1;background:none;border:2px solid #e8eaf0;color:var(--mid);border-radius:10px;padding:9px;font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;cursor:pointer;">Not needed</button>
+        <button id="rn-send-${r.id}" onclick="sendRenewal('${r.id}')" style="flex:2;background:var(--green);color:#fff;border:none;border-radius:10px;padding:9px;font-family:'Nunito',sans-serif;font-weight:900;font-size:13px;cursor:pointer;">✅ Confirm &amp; send link</button>
+      </div>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+async function sendRenewal(id) {
+  const r = (_renewalsCache || []).find(x => x.id === id);
+  if (!r) return;
+  const amount = parseFloat(document.getElementById('rn-amount-' + id).value);
+  const credits = parseInt(document.getElementById('rn-credits-' + id).value, 10);
+  const currency = document.getElementById('rn-currency-' + id).value;
+  const provider = document.getElementById('rn-provider-' + id).value;
+  if (!(amount > 0)) { showToast('Enter the price.', 'warning'); return; }
+  if (!(credits >= 1)) { showToast('Enter the number of classes.', 'warning'); return; }
+  if (!r.parentEmail) { showToast('This student has no parent email, so the link cannot be emailed. Add one first.', 'warning', 8000); return; }
+  const price = (_RN_SYMBOL[currency] || currency + ' ') + amount.toLocaleString();
+  const changed = r.hasLastPackage && (amount !== Number(r.amount) || credits !== Number(r.credits) || currency !== r.currency);
+  if (!confirm(`Send a payment link for ${price} (${credits} classes) to ${r.parentEmail}?${changed ? '\n\nThis is different from the last package (' + (_RN_SYMBOL[r.currency] || r.currency + ' ') + Number(r.amount).toLocaleString() + ' for ' + r.credits + ' classes).' : ''}`)) return;
+  const btn = document.getElementById('rn-send-' + id);
+  btn.disabled = true; btn.textContent = '⏳ Sending…';
+  const data = await _renewalApi('/renewals/' + id + '/send', 'POST', { amount, credits, currency, provider })
+    .catch(e => ({ success: false, error: e.message }));
+  if (data.success) {
+    showToast(data.emailed
+      ? `✅ Payment link for ${price} emailed to ${data.sentTo}. It is also on ${r.studentName}'s Top Up button.`
+      : `⚠️ Link created, but the email did not go out. Copy it from Payment Links or send it on WhatsApp: ${data.paymentUrl}`,
+      data.emailed ? 'success' : 'warning', 10000);
+    loadRenewals();
+  } else {
+    showToast('Error: ' + (data.error || 'Unknown'), 'error', 8000);
+    btn.disabled = false; btn.textContent = '✅ Confirm & send link';
+    if (/already handled/.test(data.error || '')) loadRenewals();
+  }
+}
+
+async function dismissRenewal(id) {
+  const r = (_renewalsCache || []).find(x => x.id === id);
+  const note = prompt(`Why is no renewal needed for ${r ? r.studentName : 'this student'}? (for example: parent paid by transfer, stopping classes)`, '');
+  if (note === null) return;
+  const data = await _renewalApi('/renewals/' + id + '/dismiss', 'POST', { note })
+    .catch(e => ({ success: false, error: e.message }));
+  if (data.success) { showToast('Renewal removed from the list.'); loadRenewals(); }
+  else showToast('Error: ' + (data.error || 'Unknown'), 'error', 8000);
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -323,6 +444,7 @@ function renderPaidStudents() {
    2. STUDENTS NEEDING TOP-UP
 ═══════════════════════════════════════════════════════════════ */
 function renderTopUp() {
+  loadRenewals();
   const el = document.getElementById('topupStudentsList');
   if (!el) return;
 

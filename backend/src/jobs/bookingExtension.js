@@ -235,6 +235,8 @@ async function runDailyCalendarCheck() {
     const n = await require('../routes/batches').topUpBatches();
     if (n) logger.info(`[BATCH-TOPUP] ${n} batch(es) topped up`);
   } catch (e) { logger.error('[BATCH-TOPUP] Job error:', e.message); }
+  /* Renewals for students low on credits, for Post-Sales to confirm */
+  await require('../services/renewalService').sweepRenewals();
   await runBookingExtensionCheck();
 }
 

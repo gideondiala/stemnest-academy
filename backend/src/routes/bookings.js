@@ -1578,6 +1578,12 @@ async function chargeStudentForClass(studentId, booking, bookingNotes) {
 
   logger.info(`[CREDITS] Student ${studentId}: ${currentCredits} → ${newCredits}`);
 
+  /* Low on credits: prepare a renewal for Post-Sales to confirm (nothing is sent to the parent) */
+  if (newCredits <= require('../services/renewalService').RENEW_AT) {
+    await require('../services/renewalService').ensureRenewal(studentId)
+      .catch(e => logger.warn('[RENEWAL] Could not prepare renewal: ' + e.message));
+  }
+
   /* ── Credit threshold notifications ── */
   if (student) {
     const emailSvc   = require('../services/emailService');
@@ -1619,7 +1625,7 @@ async function chargeStudentForClass(studentId, booking, bookingNotes) {
               <h2 style="color:#1a56db;">Retention Alert 🔔</h2>
               <p>Hi ${la.name},</p>
               <p><strong>${studentName}</strong> now has <strong>3 class credits remaining</strong>. This is your signal to reach out and discuss renewal before classes run out.</p>
-              <p><strong>Action:</strong> Contact the parent now and generate a renewal payment link from your dashboard.</p>
+              <p><strong>Action:</strong> Contact the parent now. A renewal with their last package is ready in the Post-Sales dashboard (Needs Top-Up): the price is confirmed or changed there before the payment link is sent.</p>
               <a href="${appUrl}/pages/sales-dashboard.html" style="display:inline-block;margin-top:12px;background:#1a56db;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:700;">Open Sales Dashboard →</a>
             </div>`,
             template: 'la_retention_alert',

@@ -400,6 +400,36 @@ const STATEMENTS = [
      result     JSONB
    )`,
   `ALTER TABLE data_fixes ENABLE ROW LEVEL SECURITY`,
+
+  /* ── Renewals waiting for staff (services/renewalService.js): prepared when a
+     student is at 3 credits or fewer, pre-filled with the last package the
+     parent paid for; staff confirm or change the price before the link is sent ── */
+  `CREATE TABLE IF NOT EXISTS renewal_drafts (
+     id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     student_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     status             VARCHAR(20) NOT NULL DEFAULT 'open',
+     credits_at_trigger INTEGER,
+     source_payment_id  UUID,
+     suggested_amount   NUMERIC(12,2),
+     suggested_currency VARCHAR(3),
+     suggested_credits  INTEGER,
+     suggested_provider VARCHAR(20),
+     course_id          VARCHAR(100),
+     payment_id         UUID,
+     sent_amount        NUMERIC(12,2),
+     sent_currency      VARCHAR(3),
+     sent_credits       INTEGER,
+     sent_provider      VARCHAR(20),
+     decided_by         UUID,
+     decided_at         TIMESTAMPTZ,
+     close_reason       VARCHAR(40),
+     note               TEXT,
+     created_at         TIMESTAMPTZ DEFAULT NOW(),
+     updated_at         TIMESTAMPTZ DEFAULT NOW()
+   )`,
+  `ALTER TABLE renewal_drafts ENABLE ROW LEVEL SECURITY`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_renewal_drafts_open ON renewal_drafts(student_id) WHERE status IN ('open','sending')`,
+  `CREATE INDEX IF NOT EXISTS idx_renewal_drafts_student ON renewal_drafts(student_id, created_at DESC)`,
 ];
 
 async function ensureSchema() {
