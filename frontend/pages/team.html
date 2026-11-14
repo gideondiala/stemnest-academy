@@ -30,6 +30,7 @@
   <link rel="apple-touch-icon" href="../assets/icons/icon.png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Our Team – StemNest Academy</title>
+<link rel="canonical" href="https://stemnestacademy.co.uk/pages/team">
   <meta name="description" content="Meet the tutors, educators, and team members behind StemNest Academy — the UK's leading 1-on-1 STEM tutoring platform.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
@@ -232,16 +233,13 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
 });
 
+/* Our tutors (same profiles as the Learning Hub author pages) */
 function loadTutors() {
-  try {
-    const stored = JSON.parse(localStorage.getItem('sn_teachers') || '[]');
-    allTutors = stored.length ? stored : [
-      { id:'CT001', name:'Sarah Rahman',  initials:'SR', subject:'Coding',   courses:['Python','Scratch','Web Dev'], photo:null },
-      { id:'MT001', name:'James Okafor',  initials:'JO', subject:'Maths',    courses:['GCSE Maths','A-Level','KS2/3'], photo:null },
-      { id:'ST001', name:'Lisa Patel',    initials:'LP', subject:'Sciences', courses:['Biology','Chemistry','Physics'], photo:null },
-      { id:'CT002', name:'Marcus King',   initials:'MK', subject:'Coding',   courses:['AI/ML','JavaScript','Apps'], photo:null },
-    ];
-  } catch { allTutors = []; }
+  allTutors = [
+    { name:'Adorable Nwabugo',   initials:'AN', subject:'Coding', courses:['Scratch','Python','Machine Learning'], photo:'../assets/team/adorable-nwabugo.jpg', years:7 },
+    { name:'Mannasseh Jackson',  initials:'MJ', subject:'Coding', courses:['Scratch','Web Dev','Data Science'],    photo:null, years:8 },
+    { name:'Patricia Oigbochie', initials:'PO', subject:'Coding', courses:['Scratch','Web Dev','UI/UX Design'],    photo:null, years:6 },
+  ];
   renderTutors('all');
 }
 
@@ -263,7 +261,7 @@ function renderTutors(filter) {
         <div class="team-avatar" style="background:${color}">${avatar}</div>
         <div class="team-name">${t.name}</div>
         <div class="team-role">${t.subject} Tutor</div>
-        <div class="team-id">${t.id}</div>
+        <div class="team-id">${t.years} years teaching</div>
         <div class="team-tags">${(t.courses||[]).slice(0,3).map(c=>`<span class="team-tag">${c}</span>`).join('')}</div>
       </div>`;
   }).join('');

@@ -62,3 +62,18 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy learn/dist --project-name=stemnest-learn --branch=main
+
+      # Tell Bing (and DuckDuckGo, Yahoo, Ecosia, which use it) about pages that
+      # changed today, so new articles are found within minutes. Google does not
+      # use IndexNow; it reads the sitemap. Never fails the deploy.
+      - name: Notify search engines (IndexNow)
+        if: steps.diff.outputs.changed == 'true'
+        continue-on-error: true
+        run: |
+          TODAY=$(TZ=Africa/Lagos date +%F)
+          URLS=$(grep -oE "<loc>[^<]+</loc><lastmod>$TODAY" learn/dist/sitemap.xml | sed -E 's#<loc>([^<]+)</loc>.*#"\1"#' | paste -sd, -)
+          if [ -z "$URLS" ]; then echo "No pages changed today: nothing to send"; exit 0; fi
+          echo "Sending: $URLS"
+          curl -s -o /dev/null -w "IndexNow answer: %{http_code}\n" -X POST https://api.indexnow.org/indexnow \
+            -H 'Content-Type: application/json; charset=utf-8' \
+            -d "{\"host\":\"learn.stemnestacademy.co.uk\",\"key\":\"f85320f8fe11ed9ecb35e53c62b3e43d\",\"keyLocation\":\"https://learn.stemnestacademy.co.uk/f85320f8fe11ed9ecb35e53c62b3e43d.txt\",\"urlList\":[$URLS]}"

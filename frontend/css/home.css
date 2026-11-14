@@ -453,3 +453,14 @@ section { padding: 80px 5%; }
   .why-stat-divider { display: none; }
   .why-stats-row    { gap: 20px; }
 }
+
+/* ── Learning Hub links (homepage) ── */
+.hub-section { background: var(--bg); }
+.hub-grid    { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+@media (max-width: 900px) { .hub-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .hub-grid { grid-template-columns: 1fr; } }
+.hub-card    { display: flex; flex-direction: column; gap: 10px; background: var(--white); border: 2px solid var(--blue-light); border-radius: 20px; padding: 22px 24px; text-decoration: none; transition: border-color .2s, transform .2s; }
+.hub-card:hover { border-color: var(--blue); transform: translateY(-3px); }
+.hub-tag     { align-self: flex-start; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: .5px; color: var(--blue-dark); background: var(--blue-light); border-radius: 50px; padding: 4px 12px; }
+.hub-title   { font-family: 'Fredoka One', cursive; font-size: 19px; line-height: 1.3; color: var(--dark); }
+.hub-more    { margin-top: auto; font-size: 13px; font-weight: 800; color: var(--blue); }
