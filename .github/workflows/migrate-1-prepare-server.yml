@@ -1,0 +1,155 @@
+name: "Migrate 1: prepare the new server"
+# Run by hand (Actions → this workflow → Run workflow). See HETZNER_MIGRATION.md.
+#
+# Sets up the new server, copies the API's settings (.env), HTTPS certificate,
+# nginx site and weekly database backups across from the OLD server, starts the
+# API there with background jobs OFF, and tests it over HTTPS. The live site is
+# not touched: the domain still points at the old server until you change DNS.
+#
+# Secrets needed:
+#   EC2_HOST, EC2_USER, EC2_SSH_KEY   the old server (already set)
+#   NEW_SERVER_HOST                    the new server's IPv4 address
+#   NEW_SERVER_SSH_KEY                 the private key whose public half was
+#                                      added when the new server was created
+# Nothing secret is printed. Safe to run again.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+jobs:
+  prepare:
+    name: Set up, copy, start (jobs off), test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      NEW_HOST: ${{ secrets.NEW_SERVER_HOST }}
+      OLD_HOST: ${{ secrets.EC2_HOST }}
+      OLD_USER: ${{ secrets.EC2_USER }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Load SSH keys
+        env:
+          NEW_KEY: ${{ secrets.NEW_SERVER_SSH_KEY }}
+          OLD_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          [ -n "$NEW_HOST" ] || { echo "Add the NEW_SERVER_HOST secret first"; exit 1; }
+          [ -n "$NEW_KEY" ]  || { echo "Add the NEW_SERVER_SSH_KEY secret first"; exit 1; }
+          [ "$NEW_HOST" != "$OLD_HOST" ] || { echo "NEW_SERVER_HOST is the same as EC2_HOST: this workflow must run BEFORE the EC2_* secrets are changed"; exit 1; }
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$NEW_KEY" | tr -d '\r' > ~/.ssh/new
+          printf '%s\n' "$OLD_KEY" | tr -d '\r' > ~/.ssh/old
+          chmod 600 ~/.ssh/new ~/.ssh/old
+          cat > ~/.ssh/config <<EOF
+          Host new-root
+            HostName $NEW_HOST
+            User root
+            IdentityFile ~/.ssh/new
+          Host new
+            HostName $NEW_HOST
+            User ubuntu
+            IdentityFile ~/.ssh/new
+          Host old
+            HostName $OLD_HOST
+            User $OLD_USER
+            IdentityFile ~/.ssh/old
+          Host *
+            StrictHostKeyChecking accept-new
+            IdentitiesOnly yes
+            ServerAliveInterval 30
+            ConnectTimeout 20
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Look at the old server (read-only)
+        run: |
+          ssh old 'bash -s' <<'EOF'
+          echo "node $(node -v) | CPU cores $(nproc)"
+          free -m | sed -n '1,2p'
+          pm2 list --no-color 2>/dev/null | sed -n '1,12p'
+          echo "database backups kept: $(ls -1 ~/db-backups/*.gpg 2>/dev/null | wc -l)"
+          echo "crontab lines: $(crontab -l 2>/dev/null | grep -vc '^\s*#\|^\s*$')"
+          crontab -l 2>/dev/null | grep -v '^\s*#\|^\s*$' | sed -E 's/[A-Za-z0-9+\/_=-]{20,}/***/g' || true
+          EOF
+
+      - name: Set up the new server (first run only)
+        run: |
+          if ssh new 'sudo -n true' 2>/dev/null && ssh new 'command -v pm2 >/dev/null'; then
+            echo "Already set up: running the setup again to apply any updates"
+            scp -q backend/setup-new-server.sh new:/tmp/setup-new-server.sh
+            ssh new "sudo bash /tmp/setup-new-server.sh '${{ github.server_url }}/${{ github.repository }}.git'"
+          else
+            scp -q backend/setup-new-server.sh new-root:/root/setup-new-server.sh
+            ssh new-root "bash /root/setup-new-server.sh '${{ github.server_url }}/${{ github.repository }}.git'"
+          fi
+
+      - name: Secure SSH (key only, no root login)
+        run: |
+          ssh new 'sudo -n true' || { echo "Cannot log in as ubuntu with sudo: not locking root"; exit 1; }
+          ssh new 'bash -s' <<'EOF'
+          set -e
+          printf 'PermitRootLogin no\nPasswordAuthentication no\nKbdInteractiveAuthentication no\n' | sudo tee /etc/ssh/sshd_config.d/00-stemnest.conf >/dev/null
+          sudo sshd -t
+          sudo systemctl reload ssh
+          echo "SSH: key login as ubuntu only"
+          EOF
+
+      - name: Copy settings, certificate, nginx site and backups from the old server
+        run: |
+          # Streamed old → new through this runner; nothing is written to disk here or printed.
+          ssh old 'cd / && L=""; for p in home/ubuntu/stemnest-academy/backend/.env etc/letsencrypt etc/nginx/sites-available/stemnest-api home/ubuntu/db-backups; do if sudo test -e "/$p"; then L="$L $p"; else echo "not on the old server: /$p" >&2; fi; done; sudo tar czf - -C / $L' \
+            | ssh new 'sudo tar xzf - -C / && echo "copied to the new server"'
+          ssh new 'bash -s' <<'EOF'
+          set -e
+          test -f /home/ubuntu/stemnest-academy/backend/.env || { echo "The .env did not arrive"; exit 1; }
+          test -f /etc/nginx/sites-available/stemnest-api || { echo "The nginx site did not arrive"; exit 1; }
+          sudo test -d /etc/letsencrypt/live/api.stemnestacademy.co.uk || { echo "The HTTPS certificate did not arrive"; exit 1; }
+          sudo chown ubuntu:ubuntu /home/ubuntu/stemnest-academy/backend/.env
+          chmod 600 /home/ubuntu/stemnest-academy/backend/.env
+          echo ".env: $(grep -c '=' /home/ubuntu/stemnest-academy/backend/.env) settings"
+          echo "database backups: $(ls -1 /home/ubuntu/db-backups/*.gpg 2>/dev/null | wc -l)"
+          EOF
+
+      - name: Start the API with background jobs OFF
+        run: |
+          ssh new 'bash -s' <<'EOF'
+          set -e
+          cd /home/ubuntu/stemnest-academy
+          git fetch --quiet origin main
+          git reset --quiet --hard origin/main
+          grep -q 'RUN_JOBS' backend/src/index.js || { echo "main does not have the RUN_JOBS switch yet: deploy it first"; exit 1; }
+          cd backend
+          grep -v '^RUN_JOBS=' .env > .env.new || true
+          echo 'RUN_JOBS=false' >> .env.new
+          mv .env.new .env && chmod 600 .env
+          npm ci --omit=dev --no-audit --no-fund
+          pm2 startOrReload ecosystem.config.js --env production --update-env
+          pm2 save
+          sudo ln -sf /etc/nginx/sites-available/stemnest-api /etc/nginx/sites-enabled/stemnest-api
+          sudo nginx -t
+          sudo systemctl reload nginx
+          sleep 15
+          pm2 list --no-color | sed -n '1,8p'
+          curl -s -o /dev/null -w "health, on the server: %{http_code}\n" http://localhost:3000/api/health
+          curl -s -o /dev/null -w "courses (reads the database), on the server: %{http_code}\n" http://localhost:3000/api/courses
+          pm2 logs stemnest-api --lines 60 --nostream 2>&1 | sed -E 's#://[^@]*@#://***@#g' | grep -E 'JOBS|running on|SCHEMA|DATA-FIX|rror' | tail -8 || true
+          EOF
+
+      - name: Test the new server over HTTPS (as the browser will reach it)
+        run: |
+          ok=1
+          for path in /api/health /api/courses; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 --resolve "api.stemnestacademy.co.uk:443:$NEW_HOST" "https://api.stemnestacademy.co.uk$path")
+            echo "https://api.stemnestacademy.co.uk$path on the NEW server: $code"
+            [ "$code" = "200" ] || ok=0
+          done
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 -X OPTIONS -H 'Origin: https://stemnestacademy.co.uk' -H 'Access-Control-Request-Method: POST' --resolve "api.stemnestacademy.co.uk:443:$NEW_HOST" "https://api.stemnestacademy.co.uk/api/auth/login")
+          echo "browser pre-check (CORS) for login: $code"
+          [ "$ok" = "1" ] || { echo "NOT READY: see the steps above"; exit 1; }
+          echo ""
+          echo "READY. The new server is running the API with background jobs OFF."
+          echo "Next: change the DNS record in Cloudflare (HETZNER_MIGRATION.md, Part C)."

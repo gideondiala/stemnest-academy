@@ -1,0 +1,115 @@
+name: "Migrate 2: switch over to the new server"
+# Run by hand AFTER changing the api DNS record in Cloudflare to the new
+# server (HETZNER_MIGRATION.md, Part C), and BEFORE changing the EC2_* secrets.
+#
+# 1. Checks that the public DNS now points api.stemnestacademy.co.uk at the
+#    new server, then waits for the old 5-minute DNS caches to expire.
+# 2. Turns background jobs (reminders, daily calendar check, reports) OFF on
+#    the old server and ON on the new one, so they never run on both.
+# The old server keeps answering any visitor whose internet provider still
+# has the old address cached; both servers share the same database.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type SWITCH to confirm you changed the DNS record in Cloudflare'
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+jobs:
+  switch:
+    name: Move background jobs to the new server
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      NEW_HOST: ${{ secrets.NEW_SERVER_HOST }}
+      OLD_HOST: ${{ secrets.EC2_HOST }}
+      OLD_USER: ${{ secrets.EC2_USER }}
+    steps:
+      - name: Check the confirmation
+        run: |
+          [ "${{ github.event.inputs.confirm }}" = "SWITCH" ] || { echo "Type SWITCH to run this"; exit 1; }
+          [ -n "$NEW_HOST" ] || { echo "NEW_SERVER_HOST secret is missing"; exit 1; }
+          [ "$NEW_HOST" != "$OLD_HOST" ] || { echo "EC2_HOST already equals NEW_SERVER_HOST: this must run BEFORE the EC2_* secrets are changed"; exit 1; }
+
+      - name: Load SSH keys
+        env:
+          NEW_KEY: ${{ secrets.NEW_SERVER_SSH_KEY }}
+          OLD_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$NEW_KEY" | tr -d '\r' > ~/.ssh/new
+          printf '%s\n' "$OLD_KEY" | tr -d '\r' > ~/.ssh/old
+          chmod 600 ~/.ssh/new ~/.ssh/old
+          cat > ~/.ssh/config <<EOF
+          Host new
+            HostName $NEW_HOST
+            User ubuntu
+            IdentityFile ~/.ssh/new
+          Host old
+            HostName $OLD_HOST
+            User $OLD_USER
+            IdentityFile ~/.ssh/old
+          Host *
+            StrictHostKeyChecking accept-new
+            IdentitiesOnly yes
+            ServerAliveInterval 30
+            ConnectTimeout 20
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Wait until public DNS points at the new server
+        run: |
+          for i in $(seq 1 30); do
+            g=$(curl -s 'https://dns.google/resolve?name=api.stemnestacademy.co.uk&type=A' | grep -oE '"data":"[0-9.]+"' | grep -oE '[0-9.]+' | head -1)
+            c=$(curl -s -H 'accept: application/dns-json' 'https://cloudflare-dns.com/dns-query?name=api.stemnestacademy.co.uk&type=A' | grep -oE '"data":"[0-9.]+"' | grep -oE '[0-9.]+' | head -1)
+            if [ "$g" = "$NEW_HOST" ] && [ "$c" = "$NEW_HOST" ]; then echo "Google and Cloudflare DNS both point at the new server"; break; fi
+            [ "$i" = "30" ] && { echo "DNS still does not point at the new server after 15 minutes: check the record in Cloudflare (DNS only, grey cloud)"; exit 1; }
+            echo "waiting for DNS ($i/30)..."; sleep 30
+          done
+          echo "Waiting 6 minutes for the old 5-minute DNS caches to expire..."
+          sleep 360
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 https://api.stemnestacademy.co.uk/api/health)
+          echo "public API health now: $code"
+          [ "$code" = "200" ] || { echo "The public API is not answering 200: not switching jobs. Point DNS back to the old server if the site is down."; exit 1; }
+
+      - name: Background jobs OFF on the old server
+        run: |
+          ssh old 'bash -s' <<'EOF'
+          set -e
+          cd /home/ubuntu/stemnest-academy/backend
+          grep -q 'RUN_JOBS' src/index.js || { echo "The old server does not have the RUN_JOBS switch: deploy it first"; exit 1; }
+          cp .env "/home/ubuntu/env-before-switch-$(date +%Y%m%d-%H%M%S)"
+          grep -v '^RUN_JOBS=' .env > .env.new || true
+          echo 'RUN_JOBS=false' >> .env.new
+          mv .env.new .env && chmod 600 .env
+          pm2 reload stemnest-api --update-env
+          sleep 30
+          pm2 logs stemnest-api --lines 80 --nostream 2>&1 | grep -E '\[JOBS\]' | tail -3
+          EOF
+
+      - name: Background jobs ON on the new server
+        run: |
+          ssh new 'bash -s' <<'EOF'
+          set -e
+          cd /home/ubuntu/stemnest-academy/backend
+          grep -v '^RUN_JOBS=' .env > .env.new || true
+          echo 'RUN_JOBS=true' >> .env.new
+          mv .env.new .env && chmod 600 .env
+          pm2 reload stemnest-api --update-env
+          pm2 save
+          started=0
+          for i in $(seq 1 12); do
+            sleep 5
+            if pm2 logs stemnest-api --lines 80 --nostream 2>&1 | grep -q 'starting background jobs'; then started=1; break; fi
+          done
+          pm2 logs stemnest-api --lines 80 --nostream 2>&1 | grep -E '\[JOBS\]' | tail -3
+          [ "$started" = "1" ] || { echo "Jobs did not start on the new server within a minute"; exit 1; }
+          curl -s -o /dev/null -w "courses (reads the database): %{http_code}\n" http://localhost:3000/api/courses
+          EOF
+          echo ""
+          echo "SWITCHED. The new server now runs the API and all background jobs."
+          echo "Next: update the EC2_HOST, EC2_USER and EC2_SSH_KEY secrets (HETZNER_MIGRATION.md, Part D)."

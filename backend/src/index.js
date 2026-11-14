@@ -178,6 +178,21 @@ const server = app.listen(PORT, () => {
     .then(() => require('./db/dataFixes').runDataFixes())
     .catch(e => logger.warn('[DATA-FIX] ' + e.message))
     .then(() => {
+      /* Background jobs run in ONE process only. PM2 cluster mode starts one
+         copy of the API per CPU core (NODE_APP_INSTANCE 0, 1, ...); without
+         this, every copy sent the same reminders and ran the same daily
+         checks. RUN_JOBS=false switches them off on a server entirely, e.g. a
+         new server being tested before it takes over (see HETZNER_MIGRATION.md). */
+      const instance = process.env.NODE_APP_INSTANCE;
+      if (String(process.env.RUN_JOBS || '').toLowerCase() === 'false') {
+        logger.info('[JOBS] RUN_JOBS=false: background jobs are off on this server');
+        return;
+      }
+      if (instance !== undefined && instance !== '0') {
+        logger.info(`[JOBS] instance ${instance}: background jobs run in instance 0 only`);
+        return;
+      }
+      logger.info('[JOBS] starting background jobs');
       startReminderJob();
       startRetentionJob();
       startBookingExtensionJob();
